@@ -12,7 +12,7 @@ Tag: `ux/review/2026-11-02`
   mode, notes as pills; an overview strip at the top (a lane per speaker, notes, playhead); passes in the menu with a
   progress banner. *Liked, with the player moved to the bottom*: c2.
 - **c2 — Document + player below** (the owner's change to c): c with the overview and the play controls in a bar at
-  the bottom. *Picked*, promoted in (pending).
+  the bottom. *Picked*, promoted in cfafc1d.
 
 ## What they faked
 - All: playback (a clock, no audio), the refine pass and the speaker pass (progress, then made-up results: large-v3's
