@@ -42,7 +42,7 @@ class ReviewTest {
 
     private fun TestScope.review(): LectureReview {
         store.save(lecture)
-        return LectureReview(store, voices, player, backgroundScope) { _, id -> if (id == "speaker-2") listOf(0.1f, 1f) else null }
+        return LectureReview(store, voices, player, backgroundScope, printOf = { _, id -> if (id == "speaker-2") listOf(0.1f, 1f) else null })
             .also { assertTrue(it.open(lecture.notebookId, lecture.id, "פסיכולוגיה")) }
     }
 

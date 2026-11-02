@@ -43,6 +43,41 @@ data class Lecture(
     val speakerPass: Boolean = false,
     /** The model the refine pass transcribed it with again; null before it. */
     val refinedWith: String? = null,
+    /** Earlier transcripts of the recording, kept when a refine pass or a switch replaced them (`versions/<id>.json`). */
+    val versions: List<VersionInfo> = emptyList(),
+)
+
+/**
+ * An earlier transcript, as the lecture lists it: written by [modelId] (the live model, or a refine pass's), kept at
+ * [keptAtMillis], with [lines] lines of which [edited] the user corrected. Its lines and speakers are in its own file.
+ */
+data class VersionInfo(
+    val id: String,
+    val modelId: String,
+    val keptAtMillis: Long,
+    val lines: Int,
+    val edited: Int,
+    /** Written by a refine pass (else by live transcription). */
+    val refined: Boolean = false,
+)
+
+/** An earlier transcript in full: its lines and speakers. */
+data class Version(
+    val info: VersionInfo,
+    val segments: List<Segment>,
+    val speakers: List<Speaker>,
+    val speakerPass: Boolean,
+    /** The refine pass's model, if it wrote this version. */
+    val refinedWith: String?,
+)
+
+/** The model that wrote most of the lecture's lines now. */
+val Lecture.modelOfText: String? get() = segments.groupingBy { it.modelId }.eachCount().maxByOrNull { it.value }?.key
+
+/** The current transcript, kept as a version at [now]. */
+fun Lecture.asVersion(now: Long) = Version(
+    VersionInfo("v$now", refinedWith ?: modelOfText.orEmpty(), now, segments.size, segments.count { it.edited }, refinedWith != null),
+    segments, speakers, speakerPass, refinedWith,
 )
 
 const val AUDIO_WAV = "audio.wav"

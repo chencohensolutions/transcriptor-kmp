@@ -53,8 +53,7 @@
     <string name="review_play">ניגון</string>
     <string name="review_pause">השהיה</string>
     <string name="review_speed">%1$sx</string>
-    <string name="review_refine">שיפור עם %1$s</string>
-    <string name="review_refining">משפר עם %1$s… %2$d%%</string>
+    <string name="review_refining">משפר… %1$d%%</string>
     <string name="review_find_speakers">זיהוי הדוברים</string>
     <string name="review_finding_speakers">מזהה את הדוברים… %1$d%%</string>
     <string name="review_save">שמירה</string>
@@ -71,4 +70,12 @@
     <string name="start_refine_models">אחרי ההרצאה: שיפור (עברית)</string>
     <string name="start_refine_note">מתמלל הרצאה מחדש עם המודל הגדול, מהתפריט של מסך ההרצאה: מדויק יותר, עם פיסוק, ואיטי יותר מההרצאה עצמה. שורות שערכתם נשארות.</string>
     <string name="model_in_use_refine">משמש לשיפור</string>
+    <string name="review_refine_with">שיפור עם…</string>
+    <string name="review_refine_note">כל שורה מתומללת מחדש עם המודל שתבחרו; שורות שערכתם נשארות. התמלול הנוכחי נשמר, תחת גרסאות.</string>
+    <string name="review_versions">גרסאות (%1$d)</string>
+    <string name="review_version_now">עכשיו</string>
+    <string name="review_version_lines">%1$d שורות · %2$d נערכו</string>
+    <string name="review_versions_note">הקישו על גרסה כדי להחזיר אותה; התמלול הנוכחי נשמר כגרסה. ההערות נשארות כמו שהן.</string>
+    <string name="review_version_live">חי · %1$s</string>
+    <string name="review_version_refined">שופר · %1$s</string>
 </resources>

@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import com.chencohensolution.transcriptor.lab.LabData
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Speaker
+import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
 import kotlinx.coroutines.delay
@@ -57,7 +58,7 @@ private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
     }
     val state = ReviewState(
         notebookTitle = LabData.notebooks.first().title, lecture = lecture, positionMillis = position, playing = playing,
-        speed = speed, refineModelName = "large-v3", refine = refine, speakerPass = speakers,
+        speed = speed, refineModels = listOf(ModelChoice("ivrit-whisper-large-v3", "ivrit.ai Whisper large-v3"), ModelChoice("whisper-large-v3", "Whisper large-v3")), refine = refine, speakerPass = speakers,
     )
     val actions = ReviewActions(
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
@@ -68,6 +69,7 @@ private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
         setLineSpeaker = { line, speaker -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == line) it.copy(speakerId = speaker) else it }) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it }) },
         refine = { if (refine !is PassState.Running) refine = PassState.Running(0f) },
+        switchVersion = {},
         findSpeakers = { if (speakers !is PassState.Running) speakers = PassState.Running(0f) },
         addNote = { at, text -> lecture = lecture.copy(notes = (lecture.notes + Note("n${lecture.notes.size + 1}", at, text.trim())).sortedBy { it.atMillis }) },
         editNote = { id, text -> lecture = lecture.copy(notes = lecture.notes.map { if (it.id == id) it.copy(text = text.trim()) else it }) },

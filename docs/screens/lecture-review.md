@@ -27,9 +27,13 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
   the playhead.
 - ⋮ → Find the speakers runs the speaker pass in the recording service (a banner shows its progress); the lines are
   read again when it finishes. Shown only when its models are downloaded.
-- ⋮ → Refine with (the refine model) runs the refine pass in the recording service: every line transcribed again from
-  its own audio with Whisper large-v3, edited lines kept, times and speakers kept (its word times are dropped, so run
-  Find the speakers first). Slower than the lecture itself on a phone. Shown when a refine model is downloaded.
+- ⋮ → Refine with… picks any speech model downloaded for the lecture's language (the large Whisper models first; also
+  turbo and the Zipformer) and runs the refine pass in the recording service: every line transcribed again from its
+  own audio, edited lines kept, times and speakers kept (its word times are dropped, so run Find the speakers first).
+  The transcript it replaces is kept as a version first. Large-v3 is slower than the lecture itself on a phone.
+- ⋮ → Versions (n): the transcript now and every earlier one (live or refined, its model, when it was kept, its lines
+  and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
+  is lost. Notes belong to the lecture, not to a version.
 - Every change is saved to `lecture.json` at once.
 
 ## Code

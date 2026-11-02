@@ -96,6 +96,8 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
   "v": 1,
   "speakerPass": true,
   "refinedWith": "ivrit-whisper-large-v3",
+  "versions": [{ "id": "v1793633774646", "model": "ivrit-zipformer2-66m-streaming", "keptAt": 1793633774646,
+                 "lines": 21, "edited": 0, "refined": false }],
   "id": "lecture-7",
   "title": "זיכרון עבודה",
   "language": "he",
@@ -135,7 +137,11 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 - **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
   model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
   non-speech pieces, no impossible word counts, loops collapsed). Lines keep their times and speakers; edited lines and
-  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. Not timed on the phone yet;
+  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. Any downloaded speech
+  model for the language can refine (owner's request): Whisper models through `transcribeLine`, the Zipformer a line at
+  a time (`transcribeLineStreaming`). Before a pass, the current transcript is kept as a **version**
+  (`versions/<id>.json` in the lecture's folder: its lines, speakers and edits; `lecture.json` lists them under
+  `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
 - Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.

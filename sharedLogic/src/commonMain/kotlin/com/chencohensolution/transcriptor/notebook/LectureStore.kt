@@ -45,6 +45,34 @@ class LectureStore(private val fileSystem: FileSystem, private val root: Path) {
         if (lecture.audioFile == AUDIO_WAV && fileSystem.exists(audio)) WavWriter.repair(fileSystem, audio)
     }
 
+    /** Keeps [version] in the lecture's folder (`versions/<id>.json`); the lecture lists it in [Lecture.versions]. */
+    fun saveVersion(lecture: Lecture, version: Version) {
+        val dir = folder(lecture.notebookId, lecture.id) / "versions"
+        fileSystem.createDirectories(dir)
+        val temp = dir / "${version.info.id}.json.tmp"
+        fileSystem.write(temp) { writeUtf8(json.encodeToString(VersionFileV1.of(version))) }
+        fileSystem.atomicMove(temp, dir / "${version.info.id}.json")
+    }
+
+    fun loadVersion(lecture: Lecture, id: String): Version? {
+        val file = folder(lecture.notebookId, lecture.id) / "versions" / "$id.json"
+        if (!fileSystem.exists(file)) return null
+        return json.decodeFromString<VersionFileV1>(fileSystem.read(file) { readUtf8() }).toVersion()
+    }
+
+    fun deleteVersion(lecture: Lecture, id: String) = fileSystem.delete(folder(lecture.notebookId, lecture.id) / "versions" / "$id.json")
+
+    /**
+     * Keeps the lecture's current transcript as a version and returns the lecture listing it (not saved: the caller
+     * saves the lecture it makes of it).
+     */
+    fun keepCurrent(lecture: Lecture, now: Long): Lecture {
+        if (lecture.segments.isEmpty()) return lecture
+        val version = lecture.asVersion(now)
+        saveVersion(lecture, version)
+        return lecture.copy(versions = lecture.versions + version.info)
+    }
+
     /** Every lecture, in every notebook. */
     fun all(): List<Lecture> {
         val notebooks = root / "notebooks"
@@ -67,6 +95,7 @@ private data class LectureFileV1(
     val pendingFlac: Boolean = false,
     val speakerPass: Boolean = false,
     val refinedWith: String? = null,
+    val versions: List<VersionInfoV1> = emptyList(),
     val speakers: List<SpeakerV1> = emptyList(),
     val segments: List<SegmentV1> = emptyList(),
     val notes: List<NoteV1> = emptyList(),
@@ -79,6 +108,7 @@ private data class LectureFileV1(
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
         audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass, refinedWith = refinedWith,
+        versions = versions.map { it.toInfo() },
     )
 
     companion object {
@@ -88,6 +118,7 @@ private data class LectureFileV1(
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
             durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac,
             speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
+            versions = lecture.versions.map { VersionInfoV1.of(it) },
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },
             segments = lecture.segments.map {
                 SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId, it.words.map { w -> WordV1(w.atMillis, w.text) })
@@ -118,3 +149,38 @@ private data class WordV1(val atMs: Long, val text: String)
 
 @Serializable
 private data class NoteV1(val id: String, val atMs: Long, val text: String)
+
+@Serializable
+private data class VersionInfoV1(val id: String, val model: String, val keptAt: Long, val lines: Int, val edited: Int, val refined: Boolean = false) {
+    fun toInfo() = VersionInfo(id, model, keptAt, lines, edited, refined)
+
+    companion object {
+        fun of(i: VersionInfo) = VersionInfoV1(i.id, i.modelId, i.keptAtMillis, i.lines, i.edited, i.refined)
+    }
+}
+
+/** `versions/<id>.json`: an earlier transcript, in lecture.json's own line and speaker format. */
+@Serializable
+private data class VersionFileV1(
+    val v: Int = 1,
+    val info: VersionInfoV1,
+    val speakerPass: Boolean = false,
+    val refinedWith: String? = null,
+    val speakers: List<SpeakerV1> = emptyList(),
+    val segments: List<SegmentV1> = emptyList(),
+) {
+    fun toVersion() = Version(
+        info.toInfo(),
+        segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
+        speakers.map { Speaker(it.id, it.name) },
+        speakerPass, refinedWith,
+    )
+
+    companion object {
+        fun of(v: Version) = VersionFileV1(
+            info = VersionInfoV1.of(v.info), speakerPass = v.speakerPass, refinedWith = v.refinedWith,
+            speakers = v.speakers.map { SpeakerV1(it.id, it.name) },
+            segments = v.segments.map { SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId, it.words.map { w -> WordV1(w.atMillis, w.text) }) },
+        )
+    }
+}

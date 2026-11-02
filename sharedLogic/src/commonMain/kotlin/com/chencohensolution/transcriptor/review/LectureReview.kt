@@ -28,13 +28,14 @@ class LectureReview(
     scope: CoroutineScope,
     /** The average voice print of a speaker's lines in a lecture; null when it can't be made (no model). */
     private val printOf: (Lecture, speakerId: String) -> List<Float>? = { _, _ -> null },
+    private val now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) {
     private class Open(val notebookTitle: String, val lecture: Lecture, val speed: Float)
 
     private val open = MutableStateFlow<Open?>(null)
 
     /** The passes over the recording for the open lecture, fed by the app: each null when it can't run here. */
-    data class Passes(val speakers: PassState? = null, val refine: PassState? = null, val refineModelName: String? = null)
+    data class Passes(val speakers: PassState? = null, val refine: PassState? = null, val refineModels: List<ModelChoice> = emptyList())
 
     val passes = MutableStateFlow(Passes())
 
@@ -43,7 +44,7 @@ class LectureReview(
             o?.let {
                 ReviewState(
                     notebookTitle = it.notebookTitle, lecture = it.lecture, positionMillis = position, playing = playing,
-                    speed = it.speed, refineModelName = p.refineModelName, refine = p.refine, speakerPass = p.speakers,
+                    speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -72,6 +73,22 @@ class LectureReview(
         val o = open.value ?: return
         val lecture = store.load(o.lecture.notebookId, o.lecture.id) ?: return
         open.value = Open(o.notebookTitle, lecture, o.speed)
+    }
+
+    /**
+     * Makes an earlier transcript the current one: its lines, speakers and edits come back, and the transcript it
+     * replaces is kept as a version, so switching back is always possible. Notes are the lecture's, not a version's.
+     */
+    fun switchTo(versionId: String) {
+        val o = open.value ?: return
+        val chosen = store.loadVersion(o.lecture, versionId) ?: return
+        val kept = store.keepCurrent(o.lecture.copy(versions = o.lecture.versions.filter { it.id != versionId }), now())
+        val switched = kept.copy(
+            segments = chosen.segments, speakers = chosen.speakers, speakerPass = chosen.speakerPass, refinedWith = chosen.refinedWith,
+        )
+        synchronized(saveLock) { store.save(switched) }
+        store.deleteVersion(o.lecture, versionId)
+        open.value = Open(o.notebookTitle, switched, o.speed)
     }
 
     fun playPause() {

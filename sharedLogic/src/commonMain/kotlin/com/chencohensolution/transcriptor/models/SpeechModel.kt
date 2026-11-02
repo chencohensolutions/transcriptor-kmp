@@ -162,6 +162,9 @@ object ModelCatalog {
 
     val all = listOf(ivritTurbo, ivritZipformer, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
+    /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
+    fun nameOf(id: String): String = (all + voicePrints + speakerSegmentation).firstOrNull { it.id == id }?.name ?: id
+
     /** The models that know [language]: the ones made for it first, then the multilingual ones. */
     fun forLanguage(language: String): List<SpeechModel> =
         all.filter { language in it.languages } + all.filter { SpeechModel.MULTILINGUAL in it.languages }

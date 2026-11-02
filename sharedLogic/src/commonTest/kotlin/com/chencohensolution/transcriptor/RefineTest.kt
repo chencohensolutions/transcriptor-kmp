@@ -8,6 +8,7 @@ import com.chencohensolution.transcriptor.speech.RefinePass
 import com.chencohensolution.transcriptor.speech.SpeechEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RefineTest {
     /** "בגדול: <n>" for a stretch of n ms; nothing (as Whisper on noise) for a stretch under a second. */
@@ -30,7 +31,7 @@ class RefineTest {
         )
         val asked = mutableListOf<Pair<Long, Long>>()
         val progress = mutableListOf<Float>()
-        val refined = RefinePass(LargeModel()) { a, b -> asked += a to b; FloatArray(((b - a) * 16).toInt()) }
+        val refined = RefinePass(LargeModel(), "he") { a, b -> asked += a to b; FloatArray(((b - a) * 16).toInt()) }
             .run(lecture, "large", progress::add)
         assertEquals(listOf("בגדול: 4500.", "תוקן ביד", "קצר"), refined.segments.map { it.text })
         assertEquals(listOf("large", "turbo", "turbo"), refined.segments.map { it.modelId })
@@ -41,5 +42,50 @@ class RefineTest {
         assertEquals(listOf(800L to 5_300L, 9_800L to 10_700L), asked)
         assertEquals(listOf(1f / 3, 2f / 3, 1f), progress)
         assertEquals("large", refined.refinedWith)
+    }
+}
+
+class VersionTest {
+    private val fs = okio.fakefilesystem.FakeFileSystem()
+    private val store = com.chencohensolution.transcriptor.notebook.LectureStore(fs, okio.Path.Companion.run { "/data".toPath() })
+    private val live = com.chencohensolution.transcriptor.lab.LabData.liveLectureWithSpeakers
+
+    @Test
+    fun aKeptTranscriptCanBeSwitchedBackAndForth() = kotlinx.coroutines.test.runTest {
+        // Refined: the live transcript kept as a version first.
+        val kept = store.keepCurrent(live, now = 100)
+        val refined = kept.copy(segments = kept.segments.map { it.copy(text = it.text + "!", modelId = "large") }, refinedWith = "large")
+        store.save(refined)
+        assertEquals(listOf("v100"), refined.versions.map { it.id })
+        assertEquals(live.segments, store.loadVersion(refined, "v100")!!.segments)
+
+        val player = object : com.chencohensolution.transcriptor.review.AudioPlayer {
+            override val positionMillis = kotlinx.coroutines.flow.MutableStateFlow(0L)
+            override val playing = kotlinx.coroutines.flow.MutableStateFlow(false)
+            override fun load(file: okio.Path) {}
+            override fun play() {}
+            override fun pause() {}
+            override fun seekTo(millis: Long) {}
+            override fun setSpeed(speed: Float) {}
+            override fun release() {}
+        }
+        var clock = 200L
+        val review = com.chencohensolution.transcriptor.review.LectureReview(store, null, player, backgroundScope, now = { clock })
+        review.open(live.notebookId, live.id, "")
+        review.switchTo("v100")
+        val back = store.load(live.notebookId, live.id)!!
+        assertEquals(live.segments, back.segments)
+        assertEquals(null, back.refinedWith)
+        assertEquals(listOf("v200"), back.versions.map { it.id })
+        assertEquals("large", back.versions.single().modelId)
+        assertTrue(back.versions.single().refined)
+        assertEquals(null, store.loadVersion(back, "v100"))
+
+        clock = 300
+        review.switchTo("v200")
+        val again = store.load(live.notebookId, live.id)!!
+        assertEquals(refined.segments, again.segments)
+        assertEquals("large", again.refinedWith)
+        assertEquals(listOf("v300"), again.versions.map { it.id })
     }
 }

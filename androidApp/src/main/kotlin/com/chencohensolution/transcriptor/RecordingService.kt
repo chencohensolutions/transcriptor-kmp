@@ -61,8 +61,9 @@ class RecordingService : Service() {
             }
             ACTION_REFINE -> {
                 val lecture = Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_LECTURE)!!)
-                if (lecture != null && !session.isRecording && !compressing && Recording.refineModelFor(lecture.language) != null) {
-                    refine(lecture)
+                val model = intent.getStringExtra(EXTRA_MODEL)!!
+                if (lecture != null && !session.isRecording && !compressing && Recording.refineModels(lecture.language).any { it.id == model }) {
+                    refine(lecture, model)
                 } else {
                     startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
                     finish()
@@ -110,14 +111,14 @@ class RecordingService : Service() {
     }
 
     /** The refine pass on [lecture], as a media-processing foreground service; then any FLAC compression. */
-    private fun refine(lecture: Lecture) {
+    private fun refine(lecture: Lecture, modelId: String) {
         compressing = true
         startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             Recording.refining.value = lecture.id to 0f
             runCatching {
-                Recording.refine(lecture) { p ->
+                Recording.refine(lecture, modelId, kept = { launch(Dispatchers.Main) { if (Recording.review.lecture?.id == lecture.id) Recording.review.reload() } }) { p ->
                     Recording.refining.value = lecture.id to p
                     val percent = (p * 100).toInt()
                     if (percent != shown) { shown = percent; notify(progressNotification(R.string.refining, p)) }
@@ -220,6 +221,7 @@ class RecordingService : Service() {
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_LECTURE = "lecture"
+        private const val EXTRA_MODEL = "model"
 
         fun start(context: Context, notebook: Notebook, title: String) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
@@ -230,10 +232,10 @@ class RecordingService : Service() {
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
 
-        /** Runs the refine pass on [lecture]. */
-        fun refine(context: Context, lecture: Lecture) = context.startForegroundService(
+        /** Runs the refine pass on [lecture] with [modelId]. */
+        fun refine(context: Context, lecture: Lecture, modelId: String) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_REFINE)
-                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId),
+                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId).putExtra(EXTRA_MODEL, modelId),
         )
 
         /** Runs the speaker pass on [lecture] (again), or on [Recording.lastLecture]. */

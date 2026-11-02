@@ -51,6 +51,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.lifecycleScope
 import com.chencohensolution.transcriptor.review.LectureReview
+import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
 import com.chencohensolution.transcriptor.ui.ReviewActions
@@ -112,7 +113,8 @@ class MainActivity : ComponentActivity() {
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
-                                refine = { RecordingService.refine(this, review.lecture) },
+                                refine = { model -> RecordingService.refine(this, review.lecture, model) },
+                                switchVersion = r::switchTo,
                                 addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
                             ),
                         )
@@ -149,7 +151,7 @@ private fun ReviewPasses() {
         if (lecture == null) { Recording.review.passes.value = LectureReview.Passes(); return@LaunchedEffect }
         val speakers = finding
         val refine = refining?.takeIf { it.first == lecture.id }?.second
-        val model = Recording.refineModelFor(lecture.language)
+        val models = Recording.refineModels(lecture.language)
         Recording.review.passes.value = LectureReview.Passes(
             speakers = when {
                 !Recording.canFindSpeakers -> null
@@ -158,12 +160,12 @@ private fun ReviewPasses() {
                 else -> PassState.NotRun
             },
             refine = when {
-                model == null -> null
+                models.isEmpty() -> null
                 refine != null -> PassState.Running(refine)
                 lecture.refinedWith != null -> PassState.Done
                 else -> PassState.NotRun
             },
-            refineModelName = model?.name,
+            refineModels = models.map { ModelChoice(it.id, it.name) },
         )
     }
 }
@@ -257,7 +259,7 @@ private fun RefineModels(language: String) {
             delay(1_000)
         }
     }
-    val inUse = remember(statuses, refresh) { Recording.refineModelFor(language) }
+    val inUse = remember(statuses, refresh) { Recording.refineModels(language).firstOrNull { !it.fitsLive } }
     Text(stringResource(R.string.start_refine_models), style = MaterialTheme.typography.titleSmall)
     Text(stringResource(R.string.start_refine_note), style = MaterialTheme.typography.bodySmall)
     models.forEach { model -> ModelRow(model, statuses[model.id], model == inUse, choose = {}) { refresh++ } }

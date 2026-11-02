@@ -53,8 +53,7 @@
     <string name="review_play">Play</string>
     <string name="review_pause">Pause</string>
     <string name="review_speed">%1$sx</string>
-    <string name="review_refine">Refine with %1$s</string>
-    <string name="review_refining">Refining with %1$s… %2$d%%</string>
+    <string name="review_refining">Refining… %1$d%%</string>
     <string name="review_find_speakers">Find the speakers</string>
     <string name="review_finding_speakers">Finding the speakers… %1$d%%</string>
     <string name="review_save">Save</string>
@@ -71,4 +70,12 @@
     <string name="start_refine_models">After the lecture: refine (Hebrew)</string>
     <string name="start_refine_note">Transcribes a lecture again with the larger model, from its review screen\'s menu: more accurate, with punctuation, and slower than the lecture itself. Lines you edited stay.</string>
     <string name="model_in_use_refine">Used to refine</string>
+    <string name="review_refine_with">Refine with…</string>
+    <string name="review_refine_note">Every line is transcribed again with the model you pick; lines you edited stay. The transcript now is kept, under Versions.</string>
+    <string name="review_versions">Versions (%1$d)</string>
+    <string name="review_version_now">Now</string>
+    <string name="review_version_lines">%1$d lines · %2$d edited</string>
+    <string name="review_versions_note">Tap one to bring it back; the transcript now is kept as a version. Notes stay as they are.</string>
+    <string name="review_version_live">Live · %1$s</string>
+    <string name="review_version_refined">Refined · %1$s</string>
 </resources>

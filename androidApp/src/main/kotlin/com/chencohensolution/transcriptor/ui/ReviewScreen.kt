@@ -92,7 +92,10 @@ class ReviewActions(
     /** Moves a line to another speaker. */
     val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
-    val refine: () -> Unit = {},
+    /** Runs the refine pass with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id). */
+    val refine: (modelId: String) -> Unit = {},
+    /** Makes an earlier transcript (a version's id) the current one, keeping this one as a version. */
+    val switchVersion: (id: String) -> Unit = {},
     val findSpeakers: () -> Unit = {},
     val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
     val editNote: (id: String, text: String) -> Unit = { _, _ -> },
@@ -115,11 +118,15 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     var moving by remember { mutableStateOf<Segment?>(null) }
     var note by remember { mutableStateOf<Note?>(null) }
     var noting by remember { mutableStateOf<Long?>(null) }
+    var pickingModel by remember { mutableStateOf(false) }
+    var showingVersions by remember { mutableStateOf(false) }
     val turns = remember(state.lecture.segments) { turnsOf(state.lecture.segments) }
 
     renaming?.let { s -> RenameSpeakerDialog(s, onDismiss = { renaming = null }) { actions.renameSpeaker(s.id, it); renaming = null } }
     moving?.let { line -> MoveLineDialog(line, state.lecture.speakers, onDismiss = { moving = null }) { actions.setLineSpeaker(line.id, it); moving = null } }
     note?.let { n -> NoteDialog(stringResource(R.string.review_note_here, formatClock(n.atMillis)), n.text, onDelete = { actions.deleteNote(n.id); note = null }, onDismiss = { note = null }) { actions.editNote(n.id, it); note = null } }
+    if (pickingModel) RefineDialog(state, onDismiss = { pickingModel = false }) { actions.refine(it); pickingModel = false }
+    if (showingVersions) VersionsDialog(state, onDismiss = { showingVersions = false }) { actions.switchVersion(it); showingVersions = false }
     noting?.let { at -> NoteDialog(stringResource(R.string.review_note_here, formatClock(at)), "", onDelete = null, onDismiss = { noting = null }) { actions.addNote(at, it); noting = null } }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -140,12 +147,17 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                     }) {
                         Icon(if (editing) Icons.Filled.Check else Icons.Filled.Edit, stringResource(if (editing) R.string.review_done else R.string.review_edit_text))
                     }
-                    if (state.refine != null || state.speakerPass != null) {
+                    if (state.refine != null || state.speakerPass != null || state.lecture.versions.isNotEmpty()) {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             if (state.refine != null) DropdownMenuItem(
-                                text = { Text(stringResource(R.string.review_refine, state.refineModelName ?: "")) }, enabled = state.refine !is PassState.Running,
-                                onClick = { actions.refine(); menu = false },
+                                text = { Text(stringResource(R.string.review_refine_with)) }, enabled = state.refine !is PassState.Running,
+                                onClick = { pickingModel = true; menu = false },
+                            )
+                            if (state.lecture.versions.isNotEmpty()) DropdownMenuItem(
+                                text = { Text(stringResource(R.string.review_versions, state.lecture.versions.size + 1)) },
+                                enabled = state.refine !is PassState.Running,
+                                onClick = { showingVersions = true; menu = false },
                             )
                             if (state.speakerPass != null) DropdownMenuItem(
                                 text = { Text(stringResource(R.string.review_find_speakers)) }, enabled = state.speakerPass !is PassState.Running,
@@ -154,7 +166,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         }
                     }
                 }
-                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_refining, state.refineModelName ?: "", (it.progress * 100).toInt()), it.progress) }
+                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_refining, (it.progress * 100).toInt()), it.progress) }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
                 HorizontalDivider()
             }
@@ -354,4 +366,69 @@ private fun NoteDialog(title: String, initial: String, onDelete: (() -> Unit)?, 
             }
         },
     )
+}
+
+/** The models the refine pass can use here; the large ones first. */
+@Composable
+private fun RefineDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.review_refine_with)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.review_refine_note), style = MaterialTheme.typography.bodySmall)
+                state.refineModels.forEach { m ->
+                    TextButton(onClick = { onPick(m.id) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(m.name, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) } },
+    )
+}
+
+/** The transcript now and the earlier ones, newest first: who wrote each, when it was kept, its lines and edits. */
+@Composable
+private fun VersionsDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    val lecture = state.lecture
+    val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.review_versions, lecture.versions.size + 1)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val nowModel = lecture.refinedWith ?: lecture.segments.groupingBy { it.modelId }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
+                VersionRow(
+                    stringResource(R.string.review_version_now),
+                    stringResource(if (lecture.refinedWith != null) R.string.review_version_refined else R.string.review_version_live, com.chencohensolution.transcriptor.models.ModelCatalog.nameOf(nowModel)),
+                    stringResource(R.string.review_version_lines, lecture.segments.size, lecture.segments.count { it.edited }),
+                    current = true, onClick = null,
+                )
+                lecture.versions.sortedByDescending { it.keptAtMillis }.forEach { v ->
+                    VersionRow(
+                        format.format(java.util.Date(v.keptAtMillis)),
+                        stringResource(if (v.refined) R.string.review_version_refined else R.string.review_version_live, com.chencohensolution.transcriptor.models.ModelCatalog.nameOf(v.modelId)),
+                        stringResource(R.string.review_version_lines, v.lines, v.edited),
+                        current = false, onClick = { onPick(v.id) },
+                    )
+                }
+                Text(stringResource(R.string.review_versions_note), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) } },
+    )
+}
+
+@Composable
+private fun VersionRow(title: String, model: String, lines: String, current: Boolean, onClick: (() -> Unit)?) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(if (current) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(12.dp),
+    ) {
+        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(model, style = MaterialTheme.typography.bodyMedium)
+        Text(lines, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+    }
 }

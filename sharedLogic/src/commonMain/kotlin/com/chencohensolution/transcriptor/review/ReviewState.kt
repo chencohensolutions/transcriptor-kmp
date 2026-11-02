@@ -10,6 +10,9 @@ sealed interface PassState {
     data object Done : PassState
 }
 
+/** A model to pick, by [id], shown as [name]. */
+data class ModelChoice(val id: String, val name: String)
+
 /** A recorded lecture, opened ([LectureReview]). */
 data class ReviewState(
     val notebookTitle: String,
@@ -17,8 +20,8 @@ data class ReviewState(
     val positionMillis: Long,
     val playing: Boolean,
     val speed: Float,
-    /** The model the refine pass would use; null while the refine pass isn't available. */
-    val refineModelName: String?,
+    /** The models the refine pass can use here (downloaded, for the lecture's language); empty: none. */
+    val refineModels: List<ModelChoice>,
     /** Null while the refine pass isn't available. */
     val refine: PassState?,
     /** Null while the speaker pass can't run (its models aren't downloaded). */
