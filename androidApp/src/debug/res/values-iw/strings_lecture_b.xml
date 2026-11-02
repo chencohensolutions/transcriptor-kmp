@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="lecture_b_notes">ההערות שלי</string>
-    <string name="lecture_b_count">%1$d</string>
-    <string name="lecture_b_hint">כתבו הערה; Enter מתחיל את הבאה</string>
-</resources>

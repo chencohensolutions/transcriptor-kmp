@@ -32,4 +32,4 @@ every option uses, `LiveLectureState` and `LiveLectureActions`; `a/`, `b/`, `c/`
 
 ## Design history
 
-- Round 1 (Nov 2, 2026), open: a — one timeline, b — two panes, c — document + recorder.
+- [Round 1 (Nov 2, 2026)](../ux-history/lecture/2026-11-02-while-recording.md): a — one timeline (picked), b — two panes, c — document + recorder.

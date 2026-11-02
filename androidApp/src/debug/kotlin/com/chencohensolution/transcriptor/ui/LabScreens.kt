@@ -7,7 +7,5 @@ package com.chencohensolution.transcriptor.ui
 internal val labScreens: List<LabScreen> = listOf(
     LabScreen("lecture", "Lecture, while recording", listOf(
         lectureOptionA,
-        lectureOptionB,
-        lectureOptionC,
     )),
 )
