@@ -1,0 +1,17 @@
+# Screens
+
+One page per screen: what it's for, what it shows, how it behaves, and where the code is. Rounds of UX suggestions
+are in [docs/ux-history/](../ux-history/README.md), linked from each screen's "Design history".
+
+| Screen | Shown when | Doc | State |
+|---|---|---|---|
+| Notebooks | On launch: the courses and their lectures | [notebooks.md](notebooks.md) | Planned |
+| Lecture, while recording | New lecture | [lecture.md](lecture.md) | In the UI lab (round 1) |
+| Lecture, after | Opening a recorded lecture: play, edit, refine, speakers | [lecture-review.md](lecture-review.md) | Planned |
+| Settings › Models | Settings | [models.md](models.md) | Planned |
+
+```
+Notebooks ──► Lecture (recording) ──Stop──► Lecture (after) ◄── Notebooks
+    │
+    └──► Settings ──► Models
+```

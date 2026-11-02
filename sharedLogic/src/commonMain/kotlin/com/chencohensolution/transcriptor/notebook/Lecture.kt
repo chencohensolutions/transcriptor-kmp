@@ -1,0 +1,65 @@
+package com.chencohensolution.transcriptor.notebook
+
+/**
+ * A course: its lectures share a language, which picks the speech models (Settings › Models).
+ * [language] is a BCP-47 tag ("he", "en").
+ */
+data class Notebook(
+    val id: String,
+    val title: String,
+    val language: String,
+    val lectures: List<LectureSummary>,
+)
+
+/** A lecture as the notebook lists it. */
+data class LectureSummary(
+    val id: String,
+    val title: String,
+    val startedAtMillis: Long,
+    val durationMillis: Long,
+    val noteCount: Int,
+    val refined: Boolean,
+)
+
+/**
+ * One recorded class: the audio file (FLAC, 48 kHz, stereo, 16 bit) and what was said and written in it. Every time
+ * is in milliseconds from the start of the recording, so a line or a note always points into the audio.
+ */
+data class Lecture(
+    val id: String,
+    val notebookId: String,
+    val title: String,
+    val language: String,
+    val startedAtMillis: Long,
+    val durationMillis: Long,
+    val segments: List<Segment>,
+    val notes: List<Note>,
+    val speakers: List<Speaker> = emptyList(),
+)
+
+/** A line or paragraph of speech, from [startMillis] to [endMillis]. */
+data class Segment(
+    val id: String,
+    val startMillis: Long,
+    val endMillis: Long,
+    val text: String,
+    /** The model that wrote [text] (a [com.chencohensolution.transcriptor.models.SpeechModel] id). */
+    val modelId: String,
+    /** The user changed [text] by hand; a refine pass leaves it alone. */
+    val edited: Boolean = false,
+    /** Set by the refine pass's speaker step; null before it. */
+    val speakerId: String? = null,
+)
+
+/** A note typed during or after the lecture, pinned to [atMillis] (when the user started typing it). */
+data class Note(
+    val id: String,
+    val atMillis: Long,
+    val text: String,
+)
+
+/** A voice the refine pass told apart ("Speaker 1"), renamed by the user ("Lecturer"). */
+data class Speaker(
+    val id: String,
+    val name: String,
+)

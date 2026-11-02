@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A placeholder icon: a microphone beside the lines of a page. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M36,34a8,8 0,0 1,16 0v18a8,8 0,0 1,-16 0z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="3.5" android:strokeLineCap="round"
+        android:pathData="M30,50a14,14 0,0 0,28 0M44,64v8" />
+    <path android:strokeColor="#FFD9A0" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M64,38h14M64,48h14M64,58h10M64,68h14" />
+</vector>

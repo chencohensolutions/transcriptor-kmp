@@ -1,0 +1,30 @@
+*.iml
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+.idea
+.DS_Store
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+iosApp/Configuration/Local.xcconfig
+
+# Screenshot test images: rendered locally with ./scripts/screenshots.sh (docs/previews.md)
+androidApp/src/screenshotTestDebug/
+build/
+tools/cache/
+tools/out/
+
+# Release signing (docs/release.md)
+keystore.properties
+*.jks
+*.keystore
