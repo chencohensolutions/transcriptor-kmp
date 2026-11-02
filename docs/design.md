@@ -67,7 +67,10 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 - **During the lecture** (owner's request, Nov 2, 2026): when a line ends, a voice print of its audio (3D-Speaker
   CAM++, Apache-2.0, 28 MB, on sherpa-onnx; `SpeakerLabeler`) joins the speaker whose average print is closest, if
   at least 0.5 alike (cosine), else starts a new "Speaker N" (`SpeakerTracker`). Lines under 1.5 s get no label.
-  Each line is one speaker, as lines end at pauses, which is usually where the speaker changes.
+  A line where the voice changes without a pause (a TV debate, an interruption) is split: prints of 1.5 s windows
+  every 0.75 s are grouped by voice, a change lasting two windows splits the line at the nearest word (the streaming
+  model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
+  two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
 - Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
   `voices.json` (`VoiceStore`), and its next lectures start with those voices, labeled by name from their first line.
 - After the lecture, the refine pass can regroup with the whole recording (pyannote segmentation, MIT) and split a

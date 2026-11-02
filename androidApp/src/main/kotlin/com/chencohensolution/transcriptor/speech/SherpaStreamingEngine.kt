@@ -45,6 +45,9 @@ class SherpaStreamingEngine(dir: File) : StreamingEngine {
 
     override val text: String get() = recognizer.getResult(stream).text
 
+    override val tokens: List<TimedToken>
+        get() = recognizer.getResult(stream).let { r -> r.tokens.zip(r.timestamps.toList()).map { (t, s) -> TimedToken(t, s) } }
+
     override fun isEndpoint() = recognizer.isEndpoint(stream)
 
     override fun reset() = recognizer.reset(stream)

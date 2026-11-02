@@ -48,6 +48,31 @@ class SpeakerTracker(known: List<Voice> = emptyList(), private val threshold: Fl
         cluster.id ?: "speaker-${next++}".also { cluster.id = it }
     }
 
+    /**
+     * Groups voice prints of short windows of one line by speaker, without changing the speakers: each window joins
+     * the closest speaker so far or of this line (at least [threshold] alike), or starts a new group. Equal numbers,
+     * same voice.
+     */
+    fun group(prints: List<FloatArray>): List<Int> = synchronized(lock) {
+        val centers = clusters.map { normalized(it.sum) }.toMutableList()
+        val sums = centers.map { it.copyOf() }.toMutableList()
+        prints.map { print ->
+            val p = normalized(print)
+            val best = centers.indices.maxByOrNull { cosine(centers[it], p) }
+            if (best != null && cosine(centers[best], p) >= threshold) {
+                if (best >= clusters.size) {
+                    sums[best] = FloatArray(p.size) { sums[best][it] + p[it] }
+                    centers[best] = normalized(sums[best])
+                }
+                best
+            } else {
+                centers.add(p)
+                sums.add(p.copyOf())
+                centers.size - 1
+            }
+        }
+    }
+
     /** The average voice print of speaker [id], to remember them in the notebook; null if they never spoke. */
     fun print(id: String): List<Float>? = synchronized(lock) { clusters.firstOrNull { it.id == id }?.let { normalized(it.sum).toList() } }
 
@@ -90,6 +115,51 @@ class SpeakerLabeler(val tracker: SpeakerTracker, private val load: () -> VoiceE
         }
     }
 
+    /**
+     * Who spoke which part of a line's [samples]: voice prints of [WINDOW]-long windows every [HOP] are grouped by
+     * speaker ([SpeakerTracker.group]); a change that lasts at least two windows splits the line, at the [cuts]
+     * (sample offsets where a word starts) nearest to it. Each part is then labeled as a line of its own. One part, the
+     * whole line, when the speaker doesn't change or the line is too short to tell.
+     */
+    fun split(samples: FloatArray, cuts: List<Int>): List<SpeakerPart> {
+        val whole = listOf(SpeakerPart(0, samples.size, null))
+        if (samples.size < 2 * WINDOW || failed || cuts.isEmpty()) return whole.map { it.copy(speaker = label(samples)) }
+        val groups = try {
+            val e = embedder ?: load().also { embedder = it }
+            val starts = (0..samples.size - WINDOW step HOP).toList()
+            tracker.group(starts.map { e.embed(samples.copyOfRange(it, it + WINDOW)) })
+        } catch (e: Throwable) {
+            failed = embedder == null
+            return whole
+        }
+        // Runs of one group; a run of a single window is a flicker and joins the run before it (or after it).
+        val runs = mutableListOf<MutableList<Int>>() // [group, first window, last window]
+        groups.forEachIndexed { i, g -> if (runs.isNotEmpty() && runs.last()[0] == g) runs.last()[2] = i else runs.add(mutableListOf(g, i, i)) }
+        var merged = true
+        while (merged && runs.size > 1) {
+            merged = false
+            val i = runs.indexOfFirst { it[2] == it[1] }
+            if (i >= 0) {
+                if (i > 0) runs[i - 1][2] = runs[i][2] else runs[1][1] = runs[0][1]
+                runs.removeAt(i)
+                merged = true
+                // Neighbours of one group become one run.
+                var j = 1
+                while (j < runs.size) {
+                    if (runs[j][0] == runs[j - 1][0]) { runs[j - 1][2] = runs[j][2]; runs.removeAt(j) } else j++
+                }
+            }
+        }
+        if (runs.size == 1) return whole.map { it.copy(speaker = label(samples)) }
+        // A change between window a (last of a run) and a + 1: halfway through their overlap, at the nearest word.
+        val bounds = runs.drop(1).map { run ->
+            val change = run[1] * HOP + (WINDOW - HOP) / 2
+            cuts.minByOrNull { kotlin.math.abs(it - change) }!!
+        }.distinct().filter { it in 1 until samples.size }.sorted()
+        val edges = listOf(0) + bounds + samples.size
+        return edges.zipWithNext().filter { (a, b) -> b > a }.map { (a, b) -> SpeakerPart(a, b, label(samples.copyOfRange(a, b))) }
+    }
+
     fun close() {
         embedder?.close()
         embedder = null
@@ -97,5 +167,10 @@ class SpeakerLabeler(val tracker: SpeakerTracker, private val load: () -> VoiceE
 
     companion object {
         const val MIN_SAMPLES = 24_000 // 1.5 s
+        const val WINDOW = 24_000 // 1.5 s
+        const val HOP = 12_000
     }
 }
+
+/** A part of a line, [start] to [end] (sample offsets in the line), said by [speaker] (null: unknown). */
+data class SpeakerPart(val start: Int, val end: Int, val speaker: String?)

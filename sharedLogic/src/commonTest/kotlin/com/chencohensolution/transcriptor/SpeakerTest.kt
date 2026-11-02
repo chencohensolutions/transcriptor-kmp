@@ -44,6 +44,16 @@ class SpeakerTest {
     }
 
     @Test
+    fun windowsAreGroupedWithoutChangingTheSpeakers() {
+        val t = SpeakerTracker()
+        t.assign(floatArrayOf(1f, 0.1f))
+        val a = floatArrayOf(0.9f, 0.1f)
+        val b = floatArrayOf(0.1f, 0.9f)
+        assertEquals(listOf(0, 0, 1, 1, 0), t.group(listOf(a, a, b, b, a)))
+        assertEquals(listOf(Speaker("speaker-1", "")), t.speakers)
+    }
+
+    @Test
     fun aShortLineGetsNoLabel() {
         val labeler = SpeakerLabeler(SpeakerTracker()) { PitchEmbedder() }
         assertNull(labeler.label(FloatArray(SpeakerLabeler.MIN_SAMPLES - 1)))

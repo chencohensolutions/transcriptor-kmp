@@ -24,6 +24,9 @@ interface StreamingEngine : AutoCloseable {
     /** The line so far. */
     val text: String
 
+    /** The line's tokens so far, each with when it was said, in seconds from the line's start (the last [reset]). */
+    val tokens: List<TimedToken>
+
     /** The model's own end of a line: a pause after speech, or a line too long. */
     fun isEndpoint(): Boolean
 
@@ -34,11 +37,15 @@ interface StreamingEngine : AutoCloseable {
     fun flush()
 }
 
+/** A piece of a word (a word starts with a space) and when it was said. */
+data class TimedToken(val text: String, val seconds: Float)
+
 /**
  * Live transcription with a streaming model (Zipformer): every buffer goes to the model as it arrives, so the
  * words of the line being spoken appear within about a second, and the model's endpoint (a pause) ends the line.
- * A line's start is when its first words appeared, less the model's chunk; its end, when its last words did.
- * Pause and Stop end the line too.
+ * A line runs from its first word to its last, by the model's word times (without them, from when its first words
+ * appeared, less the model's chunk, to when its last did). With speaker labels, a line where the speaker changes is
+ * split there, at a word ([SpeakerLabeler.split]). Pause and Stop end the line too.
  */
 class StreamingTranscriber(
     private val modelId: String,
@@ -107,7 +114,7 @@ class StreamingTranscriber(
                 if (samples.isNotEmpty()) {
                     engine.accept(samples)
                     consumed += samples.size
-                    if (speakers != null) lineAudio.add(samples)
+                    lineAudio.add(samples)
                     val text = engine.text.trim()
                     if (text != lastText) {
                         if (firstWordsAt == null && text.isNotEmpty()) firstWordsAt = consumed
@@ -144,25 +151,43 @@ class StreamingTranscriber(
     private fun endLine(engine: StreamingEngine) {
         val text = cleanLine(lastText)
         val first = firstWordsAt
+        // Every token goes into the text (punctuation, a lone space); words alone set the times.
+        val allTokens = engine.tokens
+        val tokens = allTokens.filter { it.text.any(Char::isLetterOrDigit) }
+        val audio = lineAudio.drain()
         if (text.isNotEmpty() && first != null) {
-            val start = maxOf(lineStart, first - CHUNK_SAMPLES)
-            val end = maxOf(start, minOf(consumed, lastChangeAt))
-            val speaker = speakers?.let { labeler ->
-                val audio = lineAudio.drain()
-                labeler.label(audio.copyOfRange((start - lineStart).toInt().coerceIn(0, audio.size), (end - lineStart).toInt().coerceIn(0, audio.size)))
+            val lines = if (tokens.isNotEmpty()) {
+                // Word times are from the line's start: a word, at its sample in the line's audio.
+                fun at(t: TimedToken) = (t.seconds * 16_000).toLong()
+                val start = (at(tokens.first()) - LEAD_SAMPLES).coerceAtLeast(0)
+                val end = minOf(consumed - lineStart, at(tokens.last()) + TAIL_SAMPLES)
+                val wordStarts = tokens.filter { it.text.startsWith(" ") || it.text.startsWith("▁") }.map { (at(it) - start).toInt() }
+                val parts = speakers?.split(audio.copyOfRange(start.toInt().coerceIn(0, audio.size), end.toInt().coerceIn(0, audio.size)), wordStarts.filter { it > 0 })
+                    ?: listOf(SpeakerPart(0, (end - start).toInt(), null))
+                parts.mapNotNull { part ->
+                    val words = allTokens.filter { at(it) - start in part.start until part.end || (part.end == parts.last().end && at(it) - start >= part.end) }
+                    val t = cleanLine(words.joinToString("") { it.text.replace('▁', ' ') })
+                    if (t.isEmpty()) null else Triple(lineStart + start + part.start, lineStart + start + part.end, t to part.speaker)
+                }
+            } else {
+                val start = maxOf(lineStart, first - CHUNK_SAMPLES)
+                val end = maxOf(start, minOf(consumed, lastChangeAt))
+                val speaker = speakers?.label(audio.copyOfRange((start - lineStart).toInt().coerceIn(0, audio.size), (end - lineStart).toInt().coerceIn(0, audio.size)))
+                listOf(Triple(start, end, text to speaker))
             }
             _output.update { out ->
                 out.copy(
-                    segments = out.segments + Segment(
-                        id = "s${out.segments.size + 1}", startMillis = start / 16, endMillis = end / 16,
-                        text = text, modelId = modelId, speakerId = speaker,
-                    ),
+                    segments = out.segments + lines.mapIndexed { i, (start, end, line) ->
+                        Segment(
+                            id = "s${out.segments.size + i + 1}", startMillis = start / 16, endMillis = end / 16,
+                            text = line.first, modelId = modelId, speakerId = line.second,
+                        )
+                    },
                     partial = null,
                     speakers = speakers?.tracker?.speakers ?: out.speakers,
                 )
             }
         }
-        lineAudio.drain()
         engine.reset()
         lineStart = consumed
         firstWordsAt = null
@@ -174,5 +199,9 @@ class StreamingTranscriber(
     companion object {
         /** The model decodes 1.28 s at a time: words appear up to that long after they were said. */
         const val CHUNK_SAMPLES = 20_480L
+
+        /** A word's time is about when it starts: a line starts a little before its first, ends a little after its last. */
+        const val LEAD_SAMPLES = 3_200L
+        const val TAIL_SAMPLES = 8_000L
     }
 }
