@@ -113,6 +113,11 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
 
 A note's time is when the user **started** typing it, so it points at what was being said then.
 
+### NPU
+
+Planned (owner's request, Nov 2, 2026): the larger Hebrew Whisper on the Snapdragon NPU for the refine pass, and
+maybe the live model, with the CPU path kept for other phones. Plan: [npu-plan.md](npu-plan.md).
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.
