@@ -13,8 +13,9 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.sin
 
-// Fakes: the recording (clock, level, the partial line growing), live transcription and the lag figure; Stop and
-// tapping a line do nothing. Notes and pause work in memory.
+// Fakes: the recording (clock, level, the partial line growing), live transcription, speaker labels (a lecturer the
+// notebook knew and an unnamed student) and the lag figure; Stop and tapping a line do nothing. Notes, pause and
+// renaming a speaker work in memory.
 internal val lectureCurrent = LabOption("current", "One timeline (the app's)", "LectureScreen with a faked recording and live transcription") {
     val (state, actions) = rememberLiveLectureLab()
     LectureScreen(state, actions)
@@ -26,7 +27,7 @@ internal val lectureCurrent = LabOption("current", "One timeline (the app's)", "
  */
 @Composable
 private fun rememberLiveLectureLab(): Pair<LiveLectureState, LiveLectureActions> {
-    var lecture by remember { mutableStateOf(LabData.lecture) }
+    var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers) }
     var elapsed by remember { mutableStateOf(LabData.lecture.durationMillis) }
     var paused by remember { mutableStateOf(false) }
     var words by remember { mutableStateOf(1) }
@@ -55,6 +56,7 @@ private fun rememberLiveLectureLab(): Pair<LiveLectureState, LiveLectureActions>
     val actions = LiveLectureActions(
         pauseOrResume = { paused = !paused },
         addNote = { at, text -> lecture = lecture.copy(notes = lecture.notes + Note("n${lecture.notes.size + 1}", at, text)) },
+        renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name) else it }) },
     )
     return state to actions
 }

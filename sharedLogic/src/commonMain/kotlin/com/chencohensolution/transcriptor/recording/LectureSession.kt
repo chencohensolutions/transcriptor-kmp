@@ -9,7 +9,11 @@ import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.speech.LiveOutput
+import com.chencohensolution.transcriptor.notebook.Speaker
+import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.speech.LiveTranscriber
+import com.chencohensolution.transcriptor.speech.SpeakerTracker
+import com.chencohensolution.transcriptor.speech.Voice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,8 +30,11 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/** The live model for a lecture: its name, for the screen, and the transcriber running it. */
-class LiveModel(val name: String, val transcriber: LiveTranscriber)
+/**
+ * The live model for a lecture: its name, for the screen, the transcriber running it, and the speakers it tells apart
+ * (null without a voice-print model).
+ */
+class LiveModel(val name: String, val transcriber: LiveTranscriber, val speakers: SpeakerTracker? = null)
 
 /**
  * Recording one lecture: the microphone to the audio file ([AudioRecorder]), the lines from live transcription
@@ -43,8 +50,13 @@ class LectureSession(
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    /** Starts live transcription for a language; null when no live model is downloaded for it. */
-    private val live: (language: String, scope: CoroutineScope) -> LiveModel? = { _, _ -> null },
+    /** The notebooks' known voices: speakers the user named, labeled by name in later lectures. */
+    private val voices: VoiceStore? = null,
+    /**
+     * Starts live transcription for a language, with the voices the notebook knows; null when no live model is
+     * downloaded for it.
+     */
+    private val live: (language: String, scope: CoroutineScope, known: List<Voice>) -> LiveModel? = { _, _, _ -> null },
 ) {
     private data class Recording(
         val notebookTitle: String,
@@ -84,14 +96,15 @@ class LectureSession(
             audioFile = if (format == AudioFormat.FlacLive) AUDIO_FLAC else AUDIO_WAV,
         )
         store.save(lecture)
-        liveModel = live(notebook.language, scope)?.also { model ->
+        names = emptyMap()
+        liveModel = live(notebook.language, scope, voices?.load(notebook.id).orEmpty())?.also { model ->
             recorder.onPcm = model.transcriber::feed
             following = scope.launch {
                 model.transcriber.output.collect { out ->
                     liveOutput.value = out
                     val r = recording.value ?: return@collect
-                    if (out.segments.size != r.lecture.segments.size) {
-                        recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments)) }
+                    if (out.segments.size != r.lecture.segments.size || out.speakers.size != r.lecture.speakers.size) {
+                        recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
                         saveNow()
                     }
                 }
@@ -124,6 +137,23 @@ class LectureSession(
         }
     }
 
+    /**
+     * Names a speaker ("Lecturer"): in this lecture, and in the notebook's voices, so its next lectures label them by
+     * name from the start.
+     */
+    fun renameSpeaker(id: String, name: String) {
+        val r = recording.value ?: return
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        val old = r.lecture.speakers.firstOrNull { it.id == id }?.name.orEmpty()
+        names = names + (id to clean)
+        recording.update { it?.copy(lecture = it.lecture.copy(speakers = named(it.lecture.speakers))) }
+        saveNow()
+        val print = liveModel?.speakers?.print(id) ?: return
+        if (old.isNotEmpty() && old != clean) voices?.rename(r.lecture.notebookId, old, clean)
+        voices?.save(r.lecture.notebookId, Voice(clean, print))
+    }
+
     /** A note pinned to [atMillis]: the position in the audio when the user started typing it. */
     fun addNote(atMillis: Long, text: String) {
         if (text.isBlank() || recording.value == null) return
@@ -151,8 +181,15 @@ class LectureSession(
         liveModel?.transcriber?.let { transcriber ->
             transcriber.finish()
             following?.cancel()
-            val segments = transcriber.output.value.segments
-            recording.update { it?.copy(lecture = it.lecture.copy(segments = segments)) }
+            val out = transcriber.output.value
+            recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
+            // The named speakers' voices, as this whole lecture heard them, for the notebook's next lectures.
+            val tracker = liveModel?.speakers
+            if (tracker != null && voices != null) {
+                for (s in recording.value!!.lecture.speakers) {
+                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it)) }
+                }
+            }
         }
         val lecture = recording.value!!.lecture.copy(
             durationMillis = duration,
@@ -164,6 +201,13 @@ class LectureSession(
         liveModel = null
         return lecture
     }
+
+    /** Names the user gave this lecture's speakers, over the tracker's (known voices' names, or none). */
+    // Replaced, not changed in place: the UI's thread writes it, live transcription's reads it.
+    @kotlin.concurrent.Volatile
+    private var names = mapOf<String, String>()
+
+    private fun named(speakers: List<Speaker>) = speakers.map { s -> names[s.id]?.let { s.copy(name = it) } ?: s }
 
     private fun current() = recording.value?.lecture?.copy(durationMillis = recorder.positionMillis.value)
 

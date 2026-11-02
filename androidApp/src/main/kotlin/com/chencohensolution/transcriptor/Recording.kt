@@ -12,7 +12,12 @@ import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
+import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
+import com.chencohensolution.transcriptor.speech.SherpaVoiceEmbedder
+import com.chencohensolution.transcriptor.speech.SpeakerLabeler
+import com.chencohensolution.transcriptor.speech.SpeakerTracker
+import com.chencohensolution.transcriptor.speech.Voice
 import com.chencohensolution.transcriptor.speech.StreamingTranscriber
 import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.ModelFiles
@@ -53,6 +58,7 @@ object Recording {
         models = ModelFiles(app)
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            voices = VoiceStore(FileSystem.SYSTEM, root),
             live = ::liveModel,
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
@@ -69,22 +75,29 @@ fun liveModelFor(language: String): SpeechModel? {
     return ready.firstOrNull { it.id == Recording.settings.liveModel(language) } ?: ready.firstOrNull()
 }
 
-/** Live transcription for [language] with [liveModelFor]'s model; null when none is downloaded. */
-private fun liveModel(language: String, scope: CoroutineScope): LiveModel? {
+/**
+ * Live transcription for [language] with [liveModelFor]'s model, and speaker labels when the voice-print model is
+ * downloaded, starting from the voices the notebook [known]; null when no live model is downloaded.
+ */
+private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
     val model = liveModelFor(language) ?: return null
+    val prints = ModelCatalog.voicePrints
+    val tracker = if (Recording.models.isReady(prints)) SpeakerTracker(known) else null
+    val labeler = tracker?.let { t -> SpeakerLabeler(t) { SherpaVoiceEmbedder(Recording.models.file(prints)) } }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
     val transcriber = when (model.kind) {
         ModelKind.Whisper -> {
             val path = Recording.models.file(model).path
-            UtteranceTranscriber(language, model.id, scope, worker) { WhisperEngine(path) }
+            UtteranceTranscriber(language, model.id, scope, worker, labeler) { WhisperEngine(path) }
         }
         ModelKind.StreamingTransducer -> {
             val dir = Recording.models.dir(model)
-            StreamingTranscriber(model.id, scope, worker) { SherpaStreamingEngine(dir) }
+            StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir) }
         }
+        ModelKind.SpeakerEmbedding -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber)
+    return LiveModel(model.name, transcriber, tracker)
 }
 
 class TranscriptorApp : Application() {

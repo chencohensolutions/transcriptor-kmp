@@ -7,6 +7,9 @@ enum class ModelKind {
 
     /** A streaming transducer (sherpa-onnx: encoder, decoder, joiner, tokens): words as the audio arrives. */
     StreamingTransducer,
+
+    /** Voice prints for telling speakers apart (sherpa-onnx speaker embedding): not a speech model. */
+    SpeakerEmbedding,
 }
 
 /** One file of a model, downloaded from [url] (pinned to a commit) and checked against [sha256]. */
@@ -113,6 +116,25 @@ object ModelCatalog {
             ModelFile("tokens.txt", "$ZIPFORMER/tokens.txt", "e4ebb5e72a6aeef47437a55fa2308ebbedb7c51c557de7a89bf965c23ea9af4a", 17_086),
         ),
         credit = "zipformer2-66m-streaming-he by Yakov Kolani, ivrit.ai (CC-BY-4.0)",
+    )
+
+    /** Voice prints for speaker labels, in every language. Not in [all]: it doesn't transcribe. */
+    val voicePrints = SpeechModel(
+        id = "3dspeaker-campplus-zh-en-advanced",
+        name = "3D-Speaker CAM++",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "7M",
+        license = "Apache-2.0",
+        fitsLive = true,
+        source = "https://github.com/modelscope/3D-Speaker",
+        kind = ModelKind.SpeakerEmbedding,
+        files = listOf(
+            ModelFile(
+                "model.onnx",
+                "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+                "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2", 28_281_164,
+            ),
+        ),
     )
 
     val all = listOf(ivritTurbo, ivritZipformer, ivritLargeV3, whisperTurbo, whisperLargeV3)

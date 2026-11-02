@@ -22,6 +22,9 @@ is set at the first keystroke. Above the lines, a status line in the app's langu
 behind it is, "Loading…", that no live model is downloaded for the language, or that live transcription stopped (the
 recording goes on). After Stop, "Finishing the last lines…" until the waiting lines are done.
 
+- Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
+  it names the speaker, and the notebook remembers the voice for its next lectures.
+
 ## Behavior
 
 - Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the lecture and

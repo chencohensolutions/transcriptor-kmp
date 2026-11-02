@@ -18,6 +18,8 @@ data class TranscriptorColors(
     val onNote: Color,
     val time: Color,
     val partial: Color,
+    /** One per speaker, in the order they first spoke (then again from the first). */
+    val speakers: List<Color>,
 )
 
 private val lightExtra = TranscriptorColors(
@@ -26,6 +28,7 @@ private val lightExtra = TranscriptorColors(
     onNote = Color(0xFF4A3510),
     time = Color(0xFF7A7F99),
     partial = Color(0xFF9AA0B8),
+    speakers = listOf(Color(0xFF1A73E8), Color(0xFF188038), Color(0xFFA142F4), Color(0xFFE37400), Color(0xFF007B83), Color(0xFFC5221F)),
 )
 private val darkExtra = TranscriptorColors(
     recording = Color(0xFFFF6B5E),
@@ -33,6 +36,7 @@ private val darkExtra = TranscriptorColors(
     onNote = Color(0xFFFFE2B0),
     time = Color(0xFF8E93AD),
     partial = Color(0xFF6C7190),
+    speakers = listOf(Color(0xFF8AB4F8), Color(0xFF81C995), Color(0xFFD7AEFB), Color(0xFFFCAD70), Color(0xFF78D9EC), Color(0xFFF28B82)),
 )
 
 val LocalTranscriptorColors = staticCompositionLocalOf { lightExtra }

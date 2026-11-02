@@ -16,4 +16,7 @@ anything left to decide. Remove an entry once it is built.
   the WAV with `AVAudioFile`. The app needs the background audio mode and the microphone usage description.
 - Strings: `lecture_*`, `recording_*`, `compressing_flac`, `start_*`, `format_*` in `androidApp/src/main/res/values/strings.xml`
   (Hebrew in `values-iw/`).
+- Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
+  dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,
+  strings `speaker_*`. Voice prints on iOS: sherpa-onnx's iOS build with the same CAM++ model, as a `VoiceEmbedder`.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).

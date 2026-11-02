@@ -25,6 +25,7 @@ class UtteranceTranscriber(
     private val modelId: String,
     scope: CoroutineScope,
     worker: CoroutineDispatcher,
+    private val speakers: SpeakerLabeler? = null,
     private val loadEngine: () -> SpeechEngine,
 ) : LiveTranscriber {
     private val downsampler = Downsampler()
@@ -73,13 +74,17 @@ class UtteranceTranscriber(
                 val next = synchronizedQueue { queue.removeFirstOrNull() }
                 if (next != null) {
                     val text = transcribe(engine, next)
+                    val speaker = if (text.isEmpty()) null else speakers?.label(next.samples)
                     _output.update { out ->
                         val segments = if (text.isEmpty()) out.segments else out.segments + Segment(
                             id = "s${out.segments.size + 1}",
                             startMillis = next.startSample / 16, endMillis = next.endSample / 16,
-                            text = text, modelId = modelId,
+                            text = text, modelId = modelId, speakerId = speaker,
                         )
-                        out.copy(segments = segments, partial = null, lagMillis = lag(next.endSample))
+                        out.copy(
+                            segments = segments, partial = null, lagMillis = lag(next.endSample),
+                            speakers = speakers?.tracker?.speakers ?: out.speakers,
+                        )
                     }
                     lastPartialSize = 0
                     continue
@@ -106,6 +111,7 @@ class UtteranceTranscriber(
             _output.update { it.copy(error = e.message ?: e.toString()) }
         } finally {
             engine.close()
+            speakers?.close()
         }
     }
 

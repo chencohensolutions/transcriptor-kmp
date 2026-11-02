@@ -16,7 +16,8 @@ update those docs whenever a screen changes.
   platform; Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
   `SettingsStore`, `AudioFormat`. `speech/`: `LiveTranscriber` (live lines) with `UtteranceTranscriber`
   (Whisper, a line at a time: `SpeechEngine`, `Utterances` splitting at pauses) and `StreamingTranscriber`
-  (Zipformer: `StreamingEngine`), `Downsampler`.
+  (Zipformer: `StreamingEngine`), `Downsampler`, `Speakers.kt` (`SpeakerTracker`, `SpeakerLabeler`:
+  speaker labels from voice prints). `notebook/VoiceStore.kt`: the voices a notebook knows.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf` and `formatClock`. Strings in
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is

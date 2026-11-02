@@ -64,11 +64,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Speakers
 
-Yes, after the lecture: the refine pass runs speaker diarization (speaker segmentation plus voice embeddings, for
-example sherpa-onnx with pyannote's segmentation model, MIT, and a 3D-Speaker embedding model, Apache-2.0), and
-labels each segment "Speaker 1", "Speaker 2"… The user renames them ("Lecturer") once per lecture. Not live: telling
-voices apart needs the whole recording to be reliable. Expect it to work well for lecturer vs. students and less
-well for students far from the phone.
+- **During the lecture** (owner's request, Nov 2, 2026): when a line ends, a voice print of its audio (3D-Speaker
+  CAM++, Apache-2.0, 28 MB, on sherpa-onnx; `SpeakerLabeler`) joins the speaker whose average print is closest, if
+  at least 0.5 alike (cosine), else starts a new "Speaker N" (`SpeakerTracker`). Lines under 1.5 s get no label.
+  Each line is one speaker, as lines end at pauses, which is usually where the speaker changes.
+- Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
+  `voices.json` (`VoiceStore`), and its next lectures start with those voices, labeled by name from their first line.
+- After the lecture, the refine pass can regroup with the whole recording (pyannote segmentation, MIT) and split a
+  line where two people spoke; lines the user edited stay. Not built yet.
+- Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
+  speech (two at once) gets one speaker, the louder.
 
 ### Data
 
@@ -107,7 +112,8 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
   `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
   downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
-- Next: speaker labels during the lecture (owner's request): a voice print per line, matched to the speakers so far.
+- Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
+  the start screen; labels are on once it is there.
 
 ## Open questions
 

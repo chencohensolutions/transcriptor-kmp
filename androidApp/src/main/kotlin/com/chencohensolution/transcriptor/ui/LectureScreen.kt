@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.notebook.Segment
+import com.chencohensolution.transcriptor.notebook.Speaker
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import com.chencohensolution.transcriptor.notebook.TimelineEntry
 import com.chencohensolution.transcriptor.notebook.timelineOf
 import com.chencohensolution.transcriptor.recording.LiveLectureState
@@ -77,6 +80,8 @@ class LiveLectureActions(
     /** A note pinned to [atMillis], when the user started typing it. */
     val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
     val openSegment: (Segment) -> Unit = {},
+    /** Names a speaker ("Lecturer"); the notebook remembers the voice. */
+    val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
 )
 
 /**
@@ -87,6 +92,23 @@ class LiveLectureActions(
 fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     val colors = LocalTranscriptorColors.current
     val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
+    // A line shows its speaker where the speaker changes: line id to speaker id.
+    val speakerChanges = remember(state.lecture.segments) {
+        var previous: String? = null
+        buildMap {
+            for (s in state.lecture.segments) {
+                if (s.speakerId != null && s.speakerId != previous) put(s.id, s.speakerId!!)
+                if (s.speakerId != null) previous = s.speakerId
+            }
+        }
+    }
+    var renaming by remember { mutableStateOf<Speaker?>(null) }
+    renaming?.let { speaker ->
+        RenameSpeakerDialog(speaker, onDismiss = { renaming = null }) { name ->
+            actions.renameSpeaker(speaker.id, name)
+            renaming = null
+        }
+    }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val atLive by remember { derivedStateOf { !list.canScrollForward } }
@@ -155,7 +177,12 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     }
                     items(entries, key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
                         when (entry) {
-                            is TimelineEntry.Speech -> SpeechRow(entry, onClick = { actions.openSegment(entry.segment) })
+                            is TimelineEntry.Speech -> SpeechRow(
+                                entry,
+                                speaker = speakerChanges[entry.segment.id]?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } },
+                                onSpeaker = { renaming = it },
+                                onClick = { actions.openSegment(entry.segment) },
+                            )
                             is TimelineEntry.Written -> NoteCard(entry)
                         }
                     }
@@ -199,17 +226,61 @@ private fun TextStyle.inNotebookDirection() =
     copy(textDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextDirection.Rtl else TextDirection.Ltr)
 
 @Composable
-private fun SpeechRow(entry: TimelineEntry.Speech, onClick: () -> Unit) {
+private fun SpeechRow(entry: TimelineEntry.Speech, speaker: Speaker?, onSpeaker: (Speaker) -> Unit, onClick: () -> Unit) {
     val colors = LocalTranscriptorColors.current
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp)) {
-        Text(
-            formatClock(entry.segment.startMillis),
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.time,
-            modifier = Modifier.width(44.dp).padding(top = 3.dp),
-        )
-        Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp)
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp)) {
+        if (speaker != null) SpeakerChip(speaker, Modifier.padding(start = 44.dp, bottom = 4.dp)) { onSpeaker(speaker) }
+        Row {
+            Text(
+                formatClock(entry.segment.startMillis),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.time,
+                modifier = Modifier.width(44.dp).padding(top = 3.dp),
+            )
+            Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp)
+        }
     }
+}
+
+/** "Speaker 2", or the name the user gave; its number is its order of speaking. */
+@Composable
+fun speakerLabel(speaker: Speaker): String =
+    speaker.name.ifEmpty { stringResource(R.string.speaker_n, speaker.id.removePrefix("speaker-").toIntOrNull() ?: 0) }
+
+/** The speaker's name in their color; tap to rename. */
+@Composable
+private fun SpeakerChip(speaker: Speaker, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val palette = LocalTranscriptorColors.current.speakers
+    val color = palette[((speaker.id.removePrefix("speaker-").toIntOrNull() ?: 1) - 1).mod(palette.size)]
+    Text(
+        speakerLabel(speaker),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.12f))
+            .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+private fun RenameSpeakerDialog(speaker: Speaker, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(speaker.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.speaker_rename_title, speakerLabel(speaker))) },
+        text = {
+            Column {
+                Text(stringResource(R.string.speaker_rename_note), style = MaterialTheme.typography.bodySmall)
+                TextField(
+                    value = name, onValueChange = { name = it }, singleLine = true,
+                    placeholder = { Text(stringResource(R.string.speaker_rename_hint)) },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(name) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.speaker_rename_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.speaker_rename_cancel)) } },
+    )
 }
 
 @Composable

@@ -44,6 +44,7 @@ class StreamingTranscriber(
     private val modelId: String,
     scope: CoroutineScope,
     worker: CoroutineDispatcher,
+    private val speakers: SpeakerLabeler? = null,
     private val loadEngine: () -> StreamingEngine,
 ) : LiveTranscriber {
     private val downsampler = Downsampler()
@@ -62,6 +63,8 @@ class StreamingTranscriber(
     private var firstWordsAt: Long? = null
     private var lastChangeAt = 0L
     private var lastText = ""
+    /** The line's audio, from [lineStart], for its voice print. */
+    private val lineAudio = FloatBuilder()
 
     private val job: Job = scope.launch(worker) { run() }
 
@@ -104,6 +107,7 @@ class StreamingTranscriber(
                 if (samples.isNotEmpty()) {
                     engine.accept(samples)
                     consumed += samples.size
+                    if (speakers != null) lineAudio.add(samples)
                     val text = engine.text.trim()
                     if (text != lastText) {
                         if (firstWordsAt == null && text.isNotEmpty()) firstWordsAt = consumed
@@ -133,6 +137,7 @@ class StreamingTranscriber(
             _output.update { it.copy(error = e.message ?: e.toString()) }
         } finally {
             engine.close()
+            speakers?.close()
         }
     }
 
@@ -141,16 +146,23 @@ class StreamingTranscriber(
         val first = firstWordsAt
         if (text.isNotEmpty() && first != null) {
             val start = maxOf(lineStart, first - CHUNK_SAMPLES)
+            val end = maxOf(start, minOf(consumed, lastChangeAt))
+            val speaker = speakers?.let { labeler ->
+                val audio = lineAudio.drain()
+                labeler.label(audio.copyOfRange((start - lineStart).toInt().coerceIn(0, audio.size), (end - lineStart).toInt().coerceIn(0, audio.size)))
+            }
             _output.update { out ->
                 out.copy(
                     segments = out.segments + Segment(
-                        id = "s${out.segments.size + 1}", startMillis = start / 16,
-                        endMillis = maxOf(start, minOf(consumed, lastChangeAt)) / 16, text = text, modelId = modelId,
+                        id = "s${out.segments.size + 1}", startMillis = start / 16, endMillis = end / 16,
+                        text = text, modelId = modelId, speakerId = speaker,
                     ),
                     partial = null,
+                    speakers = speakers?.tracker?.speakers ?: out.speakers,
                 )
             }
         }
+        lineAudio.drain()
         engine.reset()
         lineStart = consumed
         firstWordsAt = null

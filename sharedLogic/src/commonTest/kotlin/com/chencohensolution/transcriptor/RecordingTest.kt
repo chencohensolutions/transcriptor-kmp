@@ -30,7 +30,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** Writes a WAV of silence as it "records": [advance] moves the position by writing that much audio. */
-private class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
+class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override val positionMillis = MutableStateFlow(0L)
     override val level = MutableStateFlow(0f)
     override var onPcm: ((ByteArray, Int) -> Unit)? = null
@@ -220,7 +220,7 @@ class LiveRecordingTest {
     @Test
     fun linesFromLiveTranscriptionAreSavedAndStopWaitsForTheLast() = runTest {
         val engine = FakeEngine()
-        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 1L }) { language, scope ->
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 1L }) { language, scope, _ ->
             com.chencohensolution.transcriptor.recording.LiveModel(
                 "fake",
                 com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },

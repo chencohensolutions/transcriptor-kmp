@@ -43,6 +43,7 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.speech.ModelStatus
@@ -76,6 +77,7 @@ class MainActivity : ComponentActivity() {
                             pauseOrResume = Recording.session::pauseOrResume,
                             stop = { RecordingService.stop(this) },
                             addNote = Recording.session::addNote,
+                            renameSpeaker = Recording.session::renameSpeaker,
                         ),
                     )
                 } else {
@@ -135,6 +137,7 @@ private fun StartScreen(onStart: () -> Unit) {
                 }
             }
             LiveModels("he")
+            SpeakerModel()
             Button(
                 onClick = { permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -167,6 +170,22 @@ private fun LiveModels(language: String) {
     }
 }
 
+/** The voice-print model for speaker labels: labels are on once it is downloaded. */
+@Composable
+private fun SpeakerModel() {
+    val model = ModelCatalog.voicePrints
+    var refresh by remember { mutableStateOf(0) }
+    val status by produceState<ModelStatus?>(null, refresh) {
+        while (true) {
+            value = Recording.models.status(model)
+            delay(1_000)
+        }
+    }
+    Text(stringResource(R.string.start_speakers), style = MaterialTheme.typography.titleSmall)
+    Text(stringResource(R.string.start_speakers_note), style = MaterialTheme.typography.bodySmall)
+    ModelRow(model, status, inUse = status == ModelStatus.Ready, choose = {}) { refresh++ }
+}
+
 @Composable
 private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, choose: () -> Unit, changed: () -> Unit) {
     var startError by remember { mutableStateOf<String?>(null) }
@@ -174,7 +193,7 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
     Column(Modifier.fillMaxWidth()) {
         Text(model.name, style = MaterialTheme.typography.bodyLarge)
         Text(
-            "${model.parameters} · ${model.license}" + if (inUse) " · " + stringResource(R.string.model_in_use) else "",
+            "${model.parameters} · ${model.license}" + if (inUse && model.kind != ModelKind.SpeakerEmbedding) " · " + stringResource(R.string.model_in_use) else "",
             style = MaterialTheme.typography.bodySmall,
         )
         model.credit?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

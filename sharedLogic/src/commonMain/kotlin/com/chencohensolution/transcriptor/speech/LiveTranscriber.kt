@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.speech
 
 import com.chencohensolution.transcriptor.notebook.Segment
+import com.chencohensolution.transcriptor.notebook.Speaker
 import kotlinx.coroutines.flow.StateFlow
 
 /** What live transcription has so far. */
@@ -14,6 +15,8 @@ data class LiveOutput(
     val loading: Boolean = true,
     /** The model failed to load or run. */
     val error: String? = null,
+    /** The speakers told apart so far ([SpeakerLabeler]); the lines' speakerId points into it. */
+    val speakers: List<Speaker> = emptyList(),
 )
 
 /**
