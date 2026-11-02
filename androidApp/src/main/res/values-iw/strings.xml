@@ -36,4 +36,5 @@
     <string name="model_cancel">ביטול</string>
     <string name="model_delete">מחיקה</string>
     <string name="model_in_use">משמש לתמלול חי</string>
+    <string name="model_use_live">לשימוש בתמלול חי</string>
 </resources>

@@ -31,7 +31,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   languages: OpenAI's Whisper large-v3 and turbo (MIT). Every model offered must be free for commercial use. Models
   under non-commercial licenses (Meta's MMS, SeamlessM4T: CC-BY-NC) were not better for Hebrew and are left out.
   Compare new Hebrew models on the [ivrit.ai leaderboard](https://ivrit-ai-hebrew-transcription-leaderboard.hf.space/).
-- Lines, live: the recording is downsampled to 16 kHz mono and split at pauses by loudness against the room's noise
+- Live, streaming (an option for Hebrew, Nov 2, 2026): ivrit.ai's mirror of Yakov Kolani's
+  [zipformer2-66m-streaming-he](https://huggingface.co/ivrit-ai/zipformer2-66m-streaming-he) (CC-BY-4.0: commercial
+  use with credit, shown with the model), 66M parameters, 74 MB int8, on [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+  (Apache-2.0; its release AAR is fetched by Gradle, pinned and hash-checked). Its own card gives 5.1% WER on
+  ivrit.ai's eval-d1 against 5.3% for ivrit.ai Whisper turbo (8.9% against 7.1% on WhatsApp audio). Words appear as
+  they are said (1.28 s chunks), a pause (0.8 s after words) ends the line, and as a transducer it doesn't invent
+  text from noise as Whisper does; no punctuation. Chosen per language on the start screen ("Use for live"); without
+  a choice, the first downloaded live model in the catalog runs. sherpa-onnx can also run it on Qualcomm's NPU (QNN),
+  not tried yet.
+- Lines, live with Whisper: the recording is downsampled to 16 kHz mono and split at pauses by loudness against the room's noise
   floor (`Utterances`: a pause of 0.6 s ends a line; past 15 s a short pause does; 25 s at most). Each line becomes a
   **segment** with its start and end in the recording; the line being spoken is transcribed again every 1.5 s of new
   audio for the grey partial line. Lines waiting go first. Silero VAD (built into whisper.cpp) may replace the

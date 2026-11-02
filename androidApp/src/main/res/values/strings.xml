@@ -36,4 +36,5 @@
     <string name="model_cancel">Cancel</string>
     <string name="model_delete">Delete</string>
     <string name="model_in_use">Used for live transcription</string>
+    <string name="model_use_live">Use for live</string>
 </resources>

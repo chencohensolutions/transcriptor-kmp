@@ -1,7 +1,7 @@
 package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.speech.Downsampler
-import com.chencohensolution.transcriptor.speech.LiveTranscriber
+import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.Piece
 import com.chencohensolution.transcriptor.speech.SpeechEngine
 import com.chencohensolution.transcriptor.speech.Utterances
@@ -71,7 +71,7 @@ class SpeechTest {
                 listOf(Piece(0, 1000, "חבר הכנסת איילתא מיוחדת, ".repeat(5) + "חבר הכנסת גדול"))
             override fun close() {}
         }
-        val live = LiveTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
+        val live = UtteranceTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
         val pcm = silence(300) + tone(1_200) + silence(2_200)
         live.feed(pcm, pcm.size)
         runCurrent()
@@ -93,7 +93,7 @@ class SpeechTest {
     }
 
     private fun TestScope.transcriber(engine: FakeEngine) =
-        LiveTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
+        UtteranceTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
 
     @Test
     fun eachLineBecomesASegment() = runTest {
@@ -163,7 +163,7 @@ class SpeechTest {
                 listOf(Piece(0, 1000, "שלום", 0.1f), Piece(1000, 2000, "תודה רבה.", 0.9f))
             override fun close() {}
         }
-        val live = LiveTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
+        val live = UtteranceTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { engine }
         val pcm = silence(300) + tone(800) + silence(2_200)
         live.feed(pcm, pcm.size)
         runCurrent()
@@ -172,7 +172,7 @@ class SpeechTest {
 
     @Test
     fun aModelThatFailsToLoadIsReported() = runTest {
-        val live = LiveTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { error("no file") }
+        val live = UtteranceTranscriber("he", "m", backgroundScope, StandardTestDispatcher(testScheduler)) { error("no file") }
         runCurrent()
         assertEquals("no file", live.output.value.error)
     }

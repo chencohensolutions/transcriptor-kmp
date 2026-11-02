@@ -10,7 +10,11 @@ import com.chencohensolution.transcriptor.recording.androidFlacEncode
 import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
-import com.chencohensolution.transcriptor.speech.LiveTranscriber
+import com.chencohensolution.transcriptor.models.ModelKind
+import com.chencohensolution.transcriptor.models.SpeechModel
+import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
+import com.chencohensolution.transcriptor.speech.StreamingTranscriber
+import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.ModelFiles
 import com.chencohensolution.transcriptor.speech.WhisperEngine
 import kotlinx.coroutines.CoroutineScope
@@ -55,16 +59,32 @@ object Recording {
     }
 }
 
-/**
- * Live transcription for [language] with the first live model for it that is downloaded (the language's own models
- * come first: ivrit.ai's for Hebrew). Until Settings › Models exists, that order is the choice.
- */
+/** The live models for [language] that are downloaded, the language's own first (ivrit.ai's for Hebrew). */
+fun readyLiveModels(language: String) =
+    ModelCatalog.forLanguage(language).filter { it.fitsLive && Recording.models.isReady(it) }
+
+/** The live model that runs for [language]: the one chosen on the start screen if it is ready, else the first ready. */
+fun liveModelFor(language: String): SpeechModel? {
+    val ready = readyLiveModels(language)
+    return ready.firstOrNull { it.id == Recording.settings.liveModel(language) } ?: ready.firstOrNull()
+}
+
+/** Live transcription for [language] with [liveModelFor]'s model; null when none is downloaded. */
 private fun liveModel(language: String, scope: CoroutineScope): LiveModel? {
-    val model = ModelCatalog.forLanguage(language).firstOrNull { it.fitsLive && Recording.models.isReady(it) } ?: return null
-    val path = Recording.models.file(model).path
+    val model = liveModelFor(language) ?: return null
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
-    return LiveModel(model.name, LiveTranscriber(language, model.id, scope, worker) { WhisperEngine(path) })
+    val transcriber = when (model.kind) {
+        ModelKind.Whisper -> {
+            val path = Recording.models.file(model).path
+            UtteranceTranscriber(language, model.id, scope, worker) { WhisperEngine(path) }
+        }
+        ModelKind.StreamingTransducer -> {
+            val dir = Recording.models.dir(model)
+            StreamingTranscriber(model.id, scope, worker) { SherpaStreamingEngine(dir) }
+        }
+    }
+    return LiveModel(model.name, transcriber)
 }
 
 class TranscriptorApp : Application() {

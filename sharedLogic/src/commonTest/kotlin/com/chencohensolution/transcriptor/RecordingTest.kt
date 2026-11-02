@@ -76,6 +76,10 @@ class RecordingTest {
         assertEquals(AudioFormat.Wav, settings.audioFormat)
         settings.audioFormat = AudioFormat.FlacLive
         assertEquals(AudioFormat.FlacLive, SettingsStore(fs, root).audioFormat)
+        assertNull(settings.liveModel("he"))
+        settings.setLiveModel("he", "ivrit-zipformer2-66m-streaming")
+        assertEquals("ivrit-zipformer2-66m-streaming", SettingsStore(fs, root).liveModel("he"))
+        assertEquals(AudioFormat.FlacLive, SettingsStore(fs, root).audioFormat)
     }
 
     @Test
@@ -219,7 +223,7 @@ class LiveRecordingTest {
         val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 1L }) { language, scope ->
             com.chencohensolution.transcriptor.recording.LiveModel(
                 "fake",
-                com.chencohensolution.transcriptor.speech.LiveTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
+                com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
             )
         }
         val lecture = session.start(notebook, "t")

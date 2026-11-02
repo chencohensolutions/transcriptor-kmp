@@ -122,4 +122,7 @@ internal class FloatBuilder {
     }
 
     fun toArray() = data.copyOf(size)
+
+    /** The values so far, and empties the builder. */
+    fun drain(): FloatArray = toArray().also { size = 0 }
 }

@@ -8,7 +8,7 @@ class ModelCatalogTest {
     @Test
     fun hebrewGetsItsOwnModelsBeforeTheMultilingualOnes() {
         assertEquals(
-            listOf("ivrit-whisper-large-v3-turbo", "ivrit-whisper-large-v3", "whisper-large-v3-turbo", "whisper-large-v3"),
+            listOf("ivrit-whisper-large-v3-turbo", "ivrit-zipformer2-66m-streaming", "ivrit-whisper-large-v3", "whisper-large-v3-turbo", "whisper-large-v3"),
             ModelCatalog.forLanguage("he").map { it.id },
         )
     }

@@ -23,6 +23,8 @@ enum class AudioFormat {
 private data class SettingsFileV1(
     val v: Int = 1,
     val audioFormat: AudioFormat = AudioFormat.Wav,
+    /** The live model chosen per language (BCP-47 tag to model id). */
+    val liveModels: Map<String, String> = emptyMap(),
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -33,6 +35,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var audioFormat: AudioFormat
         get() = read().audioFormat
         set(value) = write(read().copy(audioFormat = value))
+
+    /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
+    fun liveModel(language: String): String? = read().liveModels[language]
+
+    fun setLiveModel(language: String, modelId: String) = write(read().let { it.copy(liveModels = it.liveModels + (language to modelId)) })
 
     private fun read(): SettingsFileV1 =
         if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else SettingsFileV1()

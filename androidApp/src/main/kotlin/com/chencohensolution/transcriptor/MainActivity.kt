@@ -156,15 +156,19 @@ private fun LiveModels(language: String) {
             delay(1_000)
         }
     }
-    val inUse = models.firstOrNull { statuses[it.id] == ModelStatus.Ready }
+    // Read again when a download finishes or a model is chosen.
+    val inUse = remember(statuses, refresh) { liveModelFor(language) }
     Text(stringResource(R.string.start_live_models), style = MaterialTheme.typography.titleSmall)
     models.forEach { model ->
-        ModelRow(model, statuses[model.id], model == inUse) { refresh++ }
+        ModelRow(
+            model, statuses[model.id], model == inUse,
+            choose = { Recording.settings.setLiveModel(language, model.id); refresh++ },
+        ) { refresh++ }
     }
 }
 
 @Composable
-private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, changed: () -> Unit) {
+private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, choose: () -> Unit, changed: () -> Unit) {
     var startError by remember { mutableStateOf<String?>(null) }
     val download = { startError = Recording.models.download(model); changed() }
     Column(Modifier.fillMaxWidth()) {
@@ -173,16 +177,17 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
             "${model.parameters} · ${model.license}" + if (inUse) " · " + stringResource(R.string.model_in_use) else "",
             style = MaterialTheme.typography.bodySmall,
         )
+        model.credit?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             when (status) {
                 null -> {}
                 ModelStatus.Missing -> TextButton(onClick = download) {
-                    Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
+                    Text(stringResource(R.string.model_download, sizeText(model.sizeBytes)))
                 }
                 is ModelStatus.Failed -> {
                     Text(stringResource(R.string.model_failed, status.reason), color = MaterialTheme.colorScheme.error)
                     TextButton(onClick = download) {
-                        Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
+                        Text(stringResource(R.string.model_download, sizeText(model.sizeBytes)))
                     }
                 }
                 is ModelStatus.Downloading, ModelStatus.WaitingForWifi -> {
@@ -200,12 +205,15 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
                 ModelStatus.Ready -> {
                     startError = null
                     Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    if (!inUse) TextButton(onClick = choose) { Text(stringResource(R.string.model_use_live)) }
                     TextButton(onClick = { Recording.models.delete(model); changed() }) { Text(stringResource(R.string.model_delete)) }
                 }
             }
         }
     }
 }
+
+private fun sizeText(bytes: Long) = if (bytes >= 1e9) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6)
 
 @Composable
 private fun LastLecture(lecture: Lecture, compressing: Float?) {
