@@ -12,5 +12,6 @@ internal val labScreens: List<LabScreen> = listOf(
         reviewOptionA,
         reviewOptionB,
         reviewOptionC,
+        reviewOptionC2,
     )),
 )
