@@ -34,4 +34,4 @@ Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/revi
 
 ## Design history
 
-- Round 1 (Nov 2, 2026), open: a — player + timeline, b — tabs, c — document + overview, c2 — c with the player at the bottom (owner's change to c).
+- [Round 1 (Nov 2, 2026)](../ux-history/review/2026-11-02-after-the-lecture.md): c2 — document with the player at the bottom (picked); a — player + timeline, b — tabs, c — document + overview.

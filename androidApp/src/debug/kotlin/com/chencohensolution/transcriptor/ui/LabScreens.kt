@@ -9,9 +9,6 @@ internal val labScreens: List<LabScreen> = listOf(
         lectureCurrent,
     )),
     LabScreen("review", "Lecture, after", listOf(
-        reviewOptionA,
-        reviewOptionB,
-        reviewOptionC,
         reviewOptionC2,
     )),
 )
