@@ -49,7 +49,14 @@ fun TranscriptorTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composabl
         lightColorScheme(primary = Color(0xFF2E3A8C), onPrimary = Color.White, primaryContainer = Color(0xFFDDE1FF))
     }
     androidx.compose.runtime.CompositionLocalProvider(LocalTranscriptorColors provides if (dark) darkExtra else lightExtra) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) {
+            // Text drawn straight on the background (not in a Surface) takes the background's text color, not
+            // Compose's default black, which is unreadable in the dark theme.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides scheme.onBackground,
+                content = content,
+            )
+        }
     }
 }
 
