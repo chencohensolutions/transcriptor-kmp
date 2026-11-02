@@ -27,6 +27,7 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
     private var thread: Thread? = null
     @Volatile private var reading = false
     private var frames = 0L
+    private var reads = 0
 
     @SuppressLint("MissingPermission")
     override fun start(file: Path, format: AudioFileFormat) {
@@ -87,9 +88,13 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
             synchronized(lock) { sink?.write(buffer, read) }
             onPcm?.invoke(buffer, read)
             frames += read / BYTES_PER_FRAME
-            position.value = frames * 1000 / RATE
-            meter.value = levelOf(buffer, read)
+            // The clock and the meter at 10 Hz: every buffer (50 Hz) would redraw the screen for nothing.
+            if (++reads % 5 == 0) {
+                position.value = frames * 1000 / RATE
+                meter.value = levelOf(buffer, read)
+            }
         }
+        position.value = frames * 1000 / RATE
     }
 
     /** RMS of the buffer on a rough dB scale, 0..1 (silence about 0, a voice near the phone 0.5–0.9). */

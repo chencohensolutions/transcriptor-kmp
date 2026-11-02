@@ -29,7 +29,8 @@ data class LiveOutput(
  * Live transcription of a lecture: the recording's PCM ([feed], from the recorder's thread) is downsampled, split
  * into utterances at pauses, and each closed utterance becomes a [Segment] (one line, with its start and end in the
  * recording). While nothing closed is waiting, the utterance being spoken is transcribed again every
- * [PARTIAL_EVERY_MS] of new audio, for the grey line. The engine runs on [worker], one call at a time; closed
+ * [PARTIAL_EVERY_MS] of new audio, for the grey line, until it is [MAX_PARTIAL_MS] long: each partial costs as much
+ * as the line so far, so a long line waits for its end. The engine runs on [worker], one call at a time; closed
  * utterances go first. Pauses don't reach [feed], so sample counts are the position in the audio.
  */
 class LiveTranscriber(
@@ -102,6 +103,7 @@ class LiveTranscriber(
                 if (synchronizedQueue { finishing }) break
                 val open = synchronizedQueue { utterances.openSnapshot() }
                 if (open != null && open.samples.size >= MIN_PARTIAL_SAMPLES &&
+                    open.samples.size <= MAX_PARTIAL_MS * 16 &&
                     open.samples.size - lastPartialSize >= PARTIAL_EVERY_MS * 16
                 ) {
                     lastPartialSize = open.samples.size
@@ -123,9 +125,14 @@ class LiveTranscriber(
         }
     }
 
+    // No prompt from the lines before: with one, the model continues mid-sentence (lines starting with ", ") and
+    // carries a repetition from line to line.
     private fun transcribe(engine: SpeechEngine, u: Utterance): String {
-        val prompt = _output.value.segments.takeLast(2).joinToString(" ") { it.text }.ifEmpty { null }
-        return engine.transcribe(u.samples, language, prompt).joinToString(" ") { it.text.trim() }.trim()
+        val raw = engine.transcribe(u.samples, language, null).filter { it.noSpeech < NO_SPEECH }.joinToString(" ") { it.text.trim() }
+        // More words than anyone can say in the time is the model inventing (often a phrase over and over), counted
+        // before the tidying shortens a loop.
+        val words = raw.split(' ').count { it.any(Char::isLetterOrDigit) }
+        return if (words > 2 + u.samples.size / 16_000.0 * MAX_WORDS_PER_SECOND) "" else cleanLine(raw)
     }
 
     private fun lag(doneUpToSample: Long) = ((synchronizedQueue { fed } - doneUpToSample) / 16).coerceAtLeast(0)
@@ -135,7 +142,21 @@ class LiveTranscriber(
     private inline fun <T> synchronizedQueue(block: () -> T): T = synchronized(queueLock) { block() }
 
     companion object {
-        const val PARTIAL_EVERY_MS = 1_500
+        /** Pieces the model rates above this as probably not speech are dropped ("תודה רבה." out of noise). */
+        const val NO_SPEECH = 0.6f
+        const val MAX_WORDS_PER_SECOND = 4.5
+        const val PARTIAL_EVERY_MS = 2_000
+        const val MAX_PARTIAL_MS = 10_000
         const val MIN_PARTIAL_SAMPLES = 16_000
     }
+}
+
+/**
+ * A line as the model wrote it, tidied: no punctuation or spaces before the first word, and a word or phrase (up to
+ * eight words) said three or more times in a row (a model stuck in a loop: "אתם, אתם, אתם") kept once.
+ */
+fun cleanLine(text: String): String {
+    var t = text.trim().trimStart { !it.isLetterOrDigit() }.replace(Regex("""\s+"""), " ")
+    t = Regex("""((?<!\S)[^\s,.]+(?:\s+[^\s,.]+){0,7}[,.]?)(?:\s+\1){2,}""").replace(t) { it.groupValues[1] }
+    return t.trim()
 }

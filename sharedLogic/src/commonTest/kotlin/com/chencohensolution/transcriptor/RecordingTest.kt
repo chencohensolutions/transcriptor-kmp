@@ -224,7 +224,7 @@ class LiveRecordingTest {
         }
         val lecture = session.start(notebook, "t")
         recorder.advance(500, silence(500))
-        recorder.advance(2_000, tone(2_000))
+        recorder.advance(3_500, tone(3_500))
         recorder.advance(1_000, silence(1_000))
         runCurrent()
         assertEquals("fake", session.state.value?.liveModelName)

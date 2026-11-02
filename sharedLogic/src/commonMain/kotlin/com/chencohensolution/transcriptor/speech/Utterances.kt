@@ -10,7 +10,8 @@ class Utterance(val startSample: Long, val samples: FloatArray) {
 
 /**
  * Splits 16 kHz audio into utterances at pauses, by loudness against a noise floor that follows the room: a line
- * ends after [PAUSE_MS] of quiet, or, past [SOFT_MAX_MS], at the first short quiet, and never runs past
+ * of at least [MIN_LINE_MS] ends after [PAUSE_MS] of quiet (a shorter one only after [LONG_PAUSE_MS]: the model
+ * guesses badly from a second of audio), or, past [SOFT_MAX_MS], at the first short quiet, and never runs past
  * [HARD_MAX_MS]. Keeps [PRE_ROLL_MS] before the speech starts so its first word isn't cut. Pieces with less than
  * [MIN_SPEECH_MS] of speech are dropped (a cough, a door).
  */
@@ -86,8 +87,9 @@ class Utterances {
         u.add(f)
         if (speech) { speechFrames++; quietFrames = 0 } else quietFrames++
         val lengthMs = u.size / 16
-        val end = quietFrames * FRAME_MS >= PAUSE_MS ||
-            (lengthMs >= SOFT_MAX_MS && quietFrames * FRAME_MS >= SHORT_PAUSE_MS) ||
+        val quietMs = quietFrames * FRAME_MS
+        val end = (quietMs >= PAUSE_MS && lengthMs - quietMs >= MIN_LINE_MS) || quietMs >= LONG_PAUSE_MS ||
+            (lengthMs >= SOFT_MAX_MS && quietMs >= SHORT_PAUSE_MS) ||
             lengthMs >= HARD_MAX_MS
         return if (end) close() else null
     }
@@ -96,6 +98,8 @@ class Utterances {
         const val FRAME = 480 // 30 ms
         const val FRAME_MS = 30
         const val PAUSE_MS = 600
+        const val LONG_PAUSE_MS = 2_000
+        const val MIN_LINE_MS = 3_000
         const val SHORT_PAUSE_MS = 150
         const val SOFT_MAX_MS = 15_000
         const val HARD_MAX_MS = 25_000

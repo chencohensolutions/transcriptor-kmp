@@ -41,7 +41,8 @@ Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeFree(JNIEnv *
     whisper_free(reinterpret_cast<whisper_context *>(ctx));
 }
 
-// Returns "t0\tt1\ttext" per segment, times in milliseconds; null if whisper_full failed.
+// Returns "t0\tt1\tno_speech\ttext" per segment, times in milliseconds, no_speech the model's probability that
+// there was no speech (0..1); null if whisper_full failed.
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeTranscribe(
         JNIEnv *env, jclass, jlong handle, jfloatArray samples, jstring language, jstring prompt, jint threads) {
@@ -56,9 +57,12 @@ Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeTranscribe(
     params.no_context = true;
     params.suppress_nst = true;
     // The encoder's window fitted to the audio (50 per second, plus a margin) instead of 30 s: several times faster
-    // for a line of a few seconds.
+    // for a line of a few seconds. Never under 8 s: with less, the model invents and repeats.
     jsize count_samples = env->GetArrayLength(samples);
-    params.audio_ctx = std::min(1500, (int) (count_samples * 50LL / 16000) + 64);
+    params.audio_ctx = std::min(1500, std::max(400, (int) (count_samples * 50LL / 16000) + 64));
+    // About what fast Hebrew speech needs (8 tokens a second) and a margin: a model stuck repeating a phrase stops
+    // there instead of decoding hundreds of tokens.
+    params.max_tokens = (int) (count_samples * 10LL / 16000) + 12;
     const char *lang = env->GetStringUTFChars(language, nullptr);
     params.language = lang;
     const char *initial = prompt ? env->GetStringUTFChars(prompt, nullptr) : nullptr;
@@ -77,6 +81,7 @@ Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeTranscribe(
     for (int i = 0; i < count; i++) {
         std::string line = std::to_string(whisper_full_get_segment_t0(ctx, i) * 10) + "\t" +
                            std::to_string(whisper_full_get_segment_t1(ctx, i) * 10) + "\t" +
+                           std::to_string(whisper_full_get_segment_no_speech_prob(ctx, i)) + "\t" +
                            whisper_full_get_segment_text(ctx, i);
         jstring s = env->NewStringUTF(line.c_str());
         env->SetObjectArrayElement(out, i, s);

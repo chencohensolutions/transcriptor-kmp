@@ -9,8 +9,8 @@ class WhisperEngine(path: String) : SpeechEngine {
         check(handle != 0L) { "Closed" }
         val lines = nativeTranscribe(handle, samples, language, prompt, threads) ?: error("whisper failed")
         return lines.map { line ->
-            val (start, end, text) = line.split('\t', limit = 3)
-            Piece(start.toLong(), end.toLong(), text)
+            val (start, end, noSpeech, text) = line.split('\t', limit = 4)
+            Piece(start.toLong(), end.toLong(), text, noSpeech.toFloat())
         }
     }
 

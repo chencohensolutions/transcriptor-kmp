@@ -55,7 +55,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,7 +86,7 @@ class LiveLectureActions(
 @Composable
 fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     val colors = LocalTranscriptorColors.current
-    val entries = timelineOf(state.lecture)
+    val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val atLive by remember { derivedStateOf { !list.canScrollForward } }
@@ -160,7 +163,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         if (state.partial != null) {
                             Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                                 Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
-                                Text(state.partial + " …", style = MaterialTheme.typography.bodyLarge, color = colors.partial, fontStyle = FontStyle.Italic)
+                                Text(state.partial + " …", style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), color = colors.partial, fontStyle = FontStyle.Italic)
                             }
                         }
                     }
@@ -187,6 +190,14 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     }
 }
 
+/**
+ * The notebook's text as paragraphs in the notebook's direction (the layout direction provided around it), not
+ * guessed from the first letter: a Hebrew line that starts with an English word or a number stays right-to-left.
+ */
+@Composable
+private fun TextStyle.inNotebookDirection() =
+    copy(textDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextDirection.Rtl else TextDirection.Ltr)
+
 @Composable
 private fun SpeechRow(entry: TimelineEntry.Speech, onClick: () -> Unit) {
     val colors = LocalTranscriptorColors.current
@@ -197,7 +208,7 @@ private fun SpeechRow(entry: TimelineEntry.Speech, onClick: () -> Unit) {
             color = colors.time,
             modifier = Modifier.width(44.dp).padding(top = 3.dp),
         )
-        Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge, lineHeight = 26.sp)
+        Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp)
     }
 }
 
@@ -213,7 +224,7 @@ private fun NoteCard(entry: TimelineEntry.Written) {
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(formatClock(entry.note.atMillis), style = MaterialTheme.typography.labelSmall, color = colors.onNote.copy(alpha = 0.7f))
-                Text(entry.note.text, style = MaterialTheme.typography.bodyMedium, color = colors.onNote)
+                Text(entry.note.text, style = MaterialTheme.typography.bodyMedium.inNotebookDirection(), color = colors.onNote)
             }
         }
     }
