@@ -95,6 +95,7 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
 {
   "v": 1,
   "speakerPass": true,
+  "refinedWith": "ivrit-whisper-large-v3",
   "id": "lecture-7",
   "title": "זיכרון עבודה",
   "language": "he",
@@ -130,8 +131,12 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
   downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
 - Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
-  naming speakers, notes after the lecture, and the speaker pass from its menu. Stop opens it. The refine pass (Whisper
-  large-v3 over the recording) is next for it.
+  naming speakers, notes after the lecture, and the speaker pass and the refine pass from its menu. Stop opens it.
+- **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
+  model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
+  non-speech pieces, no impossible word counts, loops collapsed). Lines keep their times and speakers; edited lines and
+  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. Not timed on the phone yet;
+  large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
 - Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.
 

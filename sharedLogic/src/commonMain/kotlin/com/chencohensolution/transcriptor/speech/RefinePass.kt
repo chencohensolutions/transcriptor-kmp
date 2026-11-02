@@ -1,0 +1,38 @@
+package com.chencohensolution.transcriptor.speech
+
+import com.chencohensolution.transcriptor.notebook.Lecture
+
+/**
+ * The refine pass after the lecture: every line transcribed again, from its own audio, with the larger model (Whisper
+ * large-v3: more accurate, with punctuation, slower than real time on a phone). Lines keep their times and speakers;
+ * lines the user edited keep their text too. A line the model gives nothing for (noise it won't invent from) keeps the
+ * live text. The word times of the live model no longer match the new text, so they are dropped: run the speaker pass
+ * first.
+ */
+class RefinePass(
+    private val engine: SpeechEngine,
+    /** A stretch of the recording, 16 kHz mono. */
+    private val audio: (startMillis: Long, endMillis: Long) -> FloatArray,
+) {
+    fun run(lecture: Lecture, modelId: String, progress: (Float) -> Unit = {}): Lecture {
+        val lines = lecture.segments
+        val refined = lines.mapIndexed { i, line ->
+            val done = if (line.edited) line else {
+                // A little before and after the line, so its first and last words aren't cut; at most Whisper's 30 s.
+                val start = (line.startMillis - LEAD_MILLIS).coerceAtLeast(0)
+                val end = minOf(line.endMillis + TAIL_MILLIS, start + MAX_MILLIS, lecture.durationMillis.takeIf { it > 0 } ?: Long.MAX_VALUE)
+                val text = transcribeLine(engine, audio(start, end), lecture.language)
+                if (text.isEmpty()) line else line.copy(text = text, modelId = modelId, words = emptyList())
+            }
+            progress((i + 1f) / lines.size)
+            done
+        }
+        return lecture.copy(segments = refined, refinedWith = modelId)
+    }
+
+    companion object {
+        const val LEAD_MILLIS = 200L
+        const val TAIL_MILLIS = 300L
+        const val MAX_MILLIS = 29_500L
+    }
+}

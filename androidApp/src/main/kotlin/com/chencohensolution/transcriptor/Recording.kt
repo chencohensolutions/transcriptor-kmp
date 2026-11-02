@@ -18,6 +18,7 @@ import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.speech.RecordingAudio
 import com.chencohensolution.transcriptor.speech.SherpaDiarizer
 import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
+import com.chencohensolution.transcriptor.speech.RefinePass
 import com.chencohensolution.transcriptor.speech.SpeakerPass
 import com.chencohensolution.transcriptor.speech.withTurns
 import com.chencohensolution.transcriptor.speech.SherpaVoiceEmbedder
@@ -57,8 +58,38 @@ object Recording {
     /** Compressing to FLAC: 0..1, null when not. */
     val compressing = MutableStateFlow<Float?>(null)
 
-    /** The speaker pass on [lastLecture]: 0..1, null when not running. */
+    /** The speaker pass: 0..1, null when not running. */
     val findingSpeakers = MutableStateFlow<Float?>(null)
+
+    /** The refine pass: the lecture it runs on and 0..1; null when not running. */
+    val refining = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** The refine model that runs for [language]: the first downloaded one the catalog offers for it (its own first). */
+    fun refineModelFor(language: String): SpeechModel? =
+        ModelCatalog.forLanguage(language).firstOrNull { !it.fitsLive && it.kind == ModelKind.Whisper && models.isReady(it) }
+
+    /**
+     * The refine pass on [lecture] (minutes to hours: slower than real time; not on the main thread): every line
+     * transcribed again with the refine model, edited lines kept. Saves and returns it.
+     */
+    fun refine(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
+        val model = refineModelFor(lecture.language) ?: error("No refine model for ${lecture.language}")
+        store.repairAudio(lecture)
+        val file = store.audioPath(lecture).toFile()
+        WhisperEngine(models.file(model).path).use { engine ->
+            val done = RefinePass(engine) { a, b -> RecordingAudio.range(file, a, b) }.run(lecture, model.id, progress)
+            // Saved over what is on disk now, with its edits since (the review screen may have changed it meanwhile):
+            // only the lines' texts the pass wrote are taken.
+            val now = store.load(lecture.notebookId, lecture.id) ?: lecture
+            val refined = done.segments.associateBy { it.id }
+            val merged = now.copy(
+                segments = now.segments.map { s -> refined[s.id]?.takeIf { !s.edited && it.modelId == model.id }?.let { s.copy(text = it.text, modelId = it.modelId, words = emptyList()) } ?: s },
+                refinedWith = model.id,
+            )
+            store.save(merged)
+            return merged
+        }
+    }
 
     lateinit var voices: VoiceStore
         private set

@@ -26,7 +26,10 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 - A note pill: tap to open it, tap its time to jump there, hold to edit or delete. The note-here button adds a note at
   the playhead.
 - ⋮ → Find the speakers runs the speaker pass in the recording service (a banner shows its progress); the lines are
-  read again when it finishes. Shown only when its models are downloaded. The refine pass joins the menu when built.
+  read again when it finishes. Shown only when its models are downloaded.
+- ⋮ → Refine with (the refine model) runs the refine pass in the recording service: every line transcribed again from
+  its own audio with Whisper large-v3, edited lines kept, times and speakers kept (its word times are dropped, so run
+  Find the speakers first). Slower than the lecture itself on a phone. Shown when a refine model is downloaded.
 - Every change is saved to `lecture.json` at once.
 
 ## Code

@@ -117,13 +117,7 @@ class UtteranceTranscriber(
 
     // No prompt from the lines before: with one, the model continues mid-sentence (lines starting with ", ") and
     // carries a repetition from line to line.
-    private fun transcribe(engine: SpeechEngine, u: Utterance): String {
-        val raw = engine.transcribe(u.samples, language, null).filter { it.noSpeech < NO_SPEECH }.joinToString(" ") { it.text.trim() }
-        // More words than anyone can say in the time is the model inventing (often a phrase over and over), counted
-        // before the tidying shortens a loop.
-        val words = raw.split(' ').count { it.any(Char::isLetterOrDigit) }
-        return if (words > 2 + u.samples.size / 16_000.0 * MAX_WORDS_PER_SECOND) "" else cleanLine(raw)
-    }
+    private fun transcribe(engine: SpeechEngine, u: Utterance): String = transcribeLine(engine, u.samples, language)
 
     private fun lag(doneUpToSample: Long) = ((synchronizedQueue { fed } - doneUpToSample) / 16).coerceAtLeast(0)
 
@@ -141,3 +135,14 @@ class UtteranceTranscriber(
     }
 }
 
+
+/**
+ * One line's text from a Whisper model, without what it invents: pieces it rates as probably not speech are dropped,
+ * and a line with more words than anyone can say in its time (often a phrase over and over, counted before the tidying
+ * shortens a loop) gives nothing. Live transcription and the refine pass both use it.
+ */
+fun transcribeLine(engine: SpeechEngine, samples: FloatArray, language: String): String {
+    val raw = engine.transcribe(samples, language, null).filter { it.noSpeech < UtteranceTranscriber.NO_SPEECH }.joinToString(" ") { it.text.trim() }
+    val words = raw.split(' ').count { it.any(Char::isLetterOrDigit) }
+    return if (words > 2 + samples.size / 16_000.0 * UtteranceTranscriber.MAX_WORDS_PER_SECOND) "" else cleanLine(raw)
+}

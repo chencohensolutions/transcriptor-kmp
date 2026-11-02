@@ -66,6 +66,7 @@ private data class LectureFileV1(
     val audio: String,
     val pendingFlac: Boolean = false,
     val speakerPass: Boolean = false,
+    val refinedWith: String? = null,
     val speakers: List<SpeakerV1> = emptyList(),
     val segments: List<SegmentV1> = emptyList(),
     val notes: List<NoteV1> = emptyList(),
@@ -77,7 +78,7 @@ private data class LectureFileV1(
         segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
-        audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass,
+        audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass, refinedWith = refinedWith,
     )
 
     companion object {
@@ -86,7 +87,7 @@ private data class LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
             durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac,
-            speakerPass = lecture.speakerPass,
+            speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },
             segments = lecture.segments.map {
                 SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId, it.words.map { w -> WordV1(w.atMillis, w.text) })

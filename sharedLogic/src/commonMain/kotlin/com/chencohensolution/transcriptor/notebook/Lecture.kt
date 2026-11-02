@@ -41,6 +41,8 @@ data class Lecture(
     val pendingFlac: Boolean = false,
     /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
     val speakerPass: Boolean = false,
+    /** The model the refine pass transcribed it with again; null before it. */
+    val refinedWith: String? = null,
 )
 
 const val AUDIO_WAV = "audio.wav"

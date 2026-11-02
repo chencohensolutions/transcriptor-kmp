@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.update
 /**
  * A recorded lecture, opened: playing it ([AudioPlayer]), correcting its lines and their speakers, naming the speakers
  * (in the notebook's [voices] too, with a voice print from [printOf]), and notes after the lecture. Every change is
- * saved to `lecture.json` at once. [speakerPass] is fed by the app, which runs the pass in the background.
+ * saved to `lecture.json` at once. [passes] is fed by the app, which runs the passes in the background.
  */
 class LectureReview(
     private val store: LectureStore,
@@ -33,15 +33,17 @@ class LectureReview(
 
     private val open = MutableStateFlow<Open?>(null)
 
-    /** The speaker pass for the open lecture: null when it can't run here. */
-    val speakerPass = MutableStateFlow<PassState?>(null)
+    /** The passes over the recording for the open lecture, fed by the app: each null when it can't run here. */
+    data class Passes(val speakers: PassState? = null, val refine: PassState? = null, val refineModelName: String? = null)
+
+    val passes = MutableStateFlow(Passes())
 
     val state: StateFlow<ReviewState?> =
-        combine(open, player.positionMillis, player.playing, speakerPass) { o, position, playing, speakers ->
+        combine(open, player.positionMillis, player.playing, passes) { o, position, playing, p ->
             o?.let {
                 ReviewState(
                     notebookTitle = it.notebookTitle, lecture = it.lecture, positionMillis = position, playing = playing,
-                    speed = it.speed, refineModelName = null, refine = null, speakerPass = speakers,
+                    speed = it.speed, refineModelName = p.refineModelName, refine = p.refine, speakerPass = p.speakers,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -65,7 +67,7 @@ class LectureReview(
         open.value = null
     }
 
-    /** Reads the open lecture again from disk (after the speaker pass changed it), keeping the playback. */
+    /** Reads the open lecture again from disk (after a pass changed it), keeping the playback. */
     fun reload() {
         val o = open.value ?: return
         val lecture = store.load(o.lecture.notebookId, o.lecture.id) ?: return

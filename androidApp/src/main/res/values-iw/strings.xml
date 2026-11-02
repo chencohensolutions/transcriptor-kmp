@@ -67,4 +67,8 @@
     <string name="review_move_line">מי אמר את השורה ב־%1$s?</string>
     <string name="start_lectures">הרצאות</string>
     <string name="start_speakers_count">%1$d דוברים</string>
+    <string name="refining">משפר את התמלול…</string>
+    <string name="start_refine_models">אחרי ההרצאה: שיפור (עברית)</string>
+    <string name="start_refine_note">מתמלל הרצאה מחדש עם המודל הגדול, מהתפריט של מסך ההרצאה: מדויק יותר, עם פיסוק, ואיטי יותר מההרצאה עצמה. שורות שערכתם נשארות.</string>
+    <string name="model_in_use_refine">משמש לשיפור</string>
 </resources>

@@ -59,6 +59,15 @@ class RecordingService : Service() {
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
                 if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers) findSpeakers(lecture) else compressPending()
             }
+            ACTION_REFINE -> {
+                val lecture = Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_LECTURE)!!)
+                if (lecture != null && !session.isRecording && !compressing && Recording.refineModelFor(lecture.language) != null) {
+                    refine(lecture)
+                } else {
+                    startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                    finish()
+                }
+            }
             ACTION_SPEAKERS -> {
                 val wanted = intent.getStringExtra(EXTRA_LECTURE)
                 val lecture = if (wanted == null) Recording.lastLecture.value
@@ -95,6 +104,29 @@ class RecordingService : Service() {
             }
                 .onFailure { android.util.Log.e("RecordingService", "speaker pass failed", it) }
             Recording.findingSpeakers.value = null
+            compressing = false
+            launch(Dispatchers.Main) { compressPending() }
+        }
+    }
+
+    /** The refine pass on [lecture], as a media-processing foreground service; then any FLAC compression. */
+    private fun refine(lecture: Lecture) {
+        compressing = true
+        startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        scope.launch(Dispatchers.IO) {
+            var shown = -1
+            Recording.refining.value = lecture.id to 0f
+            runCatching {
+                Recording.refine(lecture) { p ->
+                    Recording.refining.value = lecture.id to p
+                    val percent = (p * 100).toInt()
+                    if (percent != shown) { shown = percent; notify(progressNotification(R.string.refining, p)) }
+                }
+            }.onSuccess { done ->
+                if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
+                launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
+            }.onFailure { android.util.Log.e("RecordingService", "refine pass failed", it) }
+            Recording.refining.value = null
             compressing = false
             launch(Dispatchers.Main) { compressPending() }
         }
@@ -182,6 +214,7 @@ class RecordingService : Service() {
         private const val ACTION_STOP = "stop"
         private const val ACTION_COMPRESS = "compress"
         private const val ACTION_SPEAKERS = "speakers"
+        private const val ACTION_REFINE = "refine"
         private const val EXTRA_NOTEBOOK = "notebook"
         private const val EXTRA_NOTEBOOK_TITLE = "notebookTitle"
         private const val EXTRA_LANGUAGE = "language"
@@ -196,6 +229,12 @@ class RecordingService : Service() {
 
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
+
+        /** Runs the refine pass on [lecture]. */
+        fun refine(context: Context, lecture: Lecture) = context.startForegroundService(
+            Intent(context, RecordingService::class.java).setAction(ACTION_REFINE)
+                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId),
+        )
 
         /** Runs the speaker pass on [lecture] (again), or on [Recording.lastLecture]. */
         fun findSpeakers(context: Context, lecture: Lecture? = null) = context.startForegroundService(

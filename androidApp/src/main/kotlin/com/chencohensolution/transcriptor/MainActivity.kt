@@ -50,6 +50,7 @@ import com.chencohensolution.transcriptor.speech.ModelStatus
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.lifecycleScope
+import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
 import com.chencohensolution.transcriptor.ui.ReviewActions
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
                         openLecture(lecture)
                     }
                 }
-                ReviewSpeakerPass()
+                ReviewPasses()
                 val state = live
                 val review = opened
                 when {
@@ -111,6 +112,7 @@ class MainActivity : ComponentActivity() {
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
+                                refine = { RecordingService.refine(this, review.lecture) },
                                 addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
                             ),
                         )
@@ -136,20 +138,33 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Feeds the open lecture's speaker pass from the recording service: running, done, or unavailable without its models. */
+/** Feeds the open lecture's passes from the recording service: running, done, or unavailable without their models. */
 @Composable
-private fun ReviewSpeakerPass() {
+private fun ReviewPasses() {
     val finding by Recording.findingSpeakers.collectAsStateWithLifecycle()
+    val refining by Recording.refining.collectAsStateWithLifecycle()
     val opened by Recording.review.state.collectAsStateWithLifecycle()
     val lecture = opened?.lecture
-    LaunchedEffect(finding, lecture?.speakerPass, lecture?.id) {
-        val progress = finding
-        Recording.review.speakerPass.value = when {
-            lecture == null || !Recording.canFindSpeakers -> null
-            progress != null -> PassState.Running(progress)
-            lecture.speakerPass -> PassState.Done
-            else -> PassState.NotRun
-        }
+    LaunchedEffect(finding, refining, lecture?.speakerPass, lecture?.refinedWith, lecture?.id) {
+        if (lecture == null) { Recording.review.passes.value = LectureReview.Passes(); return@LaunchedEffect }
+        val speakers = finding
+        val refine = refining?.takeIf { it.first == lecture.id }?.second
+        val model = Recording.refineModelFor(lecture.language)
+        Recording.review.passes.value = LectureReview.Passes(
+            speakers = when {
+                !Recording.canFindSpeakers -> null
+                speakers != null -> PassState.Running(speakers)
+                lecture.speakerPass -> PassState.Done
+                else -> PassState.NotRun
+            },
+            refine = when {
+                model == null -> null
+                refine != null -> PassState.Running(refine)
+                lecture.refinedWith != null -> PassState.Done
+                else -> PassState.NotRun
+            },
+            refineModelName = model?.name,
+        )
     }
 }
 
@@ -196,6 +211,7 @@ private fun StartScreen(onStart: () -> Unit, onOpen: (Lecture) -> Unit) {
                 }
             }
             LiveModels("he")
+            RefineModels("he")
             SpeakerModel()
             Button(
                 onClick = { permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)) },
@@ -230,6 +246,23 @@ private fun LiveModels(language: String) {
     }
 }
 
+/** The refine models for [language] (the refine pass after the lecture); the first one ready is the one used. */
+@Composable
+private fun RefineModels(language: String) {
+    val models = ModelCatalog.forLanguage(language).filter { !it.fitsLive && it.kind == ModelKind.Whisper }
+    var refresh by remember { mutableStateOf(0) }
+    val statuses by produceState(emptyMap<String, ModelStatus>(), refresh) {
+        while (true) {
+            value = models.associate { it.id to Recording.models.status(it) }
+            delay(1_000)
+        }
+    }
+    val inUse = remember(statuses, refresh) { Recording.refineModelFor(language) }
+    Text(stringResource(R.string.start_refine_models), style = MaterialTheme.typography.titleSmall)
+    Text(stringResource(R.string.start_refine_note), style = MaterialTheme.typography.bodySmall)
+    models.forEach { model -> ModelRow(model, statuses[model.id], model == inUse, choose = {}) { refresh++ } }
+}
+
 /** The voice-print model for speaker labels: labels are on once it is downloaded. */
 @Composable
 private fun SpeakerModel() {
@@ -255,7 +288,11 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
     Column(Modifier.fillMaxWidth()) {
         Text(model.name, style = MaterialTheme.typography.bodyLarge)
         Text(
-            "${model.parameters} · ${model.license}" + if (inUse && model.kind != ModelKind.SpeakerEmbedding) " · " + stringResource(R.string.model_in_use) else "",
+            "${model.parameters} · ${model.license}" + when {
+                !inUse || model.kind != ModelKind.Whisper && model.kind != ModelKind.StreamingTransducer -> ""
+                model.fitsLive -> " · " + stringResource(R.string.model_in_use)
+                else -> " · " + stringResource(R.string.model_in_use_refine)
+            },
             style = MaterialTheme.typography.bodySmall,
         )
         model.credit?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
