@@ -33,6 +33,7 @@ kotlin {
         commonMain.dependencies {
             api(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.atomicfu)
             api(libs.okio) // Path and FileSystem are in the stores' and the recorder's API
         }
         androidMain.dependencies {

@@ -19,6 +19,7 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
     private val meter = MutableStateFlow(0f)
     override val positionMillis: StateFlow<Long> = position
     override val level: StateFlow<Float> = meter
+    @Volatile override var onPcm: ((pcm: ByteArray, size: Int) -> Unit)? = null
 
     private val lock = Any()
     private var record: AudioRecord? = null
@@ -84,6 +85,7 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
             val read = record.read(buffer, 0, buffer.size)
             if (read <= 0) continue
             synchronized(lock) { sink?.write(buffer, read) }
+            onPcm?.invoke(buffer, read)
             frames += read / BYTES_PER_FRAME
             position.value = frames * 1000 / RATE
             meter.value = levelOf(buffer, read)

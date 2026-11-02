@@ -36,8 +36,8 @@ class RecordingService : Service() {
             NotificationChannel(CHANNEL, getString(R.string.recording_channel), NotificationManager.IMPORTANCE_LOW),
         )
         scope.launch {
-            Recording.session.state.filterNotNull().map { it.paused }.distinctUntilChanged().collect { paused ->
-                notify(recordingNotification(paused))
+            Recording.session.state.filterNotNull().map { it.paused to it.finishing }.distinctUntilChanged().collect { (paused, finishing) ->
+                notify(if (finishing) finishingNotification() else recordingNotification(paused))
             }
         }
     }
@@ -53,7 +53,8 @@ class RecordingService : Service() {
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()
-            ACTION_STOP -> {
+            ACTION_STOP -> scope.launch {
+                // Returns once live transcription has finished the last lines.
                 session.stop()?.let { Recording.lastLecture.value = it }
                 compressPending()
             }
@@ -116,6 +117,13 @@ class RecordingService : Service() {
             .addAction(action(ACTION_STOP, R.string.lecture_stop))
             .build()
     }
+
+    private fun finishingNotification() = Notification.Builder(this, CHANNEL)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setContentTitle(getString(R.string.lecture_finishing))
+        .setProgress(0, 0, true)
+        .setOngoing(true)
+        .build()
 
     private fun compressNotification(progress: Float) = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)

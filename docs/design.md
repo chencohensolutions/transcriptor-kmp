@@ -13,19 +13,29 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Speech models
 
-- Engine: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT) with quantized ggml files, the same native
-  code on Android (JNI) and iOS (cinterop, Metal/Core ML for the encoder). Kotlin sees one engine interface; switching
-  models loads another file.
+- Engine: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT, a submodule in `third_party/`, pinned to a
+  release) with ggml files, the same native code on Android (JNI) and iOS (cinterop, Metal/Core ML for the encoder).
+  Kotlin sees one engine interface (`SpeechEngine`); switching models loads another file.
+- Files: downloaded from the publisher at a pinned commit and checked against their sha256 (`ModelCatalog`). ivrit.ai
+  publishes only full precision (f16, 1.6 GB for turbo), so the phone quantizes it to q8_0 after the download
+  (whisper.cpp's own quantizer, built into the app): 874 MB, and on a Galaxy S25 twice as fast, with the same text.
+  q5_0 was no faster than f16 there.
+- Measured on a Galaxy S25 (6 threads, ivrit.ai turbo q8_0): 6.5 s of Hebrew in about 2.3 s, with the encoder's
+  window fitted to the line (`audio_ctx`) instead of whisper's fixed 30 s, which alone is 5× faster. Loading the
+  model takes about 2 s, once per lecture.
 - Two passes per lecture, each with its own model, chosen **per language** in Settings › Models:
-  - **Live**, during the lecture: the turbo model (809M parameters, about 570 MB), fast enough on recent phones.
-  - **Refine**, after the lecture: large-v3 (1.55B, about 1.1 GB) over the whole FLAC, slower than real time; it
+  - **Live**, during the lecture: the turbo model (809M parameters, about 570–870 MB), fast enough on recent phones.
+  - **Refine**, after the lecture: large-v3 (1.55B, about 1.1–1.7 GB) over the whole recording, slower than real time; it
     replaces the live lines, except lines the user edited.
 - Hebrew: ivrit.ai's fine-tunes of Whisper (Apache-2.0), the strongest open Hebrew models known as of Nov 2026. Other
   languages: OpenAI's Whisper large-v3 and turbo (MIT). Every model offered must be free for commercial use. Models
   under non-commercial licenses (Meta's MMS, SeamlessM4T: CC-BY-NC) were not better for Hebrew and are left out.
   Compare new Hebrew models on the [ivrit.ai leaderboard](https://ivrit-ai-hebrew-transcription-leaderboard.hf.space/).
-- Lines: a voice activity detector (Silero VAD, MIT; built into whisper.cpp) splits the audio at pauses; each piece
-  of speech becomes a **segment** with its start and end.
+- Lines, live: the recording is downsampled to 16 kHz mono and split at pauses by loudness against the room's noise
+  floor (`Utterances`: a pause of 0.6 s ends a line; past 15 s a short pause does; 25 s at most). Each line becomes a
+  **segment** with its start and end in the recording; the line being spoken is transcribed again every 1.5 s of new
+  audio for the grey partial line. Lines waiting go first. Silero VAD (built into whisper.cpp) may replace the
+  loudness test if classrooms need it.
 
 ### Audio
 
@@ -85,9 +95,10 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 
 - The project, the shared data types and the model catalog, the Android UI lab.
 - Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
-  screen off too, and saves notes and `lecture.json`. There are no lines yet; live transcription (whisper.cpp) is
-  next. The app opens on a temporary start screen (audio format, Start lecture) until the Notebooks screen is
-  designed.
+  screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
+  `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
+  downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
+- Next: speaker labels during the lecture (owner's request): a voice print per line, matched to the speakers so far.
 
 ## Open questions
 

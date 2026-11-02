@@ -14,10 +14,13 @@ update those docs whenever a screen changes.
   `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs. `notebook/LectureStore.kt`: lectures
   on disk (`lecture.json`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per
   platform; Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
-  `SettingsStore`, `AudioFormat`.
+  `SettingsStore`, `AudioFormat`. `speech/`: `SpeechEngine`, `LiveTranscriber` (live lines), `Utterances`
+  (splitting at pauses), `Downsampler`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf` and `formatClock`. Strings in
-  `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`.
+  `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
+  `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models.
+- `third_party/whisper.cpp` — a git submodule pinned to a release: `git submodule update --init` after cloning.
 - `iosApp/` — native SwiftUI, not created yet: iOS is built after the Android app is finished. The shared logic
   already builds for iOS.
 

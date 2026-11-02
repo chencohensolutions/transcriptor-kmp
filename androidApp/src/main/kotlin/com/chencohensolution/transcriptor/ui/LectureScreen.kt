@@ -112,7 +112,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     )
                     Spacer(Modifier.width(8.dp))
                     LevelBars(state.level)
-                    IconButton(onClick = actions.pauseOrResume) {
+                    IconButton(onClick = actions.pauseOrResume, enabled = !state.finishing) {
                         Icon(
                             if (state.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                             stringResource(if (state.paused) R.string.lecture_resume else R.string.lecture_pause),
@@ -120,6 +120,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     }
                     FilledIconButton(
                         onClick = actions.stop,
+                        enabled = !state.finishing,
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.recording, contentColor = Color.White),
                     ) { Icon(Icons.Filled.Stop, stringResource(R.string.lecture_stop)) }
                 }
@@ -134,11 +135,18 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     // The app's text, in the app's direction, among the notebook's content.
                     item {
                         val model = state.liveModelName
+                        val error = state.liveError
+                        val status = when {
+                            state.finishing -> stringResource(R.string.lecture_finishing)
+                            model == null -> stringResource(R.string.lecture_no_live_model)
+                            error != null -> stringResource(R.string.lecture_live_failed, error)
+                            state.liveLoading -> stringResource(R.string.lecture_live_loading, model)
+                            else -> stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)
+                        }
                         CompositionLocalProvider(LocalLayoutDirection provides appDirection) { Text(
-                            if (model != null) stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)
-                            else stringResource(R.string.lecture_no_transcription),
+                            status,
                             style = MaterialTheme.typography.labelSmall,
-                            color = colors.time,
+                            color = if (state.liveError != null) MaterialTheme.colorScheme.error else colors.time,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                         ) }
                     }

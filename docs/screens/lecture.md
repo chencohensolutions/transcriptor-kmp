@@ -1,7 +1,6 @@
 # Lecture, while recording
 
-Android, in the app: recording and notes work, and the lines arrive with live transcription (next). iOS after
-Android is finished.
+Android, in the app: recording, live lines and notes. iOS after Android is finished.
 
 ## What it's for
 
@@ -19,8 +18,9 @@ recording or the transcription.
 
 One timeline (round 1's option a): lines and notes in the order they happened, each note as an amber card right
 after the line that was being said when its typing started. The note bar is always open at the bottom; its time chip
-is set at the first keystroke. Until live transcription exists, a line in the app's language says so where the lines
-will be.
+is set at the first keystroke. Above the lines, a status line in the app's language: the live model and how far
+behind it is, "Loading…", that no live model is downloaded for the language, or that live transcription stopped (the
+recording goes on). After Stop, "Finishing the last lines…" until the waiting lines are done.
 
 ## Behavior
 

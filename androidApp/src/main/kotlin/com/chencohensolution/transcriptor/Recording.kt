@@ -7,7 +7,12 @@ import com.chencohensolution.transcriptor.recording.AndroidRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
 import com.chencohensolution.transcriptor.recording.LectureSession
 import com.chencohensolution.transcriptor.recording.androidFlacEncode
+import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
+import com.chencohensolution.transcriptor.speech.LiveTranscriber
+import com.chencohensolution.transcriptor.speech.ModelFiles
+import com.chencohensolution.transcriptor.speech.WhisperEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +33,8 @@ object Recording {
         private set
     lateinit var compression: FlacCompression
         private set
+    lateinit var models: ModelFiles
+        private set
 
     /** The last lecture stopped, for the start screen. */
     val lastLecture = MutableStateFlow<Lecture?>(null)
@@ -39,9 +46,25 @@ object Recording {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root)
         settings = SettingsStore(FileSystem.SYSTEM, root)
-        session = LectureSession(AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        models = ModelFiles(app)
+        session = LectureSession(
+            AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            live = ::liveModel,
+        )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
     }
+}
+
+/**
+ * Live transcription for [language] with the first live model for it that is downloaded (the language's own models
+ * come first: ivrit.ai's for Hebrew). Until Settings › Models exists, that order is the choice.
+ */
+private fun liveModel(language: String, scope: CoroutineScope): LiveModel? {
+    val model = ModelCatalog.forLanguage(language).firstOrNull { it.fitsLive && Recording.models.isReady(it) } ?: return null
+    val path = Recording.models.file(model).path
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val worker = Dispatchers.Default.limitedParallelism(1)
+    return LiveModel(model.name, LiveTranscriber(language, model.id, scope, worker) { WhisperEngine(path) })
 }
 
 class TranscriptorApp : Application() {

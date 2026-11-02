@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -37,7 +42,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.Notebook
+import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.speech.ModelStatus
 import com.chencohensolution.transcriptor.ui.LectureScreen
 import com.chencohensolution.transcriptor.ui.LiveLectureActions
 import com.chencohensolution.transcriptor.ui.TranscriptorTheme
@@ -103,7 +111,7 @@ private fun StartScreen(onStart: () -> Unit) {
     }
     Surface(Modifier.fillMaxSize()) {
         Column(
-            Modifier.safeDrawingPadding().padding(24.dp),
+            Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
@@ -126,12 +134,72 @@ private fun StartScreen(onStart: () -> Unit) {
                     }
                 }
             }
+            LiveModels("he")
             Button(
                 onClick = { permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.start_lecture)) }
             last?.let { LastLecture(it, compressing) }
             Text(stringResource(R.string.main_coming_soon), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** The live models for [language], each with its download; the first one ready is the one used. */
+@Composable
+private fun LiveModels(language: String) {
+    val models = ModelCatalog.forLanguage(language).filter { it.fitsLive }
+    var refresh by remember { mutableStateOf(0) }
+    val statuses by produceState(emptyMap<String, ModelStatus>(), refresh) {
+        while (true) {
+            value = models.associate { it.id to Recording.models.status(it) }
+            delay(1_000)
+        }
+    }
+    val inUse = models.firstOrNull { statuses[it.id] == ModelStatus.Ready }
+    Text(stringResource(R.string.start_live_models), style = MaterialTheme.typography.titleSmall)
+    models.forEach { model ->
+        ModelRow(model, statuses[model.id], model == inUse) { refresh++ }
+    }
+}
+
+@Composable
+private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, changed: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(model.name, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "${model.parameters} · ${model.license}" + if (inUse) " · " + stringResource(R.string.model_in_use) else "",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            when (status) {
+                null -> {}
+                ModelStatus.Missing -> TextButton(onClick = { Recording.models.download(model); changed() }) {
+                    Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
+                }
+                is ModelStatus.Failed -> {
+                    Text(stringResource(R.string.model_failed, status.reason), color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { Recording.models.download(model); changed() }) {
+                        Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
+                    }
+                }
+                is ModelStatus.Downloading, ModelStatus.WaitingForWifi -> {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (status is ModelStatus.Downloading) stringResource(R.string.model_downloading, (status.progress * 100).toInt())
+                            else stringResource(R.string.model_waiting_wifi),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (status is ModelStatus.Downloading) LinearProgressIndicator(progress = { status.progress }, modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(onClick = { Recording.models.cancel(model); changed() }) { Text(stringResource(R.string.model_cancel)) }
+                }
+                ModelStatus.Checking -> Text(stringResource(R.string.model_checking), style = MaterialTheme.typography.bodySmall)
+                ModelStatus.Ready -> {
+                    Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { Recording.models.delete(model); changed() }) { Text(stringResource(R.string.model_delete)) }
+                }
+            }
         }
     }
 }

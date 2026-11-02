@@ -34,9 +34,14 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
-        // -Pabi=arm64-v8a (scripts/ui-lab.sh passes the device's) packs only that processor's native libraries
-        // (whisper.cpp, FLAC), for a faster install on one phone. Without it, every ABI.
-        (findProperty("abi") as String?)?.let { abis -> ndk { abiFilters += abis.split(",") } }
+        // whisper.cpp is built for 64-bit ARM only: every Android 15 phone, and the emulator on Apple silicon.
+        ndk { abiFilters += "arm64-v8a" }
+    }
+    ndkVersion = "30.0.16248370"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
     buildTypes {
         release {

@@ -17,6 +17,9 @@ interface AudioRecorder {
     /** The microphone's level, 0..1; 0 when paused or stopped. */
     val level: StateFlow<Float>
 
+    /** Gets every buffer written (48 kHz stereo 16 bit), on the recorder's thread: live transcription. */
+    var onPcm: ((pcm: ByteArray, size: Int) -> Unit)?
+
     fun start(file: Path, format: AudioFileFormat)
     fun pause()
     fun resume()

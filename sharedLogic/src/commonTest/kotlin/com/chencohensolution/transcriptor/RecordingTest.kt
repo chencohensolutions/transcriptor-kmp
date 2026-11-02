@@ -33,6 +33,7 @@ import kotlin.test.assertTrue
 private class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override val positionMillis = MutableStateFlow(0L)
     override val level = MutableStateFlow(0f)
+    override var onPcm: ((ByteArray, Int) -> Unit)? = null
     var file: Path? = null
     var format: AudioFileFormat? = null
     var paused = false
@@ -46,9 +47,10 @@ private class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
         level.value = 0.5f
     }
 
-    fun advance(millis: Long) {
-        val bytes = (millis * 48 * 4).toInt()
-        wav?.write(ByteArray(bytes), bytes)
+    /** [millis] of silence, or of what [pcm] gives (48 kHz stereo 16 bit). */
+    fun advance(millis: Long, pcm: ByteArray = ByteArray((millis * 48 * 4).toInt())) {
+        wav?.write(pcm, pcm.size)
+        onPcm?.invoke(pcm, pcm.size)
         positionMillis.value += millis
     }
 
@@ -201,5 +203,36 @@ class RecordingTest {
         assertFailsWith<IllegalStateException> { compression.compress(stopped) }
         assertTrue(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
         assertEquals(true, store.load("psych", stopped.id)?.pendingFlac)
+    }
+}
+
+class LiveRecordingTest {
+    private val fs = FakeFileSystem().apply { allowReadsWhileWriting = true; allowWritesWhileWriting = true }
+    private val root = "/data".toPath()
+    private val store = LectureStore(fs, root)
+    private val recorder = FakeRecorder(fs)
+    private val notebook = Notebook("psych", "פסיכולוגיה", "he", emptyList())
+
+    @Test
+    fun linesFromLiveTranscriptionAreSavedAndStopWaitsForTheLast() = runTest {
+        val engine = FakeEngine()
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 1L }) { language, scope ->
+            com.chencohensolution.transcriptor.recording.LiveModel(
+                "fake",
+                com.chencohensolution.transcriptor.speech.LiveTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
+            )
+        }
+        val lecture = session.start(notebook, "t")
+        recorder.advance(500, silence(500))
+        recorder.advance(2_000, tone(2_000))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        assertEquals("fake", session.state.value?.liveModelName)
+        assertEquals(listOf("line 1"), store.load("psych", lecture.id)?.segments?.map { it.text })
+        recorder.advance(900, tone(900))
+        val stopped = assertNotNull(session.stop())
+        assertEquals(listOf("line 1", "line 2"), stopped.segments.map { it.text })
+        assertEquals(listOf("line 1", "line 2"), store.load("psych", lecture.id)?.segments?.map { it.text })
+        assertTrue(engine.closed)
     }
 }

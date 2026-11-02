@@ -12,7 +12,6 @@
     <string name="lecture_save_note">הוספה</string>
     <string name="lecture_follow_live">חזרה לשידור</string>
     <string name="lecture_live_model">חי: %1$s · %2$.1f שנ׳ מאחור</string>
-    <string name="lecture_no_transcription">מקליט. תמלול חי יגיע בגרסה הבאה; ההערות נשמרות כבר עכשיו.</string>
     <string name="recording_channel">הקלטה</string>
     <string name="recording_now">מקליט</string>
     <string name="compressing_flac">דוחס ל־FLAC…</string>
@@ -23,4 +22,18 @@
     <string name="start_lecture">התחלת הרצאה</string>
     <string name="start_default_notebook">המחברת שלי</string>
     <string name="start_last">ההרצאה האחרונה: %1$s · %2$s · %3$d הערות · %4$s</string>
+    <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד במסך הפתיחה. ההקלטה וההערות עובדות.</string>
+    <string name="lecture_live_loading">טוען את %1$s…</string>
+    <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
+    <string name="lecture_finishing">מסיים את השורות האחרונות…</string>
+    <string name="start_live_models">תמלול חי (עברית)</string>
+    <string name="model_download">הורדה · %1$s</string>
+    <string name="model_downloading">מוריד %1$d%%</string>
+    <string name="model_waiting_wifi">ממתין ל־Wi-Fi</string>
+    <string name="model_checking">בודק את הקובץ…</string>
+    <string name="model_ready">מוכן</string>
+    <string name="model_failed">נכשל: %1$s</string>
+    <string name="model_cancel">ביטול</string>
+    <string name="model_delete">מחיקה</string>
+    <string name="model_in_use">משמש לתמלול חי</string>
 </resources>
