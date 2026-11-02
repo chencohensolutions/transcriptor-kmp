@@ -165,6 +165,8 @@ private fun LiveModels(language: String) {
 
 @Composable
 private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, changed: () -> Unit) {
+    var startError by remember { mutableStateOf<String?>(null) }
+    val download = { startError = Recording.models.download(model); changed() }
     Column(Modifier.fillMaxWidth()) {
         Text(model.name, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -174,12 +176,12 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
         Row(verticalAlignment = Alignment.CenterVertically) {
             when (status) {
                 null -> {}
-                ModelStatus.Missing -> TextButton(onClick = { Recording.models.download(model); changed() }) {
+                ModelStatus.Missing -> TextButton(onClick = download) {
                     Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
                 }
                 is ModelStatus.Failed -> {
                     Text(stringResource(R.string.model_failed, status.reason), color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = { Recording.models.download(model); changed() }) {
+                    TextButton(onClick = download) {
                         Text(stringResource(R.string.model_download, "%.1f GB".format(model.sizeBytes / 1e9)))
                     }
                 }
@@ -196,6 +198,7 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
                 }
                 ModelStatus.Checking -> Text(stringResource(R.string.model_checking), style = MaterialTheme.typography.bodySmall)
                 ModelStatus.Ready -> {
+                    startError = null
                     Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
                     TextButton(onClick = { Recording.models.delete(model); changed() }) { Text(stringResource(R.string.model_delete)) }
                 }

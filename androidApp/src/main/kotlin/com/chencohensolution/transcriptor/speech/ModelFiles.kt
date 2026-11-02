@@ -38,7 +38,10 @@ class ModelFiles(private val context: Context) {
     /** Downloaded, checked, and (when the catalog says so) quantized. */
     fun isReady(model: SpeechModel) = marker(model).exists() && file(model).exists()
 
-    fun download(model: SpeechModel) {
+    /** Starts the download; a reason when it couldn't be started. */
+    fun download(model: SpeechModel): String? = runCatching { enqueue(model) }.exceptionOrNull()?.let { it.message ?: it.toString() }
+
+    private fun enqueue(model: SpeechModel) {
         if (isReady(model) || prefs.contains(model.id)) return
         part(model).delete()
         val id = downloads.enqueue(
@@ -91,6 +94,9 @@ class ModelFiles(private val context: Context) {
         if (!synchronized(verifying) { verifying.add(model.id) }) return ModelStatus.Checking
         try {
             return check(model)
+        } catch (e: java.io.IOException) {
+            cancel(model)
+            return ModelStatus.Failed(e.message ?: e.toString())
         } finally {
             synchronized(verifying) { verifying.remove(model.id) }
         }
