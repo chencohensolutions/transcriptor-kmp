@@ -16,6 +16,7 @@ Settings › Models: one for live transcription, one for refining after class.
 | Model | Languages | Size | License | Use |
 |---|---|---|---|---|
 | [ivrit.ai Whisper large-v3 turbo](https://huggingface.co/ivrit-ai/whisper-large-v3-turbo) | Hebrew | 809M params | Apache-2.0 | Live |
+| [ivrit.ai Zipformer streaming](https://huggingface.co/ivrit-ai/zipformer2-66m-streaming-he) (by Yakov Kolani) | Hebrew | 66M params | CC-BY-4.0 | Live (streaming) |
 | [ivrit.ai Whisper large-v3](https://huggingface.co/ivrit-ai/whisper-large-v3) | Hebrew | 1.55B params | Apache-2.0 | Refine |
 | [Whisper large-v3 turbo](https://huggingface.co/openai/whisper-large-v3-turbo) | ~100 languages | 809M params | MIT | Live |
 | [Whisper large-v3](https://huggingface.co/openai/whisper-large-v3) | ~100 languages | 1.55B params | MIT | Refine |
