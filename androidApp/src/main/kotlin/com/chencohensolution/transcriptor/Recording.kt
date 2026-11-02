@@ -13,7 +13,11 @@ import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.speech.RecordingAudio
+import com.chencohensolution.transcriptor.speech.SherpaDiarizer
 import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
+import com.chencohensolution.transcriptor.speech.SpeakerPass
+import com.chencohensolution.transcriptor.speech.withTurns
 import com.chencohensolution.transcriptor.speech.SherpaVoiceEmbedder
 import com.chencohensolution.transcriptor.speech.SpeakerLabeler
 import com.chencohensolution.transcriptor.speech.SpeakerTracker
@@ -51,6 +55,38 @@ object Recording {
     /** Compressing to FLAC: 0..1, null when not. */
     val compressing = MutableStateFlow<Float?>(null)
 
+    /** The speaker pass on [lastLecture]: 0..1, null when not running. */
+    val findingSpeakers = MutableStateFlow<Float?>(null)
+
+    lateinit var voices: VoiceStore
+        private set
+
+    /** Both models of the speaker pass are downloaded. */
+    val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && models.isReady(ModelCatalog.voicePrints)
+
+    /**
+     * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
+     * relabeled and split to match, and the speakers named from the notebook's voices. Saves and returns it.
+     */
+    fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
+        store.repairAudio(lecture)
+        val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), models.file(ModelCatalog.voicePrints))
+        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        try {
+            RecordingAudio(store.audioPath(lecture).toFile()).use { audio ->
+                val result = SpeakerPass(diarizer, embedder).run(audio, voices.load(lecture.notebookId)) { at ->
+                    progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
+                }
+                val done = lecture.withTurns(result.turns, result.speakers)
+                store.save(done)
+                return done
+            }
+        } finally {
+            diarizer.close()
+            embedder.close()
+        }
+    }
+
     fun init(app: Application) {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root)
@@ -58,7 +94,7 @@ object Recording {
         models = ModelFiles(app)
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            voices = VoiceStore(FileSystem.SYSTEM, root),
+            voices = VoiceStore(FileSystem.SYSTEM, root).also { voices = it },
             live = ::liveModel,
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
@@ -95,7 +131,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
             val dir = Recording.models.dir(model)
             StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir) }
         }
-        ModelKind.SpeakerEmbedding -> error("Not a speech model: ${model.id}")
+        ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
     return LiveModel(model.name, transcriber, tracker)
 }

@@ -73,8 +73,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
 - Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
   `voices.json` (`VoiceStore`), and its next lectures start with those voices, labeled by name from their first line.
-- After the lecture, the refine pass can regroup with the whole recording (pyannote segmentation, MIT) and split a
-  line where two people spoke; lines the user edited stay. Not built yet.
+- **After the lecture, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
+  runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
+  when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python
+  pipeline can't run on a phone, and on a test recording it was 10× slower and merged every voice (its settings
+  expect long meetings). The recording is read in 5-minute pieces (`RecordingAudio`: WAV, or FLAC through the system
+  decoder); each piece's speakers are matched across pieces and to the notebook's voices by print, so named voices
+  keep their names. Lines are then relabeled (`withTurns`): a line with word times (streaming model) splits where the
+  turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
+  keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
+  start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
 - Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
   speech (two at once) gets one speaker, the louder.
 
@@ -86,6 +94,7 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
 ```json
 {
   "v": 1,
+  "speakerPass": true,
   "id": "lecture-7",
   "title": "זיכרון עבודה",
   "language": "he",

@@ -39,6 +39,8 @@ data class Lecture(
     val audioFile: String = AUDIO_WAV,
     /** Recorded as WAV with the "WAV, then FLAC" setting, and not compressed yet. */
     val pendingFlac: Boolean = false,
+    /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
+    val speakerPass: Boolean = false,
 )
 
 const val AUDIO_WAV = "audio.wav"
@@ -54,9 +56,14 @@ data class Segment(
     val modelId: String,
     /** The user changed [text] by hand; a refine pass leaves it alone. */
     val edited: Boolean = false,
-    /** Set by the refine pass's speaker step; null before it. */
+    /** Who said it: live speaker labels, then the speaker pass; null when unknown. */
     val speakerId: String? = null,
+    /** Its words with when each was said, when the model gives them (the streaming one): to split it by speaker. */
+    val words: List<Word> = emptyList(),
 )
+
+/** A word of a line, said at [atMillis]. */
+data class Word(val atMillis: Long, val text: String)
 
 /** A note typed during or after the lecture, pinned to [atMillis] (when the user started typing it). */
 data class Note(

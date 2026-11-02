@@ -38,11 +38,15 @@
     <string name="model_in_use">משמש לתמלול חי</string>
     <string name="model_use_live">לשימוש בתמלול חי</string>
     <string name="start_speakers">זיהוי דוברים</string>
-    <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך ההרצאה. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו בהרצאות הבאות.</string>
+    <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך ההרצאה; אחריה, מעבר נוסף מוצא מי דיבר מתי, גם כשמדברים יחד, ומתקן את השורות. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו בהרצאות הבאות.</string>
     <string name="speaker_n">דובר %1$d</string>
     <string name="speaker_rename_title">שם עבור %1$s</string>
     <string name="speaker_rename_note">המחברת תזהה את הקול הזה בהרצאות הבאות שלה.</string>
     <string name="speaker_rename_hint">המרצה</string>
     <string name="speaker_rename_save">שמירה</string>
     <string name="speaker_rename_cancel">ביטול</string>
+    <string name="finding_speakers">מזהה את הדוברים…</string>
+    <string name="find_speakers">זיהוי הדוברים</string>
+    <string name="find_speakers_again">זיהוי הדוברים מחדש</string>
+    <string name="speaker_lines">%1$d שורות</string>
 </resources>

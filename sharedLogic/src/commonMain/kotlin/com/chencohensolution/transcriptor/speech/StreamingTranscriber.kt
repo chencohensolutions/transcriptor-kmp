@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.speech
 
 import com.chencohensolution.transcriptor.notebook.Segment
+import com.chencohensolution.transcriptor.notebook.Word
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -167,20 +168,20 @@ class StreamingTranscriber(
                 parts.mapNotNull { part ->
                     val words = allTokens.filter { at(it) - start in part.start until part.end || (part.end == parts.last().end && at(it) - start >= part.end) }
                     val t = cleanLine(words.joinToString("") { it.text.replace('▁', ' ') })
-                    if (t.isEmpty()) null else Triple(lineStart + start + part.start, lineStart + start + part.end, t to part.speaker)
+                    if (t.isEmpty()) null else Triple(lineStart + start + part.start, lineStart + start + part.end, Triple(t, part.speaker, wordsOf(words)))
                 }
             } else {
                 val start = maxOf(lineStart, first - CHUNK_SAMPLES)
                 val end = maxOf(start, minOf(consumed, lastChangeAt))
                 val speaker = speakers?.label(audio.copyOfRange((start - lineStart).toInt().coerceIn(0, audio.size), (end - lineStart).toInt().coerceIn(0, audio.size)))
-                listOf(Triple(start, end, text to speaker))
+                listOf(Triple(start, end, Triple(text, speaker, emptyList<Word>())))
             }
             _output.update { out ->
                 out.copy(
                     segments = out.segments + lines.mapIndexed { i, (start, end, line) ->
                         Segment(
                             id = "s${out.segments.size + i + 1}", startMillis = start / 16, endMillis = end / 16,
-                            text = line.first, modelId = modelId, speakerId = line.second,
+                            text = line.first, modelId = modelId, speakerId = line.second, words = line.third,
                         )
                     },
                     partial = null,
@@ -192,6 +193,21 @@ class StreamingTranscriber(
         lineStart = consumed
         firstWordsAt = null
         lastText = ""
+    }
+
+    /** Tokens to words (a token starting with a space starts one), each at its first token's time, in the recording. */
+    private fun wordsOf(tokens: List<TimedToken>): List<Word> {
+        val words = mutableListOf<Word>()
+        var space = true
+        for (t in tokens) {
+            val piece = t.text.replace('▁', ' ')
+            if (piece.isBlank()) { space = true; continue }
+            val at = lineStart / 16 + (t.seconds * 1000).toLong()
+            if (space || piece.startsWith(" ")) words += Word(at, piece.trim())
+            else words[words.lastIndex] = words.last().copy(text = words.last().text + piece)
+            space = piece.endsWith(" ")
+        }
+        return words.filter { w -> w.text.any(Char::isLetterOrDigit) }
     }
 
     private fun lag() = ((synchronized(lock) { fed } - consumed) / 16).coerceAtLeast(0)

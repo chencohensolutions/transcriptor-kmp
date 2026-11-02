@@ -122,6 +122,9 @@ class StreamingTest {
         // Every word once, in order, with its punctuation.
         val words = (lines[0].text + " " + lines[1].text).split(" ")
         assertEquals((1..words.size).map { "מילה$it," }, words)
+        // The lines keep their words with their times, for the speaker pass.
+        assertEquals(words.size, lines.sumOf { it.words.size })
+        assertTrue(lines[1].words.first().atMillis >= lines[1].startMillis)
     }
 
     @Test

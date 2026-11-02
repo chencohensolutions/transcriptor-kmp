@@ -110,7 +110,7 @@ class Utterances {
 }
 
 /** A growing FloatArray. */
-internal class FloatBuilder {
+class FloatBuilder {
     private var data = FloatArray(16_000)
     var size = 0
         private set

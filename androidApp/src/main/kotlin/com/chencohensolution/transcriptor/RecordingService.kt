@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.Notebook
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,12 +56,43 @@ class RecordingService : Service() {
             ACTION_PAUSE -> session.pauseOrResume()
             ACTION_STOP -> scope.launch {
                 // Returns once live transcription has finished the last lines.
-                session.stop()?.let { Recording.lastLecture.value = it }
-                compressPending()
+                val lecture = session.stop()?.also { Recording.lastLecture.value = it }
+                if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers) findSpeakers(lecture) else compressPending()
+            }
+            ACTION_SPEAKERS -> {
+                val lecture = Recording.lastLecture.value
+                if (lecture != null && !session.isRecording && !compressing) {
+                    findSpeakers(lecture)
+                } else {
+                    // Started as a foreground service: it must be one before stopping.
+                    startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                    finish()
+                }
             }
             ACTION_COMPRESS -> compressPending()
         }
         return START_NOT_STICKY
+    }
+
+    /** The speaker pass on [lecture], as a media-processing foreground service; then any FLAC compression. */
+    private fun findSpeakers(lecture: Lecture) {
+        compressing = true
+        startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        scope.launch(Dispatchers.IO) {
+            var shown = -1
+            Recording.findingSpeakers.value = 0f
+            runCatching {
+                Recording.findSpeakers(lecture) { p ->
+                    Recording.findingSpeakers.value = p
+                    val percent = (p * 100).toInt()
+                    if (percent != shown) { shown = percent; notify(progressNotification(R.string.finding_speakers, p)) }
+                }
+            }.onSuccess { done -> if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done }
+                .onFailure { android.util.Log.e("RecordingService", "speaker pass failed", it) }
+            Recording.findingSpeakers.value = null
+            compressing = false
+            launch(Dispatchers.Main) { compressPending() }
+        }
     }
 
     private fun compressPending() {
@@ -68,7 +100,7 @@ class RecordingService : Service() {
         val pending = Recording.compression.pending()
         if (pending.isEmpty()) { finish(); return }
         compressing = true
-        startForeground(ID, compressNotification(0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        startForeground(ID, progressNotification(R.string.compressing_flac, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
             for (lecture in pending) {
                 runCatching {
@@ -76,7 +108,7 @@ class RecordingService : Service() {
                     Recording.compression.compress(lecture) { p ->
                         Recording.compressing.value = p
                         val percent = (p * 100).toInt()
-                        if (percent != shown) { shown = percent; notify(compressNotification(p)) }
+                        if (percent != shown) { shown = percent; notify(progressNotification(R.string.compressing_flac, p)) }
                     }
                 }.onSuccess { done ->
                     if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
@@ -125,9 +157,9 @@ class RecordingService : Service() {
         .setOngoing(true)
         .build()
 
-    private fun compressNotification(progress: Float) = Notification.Builder(this, CHANNEL)
+    private fun progressNotification(title: Int, progress: Float) = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(getString(R.string.compressing_flac))
+        .setContentTitle(getString(title))
         .setProgress(100, (progress * 100).toInt(), false)
         .setOngoing(true)
         .build()
@@ -144,6 +176,7 @@ class RecordingService : Service() {
         private const val ACTION_PAUSE = "pause"
         private const val ACTION_STOP = "stop"
         private const val ACTION_COMPRESS = "compress"
+        private const val ACTION_SPEAKERS = "speakers"
         private const val EXTRA_NOTEBOOK = "notebook"
         private const val EXTRA_NOTEBOOK_TITLE = "notebookTitle"
         private const val EXTRA_LANGUAGE = "language"
@@ -157,6 +190,10 @@ class RecordingService : Service() {
 
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
+
+        /** Runs the speaker pass on [Recording.lastLecture] again. */
+        fun findSpeakers(context: Context) =
+            context.startForegroundService(Intent(context, RecordingService::class.java).setAction(ACTION_SPEAKERS))
 
         /** Compresses lectures an interruption left pending; from the app's start, while it is in the foreground. */
         fun compressPending(context: Context) =

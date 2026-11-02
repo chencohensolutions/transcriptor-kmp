@@ -1,6 +1,8 @@
 package com.chencohensolution.transcriptor.notebook
 
 import com.chencohensolution.transcriptor.recording.WavWriter
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okio.FileSystem
@@ -63,6 +65,7 @@ private data class LectureFileV1(
     val durationMs: Long,
     val audio: String,
     val pendingFlac: Boolean = false,
+    val speakerPass: Boolean = false,
     val speakers: List<SpeakerV1> = emptyList(),
     val segments: List<SegmentV1> = emptyList(),
     val notes: List<NoteV1> = emptyList(),
@@ -71,10 +74,10 @@ private data class LectureFileV1(
     fun toLecture(notebookId: String) = Lecture(
         id = id, notebookId = notebookId, title = title, language = language,
         startedAtMillis = Instant.parse(startedAt).toEpochMilliseconds(), durationMillis = durationMs,
-        segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker) },
+        segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
-        audioFile = audio, pendingFlac = pendingFlac,
+        audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass,
     )
 
     companion object {
@@ -83,8 +86,11 @@ private data class LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
             durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac,
+            speakerPass = lecture.speakerPass,
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },
-            segments = lecture.segments.map { SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId) },
+            segments = lecture.segments.map {
+                SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId, it.words.map { w -> WordV1(w.atMillis, w.text) })
+            },
             notes = lecture.notes.map { NoteV1(it.id, it.atMillis, it.text) },
         )
     }
@@ -93,6 +99,7 @@ private data class LectureFileV1(
 @Serializable
 private data class SpeakerV1(val id: String, val name: String)
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 private data class SegmentV1(
     val id: String,
@@ -102,7 +109,11 @@ private data class SegmentV1(
     val model: String,
     val edited: Boolean = false,
     val speaker: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val words: List<WordV1> = emptyList(),
 )
+
+@Serializable
+private data class WordV1(val atMs: Long, val text: String)
 
 @Serializable
 private data class NoteV1(val id: String, val atMs: Long, val text: String)

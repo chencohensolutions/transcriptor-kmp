@@ -10,6 +10,9 @@ enum class ModelKind {
 
     /** Voice prints for telling speakers apart (sherpa-onnx speaker embedding): not a speech model. */
     SpeakerEmbedding,
+
+    /** Who speaks when, frame by frame, overlaps included (pyannote segmentation on sherpa-onnx): not a speech model. */
+    SpeakerSegmentation,
 }
 
 /** One file of a model, downloaded from [url] (pinned to a commit) and checked against [sha256]. */
@@ -133,6 +136,26 @@ object ModelCatalog {
                 "model.onnx",
                 "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
                 "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2", 28_281_164,
+            ),
+        ),
+    )
+
+    /** pyannote's segmentation 3.0, for the speaker pass after the lecture (with [voicePrints]). Not in [all]. */
+    val speakerSegmentation = SpeechModel(
+        id = "pyannote-segmentation-3.0",
+        name = "pyannote segmentation 3.0",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "1.5M",
+        license = "MIT",
+        fitsLive = false,
+        source = "https://huggingface.co/pyannote/segmentation-3.0",
+        kind = ModelKind.SpeakerSegmentation,
+        // sherpa-onnx's ONNX export, by its author.
+        files = listOf(
+            ModelFile(
+                "model.onnx",
+                "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/9403a6902bb58e3d5ae8c7e77c3422de279db2e0/model.onnx",
+                "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079", 5_992_913,
             ),
         ),
     )

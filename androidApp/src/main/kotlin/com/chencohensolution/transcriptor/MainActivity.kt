@@ -105,6 +105,10 @@ private fun StartScreen(onStart: () -> Unit) {
     val compressing by Recording.compressing.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
+        // The latest lecture, when the app opens.
+        if (Recording.lastLecture.value == null) {
+            Recording.lastLecture.value = withContext(Dispatchers.IO) { Recording.store.all().maxByOrNull { it.startedAtMillis } }
+        }
         val pending = withContext(Dispatchers.IO) { Recording.compression.pending() }
         if (pending.isNotEmpty() && compressing == null) RecordingService.compressPending(context)
     }
@@ -143,6 +147,7 @@ private fun StartScreen(onStart: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.start_lecture)) }
             last?.let { LastLecture(it, compressing) }
+            last?.let { SpeakersOf(it) }
             Text(stringResource(R.string.main_coming_soon), style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -173,17 +178,19 @@ private fun LiveModels(language: String) {
 /** The voice-print model for speaker labels: labels are on once it is downloaded. */
 @Composable
 private fun SpeakerModel() {
-    val model = ModelCatalog.voicePrints
+    val models = listOf(ModelCatalog.voicePrints, ModelCatalog.speakerSegmentation)
     var refresh by remember { mutableStateOf(0) }
-    val status by produceState<ModelStatus?>(null, refresh) {
+    val statuses by produceState(emptyMap<String, ModelStatus>(), refresh) {
         while (true) {
-            value = Recording.models.status(model)
+            value = models.associate { it.id to Recording.models.status(it) }
             delay(1_000)
         }
     }
     Text(stringResource(R.string.start_speakers), style = MaterialTheme.typography.titleSmall)
     Text(stringResource(R.string.start_speakers_note), style = MaterialTheme.typography.bodySmall)
-    ModelRow(model, status, inUse = status == ModelStatus.Ready, choose = {}) { refresh++ }
+    models.forEach { model ->
+        ModelRow(model, statuses[model.id], inUse = statuses[model.id] == ModelStatus.Ready, choose = {}) { refresh++ }
+    }
 }
 
 @Composable
@@ -233,6 +240,29 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
 }
 
 private fun sizeText(bytes: Long) = if (bytes >= 1e9) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6)
+
+/** The last lecture's speakers, and the speaker pass: running, or a button to run it (again). */
+@Composable
+private fun SpeakersOf(lecture: Lecture) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val finding by Recording.findingSpeakers.collectAsStateWithLifecycle()
+    val compressing by Recording.compressing.collectAsStateWithLifecycle()
+    val lines = lecture.segments.groupingBy { it.speakerId }.eachCount()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        lecture.speakers.forEach { speaker ->
+            Text("${com.chencohensolution.transcriptor.ui.speakerLabel(speaker)} · ${stringResource(R.string.speaker_lines, lines[speaker.id] ?: 0)}", style = MaterialTheme.typography.bodySmall)
+        }
+        val progress = finding
+        if (progress != null) {
+            Text(stringResource(R.string.finding_speakers), style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        } else if (Recording.canFindSpeakers && compressing == null) {
+            TextButton(onClick = { RecordingService.findSpeakers(context) }) {
+                Text(stringResource(if (lecture.speakerPass) R.string.find_speakers_again else R.string.find_speakers))
+            }
+        }
+    }
+}
 
 @Composable
 private fun LastLecture(lecture: Lecture, compressing: Float?) {

@@ -38,11 +38,15 @@
     <string name="model_in_use">Used for live transcription</string>
     <string name="model_use_live">Use for live</string>
     <string name="start_speakers">Speaker labels</string>
-    <string name="start_speakers_note">Each line gets the speaker whose voice is closest, during the lecture. Name a speaker once and the notebook\'s next lectures know them.</string>
+    <string name="start_speakers_note">Each line gets the speaker whose voice is closest, during the lecture; after it, a speaker pass finds who spoke when, overlaps included, and fixes the lines. Name a speaker once and the notebook\'s next lectures know them.</string>
     <string name="speaker_n">Speaker %1$d</string>
     <string name="speaker_rename_title">Name %1$s</string>
     <string name="speaker_rename_note">The notebook will recognize this voice in its next lectures.</string>
     <string name="speaker_rename_hint">Lecturer</string>
     <string name="speaker_rename_save">Save</string>
     <string name="speaker_rename_cancel">Cancel</string>
+    <string name="finding_speakers">Finding the speakers…</string>
+    <string name="find_speakers">Find the speakers</string>
+    <string name="find_speakers_again">Find the speakers again</string>
+    <string name="speaker_lines">%1$d lines</string>
 </resources>
