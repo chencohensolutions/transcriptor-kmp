@@ -129,6 +129,9 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
   `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
   downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
+- Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
+  naming speakers, notes after the lecture, and the speaker pass from its menu. Stop opens it. The refine pass (Whisper
+  large-v3 over the recording) is next for it.
 - Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.
 

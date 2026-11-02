@@ -69,6 +69,27 @@ class RecordingAudio(file: File) : AudioSource, AutoCloseable {
         }
     }
 
+    companion object {
+        /** [startMillis] to [endMillis] of a recording, 16 kHz mono (from the nearest earlier frame, for FLAC). */
+        fun range(file: File, startMillis: Long, endMillis: Long): FloatArray {
+            val want = ((endMillis - startMillis) * 16).toInt().coerceAtLeast(0)
+            if (file.name.endsWith(".wav")) {
+                RandomAccessFile(file, "r").use { f ->
+                    f.seek(WavWriter.HEADER_SIZE + startMillis * 48 * 4)
+                    val bytes = ByteArray(want * 3 * 4)
+                    val n = f.read(bytes).coerceAtLeast(0)
+                    return Downsampler().process(bytes, n - n % 4)
+                }
+            }
+            return RecordingAudio(file).use { audio ->
+                audio.extractor!!.seekTo(startMillis * 1000, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                val skip = ((startMillis * 1000 - audio.extractor.sampleTime).coerceAtLeast(0) / 1000 * 16).toInt()
+                val got = audio.read(skip + want) ?: return FloatArray(0)
+                got.copyOfRange(minOf(skip, got.size), got.size)
+            }
+        }
+    }
+
     override fun close() {
         wav?.close()
         codec?.run { stop(); release() }

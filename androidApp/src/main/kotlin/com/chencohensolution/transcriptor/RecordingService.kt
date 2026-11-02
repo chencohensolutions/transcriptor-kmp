@@ -60,7 +60,9 @@ class RecordingService : Service() {
                 if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers) findSpeakers(lecture) else compressPending()
             }
             ACTION_SPEAKERS -> {
-                val lecture = Recording.lastLecture.value
+                val wanted = intent.getStringExtra(EXTRA_LECTURE)
+                val lecture = if (wanted == null) Recording.lastLecture.value
+                    else Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, wanted)
                 if (lecture != null && !session.isRecording && !compressing) {
                     findSpeakers(lecture)
                 } else {
@@ -87,7 +89,10 @@ class RecordingService : Service() {
                     val percent = (p * 100).toInt()
                     if (percent != shown) { shown = percent; notify(progressNotification(R.string.finding_speakers, p)) }
                 }
-            }.onSuccess { done -> if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done }
+            }.onSuccess { done ->
+                if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
+                launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
+            }
                 .onFailure { android.util.Log.e("RecordingService", "speaker pass failed", it) }
             Recording.findingSpeakers.value = null
             compressing = false
@@ -181,6 +186,7 @@ class RecordingService : Service() {
         private const val EXTRA_NOTEBOOK_TITLE = "notebookTitle"
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
+        private const val EXTRA_LECTURE = "lecture"
 
         fun start(context: Context, notebook: Notebook, title: String) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
@@ -191,9 +197,12 @@ class RecordingService : Service() {
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
 
-        /** Runs the speaker pass on [Recording.lastLecture] again. */
-        fun findSpeakers(context: Context) =
-            context.startForegroundService(Intent(context, RecordingService::class.java).setAction(ACTION_SPEAKERS))
+        /** Runs the speaker pass on [lecture] (again), or on [Recording.lastLecture]. */
+        fun findSpeakers(context: Context, lecture: Lecture? = null) = context.startForegroundService(
+            Intent(context, RecordingService::class.java).setAction(ACTION_SPEAKERS).apply {
+                lecture?.let { putExtra(EXTRA_LECTURE, it.id).putExtra(EXTRA_NOTEBOOK, it.notebookId) }
+            },
+        )
 
         /** Compresses lectures an interruption left pending; from the app's start, while it is in the foreground. */
         fun compressPending(context: Context) =

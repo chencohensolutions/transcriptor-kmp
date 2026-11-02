@@ -49,4 +49,22 @@
     <string name="find_speakers">Find the speakers</string>
     <string name="find_speakers_again">Find the speakers again</string>
     <string name="speaker_lines">%1$d lines</string>
+    <string name="review_back">Back</string>
+    <string name="review_play">Play</string>
+    <string name="review_pause">Pause</string>
+    <string name="review_speed">%1$sx</string>
+    <string name="review_refine">Refine with %1$s</string>
+    <string name="review_refining">Refining with %1$s… %2$d%%</string>
+    <string name="review_find_speakers">Find the speakers</string>
+    <string name="review_finding_speakers">Finding the speakers… %1$d%%</string>
+    <string name="review_save">Save</string>
+    <string name="review_cancel">Cancel</string>
+    <string name="review_note_here">Note at %1$s</string>
+    <string name="review_note_hint">Write a note…</string>
+    <string name="review_delete">Delete</string>
+    <string name="review_edit_text">Edit the text</string>
+    <string name="review_done">Done</string>
+    <string name="review_move_line">Who said the line at %1$s?</string>
+    <string name="start_lectures">Lectures</string>
+    <string name="start_speakers_count">%1$d speakers</string>
 </resources>

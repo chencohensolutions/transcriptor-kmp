@@ -28,7 +28,7 @@ recording goes on). After Stop, "Finishing the last lines…" until the waiting 
 ## Behavior
 
 - Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the lecture and
-  opens it after (refine, speakers).
+  opens it after ([lecture-review.md](lecture-review.md)).
 - Tapping a line opens it (to come: play that part, correct the text).
 - The transcript follows the live line; scrolling back stops following until "Back to live".
 

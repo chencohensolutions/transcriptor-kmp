@@ -47,7 +47,14 @@ import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.speech.ModelStatus
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.lifecycle.lifecycleScope
+import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
+import com.chencohensolution.transcriptor.ui.ReviewActions
+import com.chencohensolution.transcriptor.ui.ReviewScreen
+import kotlinx.coroutines.launch
 import com.chencohensolution.transcriptor.ui.LiveLectureActions
 import com.chencohensolution.transcriptor.ui.TranscriptorTheme
 import com.chencohensolution.transcriptor.ui.formatClock
@@ -57,7 +64,8 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * For now: a start screen (the audio format, Start lecture, the last lecture), and the lecture while recording.
+ * For now: a start screen (the audio format, the models, Start lecture, the lectures), the lecture while recording, and
+ * a recorded lecture opened (after Stop, or from the list).
  * The start screen gives way to the Notebooks screen once its design is chosen in the UI lab, and the audio format
  * moves to Settings.
  */
@@ -68,23 +76,53 @@ class MainActivity : ComponentActivity() {
         setContent {
             TranscriptorTheme {
                 val live by Recording.session.state.collectAsStateWithLifecycle()
+                val opened by Recording.review.state.collectAsStateWithLifecycle()
+                val last by Recording.lastLecture.collectAsStateWithLifecycle()
+                var openAfterStop by remember { mutableStateOf(false) }
+                // After Stop, the lecture just recorded opens once its last lines are in.
+                LaunchedEffect(last, live) {
+                    val lecture = last
+                    if (openAfterStop && live == null && lecture != null) {
+                        openAfterStop = false
+                        openLecture(lecture)
+                    }
+                }
+                ReviewSpeakerPass()
                 val state = live
-                if (state != null) {
-                    LectureScreen(
+                val review = opened
+                when {
+                    state != null -> LectureScreen(
                         state,
                         LiveLectureActions(
                             back = { moveTaskToBack(true) },
                             pauseOrResume = Recording.session::pauseOrResume,
-                            stop = { RecordingService.stop(this) },
+                            stop = { openAfterStop = true; RecordingService.stop(this) },
                             addNote = Recording.session::addNote,
                             renameSpeaker = Recording.session::renameSpeaker,
                         ),
                     )
-                } else {
-                    StartScreen(onStart = ::startLecture)
+                    review != null -> {
+                        BackHandler { Recording.review.close() }
+                        val r = Recording.review
+                        ReviewScreen(
+                            review,
+                            ReviewActions(
+                                back = r::close, playPause = r::playPause, seek = r::seek, playLine = r::playLine,
+                                cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
+                                renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
+                                findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
+                                addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
+                            ),
+                        )
+                    }
+                    else -> StartScreen(onStart = ::startLecture, onOpen = ::openLecture)
                 }
             }
         }
+    }
+
+    private fun openLecture(lecture: Lecture) {
+        Recording.review.open(lecture.notebookId, lecture.id, getString(R.string.start_default_notebook))
     }
 
     private fun startLecture() {
@@ -98,8 +136,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Feeds the open lecture's speaker pass from the recording service: running, done, or unavailable without its models. */
 @Composable
-private fun StartScreen(onStart: () -> Unit) {
+private fun ReviewSpeakerPass() {
+    val finding by Recording.findingSpeakers.collectAsStateWithLifecycle()
+    val opened by Recording.review.state.collectAsStateWithLifecycle()
+    val lecture = opened?.lecture
+    LaunchedEffect(finding, lecture?.speakerPass, lecture?.id) {
+        val progress = finding
+        Recording.review.speakerPass.value = when {
+            lecture == null || !Recording.canFindSpeakers -> null
+            progress != null -> PassState.Running(progress)
+            lecture.speakerPass -> PassState.Done
+            else -> PassState.NotRun
+        }
+    }
+}
+
+@Composable
+private fun StartScreen(onStart: () -> Unit, onOpen: (Lecture) -> Unit) {
     var format by remember { mutableStateOf(Recording.settings.audioFormat) }
     val last by Recording.lastLecture.collectAsStateWithLifecycle()
     val compressing by Recording.compressing.collectAsStateWithLifecycle()
@@ -147,7 +202,7 @@ private fun StartScreen(onStart: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.start_lecture)) }
             last?.let { LastLecture(it, compressing) }
-            last?.let { SpeakersOf(it) }
+            Lectures(last, onOpen)
             Text(stringResource(R.string.main_coming_soon), style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -241,24 +296,24 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
 
 private fun sizeText(bytes: Long) = if (bytes >= 1e9) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6)
 
-/** The last lecture's speakers, and the speaker pass: running, or a button to run it (again). */
+/** The recorded lectures, newest first; tap one to open it. Until the Notebooks screen is designed. */
 @Composable
-private fun SpeakersOf(lecture: Lecture) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val finding by Recording.findingSpeakers.collectAsStateWithLifecycle()
-    val compressing by Recording.compressing.collectAsStateWithLifecycle()
-    val lines = lecture.segments.groupingBy { it.speakerId }.eachCount()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        lecture.speakers.forEach { speaker ->
-            Text("${com.chencohensolution.transcriptor.ui.speakerLabel(speaker)} · ${stringResource(R.string.speaker_lines, lines[speaker.id] ?: 0)}", style = MaterialTheme.typography.bodySmall)
-        }
-        val progress = finding
-        if (progress != null) {
-            Text(stringResource(R.string.finding_speakers), style = MaterialTheme.typography.bodySmall)
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-        } else if (Recording.canFindSpeakers && compressing == null) {
-            TextButton(onClick = { RecordingService.findSpeakers(context) }) {
-                Text(stringResource(if (lecture.speakerPass) R.string.find_speakers_again else R.string.find_speakers))
+private fun Lectures(last: Lecture?, onOpen: (Lecture) -> Unit) {
+    val lectures by produceState(emptyList<Lecture>(), last) {
+        value = withContext(Dispatchers.IO) { Recording.store.all().sortedByDescending { it.startedAtMillis } }
+    }
+    if (lectures.isEmpty()) return
+    Text(stringResource(R.string.start_lectures), style = MaterialTheme.typography.titleSmall)
+    Column {
+        lectures.forEach { lecture ->
+            val started = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(lecture.startedAtMillis))
+            Column(Modifier.fillMaxWidth().clickable { onOpen(lecture) }.padding(vertical = 8.dp)) {
+                Text(lecture.title, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    "$started · ${formatClock(lecture.durationMillis)} · " + stringResource(R.string.speaker_lines, lecture.segments.size) +
+                        if (lecture.speakers.isNotEmpty()) " · " + stringResource(R.string.start_speakers_count, lecture.speakers.size) else "",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

@@ -19,4 +19,8 @@ anything left to decide. Remove an entry once it is built.
 - Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
   dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,
   strings `speaker_*`. Voice prints on iOS: sherpa-onnx's iOS build with the same CAM++ model, as a `VoiceEmbedder`.
+- Lecture, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
+  `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
+  `deleteNote`, `speakerPass`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
+  `review_*`.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).

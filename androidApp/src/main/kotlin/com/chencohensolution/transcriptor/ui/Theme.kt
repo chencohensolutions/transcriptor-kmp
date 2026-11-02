@@ -53,6 +53,14 @@ fun TranscriptorTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composabl
     }
 }
 
+/**
+ * The text direction of a notebook's text (a title, a line) where it sits in the app's chrome: a Hebrew title that
+ * starts with a number ("2 בנוב׳ 2026") stays right-to-left in an English app.
+ */
+fun textDirectionOf(language: String) =
+    if (layoutDirectionOf(language) == androidx.compose.ui.unit.LayoutDirection.Rtl) androidx.compose.ui.text.style.TextDirection.Rtl
+    else androidx.compose.ui.text.style.TextDirection.Ltr
+
 /** Right to left for languages written that way: a notebook's content follows its language, not the phone's. */
 fun layoutDirectionOf(language: String): LayoutDirection =
     if (language in setOf("he", "iw", "ar", "fa", "ur", "yi")) LayoutDirection.Rtl else LayoutDirection.Ltr

@@ -1,94 +1,24 @@
 package com.chencohensolution.transcriptor.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.lab.LabData
-import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.Note
-import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
+import com.chencohensolution.transcriptor.review.PassState
+import com.chencohensolution.transcriptor.review.ReviewState
 import kotlinx.coroutines.delay
 
-// Parts every option of the lecture-after screen uses: the state the shared logic will produce, the actions, and
-// the fakes (playback, the refine pass, the speaker pass). Shaped as the controller would produce them.
-
-/** A pass over the whole recording after the lecture: the refine pass (the large model) or the speaker pass. */
-sealed interface PassState {
-    data object NotRun : PassState
-    data class Running(val progress: Float) : PassState
-    data object Done : PassState
-}
-
-/** A recorded lecture, opened. */
-data class ReviewState(
-    val notebookTitle: String,
-    val lecture: Lecture,
-    val positionMillis: Long,
-    val playing: Boolean,
-    val speed: Float,
-    /** The model the refine pass would use ("ivrit.ai Whisper large-v3"). */
-    val refineModelName: String,
-    val refine: PassState,
-    val speakerPass: PassState,
-) {
-    /** The line being played (or last played): the one the position is in, else the one before it. */
-    val currentLine: Segment? get() = lecture.segments.lastOrNull { it.startMillis <= positionMillis }
-}
-
-class ReviewActions(
-    val back: () -> Unit = {},
-    val playPause: () -> Unit = {},
-    val seek: (atMillis: Long) -> Unit = {},
-    /** Plays from a line's start. */
-    val playLine: (Segment) -> Unit = {},
-    val cycleSpeed: () -> Unit = {},
-    /** The user's text for a line: marked edited, kept by the refine pass. */
-    val editLine: (id: String, text: String) -> Unit = { _, _ -> },
-    /** Moves a line to another speaker. */
-    val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
-    val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
-    val refine: () -> Unit = {},
-    val findSpeakers: () -> Unit = {},
-    val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
-    val editNote: (id: String, text: String) -> Unit = { _, _ -> },
-    val deleteNote: (id: String) -> Unit = {},
-)
-
-/** The color of a speaker, by order of speaking. */
-@Composable
-fun speakerColor(id: String?): Color {
-    val palette = LocalTranscriptorColors.current.speakers
-    if (id == null) return LocalTranscriptorColors.current.time
-    return palette[((id.removePrefix("speaker-").toIntOrNull() ?: 1) - 1).mod(palette.size)]
-}
-
-/** A speaker's name in their color. */
-@Composable
-fun ReviewSpeakerChip(speaker: Speaker, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    val color = speakerColor(speaker.id)
-    Text(
-        speakerLabel(speaker),
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = color,
-        modifier = modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.12f))
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+// Fakes: playback (a clock; no audio), the refine pass (not built in the app yet) and the speaker pass (progress,
+// then made-up results), the lecture's speakers and lines. Seeking, playing a sentence, editing, moving a line,
+// renaming, notes and the speed work in memory.
+internal val reviewCurrent = LabOption("current", "Document + player below (the app's)", "ReviewScreen with faked playback and passes") {
+    val (state, actions) = rememberReviewLab()
+    ReviewScreen(state, actions)
 }
 
 /**
@@ -97,7 +27,7 @@ fun ReviewSpeakerChip(speaker: Speaker, modifier: Modifier = Modifier, onClick: 
  * off and named speakers kept); edits, notes and renames in memory.
  */
 @Composable
-fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
+private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
     var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)) }
     var position by remember { mutableStateOf(65_000L) }
@@ -127,7 +57,7 @@ fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
     }
     val state = ReviewState(
         notebookTitle = LabData.notebooks.first().title, lecture = lecture, positionMillis = position, playing = playing,
-        speed = speed, refineModelName = "ivrit.ai Whisper large-v3", refine = refine, speakerPass = speakers,
+        speed = speed, refineModelName = "large-v3", refine = refine, speakerPass = speakers,
     )
     val actions = ReviewActions(
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },

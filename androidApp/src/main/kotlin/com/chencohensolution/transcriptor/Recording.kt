@@ -13,6 +13,8 @@ import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.review.AndroidAudioPlayer
+import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.speech.RecordingAudio
 import com.chencohensolution.transcriptor.speech.SherpaDiarizer
 import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
@@ -61,6 +63,26 @@ object Recording {
     lateinit var voices: VoiceStore
         private set
 
+    /** The lecture opened after recording (the review screen). */
+    lateinit var review: LectureReview
+        private set
+
+    /**
+     * A speaker's voice print in [lecture]: up to 20 s of their lines, longest first; null without the voice-print
+     * model or enough of their speech. Reads the recording: not on the main thread for long lectures.
+     */
+    fun printOf(lecture: Lecture, speakerId: String): List<Float>? {
+        if (!models.isReady(ModelCatalog.voicePrints)) return null
+        val file = store.audioPath(lecture).toFile()
+        val audio = com.chencohensolution.transcriptor.speech.FloatBuilder()
+        for (line in lecture.segments.filter { it.speakerId == speakerId }.sortedByDescending { it.endMillis - it.startMillis }) {
+            if (audio.size >= 20 * 16_000) break
+            audio.add(RecordingAudio.range(file, line.startMillis, line.endMillis))
+        }
+        if (audio.size < SpeakerLabeler.MIN_SAMPLES) return null
+        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        return try { embedder.embed(audio.toArray()).toList() } finally { embedder.close() }
+    }
     /** Both models of the speaker pass are downloaded. */
     val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && models.isReady(ModelCatalog.voicePrints)
 
@@ -98,6 +120,7 @@ object Recording {
             live = ::liveModel,
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
+        review = LectureReview(store, voices, AndroidAudioPlayer(), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
     }
 }
 
