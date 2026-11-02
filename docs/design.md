@@ -29,9 +29,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Audio
 
-- Recorded and kept as **FLAC, 48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last
-  seconds. About 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are
-  alike).
+- Recorded at **48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last seconds. The
+  audio format is a setting (`AudioFormat`; owner's decision, Nov 2, 2026):
+  - **WAV** (default): `audio.wav`, about 690 MB per hour. The safest, with no encoder to fail. A crash leaves the
+    header's sizes stale; `WavWriter.repair` fixes them from the file's length.
+  - **WAV, then FLAC**: WAV while recording, compressed to `audio.flac` after Stop (in the recording service, as a
+    media-processing foreground service), checked to hold every sample, then the WAV is deleted. An interrupted
+    compression stays `pendingFlac` in `lecture.json` and is redone when the app next opens.
+  - **FLAC live**: `audio.flac` as it records, with Android's built-in FLAC encoder.
+  - FLAC is about 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are alike).
+- `lecture.json`'s `"audio"` names the file, and `"pendingFlac"` marks a WAV waiting to be compressed.
 - The models get a copy downmixed to mono and resampled to 16 kHz, in memory.
 - Recording goes on with the screen off: a foreground service with the microphone type on Android, the background
   audio mode on iOS.
@@ -58,6 +65,7 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
   "startedAt": "2026-11-02T10:00:00+02:00",
   "durationMs": 2832000,
   "audio": "audio.flac",
+  "pendingFlac": false,
   "speakers": [{ "id": "speaker-1", "name": "המרצה" }],
   "segments": [
     { "id": "s1", "startMs": 2000, "endMs": 14500, "text": "טוב, בוקר טוב לכולם…",
@@ -76,7 +84,10 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 ## Built so far
 
 - The project, the shared data types and the model catalog, the Android UI lab.
-- Lecture (while recording): three options in the lab, round 1.
+- Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
+  screen off too, and saves notes and `lecture.json`. There are no lines yet; live transcription (whisper.cpp) is
+  next. The app opens on a temporary start screen (audio format, Start lecture) until the Notebooks screen is
+  designed.
 
 ## Open questions
 

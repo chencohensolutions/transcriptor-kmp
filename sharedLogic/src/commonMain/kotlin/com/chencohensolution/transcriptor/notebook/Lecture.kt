@@ -22,8 +22,8 @@ data class LectureSummary(
 )
 
 /**
- * One recorded class: the audio file (FLAC, 48 kHz, stereo, 16 bit) and what was said and written in it. Every time
- * is in milliseconds from the start of the recording, so a line or a note always points into the audio.
+ * One recorded class: the audio file (WAV or FLAC, 48 kHz, stereo, 16 bit) and what was said and written in it. Every
+ * time is in milliseconds from the start of the recording, so a line or a note always points into the audio.
  */
 data class Lecture(
     val id: String,
@@ -35,7 +35,14 @@ data class Lecture(
     val segments: List<Segment>,
     val notes: List<Note>,
     val speakers: List<Speaker> = emptyList(),
+    /** The audio's file name in the lecture's folder: [AUDIO_WAV] or [AUDIO_FLAC]. */
+    val audioFile: String = AUDIO_WAV,
+    /** Recorded as WAV with the "WAV, then FLAC" setting, and not compressed yet. */
+    val pendingFlac: Boolean = false,
 )
+
+const val AUDIO_WAV = "audio.wav"
+const val AUDIO_FLAC = "audio.flac"
 
 /** A line or paragraph of speech, from [startMillis] to [endMillis]. */
 data class Segment(

@@ -61,14 +61,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.notebook.Segment
+import com.chencohensolution.transcriptor.notebook.TimelineEntry
+import com.chencohensolution.transcriptor.notebook.timelineOf
+import com.chencohensolution.transcriptor.recording.LiveLectureState
 import kotlinx.coroutines.launch
+
+class LiveLectureActions(
+    val back: () -> Unit = {},
+    val pauseOrResume: () -> Unit = {},
+    val stop: () -> Unit = {},
+    /** A note pinned to [atMillis], when the user started typing it. */
+    val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
+    val openSegment: (Segment) -> Unit = {},
+)
 
 /**
  * The lecture while recording, as one timeline: lines and notes in the order they happened, notes as amber cards
  * among the lines. The note bar is always open at the bottom; the note's time is taken when typing starts.
  */
 @Composable
-fun LectureScreenA(state: LiveLectureState, actions: LiveLectureActions) {
+fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     val colors = LocalTranscriptorColors.current
     val entries = timelineOf(state.lecture)
     val list = rememberLazyListState()
@@ -115,26 +128,30 @@ fun LectureScreenA(state: LiveLectureState, actions: LiveLectureActions) {
         }
 
         Box(Modifier.weight(1f)) {
+            val appDirection = LocalLayoutDirection.current
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
                 LazyColumn(state = list, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize()) {
+                    // The app's text, in the app's direction, among the notebook's content.
                     item {
-                        Text(
-                            stringResource(R.string.lecture_live_model, state.liveModelName, state.lagMillis / 1000f),
+                        val model = state.liveModelName
+                        CompositionLocalProvider(LocalLayoutDirection provides appDirection) { Text(
+                            if (model != null) stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)
+                            else stringResource(R.string.lecture_no_transcription),
                             style = MaterialTheme.typography.labelSmall,
                             color = colors.time,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        ) }
                     }
                     items(entries, key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
                         when (entry) {
-                            is TimelineEntry.Speech -> SpeechRowA(entry, onClick = { actions.openSegment(entry.segment) })
-                            is TimelineEntry.Written -> NoteCardA(entry)
+                            is TimelineEntry.Speech -> SpeechRow(entry, onClick = { actions.openSegment(entry.segment) })
+                            is TimelineEntry.Written -> NoteCard(entry)
                         }
                     }
                     item {
                         if (state.partial != null) {
                             Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                                Text(formatClock(state.lecture.segments.last().endMillis + 1500), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
+                                Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
                                 Text(state.partial + " …", style = MaterialTheme.typography.bodyLarge, color = colors.partial, fontStyle = FontStyle.Italic)
                             }
                         }
@@ -158,12 +175,12 @@ fun LectureScreenA(state: LiveLectureState, actions: LiveLectureActions) {
             }
         }
 
-        NoteBarA(state, actions)
+        NoteBar(state, actions)
     }
 }
 
 @Composable
-private fun SpeechRowA(entry: TimelineEntry.Speech, onClick: () -> Unit) {
+private fun SpeechRow(entry: TimelineEntry.Speech, onClick: () -> Unit) {
     val colors = LocalTranscriptorColors.current
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp)) {
         Text(
@@ -177,7 +194,7 @@ private fun SpeechRowA(entry: TimelineEntry.Speech, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NoteCardA(entry: TimelineEntry.Written) {
+private fun NoteCard(entry: TimelineEntry.Written) {
     val colors = LocalTranscriptorColors.current
     Row(Modifier.padding(start = 56.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) {
         Row(
@@ -195,7 +212,7 @@ private fun NoteCardA(entry: TimelineEntry.Written) {
 }
 
 @Composable
-private fun NoteBarA(state: LiveLectureState, actions: LiveLectureActions) {
+private fun NoteBar(state: LiveLectureState, actions: LiveLectureActions) {
     val colors = LocalTranscriptorColors.current
     var text by remember { mutableStateOf("") }
     var startedAt by remember { mutableStateOf<Long?>(null) }

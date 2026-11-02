@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Transcriptor</string>
-    <string name="main_coming_soon">המחברות יופיעו כאן אחרי שהעיצוב שלהן ייבחר במעבדת הממשק.</string>
+    <string name="main_coming_soon">המחברות יחליפו את המסך הזה אחרי שהעיצוב שלהן ייבחר במעבדת הממשק.</string>
+    <string name="lecture_back">חזרה</string>
+    <string name="lecture_pause">השהיה</string>
+    <string name="lecture_resume">המשך</string>
+    <string name="lecture_stop">סיום</string>
+    <string name="lecture_paused">מושהה</string>
+    <string name="lecture_note_hint">כתבו הערה…</string>
+    <string name="lecture_note_at">הערה ב־%1$s</string>
+    <string name="lecture_save_note">הוספה</string>
+    <string name="lecture_follow_live">חזרה לשידור</string>
+    <string name="lecture_live_model">חי: %1$s · %2$.1f שנ׳ מאחור</string>
+    <string name="lecture_no_transcription">מקליט. תמלול חי יגיע בגרסה הבאה; ההערות נשמרות כבר עכשיו.</string>
+    <string name="recording_channel">הקלטה</string>
+    <string name="recording_now">מקליט</string>
+    <string name="compressing_flac">דוחס ל־FLAC…</string>
+    <string name="start_format">שמע</string>
+    <string name="format_wav">WAV (הכי גדול, כ־690MB לשעה)</string>
+    <string name="format_wav_then_flac">WAV, ודחיסה ל־FLAC אחרי ההרצאה</string>
+    <string name="format_flac_live">FLAC בזמן ההקלטה</string>
+    <string name="start_lecture">התחלת הרצאה</string>
+    <string name="start_default_notebook">המחברת שלי</string>
+    <string name="start_last">ההרצאה האחרונה: %1$s · %2$s · %3$d הערות · %4$s</string>
 </resources>

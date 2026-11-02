@@ -11,7 +11,10 @@ update those docs whenever a screen changes.
 
 - `sharedLogic/` — all logic, shared. `notebook/`: `Notebook`, `Lecture`, `Segment` (a line of speech with start
   and end), `Note`, `Speaker`. `models/`: `SpeechModel` and `ModelCatalog` (the models offered, by language).
-  `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs.
+  `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs. `notebook/LectureStore.kt`: lectures
+  on disk (`lecture.json`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per
+  platform; Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
+  `SettingsStore`, `AudioFormat`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf` and `formatClock`. Strings in
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`.

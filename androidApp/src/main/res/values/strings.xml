@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Transcriptor</string>
-    <string name="main_coming_soon">Notebooks come here once their design is chosen in the UI lab.</string>
+    <string name="main_coming_soon">Notebooks replace this screen once their design is chosen in the UI lab.</string>
+    <string name="lecture_back">Back</string>
+    <string name="lecture_pause">Pause</string>
+    <string name="lecture_resume">Resume</string>
+    <string name="lecture_stop">Stop</string>
+    <string name="lecture_paused">Paused</string>
+    <string name="lecture_note_hint">Write a note…</string>
+    <string name="lecture_note_at">Note at %1$s</string>
+    <string name="lecture_save_note">Add</string>
+    <string name="lecture_follow_live">Back to live</string>
+    <string name="lecture_live_model">Live: %1$s · %2$.1fs behind</string>
+    <string name="lecture_no_transcription">Recording. Live transcription comes in the next version; notes are saved now.</string>
+    <string name="recording_channel">Recording</string>
+    <string name="recording_now">Recording</string>
+    <string name="compressing_flac">Compressing to FLAC…</string>
+    <string name="start_format">Audio</string>
+    <string name="format_wav">WAV (largest, about 690 MB an hour)</string>
+    <string name="format_wav_then_flac">WAV, then compress to FLAC after the lecture</string>
+    <string name="format_flac_live">FLAC while recording</string>
+    <string name="start_lecture">Start lecture</string>
+    <string name="start_default_notebook">My notebook</string>
+    <string name="start_last">Last lecture: %1$s · %2$s · %3$d notes · %4$s</string>
 </resources>
