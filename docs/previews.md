@@ -11,7 +11,7 @@ as the app has it now (`current`), then the suggestions. A screen the app doesn'
 DEVICE=emulator ./scripts/ui-lab.sh    # the emulator even with a phone connected (or DEVICE=<serial>)
 ```
 
-The script builds a separate app, **Transcriptor UI Lab** (the `uiLab` build type: the debug build with the id
+The script builds a separate app, **Transcriptor ui-lab** (the `uiLab` build type: the debug build with the id
 `com.chencohensolution.transcriptor.uilab`, compiling `src/debug`, with `src/uiLab/AndroidManifest.xml` making the
 lab its only launcher entry). It installs beside Transcriptor and never touches its notebooks.
 

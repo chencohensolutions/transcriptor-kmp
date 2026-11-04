@@ -9,7 +9,7 @@ the Android UI Lab on every machine, on the owner's phone when `adb devices` lis
 
 | Lab app | Lab code | Open |
 |---|---|---|
-| Android UI Lab (`com.chencohensolution.transcriptor.uilab`), beside Transcriptor | `androidApp/src/debug/` | `./scripts/ui-lab.sh <screen> [option]` (`DEVICE=emulator` or `DEVICE=<serial>` to choose) |
+| Android UI Lab: the app **Transcriptor ui-lab** (`com.chencohensolution.transcriptor.uilab`), beside Transcriptor | `androidApp/src/debug/` | `./scripts/ui-lab.sh <screen> [option]` (`DEVICE=emulator` or `DEVICE=<serial>` to choose) |
 
 Once the iOS app exists its lab goes in `iosApp/iosApp/Lab/`, with the same screen and option ids, in SwiftUI.
 
