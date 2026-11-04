@@ -24,6 +24,10 @@ The app's first screen, lectures first (round 1's c2). In the app.
 - The gear opens Settings (for now the old start screen's settings: audio format, model downloads, the passes after
   the lecture).
 
+- The **lectures folder** card on top: until a folder is picked, "Where should lectures be kept?" with Choose a
+  folder (the system's picker, on Documents; `Transcriptor` is made there) and Not now; while lectures move there, its
+  progress; when it can't be reached, Choose again. Settings has the same choice (Change).
+
 Empty (no notebooks, no lectures): a line on what a notebook is; Record still works.
 
 ## Code
@@ -32,7 +36,9 @@ Empty (no notebooks, no lectures): a line on what a notebook is; Record still wo
 - State: `sharedLogic/.../notebook/NotebooksController.kt` (`NotebooksController`: `library`, `reload`, `create`,
   `assign`, `assignToNew`; `notebooksState(...)`, `NotebooksState`, `RecordingNow`), `NotebookGuess.kt`
   (`guessNotebook`), `NotebookStore.kt` (`notebooks.json`, `UNFILED`, `migrate`), `LectureStore.move`.
-- Filing with voices: `Recording.file`. Passes per lecture: `Recording.working`.
+- Filing with voices: `Recording.file`. Passes per lecture: `Recording.working`. The lectures folder:
+  `Recording.folder`, `chooseFolder`, `archive`, `openAudio`; `storage/SafFileSystem.kt`; shared `Place.kt`,
+  `LibraryFolder.kt` (`adoptLibrary`, `archiveFinished`), `LectureStore.archive`.
 - Strings: `notebooks_*`. Lab: `notebooks current`, `notebooks current-no-guess` (`lab/notebooks/NotebooksCurrentLab.kt`).
 
 ## Design history

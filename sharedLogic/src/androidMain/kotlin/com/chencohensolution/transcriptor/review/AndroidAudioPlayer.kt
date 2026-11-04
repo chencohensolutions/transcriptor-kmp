@@ -2,6 +2,7 @@ package com.chencohensolution.transcriptor.review
 
 import android.media.MediaPlayer
 import android.media.PlaybackParams
+import android.os.ParcelFileDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,9 +15,13 @@ import okio.Path
 
 /**
  * The recording on Android's [MediaPlayer] (WAV and FLAC both): seeks land on the exact millisecond, so a line starts
- * on its first word; the position is read every 100 ms while playing.
+ * on its first word; the position is read every 100 ms while playing. [open] opens a recording's file, in the app's
+ * storage or in the lectures folder outside it.
  */
-class AndroidAudioPlayer(private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)) : AudioPlayer {
+class AndroidAudioPlayer(
+    private val open: (Path) -> ParcelFileDescriptor = { ParcelFileDescriptor.open(java.io.File(it.toString()), ParcelFileDescriptor.MODE_READ_ONLY) },
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main),
+) : AudioPlayer {
     private val position = MutableStateFlow(0L)
     private val running = MutableStateFlow(false)
     override val positionMillis: StateFlow<Long> = position
@@ -29,7 +34,8 @@ class AndroidAudioPlayer(private val scope: CoroutineScope = CoroutineScope(Disp
     override fun load(file: Path) {
         release()
         player = MediaPlayer().apply {
-            setDataSource(file.toString())
+            // The player keeps its own copy of the descriptor.
+            open(file).use { setDataSource(it.fileDescriptor) }
             prepare()
             setOnCompletionListener { running.value = false; stopTicking(); position.value = duration.toLong() }
         }

@@ -35,13 +35,15 @@ fun adoptLibrary(lectures: LectureStore, notebooks: NotebookStore, library: Plac
 }
 
 /**
- * Moves the finished lectures still in the app's own storage to the library, except the [busy] ones (being recorded,
- * worked on, open, or waiting to be compressed to FLAC). A lecture that fails to copy stays and is tried again next
- * time. Returns how many moved.
+ * Moves the finished lectures still in the app's own storage to the library, except the busy ones (being recorded,
+ * worked on or open: [busy], asked just before each one moves) and those waiting to be compressed to FLAC. A lecture
+ * that fails to copy stays and is tried again next time. Returns how many moved.
  */
-fun archiveFinished(lectures: LectureStore, busy: Set<String>): Int {
+fun archiveFinished(lectures: LectureStore, busy: (lectureId: String) -> Boolean): Int {
     if (lectures.library == null) return 0
     return lectures.localLectures().count { lecture ->
-        lecture.id !in busy && !lecture.pendingFlac && runCatching { lectures.archive(lecture) }.getOrDefault(false)
+        !lecture.pendingFlac && !busy(lecture.id) && runCatching { lectures.archive(lecture) }.getOrDefault(false)
     }
 }
+
+fun archiveFinished(lectures: LectureStore, busy: Set<String>): Int = archiveFinished(lectures) { it in busy }

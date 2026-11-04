@@ -120,4 +120,17 @@
     <string name="notebooks_new_language">Language of the lectures</string>
     <string name="notebooks_new_language_note">Picks the speech models, and the direction its lines are written in.</string>
     <string name="notebooks_create">Create</string>
+    <!-- Lectures folder -->
+    <string name="folder_title">Lectures folder</string>
+    <string name="folder_in_app">Kept in the app only: removing the app deletes them. Choose a folder outside the app to keep them.</string>
+    <string name="folder_ready">In “%1$s”, outside the app. Each lecture is a folder there: its audio, transcript.md and lecture.json.</string>
+    <string name="folder_choose">Choose a folder</string>
+    <string name="folder_change">Change</string>
+    <string name="folder_moving">Moving lectures to “%1$s” · %2$d%%</string>
+    <string name="folder_lost">Can\'t reach “%1$s”: new lectures stay in the app until it is chosen again.</string>
+    <string name="folder_choose_again">Choose again</string>
+    <string name="folder_ask_title">Where should lectures be kept?</string>
+    <string name="folder_ask_note">In a folder outside the app (Documents/Transcriptor is suggested) they stay if the app is removed, and the transcripts sit beside their audio.</string>
+    <string name="folder_not_now">Not now</string>
+    <string name="folder_failed">Couldn\'t use that folder: %1$s</string>
 </resources>

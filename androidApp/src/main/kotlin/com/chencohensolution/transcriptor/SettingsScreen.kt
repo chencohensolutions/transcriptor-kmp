@@ -42,6 +42,8 @@ import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.speech.ModelStatus
 import com.chencohensolution.transcriptor.speech.SherpaNpuWhisperEngine
 import kotlinx.coroutines.delay
+import androidx.compose.material3.OutlinedButton
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * Settings, for now: the audio format, the live models' downloads, the passes after the lecture and their models, the
@@ -50,8 +52,9 @@ import kotlinx.coroutines.delay
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var format by remember { mutableStateOf(Recording.settings.audioFormat) }
+    val folder by Recording.folder.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -64,6 +67,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            LecturesFolder(folder, chooseFolder)
             Text(stringResource(R.string.start_format), style = MaterialTheme.typography.titleSmall)
             Column(Modifier.selectableGroup()) {
                 listOf(
@@ -215,3 +219,29 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
 }
 
 private fun sizeText(bytes: Long) = if (bytes >= 1e9) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6)
+
+/** Where finished lectures are kept: in the app only, in a folder outside it, moving there, or the folder lost. */
+@Composable
+private fun LecturesFolder(folder: Recording.Folder, choose: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.titleSmall)
+        when (folder) {
+            Recording.Folder.NotSet -> {
+                Text(stringResource(R.string.folder_in_app), style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = choose) { Text(stringResource(R.string.folder_choose)) }
+            }
+            is Recording.Folder.Ready -> {
+                Text(stringResource(R.string.folder_ready, folder.name), style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = choose) { Text(stringResource(R.string.folder_change)) }
+            }
+            is Recording.Folder.Moving -> {
+                Text(stringResource(R.string.folder_moving, folder.name, (folder.progress * 100).toInt()), style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(progress = { folder.progress }, modifier = Modifier.fillMaxWidth())
+            }
+            is Recording.Folder.Lost -> {
+                Text(stringResource(R.string.folder_lost, folder.name), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = choose) { Text(stringResource(R.string.folder_choose_again)) }
+            }
+        }
+    }
+}

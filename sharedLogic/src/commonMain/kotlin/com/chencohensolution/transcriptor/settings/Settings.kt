@@ -27,6 +27,10 @@ private data class SettingsFileV1(
     val liveModels: Map<String, String> = emptyMap(),
     /** The passes after the lecture: the speaker pass when it stops, and the refine pass on its review screen. */
     val afterLecture: Boolean = true,
+    /** The lectures folder outside the app (Android: a document URI under the picked tree); null before one is picked. */
+    val lectureFolder: String? = null,
+    /** The user was asked to pick the lectures folder (and said not now). */
+    val lectureFolderAsked: Boolean = false,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -45,6 +49,15 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var afterLecture: Boolean
         get() = read().afterLecture
         set(value) = write(read().copy(afterLecture = value))
+
+    /** Where finished lectures are kept, outside the app; null keeps them in the app's storage. */
+    var lectureFolder: String?
+        get() = read().lectureFolder
+        set(value) = write(read().copy(lectureFolder = value))
+
+    var lectureFolderAsked: Boolean
+        get() = read().lectureFolderAsked
+        set(value) = write(read().copy(lectureFolderAsked = value))
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
     fun liveModel(language: String): String? = read().liveModels[language]

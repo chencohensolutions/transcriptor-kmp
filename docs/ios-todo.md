@@ -16,6 +16,16 @@ anything left to decide. Remove an entry once it is built.
 - Filing gives the notebook the named speakers' voices (Android's `Recording.file`, with `printOf`).
 - Strings: `notebooks_*`.
 
+## The lectures folder
+
+- Android: finished lectures move from the app to a folder the user picks (`Documents/Transcriptor`), through
+  `storage/SafFileSystem.kt` (an okio `FileSystem` on the documents provider) and `Recording.chooseFolder`/`archive`/
+  `openAudio`; a `.nomedia` in it.
+- Shared: `LectureStore.library` (a `Place`), `adoptLibrary`, `archiveFinished`, `SettingsStore.lectureFolder`.
+- iOS: a folder picked with `UIDocumentPickerViewController` kept as a security-scoped bookmark (in
+  `SettingsStore.lectureFolder`), an okio `FileSystem` over it (`startAccessingSecurityScopedResource`), no `.nomedia`.
+- Strings: `folder_*`.
+
 ## Lecture, while recording
 
 - Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and

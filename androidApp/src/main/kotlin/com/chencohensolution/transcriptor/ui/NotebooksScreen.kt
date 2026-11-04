@@ -89,7 +89,20 @@ class NotebooksActions(
     /** Makes a notebook and files an unfiled lecture into it. */
     val assignToNew: (lectureId: String, title: String, language: String) -> Unit = { _, _, _ -> },
     val settings: () -> Unit = {},
+    /** Opens the system's folder picker for the lectures folder. */
+    val chooseFolder: () -> Unit = {},
+    /** "Not now" on the question where lectures are kept. */
+    val keepInApp: () -> Unit = {},
 )
+
+/** What the Notebooks screen says about the lectures folder, on top of the list. */
+sealed interface FolderNotice {
+    /** None chosen yet: where should lectures be kept? */
+    data object Ask : FolderNotice
+    data class Moving(val name: String, val progress: Float) : FolderNotice
+    /** The folder can't be reached any more. */
+    data class Lost(val name: String) : FolderNotice
+}
 
 /**
  * The app's first screen, lectures first: every lecture newest first, grouped today / this week / earlier, each with
@@ -101,7 +114,7 @@ class NotebooksActions(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions) {
+fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null) {
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
     var choosing by remember { mutableStateOf(false) }
@@ -225,6 +238,7 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions) {
         },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
+            folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
                     item {
@@ -529,4 +543,35 @@ private fun NewNotebookDialog(onDismiss: () -> Unit, onCreate: (title: String, l
         confirmButton = { TextButton(onClick = { onCreate(title, language) }, enabled = title.isNotBlank()) { Text(stringResource(R.string.notebooks_create)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
     )
+}
+
+/** The lectures folder: the question where to keep lectures, the move into the folder, or the folder lost. */
+@Composable
+private fun FolderCard(notice: FolderNotice, actions: NotebooksActions) {
+    val lost = notice is FolderNotice.Lost
+    Surface(
+        color = if (lost) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            when (notice) {
+                FolderNotice.Ask -> {
+                    Text(stringResource(R.string.folder_ask_title), style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.folder_ask_note), style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = actions.chooseFolder) { Text(stringResource(R.string.folder_choose)) }
+                        TextButton(onClick = actions.keepInApp) { Text(stringResource(R.string.folder_not_now)) }
+                    }
+                }
+                is FolderNotice.Moving -> {
+                    Text(stringResource(R.string.folder_moving, notice.name, (notice.progress * 100).toInt()), style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(progress = { notice.progress }, modifier = Modifier.fillMaxWidth())
+                }
+                is FolderNotice.Lost -> {
+                    Text(stringResource(R.string.folder_lost, notice.name), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = actions.chooseFolder) { Text(stringResource(R.string.folder_choose_again)) }
+                }
+            }
+        }
+    }
 }

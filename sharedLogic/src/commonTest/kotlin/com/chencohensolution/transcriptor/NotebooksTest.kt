@@ -332,6 +332,24 @@ class LibraryFolderTest {
     }
 
     @Test
+    fun changingTheFolderMovesEverythingIncludingTheOpenLecture() {
+        val psych = notebooks.create("Psych", "he", 1)
+        voices.save(psych.id, Voice("המרצה", listOf(0.5f)))
+        recorded("a", psych.id)
+        adoptLibrary(lectures, notebooks, library)
+        val next = Place(folder, "/next".toPath())
+
+        adoptLibrary(lectures, notebooks, next, busy = setOf("a"))
+
+        assertEquals(next, lectures.library)
+        assertEquals(listOf("Psych"), notebooks.all().map { it.title })
+        assertEquals("המרצה", voices.load(psych.id).single().name)
+        assertEquals("/next/notebooks/${psych.id}/a/audio.wav".toPath(), lectures.audioPath(assertNotNull(lectures.load(psych.id, "a"))))
+        assertFalse(folder.exists(library.folder(psych.id, "a")))
+        assertFalse(folder.exists("/library/notebooks.json".toPath()))
+    }
+
+    @Test
     fun aFailedCopyLeavesTheLectureHere() {
         adoptLibrary(lectures, notebooks, library)
         val a = recorded("a", UNFILED)

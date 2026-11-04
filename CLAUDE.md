@@ -15,7 +15,8 @@ update those docs whenever a screen changes.
   on disk (`lecture.json`, and `transcript.md` from `Transcript.kt`; `move` files a lecture).
   `notebook/NotebookStore.kt`: `notebooks.json`, `UNFILED` (lectures recorded without a notebook).
   `notebook/NotebooksController.kt` and `NotebookGuess.kt`: the Notebooks screen's state and the notebook guessed from
-  when lectures are. `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per platform;
+  when lectures are. `notebook/Place.kt` and `LibraryFolder.kt`: the lectures folder outside the app (finished lectures
+  move there; `LectureStore.library`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per platform;
   Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
   `SettingsStore`, `AudioFormat`. `speech/`: `LiveTranscriber` (live lines) with `UtteranceTranscriber`
   (Whisper, a line at a time: `SpeechEngine`, `Utterances` splitting at pauses) and `StreamingTranscriber`
@@ -24,7 +25,8 @@ update those docs whenever a screen changes.
   `LectureReview` (a recorded lecture opened: playback, edits, speakers, notes), `AudioPlayer`, `ReviewState`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf`, `titleDirection`, `isolated` and `formatClock`.
-  `NotebooksScreen.kt` is the first screen; `SettingsScreen.kt` (package root) is a temporary Settings page. Strings in
+  `NotebooksScreen.kt` is the first screen; `SettingsScreen.kt` (package root) is a temporary Settings page.
+  `storage/SafFileSystem.kt`: the lectures folder the user picks, as an okio file system under `/library`. Strings in
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
   `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models; `speech/SherpaStreamingEngine.kt`
   runs streaming models on sherpa-onnx (its AAR is downloaded into `androidApp/libs/` by the build).

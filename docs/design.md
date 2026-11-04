@@ -94,6 +94,18 @@ audio (owner's request, Nov 4, 2026): its title, date and length, then each spea
 after the turn they were written in, rewritten on every save (`transcriptMarkdown`). Other exports (Word, PDF,
 subtitles) come later from `lecture.json`.
 
+**Where the files are** (owner's decision, Nov 4, 2026): a lecture records in the app's own storage, and once it is
+finished (stopped, its passes done, compressed to FLAC if that is the setting, not open) it moves to the **lectures
+folder** outside the app, when the user picked one: `Documents/Transcriptor` is suggested (the system's folder picker
+opens on Documents, and the app makes `Transcriptor` in the folder picked unless it is one). The folder is reached
+through Android's documents provider (`SafFileSystem`, a persisted tree permission), so it outlives the app: after a
+reinstall, picking it again brings back every notebook and lecture. An empty `.nomedia` at its root keeps music and
+gallery apps from listing the recordings. Moving a lecture copies its folder, checks every file's size and that
+`lecture.json` reads back, then deletes it from the app (`LectureStore.archive`); a failed copy leaves it in the app
+for next time. `notebooks.json` and the voices live in the folder too; settings and models stay in the app. Playback
+and the passes read a lecture's audio from either place (`Recording.openAudio`). If the folder can't be reached, new
+lectures stay in the app and Notebooks asks to pick it again.
+
 The notebooks are in `notebooks.json` (`NotebookStore`, v1: id, title, language, color, createdAt). Lectures recorded
 without a notebook are in `notebooks/unfiled/` until they are filed (`LectureStore.move`); the notebook a lecture's
 weekday and time suggest is `guessNotebook`'s (same weekday, within an hour, at least two earlier lectures). Before

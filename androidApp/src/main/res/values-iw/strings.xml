@@ -120,4 +120,17 @@
     <string name="notebooks_new_language">שפת ההרצאות</string>
     <string name="notebooks_new_language_note">קובעת את מודלי הדיבור ואת כיוון הכתיבה של השורות.</string>
     <string name="notebooks_create">יצירה</string>
+    <!-- Lectures folder -->
+    <string name="folder_title">תיקיית ההרצאות</string>
+    <string name="folder_in_app">נשמרות רק בתוך האפליקציה: הסרת האפליקציה מוחקת אותן. אפשר לבחור תיקייה מחוץ לאפליקציה.</string>
+    <string name="folder_ready">בתיקייה „%1$s”, מחוץ לאפליקציה. כל הרצאה היא תיקייה שם: השמע שלה, transcript.md ו־lecture.json.</string>
+    <string name="folder_choose">בחירת תיקייה</string>
+    <string name="folder_change">שינוי</string>
+    <string name="folder_moving">מעביר הרצאות אל „%1$s” · %2$d%%</string>
+    <string name="folder_lost">אין גישה לתיקייה „%1$s”: הרצאות חדשות יישארו באפליקציה עד שתיבחר שוב.</string>
+    <string name="folder_choose_again">בחירה מחדש</string>
+    <string name="folder_ask_title">איפה לשמור את ההרצאות?</string>
+    <string name="folder_ask_note">בתיקייה מחוץ לאפליקציה (מוצע: Documents/Transcriptor) הן נשארות גם אם האפליקציה מוסרת, והתמלולים שמורים ליד השמע.</string>
+    <string name="folder_not_now">לא עכשיו</string>
+    <string name="folder_failed">אי אפשר להשתמש בתיקייה הזו: %1$s</string>
 </resources>

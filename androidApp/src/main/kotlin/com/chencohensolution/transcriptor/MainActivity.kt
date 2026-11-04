@@ -2,6 +2,8 @@ package com.chencohensolution.transcriptor
 
 import android.Manifest
 import android.os.Bundle
+import android.provider.DocumentsContract
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +30,7 @@ import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
 import com.chencohensolution.transcriptor.ui.LiveLectureActions
+import com.chencohensolution.transcriptor.ui.FolderNotice
 import com.chencohensolution.transcriptor.ui.NotebooksActions
 import com.chencohensolution.transcriptor.ui.NotebooksScreen
 import com.chencohensolution.transcriptor.ui.ReviewActions
@@ -67,10 +70,25 @@ class MainActivity : ComponentActivity() {
                         openLecture(lecture.notebookId, lecture.id)
                     }
                 }
-                // The lists again when a lecture stops, one closes, or a pass on one ends.
+                // The lists again when a lecture stops, one closes, or a pass on one ends; and finished lectures move
+                // to the lectures folder.
                 LaunchedEffect(live == null, opened == null, working.keys) {
-                    withContext(Dispatchers.IO) { Recording.library.reload() }
+                    withContext(Dispatchers.IO) {
+                        Recording.library.reload()
+                        runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
+                    }
                 }
+                val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+                    if (tree != null) lifecycleScope.launch(Dispatchers.IO) {
+                        runCatching { Recording.chooseFolder(tree) }.onFailure { e ->
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(this@MainActivity, getString(R.string.folder_failed, e.message ?: e.toString()), Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }
+                // The system's picker opens on Documents, where the app suggests its Transcriptor folder.
+                val chooseFolder = { pickFolder.launch(DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents")) }
                 CompressPending()
                 ReviewPasses()
                 val state = live
@@ -107,7 +125,7 @@ class MainActivity : ComponentActivity() {
                     }
                     settings -> {
                         BackHandler { settings = false }
-                        SettingsScreen(onBack = { settings = false })
+                        SettingsScreen(onBack = { settings = false }, chooseFolder = chooseFolder)
                     }
                     else -> Notebooks(
                         recordingNow = state?.let { RecordingNow(it.lecture.notebookId.takeIf { id -> id != UNFILED }, it.lecture.title, it.elapsedMillis, it.lecture.id) },
@@ -115,6 +133,7 @@ class MainActivity : ComponentActivity() {
                         onRecord = { notebookId, language -> startLecture(notebookId, language); showLive = true },
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
+                        chooseFolder = chooseFolder,
                     )
                 }
             }
@@ -125,8 +144,17 @@ class MainActivity : ComponentActivity() {
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
         onRecord: (notebookId: String?, language: String) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
+        chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
+        val folder by Recording.folder.collectAsStateWithLifecycle()
+        var asked by rememberSaveable { mutableStateOf(Recording.settings.lectureFolderAsked) }
+        val notice = when (val f = folder) {
+            Recording.Folder.NotSet -> FolderNotice.Ask.takeIf { !asked }
+            is Recording.Folder.Moving -> FolderNotice.Moving(f.name, f.progress)
+            is Recording.Folder.Lost -> FolderNotice.Lost(f.name)
+            is Recording.Folder.Ready -> null
+        }
         // The clock, for "today" and the guess: once a minute.
         val now by produceState(System.currentTimeMillis()) {
             while (true) {
@@ -134,9 +162,9 @@ class MainActivity : ComponentActivity() {
                 value = System.currentTimeMillis()
             }
         }
-        var asked by remember { mutableStateOf<Pair<String?, String>?>(null) }
+        var recordIn by remember { mutableStateOf<Pair<String?, String>?>(null) }
         val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            val (notebookId, language) = asked ?: return@rememberLauncherForActivityResult
+            val (notebookId, language) = recordIn ?: return@rememberLauncherForActivityResult
             if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(notebookId, language)
         }
         val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
@@ -145,7 +173,7 @@ class MainActivity : ComponentActivity() {
             NotebooksActions(
                 openLecture = ::openLecture,
                 record = { notebookId, language ->
-                    asked = notebookId to language
+                    recordIn = notebookId to language
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
                 },
                 backToRecording = onBackToRecording,
@@ -153,7 +181,10 @@ class MainActivity : ComponentActivity() {
                 assign = { lectureId, notebookId -> io { Recording.file(lectureId, notebookId) } },
                 assignToNew = { lectureId, title, language -> io { Recording.file(lectureId, Recording.library.create(title, language).id) } },
                 settings = onSettings,
+                chooseFolder = chooseFolder,
+                keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
             ),
+            notice,
         )
     }
 

@@ -1,9 +1,21 @@
 package com.chencohensolution.transcriptor
 
 import android.app.Application
+import android.content.ContentResolver
+import android.content.Intent
+import android.net.Uri
+import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
+import okio.Path
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
+import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.NotebookStore
+import com.chencohensolution.transcriptor.notebook.Place
+import com.chencohensolution.transcriptor.notebook.adoptLibrary
+import com.chencohensolution.transcriptor.notebook.archiveFinished
+import com.chencohensolution.transcriptor.storage.LIBRARY_ROOT
+import com.chencohensolution.transcriptor.storage.SafFileSystem
 import com.chencohensolution.transcriptor.notebook.NotebooksController
 import com.chencohensolution.transcriptor.recording.AndroidRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
@@ -45,6 +57,9 @@ import okio.Path.Companion.toOkioPath
  * The app's one recording session and what it needs, shared by [RecordingService] (which keeps it going with the
  * screen off) and [MainActivity] (which shows it). Files are in the app's private storage, `files/`.
  */
+/** The folder made in the one the user picks, unless it is one already. */
+private const val LIBRARY_FOLDER = "Transcriptor"
+
 object Recording {
     lateinit var store: LectureStore
         private set
@@ -104,8 +119,8 @@ object Recording {
         val withVersion = store.keepCurrent(store.load(lecture.notebookId, lecture.id) ?: lecture, System.currentTimeMillis())
         store.save(withVersion)
         kept()
-        val file = store.audioPath(lecture).toFile()
-        val audio = { a: Long, b: Long -> RecordingAudio.range(file, a, b) }
+        val path = store.audioPath(lecture)
+        val audio = { a: Long, b: Long -> RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, a, b) }
         val done = when (model.kind) {
             ModelKind.Whisper -> WhisperEngine(models.file(model).path).use { engine ->
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
@@ -142,11 +157,11 @@ object Recording {
      */
     fun printOf(lecture: Lecture, speakerId: String): List<Float>? {
         if (!models.isReady(ModelCatalog.voicePrints)) return null
-        val file = store.audioPath(lecture).toFile()
+        val path = store.audioPath(lecture)
         val audio = com.chencohensolution.transcriptor.speech.FloatBuilder()
         for (line in lecture.segments.filter { it.speakerId == speakerId }.sortedByDescending { it.endMillis - it.startMillis }) {
             if (audio.size >= 20 * 16_000) break
-            audio.add(RecordingAudio.range(file, line.startMillis, line.endMillis))
+            audio.add(RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, line.startMillis, line.endMillis))
         }
         if (audio.size < SpeakerLabeler.MIN_SAMPLES) return null
         val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
@@ -164,7 +179,7 @@ object Recording {
         val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), models.file(ModelCatalog.voicePrints))
         val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
         try {
-            RecordingAudio(store.audioPath(lecture).toFile()).use { audio ->
+            RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
                 val result = SpeakerPass(diarizer, embedder).run(audio, voices.load(lecture.notebookId)) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
@@ -189,11 +204,104 @@ object Recording {
         }
     }
 
+    private lateinit var resolver: ContentResolver
+
+    /** The lectures folder outside the app: none picked yet, ready, moving lectures into it, or no longer reachable. */
+    sealed interface Folder {
+        data object NotSet : Folder
+        data class Ready(val name: String) : Folder
+        data class Moving(val name: String, val progress: Float) : Folder
+        data class Lost(val name: String) : Folder
+    }
+
+    val folder = MutableStateFlow<Folder>(Folder.NotSet)
+
+    /** A recording's file, in the app's storage or in the lectures folder, opened for reading (with seeks). */
+    fun openAudio(path: Path): ParcelFileDescriptor {
+        val library = store.library?.fileSystem as? SafFileSystem
+        return if (library != null && path.toString().startsWith("$LIBRARY_ROOT/")) library.openFd(path)
+        else ParcelFileDescriptor.open(path.toFile(), ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+
+    /** The folder in the settings, if the app may still use it: the lectures' library from now on. */
+    private fun connectLibrary() {
+        val saved = settings.lectureFolder ?: return
+        val uri = Uri.parse(saved)
+        val fs = SafFileSystem(resolver, uri)
+        val name = runCatching { fs.name }.getOrDefault("")
+        if (!canUse(uri) || name.isEmpty()) {
+            folder.value = Folder.Lost(name.ifEmpty { uri.lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/') ?: "" })
+            return
+        }
+        store.library = Place(fs, LIBRARY_ROOT)
+        folder.value = Folder.Ready(name)
+    }
+
+    /** The app still holds the read and write permission the folder's tree was picked with. */
+    private fun canUse(folderUri: Uri): Boolean {
+        val tree = DocumentsContract.buildTreeDocumentUri(folderUri.authority, DocumentsContract.getTreeDocumentId(folderUri))
+        return resolver.persistedUriPermissions.any { it.uri == tree && it.isReadPermission && it.isWritePermission }
+    }
+
+    /**
+     * Makes the folder the user picked ([tree], from the system's folder picker) the lectures folder (files: not on the
+     * main thread): a `Transcriptor` folder in it unless it is one already (by name, or a library from before), an
+     * empty `.nomedia` so music and gallery apps skip the recordings, then the notebooks, voices and finished lectures
+     * move in ([adoptLibrary]), from the app or from the folder used before, whose permission is then given back.
+     */
+    fun chooseFolder(tree: Uri) {
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        resolver.takePersistableUriPermission(tree, flags)
+        val treeFs = SafFileSystem(resolver, tree)
+        val isLibrary = treeFs.name == LIBRARY_FOLDER || treeFs.exists(LIBRARY_ROOT / "notebooks.json")
+        val folderUri = if (isLibrary) {
+            DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        } else {
+            treeFs.createDirectories(LIBRARY_ROOT / LIBRARY_FOLDER)
+            DocumentsContract.buildDocumentUriUsingTree(tree, treeFs.documentId(LIBRARY_ROOT / LIBRARY_FOLDER))
+        }
+        val fs = SafFileSystem(resolver, folderUri)
+        if (!fs.exists(LIBRARY_ROOT / ".nomedia")) fs.write(LIBRARY_ROOT / ".nomedia") {}
+        val before = settings.lectureFolder
+        val target = Place(fs, LIBRARY_ROOT)
+        folder.value = Folder.Moving(fs.name, 0f)
+        try {
+            adoptLibrary(store, notebooks, target, busy()) { folder.value = Folder.Moving(fs.name, it) }
+            settings.lectureFolder = folderUri.toString()
+            folder.value = Folder.Ready(fs.name)
+            before?.takeIf { it != folderUri.toString() }?.let { old ->
+                val oldUri = Uri.parse(old)
+                val oldTree = DocumentsContract.buildTreeDocumentUri(oldUri.authority, DocumentsContract.getTreeDocumentId(oldUri))
+                if (oldTree != DocumentsContract.buildTreeDocumentUri(tree.authority, DocumentsContract.getTreeDocumentId(tree))) {
+                    runCatching { resolver.releasePersistableUriPermission(oldTree, flags) }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Recording", "moving to the lectures folder failed", e)
+            folder.value = before?.let { Folder.Ready((store.library?.fileSystem as? SafFileSystem)?.name ?: "") } ?: Folder.NotSet
+            throw e
+        } finally {
+            library.reload()
+        }
+    }
+
+    /** The lectures that mustn't move now: being recorded, open, or with a pass running on them. */
+    private fun busy(): Set<String> = setOfNotNull(session.state.value?.lecture?.id, review.lecture?.id) +
+        listOfNotNull(compressing.value, findingSpeakers.value, refining.value).map { it.first }
+
+    /** The finished lectures still in the app move to the lectures folder (files: not on the main thread). */
+    fun archive() {
+        if (folder.value !is Folder.Ready) return
+        if (archiveFinished(store) { it in busy() } > 0) library.reload()
+    }
+
     fun init(app: Application) {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
-        notebooks = NotebookStore(FileSystem.SYSTEM, root)
+        notebooks = NotebookStore { store.library ?: store.local }
+        resolver = app.contentResolver
+        connectLibrary()
         // Before notebooks, every lecture was in "default": they become unfiled, once.
         runCatching { notebooks.migrate(store) }.onFailure { android.util.Log.e("Recording", "notebook migration failed", it) }
         library = NotebooksController(notebooks, store, System::currentTimeMillis)
@@ -201,11 +309,11 @@ object Recording {
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            voices = VoiceStore(FileSystem.SYSTEM, root).also { voices = it },
+            voices = VoiceStore { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
-        review = LectureReview(store, voices, AndroidAudioPlayer(), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
+        review = LectureReview(store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
     }
 }
 
