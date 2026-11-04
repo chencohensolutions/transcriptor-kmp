@@ -14,7 +14,7 @@ Tag: `ux/notebooks/2026-11-04`
   those lectures wait on top ("Not in a notebook yet") with the notebook their weekday and time suggest, one tap to
   move them; the notebook can still be picked before recording. The Record bar is on no notebook unless the lecture
   history guesses one for this hour (same weekday, within an hour, at least two lectures: "Usually on Monday at
-  10:00"); a notebook the list is filtered to also counts. *Picked*.
+  10:00"); a notebook the list is filtered to also counts. *Picked*, promoted in 37624bd.
 - Each of a, b, c had an `-empty` entry (the first launch); c2 has `c2-no-guess` (Tuesday evening, no class usual).
 
 ## What they faked
