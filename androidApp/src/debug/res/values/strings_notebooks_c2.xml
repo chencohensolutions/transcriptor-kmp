@@ -12,4 +12,9 @@
     <string name="notebooks_c2_other">Other…</string>
     <string name="notebooks_c2_assign">Put in a notebook</string>
     <string name="notebooks_c2_assign_title">Notebook for %1$s</string>
+    <string name="notebooks_c2_all">All</string>
+    <string name="notebooks_c2_this_week">This week</string>
+    <string name="notebooks_c2_earlier">Earlier</string>
+    <string name="notebooks_c2_records_in">Records in</string>
+    <string name="notebooks_c2_record">Record</string>
 </resources>

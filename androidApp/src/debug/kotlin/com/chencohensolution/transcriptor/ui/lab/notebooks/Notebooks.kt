@@ -1,6 +1,5 @@
 package com.chencohensolution.transcriptor.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +13,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,21 +20,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
-import com.chencohensolution.transcriptor.lab.LabData
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.Notebook
-import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
-// Shared by the Notebooks options: the state as a controller would produce it, the actions, the lab's fakes and the
-// small pieces every option draws the same way (dates, lengths, the new notebook dialog).
+// The Notebooks screen's state as a controller would produce it, its actions, and the small pieces it draws (dates,
+// lengths, the new notebook dialog). Left from round 1's shared file; option c2 builds on it.
 
 /** What the Notebooks screen shows. */
 data class NotebooksState(
@@ -62,69 +57,6 @@ class NotebooksActions(
     val newNotebook: (title: String, language: String) -> Unit = { _, _ -> },
     val settings: () -> Unit = {},
 )
-
-/**
- * Fakes for the lab: the notebooks of [LabData] (or none), the time (an hour after the latest lecture started), a
- * refine pass running on the latest lecture, then done. Record starts a clock in that notebook; going back to it stops
- * the recording and lists the lecture. Opening a lecture and Settings only say what would open.
- */
-@Composable
-internal fun rememberNotebooksLab(empty: Boolean = false): Pair<NotebooksState, NotebooksActions> {
-    val context = LocalContext.current
-    val now = remember { LabData.notebooks.first().lectures.first().startedAtMillis + 60 * 60_000L }
-    var notebooks by remember { mutableStateOf(if (empty) emptyList() else LabData.notebooks) }
-    var last by remember { mutableStateOf(notebooks.firstOrNull()?.id) }
-    var recording by remember { mutableStateOf<RecordingNow?>(null) }
-    var working by remember { mutableStateOf(if (empty) emptyMap() else mapOf("lecture-7" to 0.3f)) }
-    LaunchedEffect(recording != null) {
-        while (recording != null) {
-            delay(1_000)
-            recording = recording?.let { it.copy(elapsedMillis = it.elapsedMillis + 1_000) }
-        }
-    }
-    LaunchedEffect(working.isNotEmpty()) {
-        while (working.isNotEmpty()) {
-            delay(150)
-            val done = working.filterValues { it >= 1f }.keys
-            notebooks = notebooks.map { n -> n.copy(lectures = n.lectures.map { if (it.id in done) it.copy(refined = true) else it }) }
-            working = working.filterKeys { it !in done }.mapValues { (it.value + 0.01f).coerceAtMost(1f) }
-        }
-    }
-    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-    val state = NotebooksState(
-        notebooks = notebooks.sortedByDescending { it.id == last },
-        nowMillis = now,
-        lastNotebookId = last,
-        recording = recording,
-        working = working,
-    )
-    val actions = NotebooksActions(
-        openLecture = { _, id -> toast("Lab: the lecture would open ($id)") },
-        record = { id ->
-            if (recording == null) {
-                recording = RecordingNow(id, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(now)), 0)
-                last = id
-                toast("Lab: the lecture screen would open. Back here, tap the banner to stop it.")
-            }
-        },
-        backToRecording = {
-            recording?.let { r ->
-                val lecture = LectureSummary("new-${r.elapsedMillis}", r.lectureTitle, now, r.elapsedMillis, 0, refined = false)
-                notebooks = notebooks.map { if (it.id == r.notebookId) it.copy(lectures = listOf(lecture) + it.lectures) else it }
-                working = working + (lecture.id to 0f)
-                toast("Lab: stopped; the lecture is listed and its speaker pass runs")
-            }
-            recording = null
-        },
-        newNotebook = { title, language ->
-            val id = "nb-${notebooks.size + 1}"
-            notebooks = notebooks + Notebook(id, title.trim(), language, emptyList())
-            last = id
-        },
-        settings = { toast("Lab: Settings would open") },
-    )
-    return state to actions
-}
 
 /** The languages a new notebook can be in: Hebrew has its own models, the others the multilingual ones. */
 internal val notebookLanguages = listOf("he", "en", "ar", "ru", "fr", "es", "de")

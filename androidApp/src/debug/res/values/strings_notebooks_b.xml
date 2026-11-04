@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="notebooks_b_last">Last: %1$s</string>
-    <string name="notebooks_b_working">Improving a transcript…</string>
-    <string name="notebooks_b_record">Record a lecture</string>
-</resources>

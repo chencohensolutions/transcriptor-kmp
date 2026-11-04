@@ -12,4 +12,9 @@
     <string name="notebooks_c2_other">אחרת…</string>
     <string name="notebooks_c2_assign">שיוך למחברת</string>
     <string name="notebooks_c2_assign_title">מחברת עבור %1$s</string>
+    <string name="notebooks_c2_all">הכול</string>
+    <string name="notebooks_c2_this_week">השבוע</string>
+    <string name="notebooks_c2_earlier">קודם</string>
+    <string name="notebooks_c2_records_in">מקליט ב:</string>
+    <string name="notebooks_c2_record">הקלטה</string>
 </resources>

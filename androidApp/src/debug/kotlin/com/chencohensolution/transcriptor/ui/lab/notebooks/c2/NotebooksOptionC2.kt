@@ -103,8 +103,8 @@ fun NotebooksScreenC2(state: NotebooksStateC2, actions: NotebooksActionsC2) {
             val days = base.nowMillis / day - l.startedAtMillis / day
             when {
                 days == 0L -> R.string.notebooks_today
-                days < 7 -> R.string.notebooks_c_this_week
-                else -> R.string.notebooks_c_earlier
+                days < 7 -> R.string.notebooks_c2_this_week
+                else -> R.string.notebooks_c2_earlier
             }
         }
 
@@ -128,7 +128,7 @@ fun NotebooksScreenC2(state: NotebooksStateC2, actions: NotebooksActionsC2) {
                         Column {
                             Box {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.notebooks_c_records_in), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stringResource(R.string.notebooks_c2_records_in), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     AssistChip(
                                         onClick = { choosing = true },
                                         label = {
@@ -185,7 +185,7 @@ fun NotebooksScreenC2(state: NotebooksStateC2, actions: NotebooksActionsC2) {
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
-                                Text(stringResource(R.string.notebooks_c_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.notebooks_c2_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
@@ -197,7 +197,7 @@ fun NotebooksScreenC2(state: NotebooksStateC2, actions: NotebooksActionsC2) {
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
                     item {
-                        FilterChip(selected = filter == null, onClick = { filter = null; target = null }, label = { Text(stringResource(R.string.notebooks_c_all)) }, modifier = Modifier.padding(end = 8.dp))
+                        FilterChip(selected = filter == null, onClick = { filter = null; target = null }, label = { Text(stringResource(R.string.notebooks_c2_all)) }, modifier = Modifier.padding(end = 8.dp))
                     }
                     if (state.unfiled.isNotEmpty()) {
                         item {
