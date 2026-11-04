@@ -45,7 +45,8 @@ update those docs whenever a screen changes.
 
 ## UX suggestions: the UI lab
 
-UX/UI suggestions follow the `ui-lab` skill ([.claude/skills/ui-lab/](.claude/skills/ui-lab/SKILL.md)): mocks in lab
+UX/UI suggestions follow the `ui-lab` skill (plugin `ui-lab@chencohen-skills`, enabled in `.claude/settings.json`;
+this project's notes for it: [.claude/ui-lab.md](.claude/ui-lab.md)): mocks in lab
 code only, in the Android UI Lab, recorded in `docs/ux-history/`; the app changes after the owner approves a plan.
 See [docs/previews.md](docs/previews.md).
 
