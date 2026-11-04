@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b3_kind_parakeet">Parakeet (NVIDIA)</string>
+    <string name="models_b3_kind_sensevoice">SenseVoice</string>
+    <string name="models_b3_kind_moonshine">Moonshine</string>
+    <string name="models_b3_kind_paraformer">Paraformer</string>
+    <string name="models_b3_add_language">הוספת שפה</string>
+    <string name="models_b3_find_language">חיפוש שפה</string>
+    <string name="models_b3_own_models">מודלים משלה</string>
+    <string name="models_b3_multilingual_note">ל%1$s אין כאן מודלים משלה: הרב־לשוניים מתמללים אותה. אפשר למצוא עוד ב־Hugging Face.</string>
+    <string name="models_b3_find_for">חיפוש מודלים ל%1$s ב־Hugging Face</string>
+    <string name="models_b3_search_hint">חיפוש ב־Hugging Face</string>
+    <string name="models_b3_any_language">כל שפה</string>
+    <string name="models_b3_all_kinds">כל הסוגים</string>
+    <string name="models_b3_search_note">מודלי Whisper וסטרימינג רצים באפליקציה כבר עכשיו. Parakeet, ‏SenseVoice, ‏Moonshine ו־Paraformer מופיעים ברשימה; האפליקציה תריץ אותם בהמשך.</string>
+    <string name="models_b3_not_yet">עוד לא באפליקציה</string>
+    <string name="models_b3_not_yet_note">האפליקציה עוד לא מריצה מודלי %1$s: מנוע הדיבור שלה קורא את הקבצים, אבל האפליקציה עוד לא משתמשת בו בשבילם.</string>
+</resources>

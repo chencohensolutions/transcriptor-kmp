@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b3_kind_parakeet">Parakeet (NVIDIA)</string>
+    <string name="models_b3_kind_sensevoice">SenseVoice</string>
+    <string name="models_b3_kind_moonshine">Moonshine</string>
+    <string name="models_b3_kind_paraformer">Paraformer</string>
+    <string name="models_b3_add_language">Add a language</string>
+    <string name="models_b3_find_language">Find a language</string>
+    <string name="models_b3_own_models">Own models</string>
+    <string name="models_b3_multilingual_note">%1$s has no models of its own here: the multilingual ones transcribe it. Find more on Hugging Face.</string>
+    <string name="models_b3_find_for">Find %1$s models on Hugging Face</string>
+    <string name="models_b3_search_hint">Search Hugging Face</string>
+    <string name="models_b3_any_language">Any language</string>
+    <string name="models_b3_all_kinds">All kinds</string>
+    <string name="models_b3_search_note">Whisper and streaming models run in the app now. Parakeet, SenseVoice, Moonshine and Paraformer are listed; the app runs them later.</string>
+    <string name="models_b3_not_yet">Not in the app yet</string>
+    <string name="models_b3_not_yet_note">The app can\'t run %1$s models yet: its speech engine reads their files, but the app doesn\'t use it for them yet.</string>
+</resources>
