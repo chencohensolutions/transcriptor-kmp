@@ -7,10 +7,15 @@ import okio.FileSystem
 import okio.Path
 
 /**
- * The voices a notebook knows: `notebooks/<notebook id>/voices.json` under [root], a name and an average voice print
- * per person the user named in one of its lectures, so the next lectures label them by name.
+ * The voices a notebook knows: `notebooks/<notebook id>/voices.json` in the [place] the lectures are kept (the library
+ * once there is one), a name and an average voice print per person the user named in one of its lectures, so the next
+ * lectures label them by name.
  */
-class VoiceStore(private val fileSystem: FileSystem, private val root: Path) {
+class VoiceStore(private val place: () -> Place) {
+    constructor(fileSystem: FileSystem, root: Path) : this({ Place(fileSystem, root) })
+
+    private val fileSystem: FileSystem get() = place().fileSystem
+    private val root: Path get() = place().root
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
     private fun file(notebookId: String) = root / "notebooks" / notebookId / "voices.json"

@@ -9,10 +9,15 @@ import okio.Path
 const val UNFILED = "unfiled"
 
 /**
- * The notebooks: `notebooks.json` under [root] (version 1), written to a temp file and then renamed. Their lectures are
- * in [LectureStore]'s `notebooks/<id>/` folders; the notebooks here come without them.
+ * The notebooks: `notebooks.json` (version 1) in the [place] the lectures are kept (the library once there is one),
+ * written to a temp file and then renamed. Their lectures are in [LectureStore]'s `notebooks/<id>/` folders; the
+ * notebooks here come without them.
  */
-class NotebookStore(private val fileSystem: FileSystem, private val root: Path) {
+class NotebookStore(private val place: () -> Place) {
+    constructor(fileSystem: FileSystem, root: Path) : this({ Place(fileSystem, root) })
+
+    private val fileSystem: FileSystem get() = place().fileSystem
+    private val root: Path get() = place().root
     private val file get() = root / "notebooks.json"
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; prettyPrint = true }
 
@@ -48,14 +53,27 @@ class NotebookStore(private val fileSystem: FileSystem, private val root: Path) 
         write(NotebooksFileV1())
     }
 
-    private fun read(): NotebooksFileV1 =
-        if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else NotebooksFileV1()
+    /**
+     * Adds to [to]'s notebooks those of [from] it lacks (by id; [to]'s win, as after a reinstall), then deletes [from]'s
+     * file: when the notebooks move to the library.
+     */
+    fun merge(from: Place, to: Place) {
+        val there = read(to)
+        val here = read(from).notebooks.filter { n -> there.notebooks.none { it.id == n.id } }
+        write(there.copy(notebooks = there.notebooks + here), to)
+        from.fileSystem.delete(from.root / "notebooks.json")
+    }
 
-    private fun write(notebooks: NotebooksFileV1) {
-        fileSystem.createDirectories(root)
-        val temp = root / "notebooks.json.tmp"
-        fileSystem.write(temp) { writeUtf8(json.encodeToString(notebooks)) }
-        fileSystem.atomicMove(temp, file)
+    private fun read(at: Place = place()): NotebooksFileV1 {
+        val file = at.root / "notebooks.json"
+        return if (at.exists(file)) json.decodeFromString(at.fileSystem.read(file) { readUtf8() }) else NotebooksFileV1()
+    }
+
+    private fun write(notebooks: NotebooksFileV1, at: Place = place()) {
+        at.fileSystem.createDirectories(at.root)
+        val temp = at.root / "notebooks.json.tmp"
+        at.fileSystem.write(temp) { writeUtf8(json.encodeToString(notebooks)) }
+        at.fileSystem.atomicMove(temp, at.root / "notebooks.json")
     }
 }
 

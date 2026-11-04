@@ -11,72 +11,118 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * The lectures on disk: `notebooks/<notebook id>/<lecture id>/` under [root], with the audio, `lecture.json` (version
- * 1, the format in docs/design.md) and `transcript.md` (the lecture to read, [transcriptMarkdown]), each written to a
- * temp file and then renamed. [utcOffset] is the phone's offset from UTC at a time, for the transcript's date.
+ * The lectures on disk: `notebooks/<notebook id>/<lecture id>/` with the audio, `lecture.json` (version 1, the format
+ * in docs/design.md) and `transcript.md` (the lecture to read, [transcriptMarkdown]), each written to a temp file and
+ * then renamed. A lecture is in one of two places: the app's own storage under [root] (while it is recorded, until
+ * [archive] moves it, or always when there is no library), or the [library], the lectures folder outside the app.
+ * [utcOffset] is the phone's offset from UTC at a time, for the transcript's date.
  */
-class LectureStore(private val fileSystem: FileSystem, private val root: Path, private val utcOffset: (Long) -> Long = { 0 }) {
+class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (Long) -> Long = { 0 }) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; prettyPrint = true }
 
-    fun folder(notebookId: String, lectureId: String): Path = root / "notebooks" / notebookId / lectureId
+    /** The app's own storage. */
+    val local = Place(fileSystem, root)
+
+    /** The lectures folder outside the app, once the user picked one; finished lectures move there ([archive]). */
+    var library: Place? = null
+
+    /** Where a lecture is: here, or in the library; a new one is here. */
+    private fun placeOf(notebookId: String, lectureId: String): Place {
+        if (local.exists(local.folder(notebookId, lectureId))) return local
+        val library = library ?: return local
+        return if (library.exists(library.folder(notebookId, lectureId))) library else local
+    }
+
+    fun folder(notebookId: String, lectureId: String): Path = placeOf(notebookId, lectureId).folder(notebookId, lectureId)
 
     fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path = folder(lecture.notebookId, lecture.id) / file
 
+    /** The lecture is in the app's own storage, not (yet) in the library. */
+    fun isLocal(lecture: Lecture) = placeOf(lecture.notebookId, lecture.id) == local
+
     fun save(lecture: Lecture) {
-        val folder = folder(lecture.notebookId, lecture.id)
-        fileSystem.createDirectories(folder)
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val fs = place.fileSystem
+        val folder = place.folder(lecture.notebookId, lecture.id)
+        fs.createDirectories(folder)
         val temp = folder / "lecture.json.tmp"
-        fileSystem.write(temp) { writeUtf8(json.encodeToString(LectureFileV1.of(lecture))) }
-        fileSystem.atomicMove(temp, folder / "lecture.json")
+        fs.write(temp) { writeUtf8(json.encodeToString(LectureFileV1.of(lecture))) }
+        fs.atomicMove(temp, folder / "lecture.json")
         val transcript = folder / "transcript.md.tmp"
-        fileSystem.write(transcript) { writeUtf8(transcriptMarkdown(lecture, utcOffset(lecture.startedAtMillis))) }
-        fileSystem.atomicMove(transcript, folder / TRANSCRIPT)
+        fs.write(transcript) { writeUtf8(transcriptMarkdown(lecture, utcOffset(lecture.startedAtMillis))) }
+        fs.atomicMove(transcript, folder / TRANSCRIPT)
     }
 
     /**
-     * Moves a lecture's folder (its audio, transcript and versions) to another notebook, and returns it there. Not while
-     * it is being recorded or a pass runs on it.
+     * Moves a lecture's folder (its audio, transcript and versions) to another notebook, in the place it is, and
+     * returns it there. Not while it is being recorded or a pass runs on it.
      */
     fun move(lecture: Lecture, notebookId: String): Lecture {
         if (lecture.notebookId == notebookId) return lecture
-        val to = folder(notebookId, lecture.id)
-        fileSystem.createDirectories(to.parent!!)
-        fileSystem.atomicMove(folder(lecture.notebookId, lecture.id), to)
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val to = place.folder(notebookId, lecture.id)
+        place.fileSystem.createDirectories(to.parent!!)
+        place.fileSystem.atomicMove(place.folder(lecture.notebookId, lecture.id), to)
         return lecture.copy(notebookId = notebookId).also(::save)
     }
 
+    /**
+     * Moves a finished lecture from the app's storage to the library: copied, checked file by file, then deleted here.
+     * False when there is no library or it isn't here; a failed copy leaves it here (and throws). Not while it is being
+     * recorded, a pass runs on it, or it is open.
+     */
+    fun archive(lecture: Lecture): Boolean {
+        val library = library ?: return false
+        val from = local.folder(lecture.notebookId, lecture.id)
+        if (!local.exists(from)) return false
+        val to = library.folder(lecture.notebookId, lecture.id)
+        if (library.exists(to)) library.fileSystem.deleteRecursively(to)
+        copyChecked(local, from, library, to)
+        checkNotNull(read(library, lecture.notebookId, lecture.id)) { "${lecture.id}'s lecture.json doesn't read back" }
+        local.fileSystem.deleteRecursively(from)
+        return true
+    }
+
     /** The lecture; null when there is none. */
-    fun load(notebookId: String, lectureId: String): Lecture? {
-        val file = folder(notebookId, lectureId) / "lecture.json"
-        if (!fileSystem.exists(file)) return null
-        return json.decodeFromString<LectureFileV1>(fileSystem.read(file) { readUtf8() }).toLecture(notebookId)
+    fun load(notebookId: String, lectureId: String): Lecture? = read(placeOf(notebookId, lectureId), notebookId, lectureId)
+
+    private fun read(place: Place, notebookId: String, lectureId: String): Lecture? {
+        val file = place.folder(notebookId, lectureId) / "lecture.json"
+        if (!place.exists(file)) return null
+        return json.decodeFromString<LectureFileV1>(place.fileSystem.read(file) { readUtf8() }).toLecture(notebookId)
     }
 
     /**
      * Fixes the WAV's header if a crash cut the recording off, before the audio is played or read. Not while the
-     * lecture is being recorded.
+     * lecture is being recorded. Only here: a lecture reaches the library finished.
      */
     fun repairAudio(lecture: Lecture) {
+        if (!isLocal(lecture)) return
         val audio = audioPath(lecture)
-        if (lecture.audioFile == AUDIO_WAV && fileSystem.exists(audio)) WavWriter.repair(fileSystem, audio)
+        if (lecture.audioFile == AUDIO_WAV && local.fileSystem.exists(audio)) WavWriter.repair(local.fileSystem, audio)
     }
 
     /** Keeps [version] in the lecture's folder (`versions/<id>.json`); the lecture lists it in [Lecture.versions]. */
     fun saveVersion(lecture: Lecture, version: Version) {
-        val dir = folder(lecture.notebookId, lecture.id) / "versions"
-        fileSystem.createDirectories(dir)
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val dir = place.folder(lecture.notebookId, lecture.id) / "versions"
+        place.fileSystem.createDirectories(dir)
         val temp = dir / "${version.info.id}.json.tmp"
-        fileSystem.write(temp) { writeUtf8(json.encodeToString(VersionFileV1.of(version))) }
-        fileSystem.atomicMove(temp, dir / "${version.info.id}.json")
+        place.fileSystem.write(temp) { writeUtf8(json.encodeToString(VersionFileV1.of(version))) }
+        place.fileSystem.atomicMove(temp, dir / "${version.info.id}.json")
     }
 
     fun loadVersion(lecture: Lecture, id: String): Version? {
-        val file = folder(lecture.notebookId, lecture.id) / "versions" / "$id.json"
-        if (!fileSystem.exists(file)) return null
-        return json.decodeFromString<VersionFileV1>(fileSystem.read(file) { readUtf8() }).toVersion()
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val file = place.folder(lecture.notebookId, lecture.id) / "versions" / "$id.json"
+        if (!place.exists(file)) return null
+        return json.decodeFromString<VersionFileV1>(place.fileSystem.read(file) { readUtf8() }).toVersion()
     }
 
-    fun deleteVersion(lecture: Lecture, id: String) = fileSystem.delete(folder(lecture.notebookId, lecture.id) / "versions" / "$id.json")
+    fun deleteVersion(lecture: Lecture, id: String) {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        place.fileSystem.delete(place.folder(lecture.notebookId, lecture.id) / "versions" / "$id.json")
+    }
 
     /**
      * Keeps the lecture's current transcript as a version and returns the lecture listing it (not saved: the caller
@@ -89,13 +135,14 @@ class LectureStore(private val fileSystem: FileSystem, private val root: Path, p
         return lecture.copy(versions = lecture.versions + version.info)
     }
 
-    /** Every lecture, in every notebook (unfiled ones included). */
-    fun all(): List<Lecture> {
-        val notebooks = root / "notebooks"
-        if (!fileSystem.exists(notebooks)) return emptyList()
-        // Lecture folders only: a notebook's folder also has its voices.json.
-        fun folders(dir: okio.Path) = fileSystem.list(dir).filter { fileSystem.metadataOrNull(it)?.isDirectory == true }
-        return folders(notebooks).flatMap { notebook -> folders(notebook).mapNotNull { load(notebook.name, it.name) } }
+    /** Every lecture, in every notebook (unfiled ones included), here and in the library. */
+    fun all(): List<Lecture> = listOfNotNull(local, library).flatMap { place ->
+        place.folders(place.notebooks).flatMap { notebook -> place.folders(notebook).mapNotNull { runCatching { read(place, notebook.name, it.name) }.getOrNull() } }
+    }.distinctBy { it.notebookId to it.id }
+
+    /** The lectures still in the app's own storage. */
+    fun localLectures(): List<Lecture> = local.folders(local.notebooks).flatMap { notebook ->
+        local.folders(notebook).mapNotNull { runCatching { read(local, notebook.name, it.name) }.getOrNull() }
     }
 }
 

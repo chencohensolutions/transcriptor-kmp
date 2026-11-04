@@ -5,6 +5,11 @@ import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.Place
+import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.notebook.adoptLibrary
+import com.chencohensolution.transcriptor.notebook.archiveFinished
+import com.chencohensolution.transcriptor.speech.Voice
 import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.notebook.RecordingNow
 import com.chencohensolution.transcriptor.notebook.NotebookStore
@@ -16,7 +21,12 @@ import com.chencohensolution.transcriptor.notebook.UNFILED
 import com.chencohensolution.transcriptor.notebook.guessNotebook
 import com.chencohensolution.transcriptor.notebook.notebooksState
 import com.chencohensolution.transcriptor.notebook.transcriptMarkdown
+import okio.Buffer
+import okio.FileSystem
+import okio.ForwardingFileSystem
+import okio.Path
 import okio.Path.Companion.toPath
+import okio.Sink
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -222,5 +232,124 @@ class NotebooksTest {
 
         /** Monday 2 November 2026, 10:00 in Israel (UTC+2). */
         const val MONDAY_10 = 1_793_606_400_000L
+    }
+}
+
+/** A file system whose writes, once [dropping], lose their bytes: a copy that arrives short. */
+private class Lossy(delegate: FileSystem) : ForwardingFileSystem(delegate) {
+    var dropping = false
+    override fun sink(file: Path, mustCreate: Boolean): Sink {
+        val sink = super.sink(file, mustCreate)
+        return if (!dropping) sink else object : Sink by sink {
+            override fun write(source: Buffer, byteCount: Long) = source.skip(byteCount)
+        }
+    }
+}
+
+class LibraryFolderTest {
+    private val phone = FakeFileSystem()
+    private val folder = Lossy(FakeFileSystem())
+    private val lectures = LectureStore(phone, "/files".toPath())
+    private val notebooks = NotebookStore { lectures.library ?: lectures.local }
+    private val voices = VoiceStore { lectures.library ?: lectures.local }
+    private val library = Place(folder, "/library".toPath())
+
+    private fun recorded(id: String, notebook: String): Lecture {
+        val l = Lecture(id, notebook, "Lecture $id", "he", 1_000, 60_000, emptyList(), emptyList())
+        lectures.save(l)
+        phone.write(lectures.audioPath(l)) { writeUtf8("audio of $id") }
+        return l
+    }
+
+    @Test
+    fun choosingTheFolderMovesNotebooksVoicesAndFinishedLecturesThere() {
+        val psych = notebooks.create("Psych", "he", 1)
+        voices.save(psych.id, Voice("המרצה", listOf(0.1f, 0.2f)))
+        recorded("a", psych.id)
+        recorded("b", UNFILED)
+        recorded("open", psych.id)
+
+        adoptLibrary(lectures, notebooks, library, busy = setOf("open"))
+
+        assertEquals(library, lectures.library)
+        assertEquals(listOf("Psych"), notebooks.all().map { it.title })
+        assertTrue(folder.exists("/library/notebooks.json".toPath()))
+        assertFalse(phone.exists("/files/notebooks.json".toPath()))
+        assertEquals("המרצה", voices.load(psych.id).single().name)
+        assertEquals("audio of a", folder.read("/library/notebooks/${psych.id}/a/audio.wav".toPath()) { readUtf8() })
+        assertTrue(folder.exists("/library/notebooks/${psych.id}/a/$TRANSCRIPT".toPath()))
+        assertFalse(phone.exists(lectures.local.folder(psych.id, "a")))
+        assertFalse(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "b"))))
+        // The open lecture stays here, and is still found.
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load(psych.id, "open"))))
+        assertEquals(setOf("a", "b", "open"), lectures.all().map { it.id }.toSet())
+
+        assertEquals(1, archiveFinished(lectures, busy = emptySet()))
+        assertFalse(phone.exists(lectures.local.folder(psych.id, "open")))
+    }
+
+    @Test
+    fun newLecturesRecordHereAndMoveWhenFinishedNotWhileBusyOrWaitingForFlac() {
+        adoptLibrary(lectures, notebooks, library)
+        val recording = recorded("now", UNFILED)
+        assertTrue(lectures.isLocal(recording))
+        lectures.save(recorded("wav", UNFILED).copy(pendingFlac = true))
+        assertEquals(0, archiveFinished(lectures, busy = setOf("now")))
+        assertEquals(1, archiveFinished(lectures, busy = emptySet()))
+        assertFalse(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "now"))))
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "wav"))))
+    }
+
+    @Test
+    fun aLectureInTheLibraryIsEditedAndFiledThere() {
+        val psych = notebooks.create("Psych", "he", 1)
+        adoptLibrary(lectures, notebooks, library)
+        recorded("a", UNFILED)
+        archiveFinished(lectures, emptySet())
+        val a = assertNotNull(lectures.load(UNFILED, "a"))
+        lectures.save(a.copy(title = "זיכרון"))
+        val moved = lectures.move(assertNotNull(lectures.load(UNFILED, "a")), psych.id)
+        assertEquals("זיכרון", lectures.load(psych.id, "a")?.title)
+        assertEquals("/library/notebooks/${psych.id}/a/audio.wav".toPath(), lectures.audioPath(moved))
+        assertFalse(phone.exists(lectures.local.folder(psych.id, "a")))
+    }
+
+    @Test
+    fun afterAReinstallTheLibrarysNotebooksAndLecturesComeBack() {
+        val old = LectureStore(folder, "/old".toPath())
+        // What the library held before: written as a previous install left it.
+        val before = NotebookStore(folder, "/library".toPath())
+        val psych = before.create("Psych", "he", 1)
+        LectureStore(folder, "/library".toPath()).save(Lecture("kept", psych.id, "Kept", "he", 1, 1, emptyList(), emptyList()))
+        // A new install: a notebook made before the folder was picked again.
+        notebooks.create("Stats", "he", 2)
+
+        adoptLibrary(lectures, notebooks, library)
+
+        assertEquals(listOf("Psych", "Stats"), notebooks.all().map { it.title })
+        assertEquals(listOf("kept"), lectures.all().map { it.id })
+        assertEquals(emptyList(), old.all())
+    }
+
+    @Test
+    fun aFailedCopyLeavesTheLectureHere() {
+        adoptLibrary(lectures, notebooks, library)
+        val a = recorded("a", UNFILED)
+        folder.dropping = true
+        assertEquals(0, archiveFinished(lectures, emptySet()))
+        folder.dropping = false
+        assertFalse(folder.exists(library.folder(UNFILED, "a")))
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "a"))))
+        assertEquals("audio of a", phone.read(lectures.audioPath(a)) { readUtf8() })
+    }
+
+    @Test
+    fun anUnreachableLibraryListsOnlyTheLecturesHere() {
+        adoptLibrary(lectures, notebooks, library)
+        recorded("a", UNFILED)
+        archiveFinished(lectures, emptySet())
+        recorded("b", UNFILED)
+        lectures.library = Place(folder, "/gone".toPath())
+        assertEquals(listOf("b"), lectures.all().map { it.id })
     }
 }
