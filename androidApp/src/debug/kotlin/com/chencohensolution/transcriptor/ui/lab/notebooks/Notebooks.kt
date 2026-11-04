@@ -51,7 +51,8 @@ data class NotebooksState(
     val working: Map<String, Float> = emptyMap(),
 )
 
-data class RecordingNow(val notebookId: String, val lectureTitle: String, val elapsedMillis: Long)
+/** A lecture recording now, in [notebookId] or in none yet (assigned after). */
+data class RecordingNow(val notebookId: String?, val lectureTitle: String, val elapsedMillis: Long)
 
 class NotebooksActions(
     val openLecture: (notebookId: String, lectureId: String) -> Unit = { _, _ -> },

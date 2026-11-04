@@ -33,7 +33,7 @@ import com.chencohensolution.transcriptor.notebook.Notebook
 
 /** A lecture is recording: its notebook, its clock, and the way back to it. */
 @Composable
-internal fun NotebooksRecordingBanner(recording: RecordingNow, notebook: Notebook?, onBack: () -> Unit, modifier: Modifier = Modifier) {
+internal fun NotebooksRecordingBanner(recording: RecordingNow, notebook: Notebook?, onBack: () -> Unit, modifier: Modifier = Modifier, noNotebook: String? = null) {
     val red = LocalTranscriptorColors.current.recording
     Surface(
         color = red.copy(alpha = 0.12f), shape = RoundedCornerShape(16.dp),
@@ -49,6 +49,7 @@ internal fun NotebooksRecordingBanner(recording: RecordingNow, notebook: Noteboo
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
+                if (notebook == null && noNotebook != null) Text(noNotebook, style = MaterialTheme.typography.bodySmall)
             }
             Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)) {
                 Text(stringResource(R.string.notebooks_back_to_lecture))

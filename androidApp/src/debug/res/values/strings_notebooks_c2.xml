@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_c2_no_notebook">No notebook</string>
+    <string name="notebooks_c2_no_notebook_assign">No notebook, file it later</string>
+    <string name="notebooks_c2_suggested">Suggested</string>
+    <string name="notebooks_c2_usually">Usually on %1$s</string>
+    <string name="notebooks_c2_slot">%1$s at %2$s</string>
+    <string name="notebooks_c2_assign_after">You\'ll pick its notebook after</string>
+    <string name="notebooks_c2_unfiled_chip">Not filed (%1$d)</string>
+    <string name="notebooks_c2_unfiled">Not in a notebook yet</string>
+    <string name="notebooks_c2_move_to">Move to %1$s</string>
+    <string name="notebooks_c2_other">Other…</string>
+    <string name="notebooks_c2_assign">Put in a notebook</string>
+    <string name="notebooks_c2_assign_title">Notebook for %1$s</string>
+</resources>
