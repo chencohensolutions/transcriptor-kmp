@@ -124,7 +124,9 @@ class ModelFiles(context: Context) {
 
     private suspend fun check(model: SpeechModel): ModelStatus = withContext(Dispatchers.IO) {
         for (file in model.files) {
-            if (sha256(part(model, file)) != file.sha256) {
+            // A small file added from Hugging Face has no sha256 there: its git blob id checks it.
+            val ok = if (file.sha256.isEmpty() && file.gitSha1 != null) gitSha1(part(model, file)) == file.gitSha1 else sha256(part(model, file)) == file.sha256
+            if (!ok) {
                 cancel(model)
                 return@withContext ModelStatus.Failed("${file.name}: the checksum doesn't match")
             }
@@ -149,6 +151,21 @@ class ModelFiles(context: Context) {
         }
         marker(model).createNewFile()
         ModelStatus.Ready
+    }
+
+    /** Git's id of a file's content: the sha1 of "blob <size>\u0000" and the bytes. */
+    private fun gitSha1(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        digest.update("blob ${file.length()}\u0000".toByteArray())
+        file.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 20)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun sha256(file: File): String {

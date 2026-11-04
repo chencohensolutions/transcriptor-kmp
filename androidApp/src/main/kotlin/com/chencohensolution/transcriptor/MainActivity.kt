@@ -54,6 +54,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             TranscriptorTheme {
+              // Model names in the lecture's screen include those added from Hugging Face.
+              androidx.compose.runtime.CompositionLocalProvider(com.chencohensolution.transcriptor.ui.LocalModelNames provides Recording.modelLibrary::nameOf) {
                 val live by Recording.session.state.collectAsStateWithLifecycle()
                 val opened by Recording.review.state.collectAsStateWithLifecycle()
                 val last by Recording.lastLecture.collectAsStateWithLifecycle()
@@ -125,7 +127,7 @@ class MainActivity : ComponentActivity() {
                     }
                     settings -> {
                         BackHandler { settings = false }
-                        SettingsScreen(onBack = { settings = false }, chooseFolder = chooseFolder)
+                        Settings(onBack = { settings = false }, chooseFolder = chooseFolder)
                     }
                     else -> Notebooks(
                         recordingNow = state?.let { RecordingNow(it.lecture.notebookId.takeIf { id -> id != UNFILED }, it.lecture.title, it.elapsedMillis, it.lecture.id) },
@@ -136,6 +138,7 @@ class MainActivity : ComponentActivity() {
                         chooseFolder = chooseFolder,
                     )
                 }
+              }
             }
         }
     }

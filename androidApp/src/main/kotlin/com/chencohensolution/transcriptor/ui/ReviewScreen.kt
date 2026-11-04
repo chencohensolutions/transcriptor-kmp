@@ -80,6 +80,9 @@ import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
 
+/** A model's name by its id: the catalog's and those added from Hugging Face (the app provides it). */
+val LocalModelNames = androidx.compose.runtime.staticCompositionLocalOf<(String) -> String> { com.chencohensolution.transcriptor.models.ModelCatalog::nameOf }
+
 class ReviewActions(
     val back: () -> Unit = {},
     val playPause: () -> Unit = {},
@@ -401,14 +404,14 @@ private fun VersionsDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (S
                 val nowModel = lecture.refinedWith ?: lecture.segments.groupingBy { it.modelId }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
                 VersionRow(
                     stringResource(R.string.review_version_now),
-                    stringResource(if (lecture.refinedWith != null) R.string.review_version_refined else R.string.review_version_live, com.chencohensolution.transcriptor.models.ModelCatalog.nameOf(nowModel)),
+                    stringResource(if (lecture.refinedWith != null) R.string.review_version_refined else R.string.review_version_live, LocalModelNames.current(nowModel)),
                     stringResource(R.string.review_version_lines, lecture.segments.size, lecture.segments.count { it.edited }),
                     current = true, onClick = null,
                 )
                 lecture.versions.sortedByDescending { it.keptAtMillis }.forEach { v ->
                     VersionRow(
                         format.format(java.util.Date(v.keptAtMillis)),
-                        stringResource(if (v.refined) R.string.review_version_refined else R.string.review_version_live, com.chencohensolution.transcriptor.models.ModelCatalog.nameOf(v.modelId)),
+                        stringResource(if (v.refined) R.string.review_version_refined else R.string.review_version_live, LocalModelNames.current(v.modelId)),
                         stringResource(R.string.review_version_lines, v.lines, v.edited),
                         current = false, onClick = { onPick(v.id) },
                     )

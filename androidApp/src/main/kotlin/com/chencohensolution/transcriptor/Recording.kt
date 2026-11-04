@@ -21,7 +21,11 @@ import com.chencohensolution.transcriptor.recording.AndroidRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
 import com.chencohensolution.transcriptor.recording.LectureSession
 import com.chencohensolution.transcriptor.recording.androidFlacEncode
+import com.chencohensolution.transcriptor.models.HubClient
+import com.chencohensolution.transcriptor.models.InstalledModels
 import com.chencohensolution.transcriptor.models.Languages
+import com.chencohensolution.transcriptor.models.ModelLibrary
+import com.chencohensolution.transcriptor.models.NpuResult
 import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
@@ -109,11 +113,61 @@ object Recording {
     val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
 
 
-    /** The models the refine pass can use for [language]: every downloaded speech model for it, the large ones first. */
+    /**
+     * The models the refine pass can use for [language]: every downloaded speech model for it, the one chosen in
+     * Settings › Models first, then the large ones.
+     */
     fun refineModels(language: String): List<SpeechModel> =
-        ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip)
+        modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip)
             .filter { it.kind.transcribes && models.isReady(it) }
-            .sortedBy { it.fitsLive }
+            .sortedWith(compareBy<SpeechModel> { it.id != settings.refineModel(language) }.thenBy { it.fitsLive })
+
+    lateinit var installedModels: InstalledModels
+        private set
+
+    /** The catalog's models and those added from Hugging Face. */
+    lateinit var modelLibrary: ModelLibrary
+        private set
+
+    /** Hugging Face's API, read over HTTPS (not on the main thread). */
+    val hub = HubClient { url ->
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.setRequestProperty("Accept", "application/json")
+            try {
+                if (connection.responseCode !in 200..299) throw java.io.IOException("Hugging Face answered ${connection.responseCode}")
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } finally {
+                connection.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Tries a downloaded NPU model on the NPU once (files: not on the main thread): loaded, with a second of silence
+     * through it. Qualcomm's runtime refuses a build for another chip or runtime version at once. Kept in models.json.
+     */
+    fun checkNpu(model: SpeechModel): NpuResult {
+        val result = runCatching {
+            val dir = models.dir(model)
+            when (model.kind) {
+                ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(dir, nativeLibDir).use { engine ->
+                    val language = model.languages.firstOrNull { it != SpeechModel.MULTILINGUAL } ?: "en"
+                    engine.load(language)
+                    engine.transcribe(FloatArray(16_000), language, null)
+                }
+                ModelKind.StreamingTransducerNpu -> SherpaStreamingEngine(dir, nativeLibDir).use { engine ->
+                    engine.accept(FloatArray(16_000))
+                    engine.text
+                }
+                else -> Unit
+            }
+        }.fold({ NpuResult(runs = true) }, { NpuResult(runs = false, reason = it.message ?: it.toString()) })
+        installedModels.setNpu(model.id, result)
+        return result
+    }
 
     /**
      * The refine pass on [lecture] with [modelId] (minutes to hours with a large model; not on the main thread): the
@@ -306,6 +360,8 @@ object Recording {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
+        installedModels = InstalledModels(FileSystem.SYSTEM, root)
+        modelLibrary = ModelLibrary(installedModels)
         notebooks = NotebookStore { store.library ?: store.local }
         resolver = app.contentResolver
         connectLibrary()
@@ -326,7 +382,7 @@ object Recording {
 
 /** The live models for [language] that are downloaded, the language's own first (ivrit.ai's for Hebrew). */
 fun readyLiveModels(language: String) =
-    ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.fitsLive && Recording.models.isReady(it) }
+    Recording.modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.fitsLive && Recording.models.isReady(it) }
 
 /** The live model that runs for [language]: the one chosen on the start screen if it is ready, else the first ready. */
 fun liveModelFor(language: String): SpeechModel? {
