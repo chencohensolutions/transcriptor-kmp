@@ -3,4 +3,4 @@
 - AVD: `Transcriptor`
 - App id: `com.chencohensolution.transcriptor`
 - UI lab app id: `com.chencohensolution.transcriptor.uilab`
-- Scripts: no emulator script, so use the skill's; `./scripts/ui-lab.sh` builds, installs and opens the lab.
+- Scripts: `./scripts/emulator.sh up` / `down` runs the AVD only while needed; `./scripts/ui-lab.sh` builds, installs and opens the lab.
