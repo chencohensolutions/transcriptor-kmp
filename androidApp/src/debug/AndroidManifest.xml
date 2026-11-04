@@ -1,19 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds only: the UI lab (UiLabActivity), which shows the app's screens with made-up data. Release builds
-     never see this file or src/debug. -->
+<!-- Debug builds only: the UI lab (UiLabActivity), which shows the app's screens with made-up data. Not a launcher
+     entry here: the lab has its own app, Transcriptor ui-lab (the uiLab build type, scripts/ui-lab.sh), so the debug
+     build of Transcriptor shows one icon. Release builds never see this file or src/debug. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
         <activity
-            android:exported="true"
+            android:exported="false"
             android:label="Transcriptor UI lab"
-            android:name=".ui.UiLabActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:name=".ui.UiLabActivity" />
     </application>
 
 </manifest>
