@@ -17,6 +17,7 @@ import com.chencohensolution.transcriptor.review.AndroidAudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.speech.RecordingAudio
 import com.chencohensolution.transcriptor.speech.SherpaDiarizer
+import com.chencohensolution.transcriptor.speech.SherpaNpuWhisperEngine
 import com.chencohensolution.transcriptor.speech.SherpaStreamingEngine
 import com.chencohensolution.transcriptor.speech.RefinePass
 import com.chencohensolution.transcriptor.speech.transcribeLineStreaming
@@ -53,6 +54,10 @@ object Recording {
     lateinit var models: ModelFiles
         private set
 
+    /** The app's unpacked native libraries: Qualcomm's NPU runtime for [ModelKind.WhisperNpu]. */
+    lateinit var nativeLibDir: String
+        private set
+
     /** The last lecture stopped, for the start screen. */
     val lastLecture = MutableStateFlow<Lecture?>(null)
 
@@ -67,8 +72,8 @@ object Recording {
 
     /** The models the refine pass can use for [language]: every downloaded speech model for it, the large ones first. */
     fun refineModels(language: String): List<SpeechModel> =
-        ModelCatalog.forLanguage(language)
-            .filter { (it.kind == ModelKind.Whisper || it.kind == ModelKind.StreamingTransducer) && models.isReady(it) }
+        ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip)
+            .filter { it.kind.transcribes && models.isReady(it) }
             .sortedBy { it.fitsLive }
 
     /**
@@ -88,7 +93,10 @@ object Recording {
             ModelKind.Whisper -> WhisperEngine(models.file(model).path).use { engine ->
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
-            else -> SherpaStreamingEngine(models.dir(model)).use { engine ->
+            ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
+                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
+            }
+            else -> SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }).use { engine ->
                 RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress)
             }
         }
@@ -158,6 +166,7 @@ object Recording {
         store = LectureStore(FileSystem.SYSTEM, root)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         models = ModelFiles(app)
+        nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
             voices = VoiceStore(FileSystem.SYSTEM, root).also { voices = it },
@@ -170,7 +179,7 @@ object Recording {
 
 /** The live models for [language] that are downloaded, the language's own first (ivrit.ai's for Hebrew). */
 fun readyLiveModels(language: String) =
-    ModelCatalog.forLanguage(language).filter { it.fitsLive && Recording.models.isReady(it) }
+    ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.fitsLive && Recording.models.isReady(it) }
 
 /** The live model that runs for [language]: the one chosen on the start screen if it is ready, else the first ready. */
 fun liveModelFor(language: String): SpeechModel? {
@@ -194,9 +203,16 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
             val path = Recording.models.file(model).path
             UtteranceTranscriber(language, model.id, scope, worker, labeler) { WhisperEngine(path) }
         }
-        ModelKind.StreamingTransducer -> {
+        ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)
-            StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir) }
+            UtteranceTranscriber(language, model.id, scope, worker, labeler) {
+                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).apply { load(language) }
+            }
+        }
+        ModelKind.StreamingTransducer, ModelKind.StreamingTransducerNpu -> {
+            val dir = Recording.models.dir(model)
+            val npu = Recording.nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }
+            StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir, npu) }
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }

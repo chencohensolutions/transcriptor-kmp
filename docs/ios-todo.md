@@ -23,4 +23,9 @@ anything left to decide. Remove an entry once it is built.
   `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
   `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
   `review_*`.
+- Improve after the lecture: `SettingsStore.afterLecture` (on by default). Off: no speaker pass when the lecture stops
+  (`RecordingService`'s stop), no Refine with… on the lecture's screen (`passes.refine` null), and the start screen
+  hides the refine models. Strings `start_after_lecture`, `start_after_lecture_note`.
+- NPU (Android only for now): `ModelKind.WhisperNpu` models run on a Qualcomm NPU; on iOS the equivalent is Core ML
+  on the Neural Engine, not built.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).

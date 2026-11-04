@@ -1,0 +1,11 @@
+--- a/scripts/whisper/qnn/export_onnx.py
++++ b/scripts/whisper/qnn/export_onnx.py
+@@ -503,7 +503,7 @@
+             )
+         model = whisper.load_model(filename)
+     else:
+-        model = whisper.load_model(name)
++        model = whisper.load_model(os.environ.get("WHISPER_CKPT", name))
+     model.to("cpu")
+ 
+     num_params = sum(p.numel() for p in model.parameters())

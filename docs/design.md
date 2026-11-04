@@ -118,8 +118,11 @@ A note's time is when the user **started** typing it, so it points at what was b
 
 ### NPU
 
-Planned (owner's request, Nov 2, 2026): the larger Hebrew Whisper on the Snapdragon NPU for the refine pass, and
-maybe the live model, with the CPU path kept for other phones. Plan: [npu-plan.md](npu-plan.md).
+ivrit.ai Whisper turbo runs on the Snapdragon 8 Elite's NPU (Nov 4, 2026): `ModelKind.WhisperNpu`, offered only on
+its chip (`SpeechModel.chips`, Android's `Build.SOC_MODEL`), on sherpa-onnx's QNN backend (`SherpaNpuWhisperEngine`),
+live and for the refine pass; other phones keep whisper.cpp on the CPU. On a 41-minute recording it was about 2× as
+fast as the CPU and used about a fifth of the energy. Its files and the QNN-enabled sherpa-onnx AAR are ours to
+publish (owner: on Hugging Face); not yet. Details and next steps: [npu-plan.md](npu-plan.md).
 
 ## Screens
 

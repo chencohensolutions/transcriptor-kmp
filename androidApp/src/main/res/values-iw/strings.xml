@@ -67,6 +67,8 @@
     <string name="start_lectures">הרצאות</string>
     <string name="start_speakers_count">%1$d דוברים</string>
     <string name="refining">משפר את התמלול…</string>
+    <string name="start_after_lecture">שיפור אחרי ההרצאה</string>
+    <string name="start_after_lecture_note">כשההרצאה נעצרת, זיהוי הדוברים מתקן מי אמר כל שורה, ובמסך ההרצאה אפשר לשפר את התמלול עם מודל גדול יותר. כבוי: ההרצאה נשארת כפי שנכתבה בזמן אמת (את הדוברים עדיין אפשר לזהות ממסך ההרצאה).</string>
     <string name="start_refine_models">אחרי ההרצאה: שיפור (עברית)</string>
     <string name="start_refine_note">מתמלל הרצאה מחדש עם המודל הגדול, מהתפריט של מסך ההרצאה: מדויק יותר, עם פיסוק, ואיטי יותר מההרצאה עצמה. שורות שערכתם נשארות.</string>
     <string name="model_in_use_refine">משמש לשיפור</string>

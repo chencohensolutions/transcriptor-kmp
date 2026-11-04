@@ -83,6 +83,14 @@ class RecordingTest {
     }
 
     @Test
+    fun thePassesAfterTheLectureAreOnUntilTurnedOff() {
+        assertTrue(settings.afterLecture)
+        settings.afterLecture = false
+        assertEquals(false, SettingsStore(fs, root).afterLecture)
+        assertEquals(AudioFormat.Wav, SettingsStore(fs, root).audioFormat)
+    }
+
+    @Test
     fun startCreatesTheFolderTheJsonAndTheAudio() = runTest {
         val lecture = session().start(notebook, "זיכרון עבודה")
         val folder = store.folder("psych", lecture.id)

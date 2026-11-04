@@ -28,5 +28,10 @@
             android:name=".RecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone|mediaProcessing" />
+        <!-- Qualcomm's FastRPC, for the NPU models: a vendor library apps see only when they ask for it. Not on other
+             chips, hence not required. -->
+        <uses-native-library
+            android:name="libcdsprpc.so"
+            android:required="false" />
     </application>
 </manifest>

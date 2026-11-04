@@ -11,19 +11,45 @@ kotlin {
         jvmTarget = JvmTarget.JVM_11
     }
 }
-// sherpa-onnx (Apache-2.0) runs the streaming models (Zipformer). It isn't on Maven Central: its release AAR is
-// downloaded once into libs/ (not in git), pinned to a version and checked against its sha256.
-val sherpaOnnx: File = file("libs/sherpa-onnx-2.0.1.aar").also { aar ->
-    if (!aar.exists()) {
-        aar.parentFile.mkdirs()
-        val temp = File(aar.path + ".part")
-        uri("https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar").toURL()
-            .openStream().use { input -> temp.outputStream().use { input.copyTo(it) } }
+/** [name] in libs/ (not in git), downloaded once from [url] and checked against its sha256. */
+fun pinned(name: String, url: String, sha256: String): File = file("libs/$name").also { out ->
+    if (!out.exists()) {
+        check(!url.contains("HF_USER")) { "libs/$name isn't published yet: build it (docs/npu-plan.md) and put it in libs/" }
+        out.parentFile.mkdirs()
+        val temp = File(out.path + ".part")
+        uri(url).toURL().openStream().use { input -> temp.outputStream().use { input.copyTo(it) } }
         val sha = MessageDigest.getInstance("SHA-256").digest(temp.readBytes()).joinToString("") { "%02x".format(it) }
-        check(sha == "a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7") { "sherpa-onnx AAR: unexpected sha256 $sha" }
-        temp.renameTo(aar)
+        check(sha == sha256) { "$name: unexpected sha256 $sha" }
+        temp.renameTo(out)
     }
 }
+
+// sherpa-onnx (Apache-2.0) runs the streaming models (Zipformer) and Whisper on Qualcomm NPUs. Its release 2.0.1
+// with Whisper's NPU settings in Kotlin (upstream #4126), our Whisper turbo fixes, and its 64-bit ARM library built
+// with the QNN backend: sherpa-onnx's own AAR project, from build/qnn/sherpa-onnx (docs/npu-plan.md).
+val sherpaOnnx = pinned(
+    "sherpa-onnx-2.0.1-qnn.aar",
+    "https://huggingface.co/HF_USER/sherpa-onnx-qnn-android/resolve/COMMIT/sherpa-onnx-2.0.1-qnn.aar",
+    "73f1d2a1546d4c497e5908a31279da91595b115c4d1fbd4d7820d33c34200c68",
+)
+
+// Qualcomm's runtime for the NPU models, as sherpa-onnx publishes it for QAIRT 2.40 (the version the models are
+// compiled with): the CPU side, and the NPU side (Skel) for each Hexagon version the catalog has a model for.
+val qnnLibs = pinned(
+    "qnn-libs-2.40.0.251030.tar.bz2",
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models-qnn/qnn-libs-2.40.0.251030.tar.bz2",
+    "1078c0833b1e948518ff433e081eda511475c7fd9a82c7798a862f59b95a7ce5",
+)
+val qnnJniLibs = layout.buildDirectory.dir("generated/qnn-jni").get().asFile
+val unpackQnnLibs = tasks.register<Sync>("unpackQnnLibs") {
+    from(tarTree(resources.bzip2(qnnLibs))) {
+        include("*/libQnnHtp.so", "*/libQnnSystem.so", "*/libQnnHtpV79Stub.so", "*/libQnnHtpV79Skel.so")
+        eachFile { path = "arm64-v8a/$name" }
+        includeEmptyDirs = false
+    }
+    into(qnnJniLibs)
+}
+tasks.named("preBuild") { dependsOn(unpackQnnLibs) }
 
 dependencies {
     implementation(project(":sharedLogic"))
@@ -77,6 +103,15 @@ android {
     sourceSets.named("uiLab") {
         kotlin.srcDir("src/debug/kotlin")
         res.srcDir("src/debug/res")
+    }
+    sourceSets.named("main") { jniLibs.srcDir(qnnJniLibs) }
+    packaging {
+        jniLibs {
+            // Unpacked on install: the NPU loads its part of Qualcomm's runtime (the Skel) from a file.
+            useLegacyPackaging = true
+            // The Skel is a Hexagon library, not ARM: nothing to strip.
+            keepDebugSymbols += "**/libQnnHtpV*Skel.so"
+        }
     }
     buildFeatures {
         compose = true

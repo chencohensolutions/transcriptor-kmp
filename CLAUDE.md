@@ -24,6 +24,8 @@ update those docs whenever a screen changes.
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
   `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models; `speech/SherpaStreamingEngine.kt`
   runs streaming models on sherpa-onnx (its AAR is downloaded into `androidApp/libs/` by the build).
+- `scripts/npu/` — building the NPU models (Snapdragon) and the patched sherpa-onnx AAR:
+  [docs/npu-build.md](docs/npu-build.md).
 - `third_party/whisper.cpp` — a git submodule pinned to a release: `git submodule update --init` after cloning.
 - `iosApp/` — native SwiftUI, not created yet: iOS is built after the Android app is finished. The shared logic
   already builds for iOS.

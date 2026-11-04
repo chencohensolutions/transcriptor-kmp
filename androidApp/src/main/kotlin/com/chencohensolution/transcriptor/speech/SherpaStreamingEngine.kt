@@ -7,24 +7,39 @@ import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
 import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
+import com.k2fsa.sherpa.onnx.QnnConfig
 import java.io.File
 
 /**
- * A streaming transducer (encoder, decoder, joiner, tokens in [dir]) on sherpa-onnx's online recognizer, on the CPU.
- * A line ends at sherpa-onnx's endpoint: [PAUSE_AFTER_SPEECH_S] of quiet after words, or [MAX_LINE_S].
+ * A streaming transducer (encoder, decoder, joiner, tokens in [dir]) on sherpa-onnx's online recognizer: on the CPU
+ * (int8 ONNX files), or with [npuLibDir] on a Qualcomm NPU (context binaries `encoder.bin`, `decoder.bin`,
+ * `joiner.bin`, and Qualcomm's runtime in [npuLibDir]; seconds to load). A line ends at sherpa-onnx's endpoint:
+ * [PAUSE_AFTER_SPEECH_S] of quiet after words, or [MAX_LINE_S].
  */
-class SherpaStreamingEngine(dir: File) : StreamingEngine {
+class SherpaStreamingEngine(dir: File, npuLibDir: String? = null) : StreamingEngine {
     private val recognizer = OnlineRecognizer(
         config = OnlineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80, dither = 0f),
             modelConfig = OnlineModelConfig(
-                transducer = OnlineTransducerModelConfig(
-                    encoder = File(dir, "encoder.int8.onnx").path,
-                    decoder = File(dir, "decoder.int8.onnx").path,
-                    joiner = File(dir, "joiner.int8.onnx").path,
-                ),
+                transducer = if (npuLibDir == null) {
+                    OnlineTransducerModelConfig(
+                        encoder = File(dir, "encoder.int8.onnx").path,
+                        decoder = File(dir, "decoder.int8.onnx").path,
+                        joiner = File(dir, "joiner.int8.onnx").path,
+                    )
+                } else {
+                    SherpaNpuWhisperEngine.useNpuLibraries(npuLibDir)
+                    OnlineTransducerModelConfig(
+                        qnnConfig = QnnConfig(
+                            backendLib = "$npuLibDir/libQnnHtp.so",
+                            contextBinary = listOf("encoder", "decoder", "joiner").joinToString(",") { File(dir, "$it.bin").path },
+                            systemLib = "$npuLibDir/libQnnSystem.so",
+                        ),
+                    )
+                },
                 tokens = File(dir, "tokens.txt").path,
                 numThreads = 2,
+                provider = if (npuLibDir == null) "cpu" else "qnn",
                 modelType = "zipformer2",
             ),
             endpointConfig = EndpointConfig(

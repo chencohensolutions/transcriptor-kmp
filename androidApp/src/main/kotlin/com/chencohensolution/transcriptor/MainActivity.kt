@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,6 +49,7 @@ import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.speech.ModelStatus
+import com.chencohensolution.transcriptor.speech.SherpaNpuWhisperEngine
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.lifecycleScope
@@ -160,7 +163,7 @@ private fun ReviewPasses() {
                 else -> PassState.NotRun
             },
             refine = when {
-                models.isEmpty() -> null
+                models.isEmpty() || !Recording.settings.afterLecture -> null
                 refine != null -> PassState.Running(refine)
                 lecture.refinedWith != null -> PassState.Done
                 else -> PassState.NotRun
@@ -213,7 +216,7 @@ private fun StartScreen(onStart: () -> Unit, onOpen: (Lecture) -> Unit) {
                 }
             }
             LiveModels("he")
-            RefineModels("he")
+            AfterLecture()
             SpeakerModel()
             Button(
                 onClick = { permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)) },
@@ -229,7 +232,7 @@ private fun StartScreen(onStart: () -> Unit, onOpen: (Lecture) -> Unit) {
 /** The live models for [language], each with its download; the first one ready is the one used. */
 @Composable
 private fun LiveModels(language: String) {
-    val models = ModelCatalog.forLanguage(language).filter { it.fitsLive }
+    val models = ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.fitsLive }
     var refresh by remember { mutableStateOf(0) }
     val statuses by produceState(emptyMap<String, ModelStatus>(), refresh) {
         while (true) {
@@ -248,10 +251,27 @@ private fun LiveModels(language: String) {
     }
 }
 
+/** Whether the passes after the lecture run (the speaker pass, the refine pass); the refine models when they do. */
+@Composable
+private fun AfterLecture() {
+    var on by remember { mutableStateOf(Recording.settings.afterLecture) }
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = { on = it; Recording.settings.afterLecture = it }),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.start_after_lecture), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.start_after_lecture_note), style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+    }
+    if (on) RefineModels("he")
+}
+
 /** The refine models for [language] (the refine pass after the lecture); the first one ready is the one used. */
 @Composable
 private fun RefineModels(language: String) {
-    val models = ModelCatalog.forLanguage(language).filter { !it.fitsLive && it.kind == ModelKind.Whisper }
+    val models = ModelCatalog.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { !it.fitsLive && it.kind == ModelKind.Whisper }
     var refresh by remember { mutableStateOf(0) }
     val statuses by produceState(emptyMap<String, ModelStatus>(), refresh) {
         while (true) {
@@ -291,7 +311,7 @@ private fun ModelRow(model: SpeechModel, status: ModelStatus?, inUse: Boolean, c
         Text(model.name, style = MaterialTheme.typography.bodyLarge)
         Text(
             "${model.parameters} · ${model.license}" + when {
-                !inUse || model.kind != ModelKind.Whisper && model.kind != ModelKind.StreamingTransducer -> ""
+                !inUse || !model.kind.transcribes -> ""
                 model.fitsLive -> " · " + stringResource(R.string.model_in_use)
                 else -> " · " + stringResource(R.string.model_in_use_refine)
             },

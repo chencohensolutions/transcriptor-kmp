@@ -57,7 +57,7 @@ class RecordingService : Service() {
             ACTION_STOP -> scope.launch {
                 // Returns once live transcription has finished the last lines.
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
-                if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers) findSpeakers(lecture) else compressPending()
+                if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.afterLecture) findSpeakers(lecture) else compressPending()
             }
             ACTION_REFINE -> {
                 val lecture = Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_LECTURE)!!)

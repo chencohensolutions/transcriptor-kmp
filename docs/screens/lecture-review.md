@@ -31,6 +31,8 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
   turbo and the Zipformer) and runs the refine pass in the recording service: every line transcribed again from its
   own audio, edited lines kept, times and speakers kept (its word times are dropped, so run Find the speakers first).
   The transcript it replaces is kept as a version first. Large-v3 is slower than the lecture itself on a phone.
+- With "Improve after the lecture" off (the start screen; `SettingsStore.afterLecture`), the speaker pass doesn't run
+  when the lecture stops and Refine with… isn't offered; Find the speakers still is.
 - ⋮ → Versions (n): the transcript now and every earlier one (live or refined, its model, when it was kept, its lines
   and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
   is lost. Notes belong to the lecture, not to a version.

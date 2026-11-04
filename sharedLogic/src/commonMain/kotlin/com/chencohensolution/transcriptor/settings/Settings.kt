@@ -25,6 +25,8 @@ private data class SettingsFileV1(
     val audioFormat: AudioFormat = AudioFormat.Wav,
     /** The live model chosen per language (BCP-47 tag to model id). */
     val liveModels: Map<String, String> = emptyMap(),
+    /** The passes after the lecture: the speaker pass when it stops, and the refine pass on its review screen. */
+    val afterLecture: Boolean = true,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -35,6 +37,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var audioFormat: AudioFormat
         get() = read().audioFormat
         set(value) = write(read().copy(audioFormat = value))
+
+    /**
+     * The passes after the lecture are offered: the speaker pass runs when it stops, and its review screen can refine
+     * it. Off: the lecture keeps its live transcript (the speakers can still be found from the review screen).
+     */
+    var afterLecture: Boolean
+        get() = read().afterLecture
+        set(value) = write(read().copy(afterLecture = value))
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
     fun liveModel(language: String): String? = read().liveModels[language]
