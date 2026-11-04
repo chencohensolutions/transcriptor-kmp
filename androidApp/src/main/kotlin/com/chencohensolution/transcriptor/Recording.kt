@@ -21,6 +21,7 @@ import com.chencohensolution.transcriptor.recording.AndroidRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
 import com.chencohensolution.transcriptor.recording.LectureSession
 import com.chencohensolution.transcriptor.recording.androidFlacEncode
+import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
@@ -97,6 +98,12 @@ object Recording {
     /** The notebooks and their lectures, for the Notebooks screen. */
     lateinit var library: NotebooksController
         private set
+
+    /** The phone's first language the app can transcribe ("he" on a Hebrew phone), else English. */
+    fun phoneLanguage(): String {
+        val locales = android.os.LocaleList.getDefault()
+        return Languages.default((0 until locales.size()).map { locales[it].language })
+    }
 
     /** The phone's offset from UTC at a time: weekdays and hours for the notebook guess and the transcript's date. */
     val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
@@ -304,7 +311,7 @@ object Recording {
         connectLibrary()
         // Before notebooks, every lecture was in "default": they become unfiled, once.
         runCatching { notebooks.migrate(store) }.onFailure { android.util.Log.e("Recording", "notebook migration failed", it) }
-        library = NotebooksController(notebooks, store, System::currentTimeMillis)
+        library = NotebooksController(notebooks, store, System::currentTimeMillis, ::phoneLanguage)
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(

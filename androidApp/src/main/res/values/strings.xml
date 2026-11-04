@@ -26,7 +26,7 @@
     <string name="lecture_live_loading">Loading %1$s…</string>
     <string name="lecture_live_failed">Live transcription stopped (%1$s). Recording and notes go on.</string>
     <string name="lecture_finishing">Finishing the last lines…</string>
-    <string name="start_live_models">Live transcription (Hebrew)</string>
+    <string name="start_live_models">Live transcription (%1$s)</string>
     <string name="model_download">Download · %1$s</string>
     <string name="model_downloading">Downloading %1$d%%</string>
     <string name="model_waiting_wifi">Waiting for Wi-Fi</string>
@@ -69,7 +69,7 @@
     <string name="refining">Refining the transcript…</string>
     <string name="start_after_lecture">Improve after the lecture</string>
     <string name="start_after_lecture_note">When a lecture stops, the speaker pass fixes who said each line, and the lecture\'s screen can refine the transcript with a larger model. Off: the lecture keeps what was written live (you can still find the speakers from its screen).</string>
-    <string name="start_refine_models">After the lecture: refine (Hebrew)</string>
+    <string name="start_refine_models">After the lecture: refine (%1$s)</string>
     <string name="start_refine_note">Transcribes a lecture again with the larger model, from its review screen\'s menu: more accurate, with punctuation, and slower than the lecture itself. Lines you edited stay.</string>
     <string name="model_in_use_refine">Used to refine</string>
     <string name="review_refine_with">Refine with…</string>

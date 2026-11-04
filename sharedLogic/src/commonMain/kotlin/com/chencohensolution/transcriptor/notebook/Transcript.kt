@@ -3,12 +3,12 @@ package com.chencohensolution.transcriptor.notebook
 /**
  * The lecture as a document to read beside its audio (`transcript.md`): its title, date and length, then each
  * speaker's turn (consecutive lines of one speaker) with its time, and the notes after the turn they were written in.
- * Speakers without a name are "Speaker 2" ("דובר 2" in a Hebrew lecture). [utcOffsetMillis] is the phone's, for the
- * date.
+ * Speakers without a name are "Speaker 2", in the lecture's language when [SPEAKER] has it ("דובר 2", "Sprecher 2").
+ * [utcOffsetMillis] is the phone's, for the date.
  */
 fun transcriptMarkdown(lecture: Lecture, utcOffsetMillis: Long = 0): String {
-    val hebrew = lecture.language == "he" || lecture.language == "iw"
-    val names = lecture.speakers.mapIndexed { i, s -> s.id to s.name.ifBlank { (if (hebrew) "דובר " else "Speaker ") + (i + 1) } }.toMap()
+    val speaker = SPEAKER[com.chencohensolution.transcriptor.models.Languages.normalize(lecture.language)] ?: "Speaker"
+    val names = lecture.speakers.mapIndexed { i, s -> s.id to s.name.ifBlank { "$speaker ${i + 1}" } }.toMap()
     val out = StringBuilder()
     out.append("# ").append(escape(lecture.title)).append("\n\n")
     out.append(dateOf(lecture.startedAtMillis + utcOffsetMillis)).append(" · ").append(clock(lecture.durationMillis)).append("\n")
@@ -36,6 +36,13 @@ fun transcriptMarkdown(lecture: Lecture, utcOffsetMillis: Long = 0): String {
     notesBefore(Long.MAX_VALUE)
     return out.toString()
 }
+
+/** "Speaker" in the languages most lectures are in; English for the rest. */
+private val SPEAKER = mapOf(
+    "he" to "דובר", "ar" to "متحدث", "en" to "Speaker", "de" to "Sprecher", "fr" to "Intervenant", "es" to "Hablante",
+    "it" to "Relatore", "pt" to "Orador", "ru" to "Говорящий", "uk" to "Мовець", "pl" to "Mówca", "nl" to "Spreker",
+    "tr" to "Konuşmacı", "fa" to "گوینده", "hi" to "वक्ता", "zh" to "发言人", "ja" to "話者", "ko" to "화자",
+)
 
 /** Markdown's own characters, escaped so the text reads as written. */
 private fun escape(text: String) = text.replace(Regex("""([\\`*_\[\]#<>|])"""), """\\$1""")

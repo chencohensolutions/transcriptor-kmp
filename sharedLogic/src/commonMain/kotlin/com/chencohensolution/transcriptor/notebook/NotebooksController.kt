@@ -10,8 +10,8 @@ data class Library(
     val notebooks: List<Notebook> = emptyList(),
     /** Lectures recorded without a notebook, newest first. */
     val unfiled: List<LectureSummary> = emptyList(),
-    /** The language a lecture with no notebook records in: the last lecture's, Hebrew before any. */
-    val unfiledLanguage: String = "he",
+    /** The language a lecture with no notebook records in: the last lecture's, the phone's before any. */
+    val unfiledLanguage: String = "en",
 )
 
 /** A lecture recording now, in a notebook or in none yet ([notebookId] null), for the Notebooks screen's banner. */
@@ -64,7 +64,13 @@ fun Lecture.summary() = LectureSummary(id, title, startedAtMillis, durationMilli
  * The notebooks and their lectures ([library]), read from the stores by [reload] (files: not on the main thread), and
  * the changes the Notebooks screen makes: new notebooks, unfiled lectures filed.
  */
-class NotebooksController(private val notebooks: NotebookStore, private val lectures: LectureStore, private val now: () -> Long) {
+class NotebooksController(
+    private val notebooks: NotebookStore,
+    private val lectures: LectureStore,
+    private val now: () -> Long,
+    /** The language before any lecture: the phone's ([com.chencohensolution.transcriptor.models.Languages.default]). */
+    private val defaultLanguage: () -> String = { "en" },
+) {
     private val _library = MutableStateFlow(Library())
     val library: StateFlow<Library> = _library.asStateFlow()
 
@@ -74,7 +80,7 @@ class NotebooksController(private val notebooks: NotebookStore, private val lect
         _library.value = Library(
             notebooks = notebooks.all().map { n -> n.copy(lectures = byNotebook[n.id].orEmpty().map { it.summary() }) },
             unfiled = byNotebook[UNFILED].orEmpty().map { it.summary() },
-            unfiledLanguage = all.firstOrNull()?.language ?: "he",
+            unfiledLanguage = all.firstOrNull()?.language ?: defaultLanguage(),
         )
     }
 

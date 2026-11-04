@@ -87,8 +87,11 @@ fun SettingsScreen(onBack: () -> Unit, chooseFolder: () -> Unit) {
                     }
                 }
             }
-            LiveModels("he")
-            AfterLecture()
+            // The languages in use: the notebooks', a lecture in none, and the phone's.
+            val library by Recording.library.library.collectAsStateWithLifecycle()
+            val languages = (library.notebooks.map { it.language } + library.unfiledLanguage + Recording.phoneLanguage()).distinct()
+            languages.forEach { LiveModels(it) }
+            AfterLecture(languages)
             SpeakerModel()
         }
     }
@@ -107,7 +110,7 @@ private fun LiveModels(language: String) {
     }
     // Read again when a download finishes or a model is chosen.
     val inUse = remember(statuses, refresh) { liveModelFor(language) }
-    Text(stringResource(R.string.start_live_models), style = MaterialTheme.typography.titleSmall)
+    Text(stringResource(R.string.start_live_models, com.chencohensolution.transcriptor.ui.languageName(language)), style = MaterialTheme.typography.titleSmall)
     models.forEach { model ->
         ModelRow(
             model, statuses[model.id], model == inUse,
@@ -118,7 +121,7 @@ private fun LiveModels(language: String) {
 
 /** Whether the passes after the lecture run (the speaker pass, the refine pass); the refine models when they do. */
 @Composable
-private fun AfterLecture() {
+private fun AfterLecture(languages: List<String>) {
     var on by remember { mutableStateOf(Recording.settings.afterLecture) }
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = { on = it; Recording.settings.afterLecture = it }),
@@ -130,7 +133,7 @@ private fun AfterLecture() {
         }
         Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
-    if (on) RefineModels("he")
+    if (on) languages.forEach { RefineModels(it) }
 }
 
 /** The refine models for [language] (the refine pass after the lecture); the first one ready is the one used. */
@@ -145,7 +148,7 @@ private fun RefineModels(language: String) {
         }
     }
     val inUse = remember(statuses, refresh) { Recording.refineModels(language).firstOrNull { !it.fitsLive } }
-    Text(stringResource(R.string.start_refine_models), style = MaterialTheme.typography.titleSmall)
+    Text(stringResource(R.string.start_refine_models, com.chencohensolution.transcriptor.ui.languageName(language)), style = MaterialTheme.typography.titleSmall)
     Text(stringResource(R.string.start_refine_note), style = MaterialTheme.typography.bodySmall)
     models.forEach { model -> ModelRow(model, statuses[model.id], model == inUse, choose = {}) { refresh++ } }
 }

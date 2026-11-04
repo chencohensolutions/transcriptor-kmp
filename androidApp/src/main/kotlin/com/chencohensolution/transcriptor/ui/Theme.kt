@@ -84,7 +84,7 @@ fun titleDirection(language: String) =
 
 /** Right to left for languages written that way: a notebook's content follows its language, not the phone's. */
 fun layoutDirectionOf(language: String): LayoutDirection =
-    if (language in setOf("he", "iw", "ar", "fa", "ur", "yi")) LayoutDirection.Rtl else LayoutDirection.Ltr
+    if (language in setOf("he", "iw", "ar", "fa", "ur", "yi", "ji", "ps", "sd", "ug", "dv", "ckb")) LayoutDirection.Rtl else LayoutDirection.Ltr
 
 /** 12:03, or 1:02:03 past an hour. */
 fun formatClock(millis: Long): String {

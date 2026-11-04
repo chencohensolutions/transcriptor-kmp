@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.notebook.NotebooksState
@@ -124,9 +126,10 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
     var language by rememberSaveable(state.unfiledLanguage) { mutableStateOf(state.unfiledLanguage) }
     var assigning by remember { mutableStateOf<LectureSummary?>(null) }
     var creatingFor by remember { mutableStateOf<LectureSummary?>(null) }
-    if (creating) NewNotebookDialog(onDismiss = { creating = false }) { t, l -> actions.newNotebook(t, l); creating = false }
+    val languages = notebookLanguages(state.notebooks.map { it.language } + state.unfiledLanguage)
+    if (creating) NewNotebookDialog(languages, onDismiss = { creating = false }) { t, l -> actions.newNotebook(t, l); creating = false }
     creatingFor?.let { lecture ->
-        NewNotebookDialog(onDismiss = { creatingFor = null }) { t, l -> actions.assignToNew(lecture.id, t, l); creatingFor = null; assigning = null }
+        NewNotebookDialog(languages, onDismiss = { creatingFor = null }) { t, l -> actions.assignToNew(lecture.id, t, l); creatingFor = null; assigning = null }
     }
     assigning?.let { lecture ->
         AssignDialog(lecture, state.notebooks, state.suggested[lecture.id]?.notebookId, onDismiss = { assigning = null }, onNew = { creatingFor = lecture }) {
@@ -134,7 +137,7 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
         }
     }
     if (choosingLanguage) {
-        LanguageDialog(language, onDismiss = { choosingLanguage = false }) { language = it; target = NONE; choosingLanguage = false }
+        LanguageDialog(language, languages, onDismiss = { choosingLanguage = false }) { language = it; target = NONE; choosingLanguage = false }
     }
 
     val recordIn = state.notebooks.firstOrNull { it.id == (target ?: filter?.let { f -> if (f == UNFILED) NONE else f } ?: state.guess?.notebookId) }
@@ -297,8 +300,15 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
 private const val NONE = ""
 private const val DAY = 24 * 60 * 60_000L
 
-/** The languages a notebook, or a lecture in none, can be in: Hebrew has its own models, the others the multilingual ones. */
-internal val notebookLanguages = listOf("he", "en", "ar", "ru", "fr", "es", "de")
+/**
+ * The languages a notebook, or a lecture in none, can be in, most likely first: the phone's, those in [used], those with
+ * models of their own (Hebrew's), then every other language Whisper knows.
+ */
+@Composable
+internal fun notebookLanguages(used: List<String> = emptyList()): List<String> {
+    val locales = LocalConfiguration.current.locales
+    return Languages.ordered((0 until locales.size()).map { locales[it].language }, used)
+}
 
 /** A notebook's color, from the palette by its [index]. */
 @Composable
@@ -481,9 +491,10 @@ private fun AssignDialog(
 
 /** The languages, as radio buttons. */
 @Composable
-private fun LanguageChoices(language: String, onChoose: (String) -> Unit) {
-    Column(Modifier.selectableGroup()) {
-        notebookLanguages.forEach { tag ->
+private fun LanguageChoices(language: String, languages: List<String>, onChoose: (String) -> Unit) {
+    // A hundred languages: a list that scrolls in the dialog.
+    LazyColumn(Modifier.selectableGroup().heightIn(max = 360.dp)) {
+        items(languages) { tag ->
             Row(
                 Modifier.fillMaxWidth().selectable(selected = language == tag, role = Role.RadioButton) { onChoose(tag) }.padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -497,11 +508,11 @@ private fun LanguageChoices(language: String, onChoose: (String) -> Unit) {
 
 /** The language of a lecture recorded in no notebook (it picks the live model). */
 @Composable
-private fun LanguageDialog(language: String, onDismiss: () -> Unit, onChoose: (String) -> Unit) {
+private fun LanguageDialog(language: String, languages: List<String>, onDismiss: () -> Unit, onChoose: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.notebooks_language_title)) },
-        text = { LanguageChoices(language, onChoose) },
+        text = { LanguageChoices(language, languages, onChoose) },
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
     )
@@ -509,9 +520,9 @@ private fun LanguageDialog(language: String, onDismiss: () -> Unit, onChoose: (S
 
 /** A new notebook: its name and language (which picks the speech models). */
 @Composable
-private fun NewNotebookDialog(onDismiss: () -> Unit, onCreate: (title: String, language: String) -> Unit) {
+private fun NewNotebookDialog(languages: List<String>, onDismiss: () -> Unit, onCreate: (title: String, language: String) -> Unit) {
     var title by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf(notebookLanguages.first()) }
+    var language by remember { mutableStateOf(languages.first()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.notebooks_new_notebook)) },
@@ -532,8 +543,8 @@ private fun NewNotebookDialog(onDismiss: () -> Unit, onCreate: (title: String, l
                         Text(languageName(language))
                         Icon(Icons.Filled.ArrowDropDown, null)
                     }
-                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                        notebookLanguages.forEach { tag ->
+                    DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.heightIn(max = 360.dp)) {
+                        languages.forEach { tag ->
                             DropdownMenuItem(text = { Text(languageName(tag)) }, onClick = { language = tag; open = false })
                         }
                     }

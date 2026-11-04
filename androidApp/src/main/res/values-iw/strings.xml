@@ -26,7 +26,7 @@
     <string name="lecture_live_loading">טוען את %1$s…</string>
     <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
     <string name="lecture_finishing">מסיים את השורות האחרונות…</string>
-    <string name="start_live_models">תמלול חי (עברית)</string>
+    <string name="start_live_models">תמלול חי (%1$s)</string>
     <string name="model_download">הורדה · %1$s</string>
     <string name="model_downloading">מוריד %1$d%%</string>
     <string name="model_waiting_wifi">ממתין ל־Wi-Fi</string>
@@ -69,7 +69,7 @@
     <string name="refining">משפר את התמלול…</string>
     <string name="start_after_lecture">שיפור אחרי ההרצאה</string>
     <string name="start_after_lecture_note">כשההרצאה נעצרת, זיהוי הדוברים מתקן מי אמר כל שורה, ובמסך ההרצאה אפשר לשפר את התמלול עם מודל גדול יותר. כבוי: ההרצאה נשארת כפי שנכתבה בזמן אמת (את הדוברים עדיין אפשר לזהות ממסך ההרצאה).</string>
-    <string name="start_refine_models">אחרי ההרצאה: שיפור (עברית)</string>
+    <string name="start_refine_models">אחרי ההרצאה: שיפור (%1$s)</string>
     <string name="start_refine_note">מתמלל הרצאה מחדש עם המודל הגדול, מהתפריט של מסך ההרצאה: מדויק יותר, עם פיסוק, ואיטי יותר מההרצאה עצמה. שורות שערכתם נשארות.</string>
     <string name="model_in_use_refine">משמש לשיפור</string>
     <string name="review_refine_with">שיפור עם…</string>

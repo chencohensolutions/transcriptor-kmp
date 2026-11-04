@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
@@ -190,7 +191,7 @@ class NotebooksTest {
         lectures.save(lecture("p2", psych.id, MONDAY_10 - WEEK))
         lectures.save(lecture("u1", UNFILED, MONDAY_10 + 5 * MIN, language = "en"))
         lectures.save(lecture("u0", UNFILED, MONDAY_10 - 3 * DAY))
-        val controller = NotebooksController(notebooks, lectures) { 100 }
+        val controller = NotebooksController(notebooks, lectures, { 100 })
         controller.reload()
 
         val library = controller.library.value
@@ -218,10 +219,37 @@ class NotebooksTest {
     }
 
     @Test
-    fun withNoLecturesTheUnfiledLanguageIsHebrew() {
-        val controller = NotebooksController(notebooks, lectures) { 0 }
+    fun withNoLecturesTheUnfiledLanguageIsThePhones() {
+        val controller = NotebooksController(notebooks, lectures, { 0 }, { Languages.default(listOf("iw")) })
         controller.reload()
         assertEquals("he", controller.library.value.unfiledLanguage)
+        val english = NotebooksController(notebooks, lectures, { 0 })
+        english.reload()
+        assertEquals("en", english.library.value.unfiledLanguage)
+    }
+
+    @Test
+    fun everyWhisperLanguageIsOfferedThePhonesFirst() {
+        assertEquals("he", Languages.normalize("iw-IL"))
+        assertEquals("id", Languages.normalize("in"))
+        assertEquals("he", Languages.default(listOf("iw", "en")))
+        assertEquals("fr", Languages.default(listOf("fr-CA")))
+        assertEquals("en", Languages.default(listOf("xx")))
+        assertTrue(Languages.all.size >= 99)
+        val offered = Languages.ordered(listOf("fr", "iw"), used = listOf("de"))
+        assertEquals(listOf("fr", "he", "de"), offered.take(3))
+        assertEquals(offered.distinct(), offered)
+        assertEquals(Languages.all.toSet(), offered.toSet())
+    }
+
+    @Test
+    fun anUnnamedSpeakerIsNamedInTheLecturesLanguage() {
+        val l = lecture("x", "n", MONDAY_10, language = "de").copy(
+            speakers = listOf(Speaker("s1", "")),
+            segments = listOf(Segment("a", 0, 1_000, "Guten Morgen.", "m", speakerId = "s1")),
+        )
+        assertTrue(transcriptMarkdown(l).contains("**Sprecher 1** · 0:00"))
+        assertTrue(transcriptMarkdown(l.copy(language = "sw")).contains("**Speaker 1** · 0:00"))
     }
 
     private companion object {
