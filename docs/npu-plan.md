@@ -100,6 +100,14 @@ first for Hebrew on that chip) runs on `SherpaNpuWhisperEngine` for live lines a
 Qualcomm's runtime from sherpa-onnx's `qnn-libs-2.40.0.251030` (pinned) and packs the Hexagon v79 libraries
 unpacked into the APK; the DSP finds its Skel through `ADSP_LIBRARY_PATH`.
 
+**Large-v3** (Nov 5, 2026): `ModelCatalog.ivritLargeV3Npu`, refine pass only (`fitsLive = false`). ivrit.ai
+large-v3 (commit 766847c9, sharded safetensors; `hf_to_openai.py` reads the index) exported as turbo was; the ONNX
+gives the same Hebrew text as PyTorch on a 30 s clip. Two compile fixes for its 2.97 GB encoder: `--no_simplification`
+(the simplifier breaks over 2 GB, leaving `Erf` the converter can't take) and `--float_bitwidth 16` (at 32-bit the
+model library is over 2 GB: "relocation truncated to fit"). encoder.bin 1.53 GB, decoder.bin 1.75 GB, built in
+`build/qnn/out-large-SM8750/binary/`, on the phone in `…/models/ivrit-whisper-large-v3-npu-sm8750/`. Not timed or
+checked against the acceptance bar (step 4) yet.
+
 **Not published yet** (owner's decision: on the owner's Hugging Face): the three model files (encoder.bin,
 decoder.bin, tokens.txt; `ModelCatalog` has their sha256) and the sherpa-onnx AAR. Until then both are built here
 and put in place by hand (the procedure: [npu-build.md](npu-build.md)):

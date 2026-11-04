@@ -121,6 +121,26 @@ object ModelCatalog {
         ),
         chips = listOf("SM8750"),
     )
+    // ivritLargeV3 (commit 766847c9) compiled the same way, for the refine pass only: 16-bit weights
+    // (`--float_bitwidth 16`; at 32-bit the encoder's library is over 2 GB and won't link) and no ONNX simplification
+    // (it fails on graphs over 2 GB). Not published yet (Nov 5, 2026): copied to the phone by hand.
+    private const val LARGE_NPU_SM8750 = "https://huggingface.co/HF_USER/ivrit-whisper-large-v3-qnn-sm8750/resolve/COMMIT"
+    val ivritLargeV3Npu = SpeechModel(
+        id = "ivrit-whisper-large-v3-npu-sm8750",
+        name = "ivrit.ai Whisper large-v3 · NPU",
+        languages = listOf("he"),
+        parameters = "1.55B",
+        license = "Apache-2.0",
+        fitsLive = false,
+        source = "https://huggingface.co/ivrit-ai/whisper-large-v3",
+        kind = ModelKind.WhisperNpu,
+        files = listOf(
+            ModelFile("encoder.bin", "$LARGE_NPU_SM8750/encoder.bin", "f6050d1bbcc885dd6b79284dd767b526044ff9148f75a903e7e84995a10ad1d5", 1_526_292_480),
+            ModelFile("decoder.bin", "$LARGE_NPU_SM8750/decoder.bin", "db4bacf5c2023cb97f0ab26dd2c05d2d1260053b93b3f69005d7cf0783cbe229", 1_751_195_648),
+            ModelFile("tokens.txt", "$LARGE_NPU_SM8750/tokens.txt", "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816_730),
+        ),
+        chips = listOf("SM8750"),
+    )
     val whisperLargeV3 = SpeechModel(
         id = "whisper-large-v3",
         name = "Whisper large-v3",
@@ -227,7 +247,7 @@ object ModelCatalog {
         ),
     )
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrints + speakerSegmentation).firstOrNull { it.id == id }?.name ?: id

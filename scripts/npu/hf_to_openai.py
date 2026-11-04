@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Hugging Face Whisper (config.json + model.safetensors) -> openai-whisper checkpoint (.pt)."""
+"""Hugging Face Whisper (config.json + model.safetensors, or shards with model.safetensors.index.json) ->
+openai-whisper checkpoint (.pt)."""
 import json
+import os
 import re
 import sys
 
@@ -9,7 +11,14 @@ from safetensors.torch import load_file
 
 src, dst = sys.argv[1], sys.argv[2]
 cfg = json.load(open(f"{src}/config.json"))
-hf = load_file(f"{src}/model.safetensors")
+if os.path.exists(f"{src}/model.safetensors"):
+    hf = load_file(f"{src}/model.safetensors")
+else:
+    # A checkpoint split in shards (ivrit.ai's large-v3): every shard the index names.
+    shards = sorted(set(json.load(open(f"{src}/model.safetensors.index.json"))["weight_map"].values()))
+    hf = {}
+    for shard in shards:
+        hf.update(load_file(f"{src}/{shard}"))
 
 dims = dict(
     n_mels=cfg["num_mel_bins"],

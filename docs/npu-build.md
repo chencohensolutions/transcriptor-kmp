@@ -9,6 +9,7 @@ What gets built, per chip (SM8750 = Snapdragon 8 Elite, Hexagon v79, the only ch
 | Model | Graphs | Source checkpoint | App catalog |
 |---|---|---|---|
 | ivrit.ai Whisper large-v3 turbo | encoder, decoder | `ivrit-ai/whisper-large-v3-turbo` safetensors, commit f33172a8 | `ivritTurboNpu` |
+| ivrit.ai Whisper large-v3 (refine only) | encoder, decoder | `ivrit-ai/whisper-large-v3` safetensors (sharded), commit 766847c9; converted with `--no_simplification --float_bitwidth 16` | `ivritLargeV3Npu` |
 | ivrit.ai Zipformer2 66M streaming | encoder, decoder, joiner | `ivrit-ai/zipformer2-66m-streaming-he` `model.pt`, commit ee769a2a | `ivritZipformerNpu` |
 
 Plus one runtime: the sherpa-onnx AAR with our QNN patch.
