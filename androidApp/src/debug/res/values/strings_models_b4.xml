@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b4_npu_filter">NPU on this phone (%1$s)</string>
+    <string name="models_b4_no_npu">No NPU the app can use</string>
+    <string name="models_b4_npu_this">NPU · %1$s, this phone</string>
+    <string name="models_b4_npu_other">NPU · %1$s, not this phone</string>
+    <string name="models_b4_npu_note_this">Compiled for this phone\'s NPU (%1$s, QNN %2$s). It is tried on the NPU once it is downloaded.</string>
+    <string name="models_b4_npu_note_other">Compiled for %1$s\'s NPU: it can\'t run on this phone (%2$s).</string>
+    <string name="models_b4_not_this_phone">Not for this phone</string>
+    <string name="models_b4_npu_checking">Trying the NPU…</string>
+    <string name="models_b4_npu_runs">Runs on this phone\'s NPU ✓</string>
+    <string name="models_b4_npu_fails">Didn\'t load on this NPU</string>
+    <string name="models_b4_npu_runtime">NPU · %1$s, QNN %2$s: may not load</string>
+    <string name="models_b4_npu_note_runtime">Compiled for this chip but with QNN %1$s; the app runs %2$s, and the NPU usually refuses a build from another version. It is tried once downloaded.</string>
+</resources>
