@@ -16,6 +16,26 @@ Plus one runtime: the sherpa-onnx AAR with our QNN patch.
 Everything happens in `build/qnn/` (not in git; tens of GB with the SDK and exports). The scripts are in
 [scripts/npu/](../scripts/npu/).
 
+## Quick: any model for the connected phone
+
+```bash
+scripts/npu/compile-for-phone.sh [--name <name>] [--soc <SM....>] [--conv "<flags>"] <graph.onnx>...
+```
+[`compile-for-phone.sh`](../scripts/npu/compile-for-phone.sh) does:
+1. Reads the chip from the phone over adb (`ro.soc.model`). `--soc` compiles for another chip, with no phone
+   needed.
+2. Checks that the chip is a Snapdragon with a 16-bit NPU (Hexagon v69 or later).
+3. Refuses CPU-quantized copies (`*int8*`, `*quant*`).
+4. Checks that every input and output has a fixed shape.
+5. Runs `compile.sh` for each graph.
+
+The binaries go to `build/qnn/out-<name>-<soc>/binary/`. It prints which Qualcomm runtime libraries the app needs
+for that chip.
+
+It needs the SDK and Docker from section 1. It builds the image and `nopi.so` itself if they are missing. The ONNX
+export (section 2) stays per model. Tested Nov 4 with the Zipformer decoder on the S25: 48 s, and identical to the
+app's `decoder.bin`.
+
 ## 1. Tools (once)
 
 - **Docker on the Mac:** Colima with an Apple-silicon VM that runs x86-64 containers through Rosetta, because QAIRT

@@ -3,7 +3,7 @@
 # build/qnn mounted at /workspace and this folder at /scripts:
 #   compile.sh <soc> <out-name> <onnx...>
 #   e.g. compile.sh SM8750 out-zipformer-SM8750 zipformer-export/encoder.onnx zipformer-export/decoder.onnx ...
-# Paths are relative to /workspace. Each graph is named after its file (encoder.onnx -> encoder.bin). Activations
+# Paths are relative to /workspace, or absolute inside the container. Each graph is named after its file (encoder.onnx -> encoder.bin). Activations
 # 16-bit, bias 32-bit; extra converter flags in CONV_ARGS (e.g. "--float_bitwidth 16" for Whisper's decoder).
 set -e
 soc=$1 out=/workspace/$2; shift 2
@@ -16,8 +16,9 @@ mkdir -p $out/logs
 step() { local log=$out/logs/$1; shift; "$@" > $log 2>&1 || { tail -20 $log; exit 1; }; }
 for onnx in "$@"; do
   m=$(basename $onnx .onnx)
+  case $onnx in /*) in=$onnx ;; *) in=/workspace/$onnx ;; esac
   echo "== $m: convert $(date +%T)"
-  step $m-converter.txt qnn-onnx-converter --input_network /workspace/$onnx --output_path $out/$m.cpp \
+  step $m-converter.txt qnn-onnx-converter --input_network $in --output_path $out/$m.cpp \
     --act_bitwidth 16 --bias_bitwidth 32 $CONV_ARGS
   echo "== $m: config"
   step $m-config.txt python3 /workspace/sherpa-onnx/scripts/qnn/generate_config.py --soc $soc --graph-name $m \
