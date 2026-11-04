@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,15 +55,20 @@ data class ModelsState(
     val freeBytes: Long,
     val audioFormat: AudioFormat,
     val afterLecture: Boolean,
+    /** Models the user added from Hugging Face (option b2), beside the catalog's. */
+    val added: List<SpeechModel> = emptyList(),
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready
 
     /** The models that can transcribe [language] live, the ones made for it first. */
-    fun liveModels(language: String) = ModelCatalog.forLanguage(language, chip).filter { it.fitsLive }
+    fun liveModels(language: String) = (ModelCatalog.forLanguage(language, chip) + addedFor(language)).filter { it.fitsLive }
 
     /** The models that can refine [language]: any that transcribes it, the large ones first. */
-    fun refineModels(language: String) = ModelCatalog.forLanguage(language, chip).sortedBy { it.fitsLive }
+    fun refineModels(language: String) = (ModelCatalog.forLanguage(language, chip) + addedFor(language)).sortedBy { it.fitsLive }
+
+    /** The added models that know [language] (multilingual ones included). */
+    fun addedFor(language: String) = added.filter { language in it.languages || SpeechModel.MULTILINGUAL in it.languages }
 
     fun liveFor(language: String): SpeechModel? = pick(liveModels(language), live[language])
     fun refineFor(language: String): SpeechModel? = pick(refineModels(language), refine[language])
@@ -71,7 +77,7 @@ data class ModelsState(
     fun recommended(language: String): List<SpeechModel> =
         listOfNotNull(liveModels(language).firstOrNull(), refineModels(language).firstOrNull { !it.fitsLive }) + speakerModels
 
-    val usedBytes get() = (ModelCatalog.all + speakerModels).filter { ready(it) }.sumOf { it.sizeBytes }
+    val usedBytes get() = (ModelCatalog.all + speakerModels + added).filter { ready(it) }.sumOf { it.sizeBytes }
 
     private fun pick(models: List<SpeechModel>, chosen: String?) =
         models.firstOrNull { it.id == chosen && ready(it) } ?: models.firstOrNull { ready(it) }
@@ -97,7 +103,8 @@ class ModelsActions(
  * for Wi-Fi and Whisper large-v3 failed. The chip is the phone's.
  */
 @Composable
-internal fun rememberModelsLab(): Pair<ModelsState, ModelsActions> {
+internal fun rememberModelsLab(added: List<SpeechModel> = emptyList()): Pair<ModelsState, ModelsActions> {
+    val known by rememberUpdatedState(ModelCatalog.all + speakerModels + added)
     var statuses by remember {
         mutableStateOf(
             mapOf(
@@ -119,7 +126,7 @@ internal fun rememberModelsLab(): Pair<ModelsState, ModelsActions> {
         while (statuses.values.any { it is ModelStatus.Downloading || it == ModelStatus.Checking }) {
             delay(200)
             statuses = statuses.mapValues { (id, s) ->
-                val model = (ModelCatalog.all + speakerModels).first { it.id == id }
+                val model = known.firstOrNull { it.id == id } ?: return@mapValues s
                 when (s) {
                     is ModelStatus.Downloading -> {
                         val p = s.progress + 12_000_000f / model.sizeBytes

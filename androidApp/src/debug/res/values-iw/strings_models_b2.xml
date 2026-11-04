@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b2_find">חיפוש ב־Hugging Face</string>
+    <string name="models_b2_search_hint">whisper hebrew, zipformer…</string>
+    <string name="models_b2_search_note">רק מודלים שהאפליקציה יכולה להריץ: קבצי whisper.cpp ומודלי סטרימינג של sherpa-onnx.</string>
+    <string name="models_b2_none">אין כאן מודל שהאפליקציה יכולה להריץ. %1$d מאגרים נמצאו בפורמטים אחרים (PyTorch, safetensors).</string>
+    <string name="models_b2_unusable">עוד %1$d מאגרים נמצאו, בפורמטים שהאפליקציה לא מריצה.</string>
+    <string name="models_b2_downloads">%1$s הורדות</string>
+    <string name="models_b2_likes">%1$s לייקים</string>
+    <string name="models_b2_kind_whisper">Whisper, שורה בכל פעם</string>
+    <string name="models_b2_kind_streaming">סטרימינג</string>
+    <string name="models_b2_sizes">%1$d גדלים, מ־%2$s</string>
+    <string name="models_b2_installed">נוסף</string>
+    <string name="models_b2_from_hub">מ־Hugging Face</string>
+    <string name="models_b2_remove">הסרה מהרשימה</string>
+    <string name="models_b2_license_ok">%1$s · מותר לשימוש מסחרי</string>
+    <string name="models_b2_license_nc">%1$s · לא לשימוש מסחרי</string>
+    <string name="models_b2_license_unknown">אין רישיון בכרטיס</string>
+    <string name="models_b2_license_ok_note">הרישיון מתיר כל שימוש בתמלולים, גם בעבודה.</string>
+    <string name="models_b2_license_nc_note">הרישיון מתיר רק שימוש אישי ולימודי, לא עבודה בתשלום.</string>
+    <string name="models_b2_license_unknown_note">בכרטיס אין רישיון: היוצר לא אמר איך מותר להשתמש בו.</string>
+    <string name="models_b2_pinned">נעול לגרסה %1$s: כל קובץ נבדק מול ה־sha256 שלו.</string>
+    <string name="models_b2_choose_size">גודל</string>
+    <string name="models_b2_install">הוספה · %1$s</string>
+    <string name="models_b2_confirm_nc_title">לא לשימוש מסחרי</string>
+    <string name="models_b2_confirm_nc">הרישיון של המודל מתיר רק שימוש אישי ולימודי. להוסיף בכל זאת?</string>
+    <string name="models_b2_confirm_unknown_title">אין רישיון</string>
+    <string name="models_b2_confirm_unknown">היוצר לא אמר איך מותר להשתמש בו. להוסיף בכל זאת?</string>
+    <string name="models_b2_install_anyway">להוסיף בכל זאת</string>
+    <string name="models_b2_multilingual">שפות רבות</string>
+</resources>
