@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.models
 
 /** How a model runs. */
+@kotlinx.serialization.Serializable
 enum class ModelKind {
     /** Whisper (whisper.cpp, one ggml file): transcribes a line at a time, with punctuation. */
     Whisper,
@@ -31,8 +32,11 @@ enum class ModelKind {
     val transcribes get() = this == Whisper || this == WhisperNpu || this == StreamingTransducer || this == StreamingTransducerNpu
 }
 
-/** One file of a model, downloaded from [url] (pinned to a commit) and checked against [sha256]. */
-data class ModelFile(val name: String, val url: String, val sha256: String, val sizeBytes: Long)
+/**
+ * One file of a model, downloaded from [url] (pinned to a commit) and checked against [sha256]. A small file added
+ * from Hugging Face, which the Hub stores without a sha256, is checked against its git blob id ([gitSha1]) instead.
+ */
+data class ModelFile(val name: String, val url: String, val sha256: String, val sizeBytes: Long, val gitSha1: String? = null)
 
 /**
  * A speech recognition model the app can download and run on the phone. Which one runs is chosen per language: one

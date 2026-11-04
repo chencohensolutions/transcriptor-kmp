@@ -25,6 +25,10 @@ private data class SettingsFileV1(
     val audioFormat: AudioFormat = AudioFormat.Wav,
     /** The live model chosen per language (BCP-47 tag to model id). */
     val liveModels: Map<String, String> = emptyMap(),
+    /** The refine model chosen per language; a language without one refines with its first ready large model. */
+    val refineModels: Map<String, String> = emptyMap(),
+    /** Languages shown in Settings › Models beside the notebooks' (added there). */
+    val modelLanguages: List<String> = emptyList(),
     /** The passes after the lecture: the speaker pass when it stops, and the refine pass on its review screen. */
     val afterLecture: Boolean = true,
     /** The lectures folder outside the app (Android: a document URI under the picked tree); null before one is picked. */
@@ -63,6 +67,15 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     fun liveModel(language: String): String? = read().liveModels[language]
 
     fun setLiveModel(language: String, modelId: String) = write(read().let { it.copy(liveModels = it.liveModels + (language to modelId)) })
+
+    /** The refine model chosen for [language]; null when none was chosen. */
+    fun refineModel(language: String): String? = read().refineModels[language]
+
+    fun setRefineModel(language: String, modelId: String) = write(read().let { it.copy(refineModels = it.refineModels + (language to modelId)) })
+
+    var modelLanguages: List<String>
+        get() = read().modelLanguages
+        set(value) = write(read().copy(modelLanguages = value.distinct()))
 
     private fun read(): SettingsFileV1 =
         if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else SettingsFileV1()
