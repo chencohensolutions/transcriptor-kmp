@@ -6,8 +6,8 @@ are in [docs/ux-history/](../ux-history/README.md), linked from each screen's "D
 | Screen | Shown when | Doc | State |
 |---|---|---|---|
 | Notebooks | On launch: the courses and their lectures | [notebooks.md](notebooks.md) | Planned |
-| Lecture, while recording | New lecture | [lecture.md](lecture.md) | In the UI lab (round 1) |
-| Lecture, after | Opening a recorded lecture: play, edit, refine, speakers | [lecture-review.md](lecture-review.md) | Planned |
+| Lecture, while recording | New lecture | [lecture.md](lecture.md) | In the app (recording and notes; no lines yet) |
+| Lecture, after | Opening a recorded lecture: play, edit, speakers, notes | [lecture-review.md](lecture-review.md) | In the app (the refine pass to come) |
 | Settings › Models | Settings | [models.md](models.md) | Planned |
 
 ```

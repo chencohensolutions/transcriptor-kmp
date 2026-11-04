@@ -37,11 +37,9 @@ if [[ -z "$serial" ]]; then
 fi
 
 echo "Device: $serial ($("$adb" -s "$serial" shell getprop ro.product.model | tr -d '\r'))"
-# Only the device's processor's native libraries (): about a third of the APK, which over
-# wireless debugging is minutes less of installing.
-abi=$("$adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r')
-./gradlew --console=plain -Pabi="$abi" :androidApp:assembleUiLab
-"$adb" -s "$serial" install -r androidApp/build/outputs/apk/uiLab/androidApp-uiLab.apk
+./gradlew --console=plain :androidApp:assembleUiLab
+# --user current: a phone with a Secure Folder (a second user) refuses an install without it
+"$adb" -s "$serial" install -r --user current androidApp/build/outputs/apk/uiLab/androidApp-uiLab.apk
 # -S: stop the old process so the new build runs; --user current: without it, a phone with a Secure Folder (a second
 # user) refuses -S
 "$adb" -s "$serial" shell am start --user current -S -n com.chencohensolution.transcriptor.uilab/com.chencohensolution.transcriptor.ui.UiLabActivity ${screen:+--es screen "$screen"} ${option:+--es option "$option"}

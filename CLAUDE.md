@@ -11,10 +11,22 @@ update those docs whenever a screen changes.
 
 - `sharedLogic/` — all logic, shared. `notebook/`: `Notebook`, `Lecture`, `Segment` (a line of speech with start
   and end), `Note`, `Speaker`. `models/`: `SpeechModel` and `ModelCatalog` (the models offered, by language).
-  `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs.
+  `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs. `notebook/LectureStore.kt`: lectures
+  on disk (`lecture.json`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per
+  platform; Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
+  `SettingsStore`, `AudioFormat`. `speech/`: `LiveTranscriber` (live lines) with `UtteranceTranscriber`
+  (Whisper, a line at a time: `SpeechEngine`, `Utterances` splitting at pauses) and `StreamingTranscriber`
+  (Zipformer: `StreamingEngine`), `Downsampler`, `Speakers.kt` (`SpeakerTracker`, `SpeakerLabeler`:
+  speaker labels from voice prints). `notebook/VoiceStore.kt`: the voices a notebook knows. `review/`:
+  `LectureReview` (a recorded lecture opened: playback, edits, speakers, notes), `AudioPlayer`, `ReviewState`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf` and `formatClock`. Strings in
-  `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`.
+  `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
+  `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models; `speech/SherpaStreamingEngine.kt`
+  runs streaming models on sherpa-onnx (its AAR is downloaded into `androidApp/libs/` by the build).
+- `scripts/npu/` — building the NPU models (Snapdragon) and the patched sherpa-onnx AAR:
+  [docs/npu-build.md](docs/npu-build.md).
+- `third_party/whisper.cpp` — a git submodule pinned to a release: `git submodule update --init` after cloning.
 - `iosApp/` — native SwiftUI, not created yet: iOS is built after the Android app is finished. The shared logic
   already builds for iOS.
 
@@ -33,7 +45,8 @@ update those docs whenever a screen changes.
 
 ## UX suggestions: the UI lab
 
-UX/UI suggestions follow the `ui-lab` skill ([.claude/skills/ui-lab/](.claude/skills/ui-lab/SKILL.md)): mocks in lab
+UX/UI suggestions follow the `ui-lab` skill (plugin `ui-lab@chencohen-skills`, enabled in `.claude/settings.json`;
+this project's notes for it: [.claude/ui-lab.md](.claude/ui-lab.md)): mocks in lab
 code only, in the Android UI Lab, recorded in `docs/ux-history/`; the app changes after the owner approves a plan.
 See [docs/previews.md](docs/previews.md).
 

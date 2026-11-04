@@ -13,36 +13,78 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Speech models
 
-- Engine: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT) with quantized ggml files, the same native
-  code on Android (JNI) and iOS (cinterop, Metal/Core ML for the encoder). Kotlin sees one engine interface; switching
-  models loads another file.
+- Engine: [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT, a submodule in `third_party/`, pinned to a
+  release) with ggml files, the same native code on Android (JNI) and iOS (cinterop, Metal/Core ML for the encoder).
+  Kotlin sees one engine interface (`SpeechEngine`); switching models loads another file.
+- Files: downloaded from the publisher at a pinned commit and checked against their sha256 (`ModelCatalog`). ivrit.ai
+  publishes only full precision (f16, 1.6 GB for turbo), so the phone quantizes it to q8_0 after the download
+  (whisper.cpp's own quantizer, built into the app): 874 MB, and on a Galaxy S25 twice as fast, with the same text.
+  q5_0 was no faster than f16 there.
+- Measured on a Galaxy S25 (6 threads, ivrit.ai turbo q8_0): 6.5 s of Hebrew in about 2.3 s, with the encoder's
+  window fitted to the line (`audio_ctx`) instead of whisper's fixed 30 s, which alone is 5× faster. Loading the
+  model takes about 2 s, once per lecture.
 - Two passes per lecture, each with its own model, chosen **per language** in Settings › Models:
-  - **Live**, during the lecture: the turbo model (809M parameters, about 570 MB), fast enough on recent phones.
-  - **Refine**, after the lecture: large-v3 (1.55B, about 1.1 GB) over the whole FLAC, slower than real time; it
+  - **Live**, during the lecture: the turbo model (809M parameters, about 570–870 MB), fast enough on recent phones.
+  - **Refine**, after the lecture: large-v3 (1.55B, about 1.1–1.7 GB) over the whole recording, slower than real time; it
     replaces the live lines, except lines the user edited.
 - Hebrew: ivrit.ai's fine-tunes of Whisper (Apache-2.0), the strongest open Hebrew models known as of Nov 2026. Other
   languages: OpenAI's Whisper large-v3 and turbo (MIT). Every model offered must be free for commercial use. Models
   under non-commercial licenses (Meta's MMS, SeamlessM4T: CC-BY-NC) were not better for Hebrew and are left out.
   Compare new Hebrew models on the [ivrit.ai leaderboard](https://ivrit-ai-hebrew-transcription-leaderboard.hf.space/).
-- Lines: a voice activity detector (Silero VAD, MIT; built into whisper.cpp) splits the audio at pauses; each piece
-  of speech becomes a **segment** with its start and end.
+- Live, streaming (an option for Hebrew, Nov 2, 2026): ivrit.ai's mirror of Yakov Kolani's
+  [zipformer2-66m-streaming-he](https://huggingface.co/ivrit-ai/zipformer2-66m-streaming-he) (CC-BY-4.0: commercial
+  use with credit, shown with the model), 66M parameters, 74 MB int8, on [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+  (Apache-2.0; its release AAR is fetched by Gradle, pinned and hash-checked). Its own card gives 5.1% WER on
+  ivrit.ai's eval-d1 against 5.3% for ivrit.ai Whisper turbo (8.9% against 7.1% on WhatsApp audio). Words appear as
+  they are said (1.28 s chunks), a pause (0.8 s after words) ends the line, and as a transducer it doesn't invent
+  text from noise as Whisper does; no punctuation. Chosen per language on the start screen ("Use for live"); without
+  a choice, the first downloaded live model in the catalog runs. sherpa-onnx can also run it on Qualcomm's NPU (QNN),
+  not tried yet.
+- Lines, live with Whisper: the recording is downsampled to 16 kHz mono and split at pauses by loudness against the room's noise
+  floor (`Utterances`: a pause of 0.6 s ends a line; past 15 s a short pause does; 25 s at most). Each line becomes a
+  **segment** with its start and end in the recording; the line being spoken is transcribed again every 1.5 s of new
+  audio for the grey partial line. Lines waiting go first. Silero VAD (built into whisper.cpp) may replace the
+  loudness test if classrooms need it.
 
 ### Audio
 
-- Recorded and kept as **FLAC, 48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last
-  seconds. About 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are
-  alike).
+- Recorded at **48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last seconds. The
+  audio format is a setting (`AudioFormat`; owner's decision, Nov 2, 2026):
+  - **WAV** (default): `audio.wav`, about 690 MB per hour. The safest, with no encoder to fail. A crash leaves the
+    header's sizes stale; `WavWriter.repair` fixes them from the file's length.
+  - **WAV, then FLAC**: WAV while recording, compressed to `audio.flac` after Stop (in the recording service, as a
+    media-processing foreground service), checked to hold every sample, then the WAV is deleted. An interrupted
+    compression stays `pendingFlac` in `lecture.json` and is redone when the app next opens.
+  - **FLAC live**: `audio.flac` as it records, with Android's built-in FLAC encoder.
+  - FLAC is about 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are alike).
+- `lecture.json`'s `"audio"` names the file, and `"pendingFlac"` marks a WAV waiting to be compressed.
 - The models get a copy downmixed to mono and resampled to 16 kHz, in memory.
 - Recording goes on with the screen off: a foreground service with the microphone type on Android, the background
   audio mode on iOS.
 
 ### Speakers
 
-Yes, after the lecture: the refine pass runs speaker diarization (speaker segmentation plus voice embeddings, for
-example sherpa-onnx with pyannote's segmentation model, MIT, and a 3D-Speaker embedding model, Apache-2.0), and
-labels each segment "Speaker 1", "Speaker 2"… The user renames them ("Lecturer") once per lecture. Not live: telling
-voices apart needs the whole recording to be reliable. Expect it to work well for lecturer vs. students and less
-well for students far from the phone.
+- **During the lecture** (owner's request, Nov 2, 2026): when a line ends, a voice print of its audio (3D-Speaker
+  CAM++, Apache-2.0, 28 MB, on sherpa-onnx; `SpeakerLabeler`) joins the speaker whose average print is closest, if
+  at least 0.5 alike (cosine), else starts a new "Speaker N" (`SpeakerTracker`). Lines under 1.5 s get no label.
+  A line where the voice changes without a pause (a TV debate, an interruption) is split: prints of 1.5 s windows
+  every 0.75 s are grouped by voice, a change lasting two windows splits the line at the nearest word (the streaming
+  model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
+  two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
+- Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
+  `voices.json` (`VoiceStore`), and its next lectures start with those voices, labeled by name from their first line.
+- **After the lecture, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
+  runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
+  when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python
+  pipeline can't run on a phone, and on a test recording it was 10× slower and merged every voice (its settings
+  expect long meetings). The recording is read in 5-minute pieces (`RecordingAudio`: WAV, or FLAC through the system
+  decoder); each piece's speakers are matched across pieces and to the notebook's voices by print, so named voices
+  keep their names. Lines are then relabeled (`withTurns`): a line with word times (streaming model) splits where the
+  turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
+  keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
+  start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
+- Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
+  speech (two at once) gets one speaker, the louder.
 
 ### Data
 
@@ -52,12 +94,17 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
 ```json
 {
   "v": 1,
+  "speakerPass": true,
+  "refinedWith": "ivrit-whisper-large-v3",
+  "versions": [{ "id": "v1793633774646", "model": "ivrit-zipformer2-66m-streaming", "keptAt": 1793633774646,
+                 "lines": 21, "edited": 0, "refined": false }],
   "id": "lecture-7",
   "title": "זיכרון עבודה",
   "language": "he",
   "startedAt": "2026-11-02T10:00:00+02:00",
   "durationMs": 2832000,
   "audio": "audio.flac",
+  "pendingFlac": false,
   "speakers": [{ "id": "speaker-1", "name": "המרצה" }],
   "segments": [
     { "id": "s1", "startMs": 2000, "endMs": 14500, "text": "טוב, בוקר טוב לכולם…",
@@ -69,6 +116,14 @@ format is a simple data file of times, text and notes; exports (Word, PDF, Markd
 
 A note's time is when the user **started** typing it, so it points at what was being said then.
 
+### NPU
+
+ivrit.ai Whisper turbo runs on the Snapdragon 8 Elite's NPU (Nov 4, 2026): `ModelKind.WhisperNpu`, offered only on
+its chip (`SpeechModel.chips`, Android's `Build.SOC_MODEL`), on sherpa-onnx's QNN backend (`SherpaNpuWhisperEngine`),
+live and for the refine pass; other phones keep whisper.cpp on the CPU. On a 41-minute recording it was about 2× as
+fast as the CPU and used about a fifth of the energy. Its files and the QNN-enabled sherpa-onnx AAR are ours to
+publish (owner: on Hugging Face); not yet. Details and next steps: [npu-plan.md](npu-plan.md).
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.
@@ -76,7 +131,23 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 ## Built so far
 
 - The project, the shared data types and the model catalog, the Android UI lab.
-- Lecture (while recording): three options in the lab, round 1.
+- Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
+  screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
+  `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
+  downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
+- Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
+  naming speakers, notes after the lecture, and the speaker pass and the refine pass from its menu. Stop opens it.
+- **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
+  model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
+  non-speech pieces, no impossible word counts, loops collapsed). Lines keep their times and speakers; edited lines and
+  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. Any downloaded speech
+  model for the language can refine (owner's request): Whisper models through `transcribeLine`, the Zipformer a line at
+  a time (`transcribeLineStreaming`). Before a pass, the current transcript is kept as a **version**
+  (`versions/<id>.json` in the lecture's folder: its lines, speakers and edits; `lecture.json` lists them under
+  `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
+  large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
+- Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
+  the start screen; labels are on once it is there.
 
 ## Open questions
 

@@ -28,3 +28,6 @@ tools/out/
 keystore.properties
 *.jks
 *.keystore
+
+# Downloaded by androidApp/build.gradle.kts (sherpa-onnx)
+androidApp/libs/

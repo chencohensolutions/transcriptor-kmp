@@ -49,6 +49,12 @@ object LabData {
     /** What live transcription is writing now, before the line ends. */
     const val partialLine = "הלוח החזותי־מרחבי, לעומת זאת, מחזיק"
 
+    /** The lecture as live transcription labels its speakers: the lecturer named in an earlier lecture, a student not. */
+    val liveLectureWithSpeakers = lecture.copy(
+        segments = lecture.segments.map { it.copy(speakerId = if (it.id == "s6") "speaker-2" else "speaker-1") },
+        speakers = listOf(Speaker("speaker-1", "המרצה"), Speaker("speaker-2", "")),
+    )
+
     /** The same lecture after the refine pass told the voices apart and a line was fixed by hand. */
     val refinedLecture = lecture.copy(
         segments = lecture.segments.map { seg ->

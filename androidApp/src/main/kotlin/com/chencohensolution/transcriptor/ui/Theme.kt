@@ -18,6 +18,8 @@ data class TranscriptorColors(
     val onNote: Color,
     val time: Color,
     val partial: Color,
+    /** One per speaker, in the order they first spoke (then again from the first). */
+    val speakers: List<Color>,
 )
 
 private val lightExtra = TranscriptorColors(
@@ -26,6 +28,7 @@ private val lightExtra = TranscriptorColors(
     onNote = Color(0xFF4A3510),
     time = Color(0xFF7A7F99),
     partial = Color(0xFF9AA0B8),
+    speakers = listOf(Color(0xFF1A73E8), Color(0xFF188038), Color(0xFFA142F4), Color(0xFFE37400), Color(0xFF007B83), Color(0xFFC5221F)),
 )
 private val darkExtra = TranscriptorColors(
     recording = Color(0xFFFF6B5E),
@@ -33,6 +36,7 @@ private val darkExtra = TranscriptorColors(
     onNote = Color(0xFFFFE2B0),
     time = Color(0xFF8E93AD),
     partial = Color(0xFF6C7190),
+    speakers = listOf(Color(0xFF8AB4F8), Color(0xFF81C995), Color(0xFFD7AEFB), Color(0xFFFCAD70), Color(0xFF78D9EC), Color(0xFFF28B82)),
 )
 
 val LocalTranscriptorColors = staticCompositionLocalOf { lightExtra }
@@ -45,9 +49,24 @@ fun TranscriptorTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composabl
         lightColorScheme(primary = Color(0xFF2E3A8C), onPrimary = Color.White, primaryContainer = Color(0xFFDDE1FF))
     }
     androidx.compose.runtime.CompositionLocalProvider(LocalTranscriptorColors provides if (dark) darkExtra else lightExtra) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) {
+            // Text drawn straight on the background (not in a Surface) takes the background's text color, not
+            // Compose's default black, which is unreadable in the dark theme.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalContentColor provides scheme.onBackground,
+                content = content,
+            )
+        }
     }
 }
+
+/**
+ * The text direction of a notebook's text (a title, a line) where it sits in the app's chrome: a Hebrew title that
+ * starts with a number ("2 בנוב׳ 2026") stays right-to-left in an English app.
+ */
+fun textDirectionOf(language: String) =
+    if (layoutDirectionOf(language) == androidx.compose.ui.unit.LayoutDirection.Rtl) androidx.compose.ui.text.style.TextDirection.Rtl
+    else androidx.compose.ui.text.style.TextDirection.Ltr
 
 /** Right to left for languages written that way: a notebook's content follows its language, not the phone's. */
 fun layoutDirectionOf(language: String): LayoutDirection =

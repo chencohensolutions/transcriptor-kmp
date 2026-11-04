@@ -4,4 +4,28 @@ iOS (SwiftUI, in `iosApp/`) is built after the Android app is finished. Each ent
 shared state and controller methods the SwiftUI side should call, the Android files to mirror, new strings, and
 anything left to decide. Remove an entry once it is built.
 
-Nothing yet: the Android screens are still being designed in the UI lab.
+## Lecture, while recording
+
+- Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and
+  `MainActivity.kt` (keeping it recording, and the temporary start screen); `docs/screens/lecture.md`.
+- Shared, to call from SwiftUI: `LectureSession` (`state`, `start(notebook, title)`, `pauseOrResume()`,
+  `addNote(atMillis, text)`, `stop()`), `timelineOf(lecture)`, `SettingsStore.audioFormat`, `FlacCompression`
+  (`pending()`, `compress(lecture, progress)`).
+- To write in `sharedLogic/src/iosMain`: an `AudioRecorder` on `AVAudioEngine` at 48 kHz stereo 16 bit, writing with
+  `AVAudioFile` (`kAudioFormatLinearPCM` for WAV, `kAudioFormatFLAC` for FLAC live), and a `FlacEncode` that converts
+  the WAV with `AVAudioFile`. The app needs the background audio mode and the microphone usage description.
+- Strings: `lecture_*`, `recording_*`, `compressing_flac`, `start_*`, `format_*` in `androidApp/src/main/res/values/strings.xml`
+  (Hebrew in `values-iw/`).
+- Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
+  dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,
+  strings `speaker_*`. Voice prints on iOS: sherpa-onnx's iOS build with the same CAM++ model, as a `VoiceEmbedder`.
+- Lecture, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
+  `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
+  `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
+  `review_*`.
+- Improve after the lecture: `SettingsStore.afterLecture` (on by default). Off: no speaker pass when the lecture stops
+  (`RecordingService`'s stop), no Refine with… on the lecture's screen (`passes.refine` null), and the start screen
+  hides the refine models. Strings `start_after_lecture`, `start_after_lecture_note`.
+- NPU (Android only for now): `ModelKind.WhisperNpu` models run on a Qualcomm NPU; on iOS the equivalent is Core ML
+  on the Neural Engine, not built.
+- To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).

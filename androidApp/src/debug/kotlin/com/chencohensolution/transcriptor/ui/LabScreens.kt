@@ -5,4 +5,10 @@ package com.chencohensolution.transcriptor.ui
 // doesn't have yet has suggestions only.
 
 internal val labScreens: List<LabScreen> = listOf(
+    LabScreen("lecture", "Lecture, while recording", listOf(
+        lectureCurrent,
+    )),
+    LabScreen("review", "Lecture, after", listOf(
+        reviewCurrent,
+    )),
 )

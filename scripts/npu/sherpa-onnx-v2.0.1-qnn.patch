@@ -1,0 +1,1059 @@
+diff --git a/sherpa-onnx/csrc/offline-whisper-model-config.cc b/sherpa-onnx/csrc/offline-whisper-model-config.cc
+index c9e12d4..00fc97f 100644
+--- a/sherpa-onnx/csrc/offline-whisper-model-config.cc
++++ b/sherpa-onnx/csrc/offline-whisper-model-config.cc
+@@ -254,7 +254,7 @@ WhisperModelType ParseWhisperModelType(const std::string &name) {
+   if (name == "small.en") return WhisperModelType::SmallEn;
+   if (name == "medium") return WhisperModelType::Medium;
+   if (name == "medium.en") return WhisperModelType::MediumEn;
+-  if (name == "large") return WhisperModelType::Large;
++  if (name == "large" || name == "turbo") return WhisperModelType::Large;
+ 
+   SHERPA_ONNX_LOGE("Unknown Whisper model: '%s'", name.c_str());
+   SHERPA_ONNX_EXIT(-1);
+diff --git a/sherpa-onnx/csrc/qnn-config.h b/sherpa-onnx/csrc/qnn-config.h
+index 4df5cc5..c79a868 100644
+--- a/sherpa-onnx/csrc/qnn-config.h
++++ b/sherpa-onnx/csrc/qnn-config.h
+@@ -30,6 +30,9 @@ struct QnnConfig {
+   // Example value: /some/path/to/libQnnSystem.so
+   std::string system_lib;
+ 
++  // read by the Java/Kotlin bindings (upstream #4126); not used by this version
++  bool htp_perf_mode = false;
++
+   std::string ToString() const;
+ 
+   void Register(ParseOptions *po);
+diff --git a/sherpa-onnx/csrc/qnn/macros.h b/sherpa-onnx/csrc/qnn/macros.h
+index 58c65cf..54e1d93 100644
+--- a/sherpa-onnx/csrc/qnn/macros.h
++++ b/sherpa-onnx/csrc/qnn/macros.h
+@@ -5,14 +5,21 @@
+ #ifndef SHERPA_ONNX_CSRC_QNN_MACROS_H_
+ #define SHERPA_ONNX_CSRC_QNN_MACROS_H_
+ 
++#include <stdexcept>
++#include <string>
++
+ #include "sherpa-onnx/csrc/macros.h"
+ 
++// Throws instead of exiting: inside an app, exiting kills the app, while the
++// JNI turns the exception into a Java one the app can fall back from.
+ #define SHERPA_ONNX_QNN_CHECK(ret, msg, ...)                             \
+   do {                                                                   \
+     if (ret != QNN_SUCCESS) {                                            \
+       SHERPA_ONNX_LOGE("Return code is: %d", static_cast<int32_t>(ret)); \
+       SHERPA_ONNX_LOGE(msg, ##__VA_ARGS__);                              \
+-      SHERPA_ONNX_EXIT(-1);                                              \
++      throw std::runtime_error("QNN error " +                            \
++                               std::to_string(static_cast<int32_t>(ret)) + \
++                               ": " + msg);                              \
+     }                                                                    \
+   } while (0)
+ 
+diff --git a/sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.cc b/sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.cc
+index 6355287..8c5f619 100644
+--- a/sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.cc
++++ b/sherpa-onnx/csrc/qnn/offline-whisper-model-qnn.cc
+@@ -6,8 +6,11 @@
+ 
+ #include <algorithm>
+ #include <array>
++#include <chrono>  // NOLINT
++#include <cstdlib>
+ #include <memory>
+ #include <mutex>
++#include <stdexcept>
+ #include <string>
+ #include <utility>
+ #include <vector>
+@@ -38,7 +41,7 @@ static std::string ParseModelPrefix(const std::string &input_name) {
+   auto pos = input_name.rfind("_mel");
+   if (pos == std::string::npos) {
+     SHERPA_ONNX_LOGE("Unexpected encoder input name: '%s'", input_name.c_str());
+-    SHERPA_ONNX_EXIT(-1);
++    throw std::runtime_error("QNN: see the log above");
+   }
+ 
+   return input_name.substr(0, pos);
+@@ -73,7 +76,7 @@ class OfflineWhisperModelQnn::Impl {
+     SHERPA_ONNX_LOGE(
+         "Please copy all files from assets to SD card and set assetManager to "
+         "null");
+-    SHERPA_ONNX_EXIT(-1);
++    throw std::runtime_error("QNN: see the log above");
+   }
+ 
+   OfflineWhisperDecoderResult Run(std::vector<float> features) const {
+@@ -107,8 +110,21 @@ class OfflineWhisperModelQnn::Impl {
+     // Pad to expected frames
+     features.resize(num_frames_ * feat_dim_, 0);
+ 
++    // SHERPA_ONNX_QNN_TIMING=1: print encoder and decoder times to stderr
++    const bool timing = std::getenv("SHERPA_ONNX_QNN_TIMING") != nullptr;
++    using Clock = std::chrono::steady_clock;
++    auto ms_since = [](Clock::time_point t) {
++      return std::chrono::duration<double, std::milli>(Clock::now() - t)
++          .count();
++    };
++    auto t_start = Clock::now();
++
+     // For QNN, encoder input shape is (1, T, C), no transpose needed
+     RunEncoder(features);
++    if (timing) {
++      SHERPA_ONNX_LOGE("timing: encoder %.1f ms", ms_since(t_start));
++    }
++    auto t_decode = Clock::now();
+ 
+     // Get encoder outputs and transpose for decoder
+     // cross_kv layout: [cross_k_0, cross_v_0, cross_k_1, cross_v_1, ...]
+@@ -141,7 +157,7 @@ class OfflineWhisperModelQnn::Impl {
+         SHERPA_ONNX_LOGE(
+             "Valid task values are: translate, transcribe. Given: '%s'",
+             config_.whisper.task.c_str());
+-        SHERPA_ONNX_EXIT(-1);
++        throw std::runtime_error("QNN: see the log above");
+       }
+ 
+       if (!config_.whisper.language.empty()) {
+@@ -149,7 +165,7 @@ class OfflineWhisperModelQnn::Impl {
+         if (lang_id < 0) {
+           SHERPA_ONNX_LOGE("Unsupported language: '%s'",
+                            config_.whisper.language.c_str());
+-          SHERPA_ONNX_EXIT(-1);
++          throw std::runtime_error("QNN: see the log above");
+         }
+         r.lang = config_.whisper.language;
+         sot_sequence[1] = lang_id;
+@@ -199,6 +215,19 @@ class OfflineWhisperModelQnn::Impl {
+       idx = MaxElementIndex(logits.data(), logits.size());
+     }
+ 
++    if (timing) {
++      double d = ms_since(t_decode);
++      SHERPA_ONNX_LOGE(
++          "timing: decoder %.1f ms for %d steps (%.1f ms/step), total %.1f ms",
++          d, offset, d / offset, ms_since(t_start));
++      SHERPA_ONNX_LOGE(
++          "timing: per step: set self kv %.1f, set cross kv %.1f, run %.1f, "
++          "read logits %.1f ms",
++          t_self_ / offset, t_cross_ / offset, t_run_ / offset,
++          t_logits_ / offset);
++      t_self_ = t_cross_ = t_run_ = t_logits_ = 0;
++    }
++
+     return r;
+   }
+ 
+@@ -307,7 +336,7 @@ class OfflineWhisperModelQnn::Impl {
+     const auto &encoder_path = config_.whisper.encoder;
+     if (encoder_path.empty()) {
+       SHERPA_ONNX_LOGE("Please provide --whisper-encoder");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     encoder_backend_->InitContext();
+@@ -322,7 +351,7 @@ class OfflineWhisperModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "You should provide --whisper.qnn-system-lib if you also provide "
+           "context binary");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     encoder_model_ = std::make_unique<QnnModel>(context_binary, system_lib,
+@@ -335,7 +364,7 @@ class OfflineWhisperModelQnn::Impl {
+     const auto &decoder_path = config_.whisper.decoder;
+     if (decoder_path.empty()) {
+       SHERPA_ONNX_LOGE("Please provide --whisper-decoder");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     decoder_backend_->InitContext();
+@@ -350,7 +379,7 @@ class OfflineWhisperModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "You should provide --whisper.qnn-system-lib if you also provide "
+           "context binary");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     decoder_model_ = std::make_unique<QnnModel>(context_binary, system_lib,
+@@ -391,7 +420,7 @@ class OfflineWhisperModelQnn::Impl {
+     const std::vector<std::string> &names = encoder_model_->InputTensorNames();
+     if (names.empty()) {
+       SHERPA_ONNX_LOGE("Encoder has no input tensors");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     prefix_ = ParseModelPrefix(names[0]);
+@@ -406,7 +435,7 @@ class OfflineWhisperModelQnn::Impl {
+     if (!encoder_model_->HasTensor(mel_name)) {
+       SHERPA_ONNX_LOGE("Encoder does not have input tensor '%s'",
+                        mel_name.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::vector<int32_t> mel_shape = encoder_model_->TensorShape(mel_name);
+@@ -417,7 +446,7 @@ class OfflineWhisperModelQnn::Impl {
+           mel_shape[0],
+           mel_shape.size() > 1 ? mel_shape[1] : 0,
+           mel_shape.size() > 2 ? mel_shape[2] : 0);
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     num_frames_ = mel_shape[1];
+@@ -430,7 +459,7 @@ class OfflineWhisperModelQnn::Impl {
+     // Encoder outputs don't have prefix
+     if (!encoder_model_->HasTensor("cross_k_0")) {
+       SHERPA_ONNX_LOGE("Encoder does not have output tensor 'cross_k_0'");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::vector<int32_t> cross_k_shape =
+@@ -457,14 +486,14 @@ class OfflineWhisperModelQnn::Impl {
+       SHERPA_ONNX_LOGE("Expect %d decoder inputs. Actual: %d",
+                        expected_num_inputs,
+                        static_cast<int32_t>(input_names.size()));
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::string mask_name = prefix_ + "_mask";
+     if (!decoder_model_->HasTensor(mask_name)) {
+       SHERPA_ONNX_LOGE("Decoder does not have input tensor '%s'",
+                        mask_name.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::vector<int32_t> mask_shape = decoder_model_->TensorShape(mask_name);
+@@ -474,7 +503,7 @@ class OfflineWhisperModelQnn::Impl {
+     if (!decoder_model_->HasTensor(logits_name)) {
+       SHERPA_ONNX_LOGE("Decoder does not have output tensor '%s'",
+                        logits_name.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::vector<int32_t> logits_shape =
+@@ -551,11 +580,17 @@ class OfflineWhisperModelQnn::Impl {
+         sot_sequence_ = {50258, 50259, 50359, 50363};
+         eot_ = 50257;
+         translate_ = 50358;
++        // large-v3 and turbo added a language token (yue), shifting the
++        // task tokens by one
++        if (prefix_ == "turbo" || prefix_ == "large_v3") {
++          sot_sequence_ = {50258, 50259, 50360, 50364};
++          translate_ = 50359;
++        }
+         break;
+       default:
+         SHERPA_ONNX_LOGE("Unsupported model type: '%s'",
+                          ToString(model_type_).c_str());
+-        SHERPA_ONNX_EXIT(-1);
++        throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     if (config_.debug) {
+@@ -581,11 +616,19 @@ class OfflineWhisperModelQnn::Impl {
+       const std::vector<std::vector<float>> &cross_kv,
+       const float *self_kv_data,
+       const std::vector<int32_t> &mask) const {
++    auto ts = std::chrono::steady_clock::now();
+     // Set tokens
+     decoder_model_->SetInputTensorData(tokens_name_, &token, 1);
+ 
+-    // Set self kv cache (flat vector layout)
+-    for (int32_t i = 0; i < n_text_layer_; ++i) {
++    // Set self kv cache (flat vector layout). With 16-bit inputs and
++    // SHERPA_ONNX_QNN_SELF_INPLACE (on unless "0"; needs a 16-bit decoder),
++    // UpdateSelfKvCache writes each new column
++    // into the input buffers directly, so they are only zeroed here at the
++    // start of an utterance.
++    static const bool self_inplace =
++        (std::getenv("SHERPA_ONNX_QNN_SELF_INPLACE") == nullptr || std::string(std::getenv("SHERPA_ONNX_QNN_SELF_INPLACE")) != "0");
++    for (int32_t i = 0; i < n_text_layer_ && (!self_inplace || offset == 0);
++         ++i) {
+       decoder_model_->SetInputTensorData(decoder_self_k_[i],
+                                          self_kv_data + (i * 2) * self_kv_size_,
+                                          self_kv_size_);
+@@ -595,8 +638,16 @@ class OfflineWhisperModelQnn::Impl {
+                                          self_kv_size_);
+     }
+ 
+-    // Set cross kv cache (from encoder, transposed)
+-    for (int32_t i = 0; i < n_text_layer_; ++i) {
++    auto t0 = std::chrono::steady_clock::now();
++    t_self_ += std::chrono::duration<double, std::milli>(t0 - ts).count();
++    // Set cross kv cache (from encoder, transposed). The input buffers keep
++    // their contents between runs: with SHERPA_ONNX_QNN_CROSS_ONCE (on unless
++    // "0"), fill them
++    // only on the first step of an utterance.
++    static const bool cross_once =
++        (std::getenv("SHERPA_ONNX_QNN_CROSS_ONCE") == nullptr || std::string(std::getenv("SHERPA_ONNX_QNN_CROSS_ONCE")) != "0");
++    for (int32_t i = 0; i < n_text_layer_ && (!cross_once || offset == 0);
++         ++i) {
+       decoder_model_->SetInputTensorData(decoder_cross_k_[i],
+                                          cross_kv[i * 2].data(),
+                                          cross_kv[i * 2].size());
+@@ -606,20 +657,49 @@ class OfflineWhisperModelQnn::Impl {
+                                          cross_kv[i * 2 + 1].size());
+     }
+ 
++    auto t1 = std::chrono::steady_clock::now();
+     // Set offset
+     decoder_model_->SetInputTensorData(offset_name_, &offset, 1);
+ 
+     // Set mask
+     decoder_model_->SetInputTensorData(mask_name_, mask.data(), mask.size());
+ 
++    auto t2 = std::chrono::steady_clock::now();
+     // Run decoder
+     decoder_model_->Run();
++    auto t3 = std::chrono::steady_clock::now();
+ 
+     // Get logits
+-    return decoder_model_->GetOutputTensorData(logits_name_);
++    auto logits = decoder_model_->GetOutputTensorData(logits_name_);
++    auto t4 = std::chrono::steady_clock::now();
++    auto ms = [](auto a, auto b) {
++      return std::chrono::duration<double, std::milli>(b - a).count();
++    };
++    t_cross_ += ms(t0, t1);
++    t_run_ += ms(t2, t3);
++    t_logits_ += ms(t3, t4);
++    return logits;
+   }
+ 
+   void UpdateSelfKvCache(float *self_kv_data, int32_t offset) const {
++    static const bool self_inplace =
++        (std::getenv("SHERPA_ONNX_QNN_SELF_INPLACE") == nullptr || std::string(std::getenv("SHERPA_ONNX_QNN_SELF_INPLACE")) != "0");
++    if (self_inplace) {
++      bool ok = true;
++      for (int32_t i = 0; i < n_text_layer_ && ok; ++i) {
++        ok = decoder_model_->CopyOutputToInputColumn(
++                 decoder_this_self_k_[i], decoder_self_k_[i], self_kv_stride_,
++                 offset) &&
++             decoder_model_->CopyOutputToInputColumn(
++                 decoder_this_self_v_[i], decoder_self_v_[i], self_kv_stride_,
++                 offset);
++      }
++      if (!ok) {
++        SHERPA_ONNX_LOGE("SHERPA_ONNX_QNN_SELF_INPLACE needs 16-bit tensors");
++        throw std::runtime_error("QNN: see the log above");
++      }
++      return;
++    }
+     for (int32_t i = 0; i < n_text_layer_; ++i) {
+       // Update self_k
+       auto delta_k =
+@@ -665,6 +745,8 @@ class OfflineWhisperModelQnn::Impl {
+   }
+ 
+  private:
++  // per-part decoder times (ms), for SHERPA_ONNX_QNN_TIMING
++  mutable double t_self_ = 0, t_cross_ = 0, t_run_ = 0, t_logits_ = 0;
+   mutable std::mutex mutex_;
+   OfflineModelConfig config_;
+ 
+diff --git a/sherpa-onnx/csrc/qnn/online-recognizer-zipformer-transducer-qnn-impl.h b/sherpa-onnx/csrc/qnn/online-recognizer-zipformer-transducer-qnn-impl.h
+index 00e0ec2..a4ee95a 100644
+--- a/sherpa-onnx/csrc/qnn/online-recognizer-zipformer-transducer-qnn-impl.h
++++ b/sherpa-onnx/csrc/qnn/online-recognizer-zipformer-transducer-qnn-impl.h
+@@ -5,6 +5,7 @@
+ #ifndef SHERPA_ONNX_CSRC_QNN_ONLINE_RECOGNIZER_ZIPFORMER_TRANSDUCER_QNN_IMPL_H_
+ #define SHERPA_ONNX_CSRC_QNN_ONLINE_RECOGNIZER_ZIPFORMER_TRANSDUCER_QNN_IMPL_H_
+ 
++#include <stdexcept>
+ #include <algorithm>
+ #include <cmath>
+ #include <memory>
+@@ -279,7 +280,7 @@ class OnlineRecognizerZipformerTransducerQnnImpl
+       const std::string &hotwords) const override {
+     if (!hotwords.empty()) {
+       SHERPA_ONNX_LOGE("hotwords are not supported with qnn transducers");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+     return CreateStream();
+   }
+@@ -390,7 +391,7 @@ class OnlineRecognizerZipformerTransducerQnnImpl
+     } else {
+       SHERPA_ONNX_LOGE("Unsupported decoding method for qnn transducer: %s",
+                        config_.decoding_method.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     r.decoder_out = model_->RunDecoder(
+diff --git a/sherpa-onnx/csrc/qnn/online-zipformer-transducer-model-qnn.cc b/sherpa-onnx/csrc/qnn/online-zipformer-transducer-model-qnn.cc
+index 1817e1f..e2ed50e 100644
+--- a/sherpa-onnx/csrc/qnn/online-zipformer-transducer-model-qnn.cc
++++ b/sherpa-onnx/csrc/qnn/online-zipformer-transducer-model-qnn.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "sherpa-onnx/csrc/qnn/online-zipformer-transducer-model-qnn.h"
+ 
++#include <stdexcept>
+ #include <functional>
+ #include <memory>
+ #include <mutex>  // NOLINT
+@@ -79,7 +80,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+     SHERPA_ONNX_LOGE(
+         "Please copy all files from assets to SD card and set assetManager to "
+         "null");
+-    SHERPA_ONNX_EXIT(-1);
++    throw std::runtime_error("QNN: see the log above");
+   }
+ 
+   std::vector<OnlineStreamStateTensor> GetEncoderInitStates() const {
+@@ -103,7 +104,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+                                std::vector<OnlineStreamStateTensor> *states) const {
+     if (!states) {
+       SHERPA_ONNX_LOGE("states pointer is null");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     std::lock_guard<std::mutex> lock(mutex_);
+@@ -233,7 +234,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+           "Actual: %d. '%s'",
+           static_cast<int32_t>(context_binaries_.size()),
+           config_.transducer.qnn_config.context_binary.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+   }
+ 
+@@ -269,7 +270,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "You should provide --transducer.qnn-system-lib if you also provide "
+           "context binary");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     *model = std::make_unique<QnnModel>(
+@@ -333,7 +334,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+   void CheckEncoder() {
+     if (!encoder_->HasTensor("encoder_out")) {
+       SHERPA_ONNX_LOGE("The encoder model does not have output 'encoder_out'");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     has_processed_lens_ = encoder_->HasTensor("processed_lens");
+@@ -369,18 +370,18 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       } else {
+         SHERPA_ONNX_LOGE("The encoder model does not have input 'x'");
+       }
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     if (state_input_names_.empty()) {
+       SHERPA_ONNX_LOGE("The encoder model does not contain streaming states");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     auto x_shape = encoder_->TensorShape(encoder_input_name_);
+     if (x_shape.size() != 3 || x_shape[0] != 1) {
+       SHERPA_ONNX_LOGE("The encoder input x should be of shape [1, ?, ?]");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     if (x_shape[1] != expected_feature_dim_) {
+@@ -388,7 +389,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+           "The encoder input x should be of shape [1, %d, T]. Given [1, %d, %d]",
+           expected_feature_dim_, static_cast<int32_t>(x_shape[1]),
+           static_cast<int32_t>(x_shape[2]));
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+     feat_dim_ = x_shape[1];
+     chunk_size_ = x_shape[2];
+@@ -396,7 +397,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+     auto out_shape = encoder_->TensorShape("encoder_out");
+     if (out_shape.size() != 3 || out_shape[0] != 1) {
+       SHERPA_ONNX_LOGE("The encoder output should be of shape [1, ?, ?]");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     encoder_out_dim_ = out_shape[2];
+@@ -407,7 +408,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       if (!encoder_->HasTensor(new_name)) {
+         SHERPA_ONNX_LOGE("The encoder model does not have output '%s'",
+                          new_name.c_str());
+-        SHERPA_ONNX_EXIT(-1);
++        throw std::runtime_error("QNN: see the log above");
+       }
+ 
+       state_output_names_.push_back(new_name);
+@@ -431,20 +432,20 @@ class OnlineZipformerTransducerModelQnn::Impl {
+     if (input_names.size() != 1) {
+       SHERPA_ONNX_LOGE("Expected one decoder input. Given %d",
+                        static_cast<int32_t>(input_names.size()));
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     decoder_input_name_ = input_names[0];
+     auto in_shape = decoder_->TensorShape(decoder_input_name_);
+     if (in_shape.size() != 2 || in_shape[0] != 1) {
+       SHERPA_ONNX_LOGE("Expected decoder input shape [1, context_size]");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+     context_size_ = in_shape[1];
+ 
+     if (!decoder_->HasTensor("decoder_out")) {
+       SHERPA_ONNX_LOGE("The decoder model does not have output 'decoder_out'");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     decoder_output_name_ = "decoder_out";
+@@ -452,7 +453,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+     if (out_shape.size() != 2 || out_shape[0] != 1) {
+       SHERPA_ONNX_LOGE(
+           "The decoder output should be of shape [1, decoder_dim]");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     const auto &output_names = decoder_->OutputTensorNames();
+@@ -460,7 +461,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "Expected one decoder output named 'decoder_out'. Given %d outputs",
+           static_cast<int32_t>(output_names.size()));
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+     decoder_out_dim_ = out_shape[1];
+   }
+@@ -468,7 +469,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+   void CheckJoiner() {
+     if (!joiner_->HasTensor("logit")) {
+       SHERPA_ONNX_LOGE("The joiner model does not have output 'logit'");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     joiner_encoder_input_name_ = "encoder_out";
+@@ -477,13 +478,13 @@ class OnlineZipformerTransducerModelQnn::Impl {
+     if (!joiner_->HasTensor(joiner_encoder_input_name_)) {
+       SHERPA_ONNX_LOGE("The joiner model does not have input '%s'",
+                        joiner_encoder_input_name_.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     if (!joiner_->HasTensor(joiner_decoder_input_name_)) {
+       SHERPA_ONNX_LOGE("The joiner model does not have input '%s'",
+                        joiner_decoder_input_name_.c_str());
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     auto encoder_in_shape = joiner_->TensorShape(joiner_encoder_input_name_);
+@@ -492,7 +493,7 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "The joiner input '%s' should be of shape [1, %d]",
+           joiner_encoder_input_name_.c_str(), encoder_out_dim_);
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     auto decoder_in_shape = joiner_->TensorShape(joiner_decoder_input_name_);
+@@ -501,13 +502,13 @@ class OnlineZipformerTransducerModelQnn::Impl {
+       SHERPA_ONNX_LOGE(
+           "The joiner input '%s' should be of shape [1, %d]",
+           joiner_decoder_input_name_.c_str(), decoder_out_dim_);
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     auto out_shape = joiner_->TensorShape("logit");
+     if (out_shape.size() != 2 || out_shape[0] != 1) {
+       SHERPA_ONNX_LOGE("The joiner output should be of shape [1, vocab_size]");
+-      SHERPA_ONNX_EXIT(-1);
++      throw std::runtime_error("QNN: see the log above");
+     }
+ 
+     joiner_output_name_ = "logit";
+diff --git a/sherpa-onnx/csrc/qnn/qnn-backend.cc b/sherpa-onnx/csrc/qnn/qnn-backend.cc
+index b482acf..9391978 100644
+--- a/sherpa-onnx/csrc/qnn/qnn-backend.cc
++++ b/sherpa-onnx/csrc/qnn/qnn-backend.cc
+@@ -40,22 +40,22 @@ class QnnBackend::Impl {
+   ~Impl() {
+     if (context_handle_) {
+       auto ret = qnn_interface_.contextFree(context_handle_, nullptr);
+-      SHERPA_ONNX_QNN_CHECK(ret, "Failed to call contextFree");
++      if (ret != QNN_SUCCESS) SHERPA_ONNX_LOGE("Failed to call contextFree: %d", static_cast<int32_t>(ret));
+     }
+ 
+     if (device_handle_) {
+       auto ret = qnn_interface_.deviceFree(device_handle_);
+-      SHERPA_ONNX_QNN_CHECK(ret, "Failed to call deviceFree");
++      if (ret != QNN_SUCCESS) SHERPA_ONNX_LOGE("Failed to call deviceFree: %d", static_cast<int32_t>(ret));
+     }
+ 
+     if (backend_handle_) {
+       auto ret = qnn_interface_.backendFree(backend_handle_);
+-      SHERPA_ONNX_QNN_CHECK(ret, "Failed to call backendFree");
++      if (ret != QNN_SUCCESS) SHERPA_ONNX_LOGE("Failed to call backendFree: %d", static_cast<int32_t>(ret));
+     }
+ 
+     if (log_handle_) {
+       auto ret = qnn_interface_.logFree(log_handle_);
+-      SHERPA_ONNX_QNN_CHECK(ret, "Failed to call logFree");
++      if (ret != QNN_SUCCESS) SHERPA_ONNX_LOGE("Failed to call logFree: %d", static_cast<int32_t>(ret));
+     }
+   }
+ 
+diff --git a/sherpa-onnx/csrc/qnn/qnn-model.cc b/sherpa-onnx/csrc/qnn/qnn-model.cc
+index b008913..993baf4 100644
+--- a/sherpa-onnx/csrc/qnn/qnn-model.cc
++++ b/sherpa-onnx/csrc/qnn/qnn-model.cc
+@@ -7,6 +7,7 @@
+ #include <dlfcn.h>
+ 
+ #include <cstdint>
++#include <cstdlib>
+ #include <fstream>
+ #include <memory>
+ #include <string>
+@@ -19,6 +20,8 @@
+ #include "sherpa-onnx/csrc/qnn/qnn-backend.h"
+ #include "sherpa-onnx/csrc/qnn/utils.h"
+ 
++#include "QnnMem.h"
++
+ namespace sherpa_onnx {
+ 
+ class QnnModel::Impl {
+@@ -213,7 +216,7 @@ class QnnModel::Impl {
+     return true;
+   }
+ 
+-  ~Impl() = default;
++  ~Impl() { FreeSharedMem(); }
+ 
+   bool SaveBinaryContext(const std::string &filename) {
+     auto qnn_interface = backend_->QnnInterface();
+@@ -399,6 +402,22 @@ class QnnModel::Impl {
+     return true;
+   }
+ 
++  bool CopyOutputToInputColumn(const std::string &out, const std::string &in,
++                               int32_t stride, int32_t offset) {
++    if (!HasTensor(out) || !HasTensor(in)) return false;
++    auto src = name2tensor_.at(out);
++    auto dst = name2tensor_.at(in);
++    if (src->v1.dataType != QNN_DATATYPE_FLOAT_16 ||
++        dst->v1.dataType != QNN_DATATYPE_FLOAT_16) {
++      return false;
++    }
++    int32_t n = src->v1.clientBuf.dataSize / sizeof(uint16_t);
++    auto *p = static_cast<const uint16_t *>(src->v1.clientBuf.data);
++    auto *q = static_cast<uint16_t *>(dst->v1.clientBuf.data);
++    for (int32_t r = 0; r != n; ++r) q[r * stride + offset] = p[r];
++    return true;
++  }
++
+   std::vector<float> GetOutputTensorData(const std::string &name) {
+     if (!HasTensor(name)) {
+       SHERPA_ONNX_LOGE("No such tensor '%s'", name.c_str());
+@@ -485,6 +504,20 @@ class QnnModel::Impl {
+       output_tensors_raw.push_back(*p);
+     }
+ 
++    // shared memory: the tensors' clientBuf.data points into registered
++    // rpcmem; pass the handles so the runtime uses it in place, without a copy
++    if (!mem_handles_.empty()) {
++      size_t k = 0;
++      for (auto &t : input_tensors_raw) {
++        t.v1.memType = QNN_TENSORMEMTYPE_MEMHANDLE;
++        t.v1.memHandle = mem_handles_[k++];
++      }
++      for (auto &t : output_tensors_raw) {
++        t.v1.memType = QNN_TENSORMEMTYPE_MEMHANDLE;
++        t.v1.memHandle = mem_handles_[k++];
++      }
++    }
++
+     auto ret = backend_->QnnInterface().graphExecute(
+         graph_handle_, input_tensors_raw.data(), input_tensors_raw.size(),
+         output_tensors_raw.data(), output_tensors_raw.size(), nullptr, nullptr);
+@@ -497,8 +530,10 @@ class QnnModel::Impl {
+ 
+  private:
+   void PostInit() {
+-    AllocateBuffer();
+-    SetupPointers();
++    if (!(std::getenv("SHERPA_ONNX_QNN_SHARED_MEM") && SetupSharedMem())) {
++      AllocateBuffer();
++      SetupPointers();
++    }
+ 
+     is_initialized_ = true;
+   }
+@@ -660,7 +695,90 @@ class QnnModel::Impl {
+     }
+   }
+ 
+- private:
++  // Allocates every input and output tensor in rpcmem (memory the Hexagon
++  // DSP maps directly) and registers it with the context once. Returns false,
++  // leaving nothing allocated, if any step fails.
++  bool SetupSharedMem() {
++    rpcmem_lib_ = dlopen("libcdsprpc.so", RTLD_NOW | RTLD_LOCAL);
++    if (!rpcmem_lib_) {
++      SHERPA_ONNX_LOGE("shared mem: cannot dlopen libcdsprpc.so: %s",
++                       dlerror());
++      return false;
++    }
++    rpcmem_alloc_ = reinterpret_cast<RpcMemAllocFn>(
++        dlsym(rpcmem_lib_, "rpcmem_alloc"));
++    rpcmem_free_ =
++        reinterpret_cast<RpcMemFreeFn>(dlsym(rpcmem_lib_, "rpcmem_free"));
++    auto to_fd =
++        reinterpret_cast<RpcMemToFdFn>(dlsym(rpcmem_lib_, "rpcmem_to_fd"));
++    if (!rpcmem_alloc_ || !rpcmem_free_ || !to_fd) {
++      SHERPA_ONNX_LOGE("shared mem: rpcmem symbols missing");
++      return false;
++    }
++
++    std::vector<Qnn_Tensor_t *> all;
++    for (auto &t : input_tensors_) all.push_back(t.get());
++    for (auto &t : output_tensors_) all.push_back(t.get());
++
++    constexpr int kHeapIdSystem = 25;  // RPCMEM_HEAP_ID_SYSTEM
++    constexpr uint32_t kDefaultFlags = 1;  // RPCMEM_DEFAULT_FLAGS
++    for (auto *t : all) {
++      uint32_t size = t->v1.clientBuf.dataSize;
++      void *p = rpcmem_alloc_(kHeapIdSystem, kDefaultFlags, size);
++      if (!p) {
++        SHERPA_ONNX_LOGE("shared mem: rpcmem_alloc(%u) failed", size);
++        FreeSharedMem();
++        return false;
++      }
++      rpcmem_ptrs_.push_back(p);
++
++      Qnn_MemDescriptor_t desc = QNN_MEM_DESCRIPTOR_INIT;
++      desc.memShape.numDim = t->v1.rank;
++      desc.memShape.dimSize = t->v1.dimensions;
++      desc.memShape.shapeConfig = nullptr;
++      desc.dataType = t->v1.dataType;
++      desc.memType = QNN_MEM_TYPE_ION;
++      desc.ionInfo.fd = to_fd(p);
++
++      Qnn_MemHandle_t handle = nullptr;
++      auto ret = backend_->QnnInterface().memRegister(
++          backend_->ContextHandle(), &desc, 1, &handle);
++      if (ret != QNN_SUCCESS) {
++        SHERPA_ONNX_LOGE("shared mem: memRegister('%s') failed: %d",
++                         t->v1.name, static_cast<int32_t>(ret));
++        FreeSharedMem();
++        return false;
++      }
++      mem_handles_.push_back(handle);
++      t->v1.clientBuf.data = p;
++    }
++
++    if (debug_) {
++      SHERPA_ONNX_LOGE("shared mem: registered %d tensors",
++                       static_cast<int32_t>(mem_handles_.size()));
++    }
++    return true;
++  }
++
++  void FreeSharedMem() {
++    if (!mem_handles_.empty()) {
++      backend_->QnnInterface().memDeRegister(mem_handles_.data(),
++                                             mem_handles_.size());
++      mem_handles_.clear();
++    }
++    for (void *p : rpcmem_ptrs_) rpcmem_free_(p);
++    rpcmem_ptrs_.clear();
++  }
++
++  using RpcMemAllocFn = void *(*)(int, uint32_t, int);
++  using RpcMemFreeFn = void (*)(void *);
++  using RpcMemToFdFn = int (*)(void *);
++  void *rpcmem_lib_ = nullptr;
++  RpcMemAllocFn rpcmem_alloc_ = nullptr;
++  RpcMemFreeFn rpcmem_free_ = nullptr;
++  std::vector<void *> rpcmem_ptrs_;
++  std::vector<Qnn_MemHandle_t> mem_handles_;
++
+   bool debug_ = true;
+   std::unique_ptr<void, decltype(&dlclose)> model_lib_handle_{nullptr,
+                                                               &dlclose};
+@@ -726,6 +844,12 @@ bool QnnModel::HasTensor(const std::string &name) const {
+   return impl_->HasTensor(name);
+ }
+ 
++bool QnnModel::CopyOutputToInputColumn(const std::string &out,
++                                       const std::string &in, int32_t stride,
++                                       int32_t offset) const {
++  return impl_->CopyOutputToInputColumn(out, in, stride, offset);
++}
++
+ bool QnnModel::SetInputTensorData(const std::string &name, const float *p,
+                                   int32_t n) const {
+   return impl_->SetInputTensorData(name, p, n);
+diff --git a/sherpa-onnx/csrc/qnn/qnn-model.h b/sherpa-onnx/csrc/qnn/qnn-model.h
+index d5d93c4..4a8cc51 100644
+--- a/sherpa-onnx/csrc/qnn/qnn-model.h
++++ b/sherpa-onnx/csrc/qnn/qnn-model.h
+@@ -44,6 +44,12 @@ class QnnModel {
+   std::vector<int32_t> GetOutputTensorDataInt32(
+       const std::string &name) const;
+ 
++  // Copies the 16-bit output `out` (n values) into column `offset` of the
++  // 16-bit input `in`, laid out as rows of `stride` values, without converting
++  // to float. Returns false unless both tensors are FLOAT_16.
++  bool CopyOutputToInputColumn(const std::string &out, const std::string &in,
++                               int32_t stride, int32_t offset) const;
++
+   bool Run() const;
+   bool IsInitialized() const;
+ 
+diff --git a/sherpa-onnx/csrc/qnn/utils.cc b/sherpa-onnx/csrc/qnn/utils.cc
+index ee30247..94bdfee 100644
+--- a/sherpa-onnx/csrc/qnn/utils.cc
++++ b/sherpa-onnx/csrc/qnn/utils.cc
+@@ -4,6 +4,9 @@
+ #include "sherpa-onnx/csrc/qnn/utils.h"
+ 
+ #include <math.h>
++#if __ANDROID_API__ >= 8
++#include <android/log.h>
++#endif
+ #include <stdio.h>
+ #include <cstring>
+ 
+@@ -452,8 +455,16 @@ void LogCallback(const char *fmt, QnnLog_Level_t level, uint64_t timestamp,
+   }
+ 
+   double ms = timestamp / 1000000.0;
++#if __ANDROID_API__ >= 8
++  // An app's stdout goes nowhere: QNN's messages go to logcat.
++  int priority = level == QNN_LOG_LEVEL_ERROR  ? ANDROID_LOG_ERROR
++                 : level == QNN_LOG_LEVEL_WARN ? ANDROID_LOG_WARN
++                                               : ANDROID_LOG_INFO;
++  __android_log_vprint(priority, "sherpa-onnx-qnn", fmt, args);
++#else
+   fprintf(stdout, "%8.1fms [%-7s] ", ms, s.c_str());
+   vfprintf(stdout, fmt, args);
++#endif
+ }
+ 
+ void PrintTensor(Qnn_TensorV2_t t) {
+diff --git a/sherpa-onnx/jni/offline-recognizer.cc b/sherpa-onnx/jni/offline-recognizer.cc
+index 422f1f4..ab5948a 100644
+--- a/sherpa-onnx/jni/offline-recognizer.cc
++++ b/sherpa-onnx/jni/offline-recognizer.cc
+@@ -119,6 +119,10 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+       ans.model_config.transducer.qnn_config.system_lib, systemLib,
+       transducer_qnn_config_cls, transducer_qnn_config);
+ 
++  SHERPA_ONNX_JNI_READ_BOOL(
++      ans.model_config.transducer.qnn_config.htp_perf_mode, htpPerfMode,
++      transducer_qnn_config_cls, transducer_qnn_config);
++
+   fid = env->GetFieldID(model_config_cls, "paraformer",
+                         "Lcom/k2fsa/sherpa/onnx/OfflineParaformerModelConfig;");
+   jobject paraformer_config = env->GetObjectField(model_config, fid);
+@@ -143,6 +147,10 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+   SHERPA_ONNX_JNI_READ_STRING(ans.model_config.paraformer.qnn_config.system_lib,
+                               systemLib, qnn_config_cls, qnn_config);
+ 
++  SHERPA_ONNX_JNI_READ_BOOL(
++      ans.model_config.paraformer.qnn_config.htp_perf_mode, htpPerfMode,
++      qnn_config_cls, qnn_config);
++
+   fid = env->GetFieldID(model_config_cls, "whisper",
+                         "Lcom/k2fsa/sherpa/onnx/OfflineWhisperModelConfig;");
+   jobject whisper_config = env->GetObjectField(model_config, fid);
+@@ -171,6 +179,24 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+                             enableSegmentTimestamps, whisper_config_cls,
+                             whisper_config);
+ 
++  fid = env->GetFieldID(whisper_config_cls, "qnnConfig",
++                        "Lcom/k2fsa/sherpa/onnx/QnnConfig;");
++  qnn_config = env->GetObjectField(whisper_config, fid);
++  qnn_config_cls = env->GetObjectClass(qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.whisper.qnn_config.backend_lib,
++                              backendLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(
++      ans.model_config.whisper.qnn_config.context_binary, contextBinary,
++      qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.whisper.qnn_config.system_lib,
++                              systemLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_BOOL(ans.model_config.whisper.qnn_config.htp_perf_mode,
++                            htpPerfMode, qnn_config_cls, qnn_config);
++
+   fid = env->GetFieldID(model_config_cls, "fireRedAsr",
+                         "Lcom/k2fsa/sherpa/onnx/OfflineFireRedAsrModelConfig;");
+   jobject fire_red_asr_config = env->GetObjectField(model_config, fid);
+@@ -207,6 +233,24 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+                               mergedDecoder, moonshine_config_cls,
+                               moonshine_config);
+ 
++  fid = env->GetFieldID(moonshine_config_cls, "qnnConfig",
++                        "Lcom/k2fsa/sherpa/onnx/QnnConfig;");
++  qnn_config = env->GetObjectField(moonshine_config, fid);
++  qnn_config_cls = env->GetObjectClass(qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.moonshine.qnn_config.backend_lib,
++                              backendLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(
++      ans.model_config.moonshine.qnn_config.context_binary, contextBinary,
++      qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.moonshine.qnn_config.system_lib,
++                              systemLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_BOOL(ans.model_config.moonshine.qnn_config.htp_perf_mode,
++                            htpPerfMode, qnn_config_cls, qnn_config);
++
+   fid = env->GetFieldID(model_config_cls, "senseVoice",
+                         "Lcom/k2fsa/sherpa/onnx/OfflineSenseVoiceModelConfig;");
+   jobject sense_voice_config = env->GetObjectField(model_config, fid);
+@@ -239,6 +283,10 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+       ans.model_config.sense_voice.qnn_config.system_lib, systemLib,
+       qnn_config_cls, qnn_config);
+ 
++  SHERPA_ONNX_JNI_READ_BOOL(
++      ans.model_config.sense_voice.qnn_config.htp_perf_mode, htpPerfMode,
++      qnn_config_cls, qnn_config);
++
+   // nemo
+   fid = env->GetFieldID(
+       model_config_cls, "nemo",
+@@ -249,6 +297,24 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+   SHERPA_ONNX_JNI_READ_STRING(ans.model_config.nemo_ctc.model, model,
+                               nemo_config_cls, nemo_config);
+ 
++  fid = env->GetFieldID(nemo_config_cls, "qnnConfig",
++                        "Lcom/k2fsa/sherpa/onnx/QnnConfig;");
++  qnn_config = env->GetObjectField(nemo_config, fid);
++  qnn_config_cls = env->GetObjectClass(qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.nemo_ctc.qnn_config.backend_lib,
++                              backendLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(
++      ans.model_config.nemo_ctc.qnn_config.context_binary, contextBinary,
++      qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_STRING(ans.model_config.nemo_ctc.qnn_config.system_lib,
++                              systemLib, qnn_config_cls, qnn_config);
++
++  SHERPA_ONNX_JNI_READ_BOOL(ans.model_config.nemo_ctc.qnn_config.htp_perf_mode,
++                            htpPerfMode, qnn_config_cls, qnn_config);
++
+   // zipformer ctc
+   fid =
+       env->GetFieldID(model_config_cls, "zipformerCtc",
+@@ -277,6 +343,10 @@ static OfflineRecognizerConfig GetOfflineConfig(JNIEnv *env, jobject config,
+       ans.model_config.zipformer_ctc.qnn_config.system_lib, systemLib,
+       qnn_config_cls, qnn_config);
+ 
++  SHERPA_ONNX_JNI_READ_BOOL(
++      ans.model_config.zipformer_ctc.qnn_config.htp_perf_mode, htpPerfMode,
++      qnn_config_cls, qnn_config);
++
+   // wenet ctc
+   fid = env->GetFieldID(model_config_cls, "wenetCtc",
+                         "Lcom/k2fsa/sherpa/onnx/OfflineWenetCtcModelConfig;");
+diff --git a/sherpa-onnx/jni/online-recognizer.cc b/sherpa-onnx/jni/online-recognizer.cc
+index 7a6af70..9abf226 100644
+--- a/sherpa-onnx/jni/online-recognizer.cc
++++ b/sherpa-onnx/jni/online-recognizer.cc
+@@ -45,6 +45,9 @@ OnlineModelConfig GetOnlineModelConfig(JNIEnv *env, jclass model_config_cls,
+   SHERPA_ONNX_JNI_READ_STRING(ans.transducer.qnn_config.system_lib, systemLib,
+                               qnn_config_cls, qnn_config);
+ 
++  SHERPA_ONNX_JNI_READ_BOOL(ans.transducer.qnn_config.htp_perf_mode,
++                            htpPerfMode, qnn_config_cls, qnn_config);
++
+   fid = env->GetFieldID(model_config_cls, "paraformer",
+                         "Lcom/k2fsa/sherpa/onnx/OnlineParaformerModelConfig;");
+   jobject paraformer_config = env->GetObjectField(model_config, fid);
+@@ -373,11 +376,14 @@ Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint(JNIEnv * /*env*/,
+ 
+ SHERPA_ONNX_EXTERN_C
+ JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_decode(
+-    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
+-  auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
+-  auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
++    JNIEnv *env, jobject /*obj*/, jlong ptr, jlong stream_ptr) {
++  // A backend error (QNN) becomes a Java exception instead of aborting the app.
++  SafeJNI(env, "OnlineRecognizer_decode", [&] {
++    auto recognizer = reinterpret_cast<sherpa_onnx::OnlineRecognizer *>(ptr);
++    auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
+ 
+-  recognizer->DecodeStream(stream);
++    recognizer->DecodeStream(stream);
++  });
+ }
+ 
+ SHERPA_ONNX_EXTERN_C
+diff --git a/sherpa-onnx/kotlin-api/OfflineRecognizer.kt b/sherpa-onnx/kotlin-api/OfflineRecognizer.kt
+index 30b1bcc..1205404 100644
+--- a/sherpa-onnx/kotlin-api/OfflineRecognizer.kt
++++ b/sherpa-onnx/kotlin-api/OfflineRecognizer.kt
+@@ -32,6 +32,7 @@ data class OfflineParaformerModelConfig(
+ 
+ data class OfflineNemoEncDecCtcModelConfig(
+     var model: String = "",
++    var qnnConfig: QnnConfig = QnnConfig(),
+ )
+ 
+ data class OfflineDolphinModelConfig(
+@@ -96,6 +97,7 @@ data class OfflineWhisperModelConfig(
+     var tailPaddings: Int = 1000, // Padding added at the end of the samples
+     var enableTokenTimestamps: Boolean = false,
+     var enableSegmentTimestamps: Boolean = false,
++    var qnnConfig: QnnConfig = QnnConfig(),
+ )
+ 
+ data class OfflineCanaryModelConfig(
+@@ -129,6 +131,7 @@ data class OfflineMoonshineModelConfig(
+     var uncachedDecoder: String = "",
+     var cachedDecoder: String = "",
+     var mergedDecoder: String = "",
++    var qnnConfig: QnnConfig = QnnConfig(),
+ )
+ 
+ data class OfflineSenseVoiceModelConfig(
+diff --git a/sherpa-onnx/kotlin-api/QnnConfig.kt b/sherpa-onnx/kotlin-api/QnnConfig.kt
+index ea7aa51..8d64dd7 100644
+--- a/sherpa-onnx/kotlin-api/QnnConfig.kt
++++ b/sherpa-onnx/kotlin-api/QnnConfig.kt
+@@ -4,4 +4,5 @@ data class QnnConfig(
+     var backendLib: String = "",
+     var contextBinary: String = "",
+     var systemLib: String = "",
++    var htpPerfMode: Boolean = false,
+ )
