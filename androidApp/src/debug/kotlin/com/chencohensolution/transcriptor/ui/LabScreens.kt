@@ -5,6 +5,19 @@ package com.chencohensolution.transcriptor.ui
 // doesn't have yet has suggestions only.
 
 internal val labScreens: List<LabScreen> = listOf(
+    LabScreen("notebooks", "Notebooks", listOf(
+        notebooksOptionA,
+        notebooksOptionAEmpty,
+        notebooksOptionB,
+        notebooksOptionBEmpty,
+        notebooksOptionC,
+        notebooksOptionCEmpty,
+    )),
+    LabScreen("models", "Settings › Models", listOf(
+        modelsOptionA,
+        modelsOptionB,
+        modelsOptionC,
+    )),
     LabScreen("lecture", "Lecture, while recording", listOf(
         lectureCurrent,
     )),

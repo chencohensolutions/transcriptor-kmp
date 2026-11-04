@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b_summary">Every language is set up · %1$s</string>
+    <string name="models_b_missing">No live model for %1$s</string>
+    <string name="models_b_language_note">Models made for this language first, then the multilingual ones.</string>
+    <string name="models_b_badge_live">Live ✓</string>
+    <string name="models_b_badge_refine">Refine ✓</string>
+    <string name="models_b_after_only">After the lecture only</string>
+    <string name="models_b_more">More</string>
+    <string name="models_b_page">Model page</string>
+</resources>

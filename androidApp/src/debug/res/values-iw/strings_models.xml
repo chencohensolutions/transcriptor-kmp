@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_title">מודלים</string>
+    <string name="models_retry">ניסיון חוזר</string>
+    <string name="models_after_note">מעבר הדוברים כשההרצאה נעצרת, ושיפור התמלול מהמסך שלה.</string>
+    <string name="models_storage">המודלים תופסים %1$s · פנויים בטלפון %2$s</string>
+    <string name="models_job_live">תמלול חי</string>
+    <string name="models_job_refine">שיפור אחרי ההרצאה</string>
+    <string name="models_job_speakers">זיהוי דוברים</string>
+    <string name="models_speakers">דוברים</string>
+    <string name="models_speakers_ready">טביעות הקול ומעבר הדוברים מוכנים</string>
+    <string name="models_none_ready">לא הורד אף מודל</string>
+    <string name="models_npu">NPU</string>
+    <string name="models_npu_long">NPU · מהיר יותר, פחות סוללה</string>
+    <string name="models_live_note">כותב את השורות בזמן שההרצאה מוקלטת. מודלי ה־NPU רצים על שבב ה־AI של הטלפון.</string>
+    <string name="models_use_refine">לשימוש בשיפור</string>
+</resources>

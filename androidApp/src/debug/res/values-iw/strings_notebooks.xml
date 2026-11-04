@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_settings">הגדרות</string>
+    <string name="notebooks_new_lecture">הרצאה חדשה</string>
+    <string name="notebooks_new_notebook">מחברת חדשה</string>
+    <string name="notebooks_new_name">שם</string>
+    <string name="notebooks_new_name_hint">מבוא לפסיכולוגיה</string>
+    <string name="notebooks_new_language">שפת ההרצאות</string>
+    <string name="notebooks_new_language_note">קובעת את מודלי הדיבור ואת כיוון הכתיבה של השורות.</string>
+    <string name="notebooks_create">יצירה</string>
+    <string name="notebooks_today">היום</string>
+    <string name="notebooks_yesterday">אתמול</string>
+    <string name="notebooks_minutes">%1$d דק׳</string>
+    <string name="notebooks_hours_minutes">%1$d ש׳ %2$d דק׳</string>
+    <string name="notebooks_hours">%1$d ש׳</string>
+    <string name="notebooks_notes">%1$d הערות</string>
+    <string name="notebooks_refined">משופר</string>
+    <string name="notebooks_lectures">%1$d הרצאות</string>
+    <string name="notebooks_no_lectures">אין עדיין הרצאות</string>
+    <string name="notebooks_last_used">אחרונה</string>
+    <string name="notebooks_record_here">הקלטת הרצאה ב%1$s</string>
+    <string name="notebooks_recording">מקליט · %1$s</string>
+    <string name="notebooks_back_to_lecture">חזרה להרצאה</string>
+    <string name="notebooks_improving">משפר את התמלול · %1$d%%</string>
+    <string name="notebooks_empty_title">מחברת לכל קורס</string>
+    <string name="notebooks_empty_note">ההרצאות שלה מוקלטות ומתומללות בטלפון, בשפת הקורס, עם ההערות שלך עליהן.</string>
+</resources>

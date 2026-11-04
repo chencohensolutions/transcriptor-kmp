@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_b_last">אחרונה: %1$s</string>
+    <string name="notebooks_b_working">משפר תמלול…</string>
+    <string name="notebooks_b_record">הקלטת הרצאה</string>
+</resources>

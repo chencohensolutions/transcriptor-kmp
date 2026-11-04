@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_c_set_up">set up</string>
+    <string name="models_c_not_set_up">needs a download</string>
+    <string name="models_c_recommended">Recommended for this phone</string>
+    <string name="models_c_all_ready">All set: lectures in this language are transcribed live and refined after.</string>
+    <string name="models_c_downloading">Downloading %1$s of %2$s</string>
+    <string name="models_c_download_all">Download all · %1$s</string>
+    <string name="models_c_choose">Choose yourself</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_b_summary">כל השפות מוכנות · %1$s</string>
+    <string name="models_b_missing">אין מודל חי ל%1$s</string>
+    <string name="models_b_language_note">קודם המודלים שנבנו לשפה הזו, אחריהם הרב־לשוניים.</string>
+    <string name="models_b_badge_live">חי ✓</string>
+    <string name="models_b_badge_refine">שיפור ✓</string>
+    <string name="models_b_after_only">רק אחרי ההרצאה</string>
+    <string name="models_b_more">עוד</string>
+    <string name="models_b_page">דף המודל</string>
+</resources>

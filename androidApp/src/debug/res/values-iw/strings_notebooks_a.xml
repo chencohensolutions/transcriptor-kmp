@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_a_record_in">הקלטה במחברת</string>
+    <string name="notebooks_a_all">כל %1$d ההרצאות</string>
+    <string name="notebooks_a_fewer">פחות</string>
+</resources>

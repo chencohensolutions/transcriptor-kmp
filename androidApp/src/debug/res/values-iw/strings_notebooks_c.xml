@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_c_all">הכול</string>
+    <string name="notebooks_c_this_week">השבוע</string>
+    <string name="notebooks_c_earlier">קודם</string>
+    <string name="notebooks_c_records_in">מקליט ב:</string>
+    <string name="notebooks_c_record">הקלטה</string>
+</resources>

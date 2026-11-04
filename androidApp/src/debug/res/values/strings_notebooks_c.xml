@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_c_all">All</string>
+    <string name="notebooks_c_this_week">This week</string>
+    <string name="notebooks_c_earlier">Earlier</string>
+    <string name="notebooks_c_records_in">Records in</string>
+    <string name="notebooks_c_record">Record</string>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notebooks_settings">Settings</string>
+    <string name="notebooks_new_lecture">New lecture</string>
+    <string name="notebooks_new_notebook">New notebook</string>
+    <string name="notebooks_new_name">Name</string>
+    <string name="notebooks_new_name_hint">Intro to Psychology</string>
+    <string name="notebooks_new_language">Language of the lectures</string>
+    <string name="notebooks_new_language_note">Picks the speech models, and the direction its lines are written in.</string>
+    <string name="notebooks_create">Create</string>
+    <string name="notebooks_today">Today</string>
+    <string name="notebooks_yesterday">Yesterday</string>
+    <string name="notebooks_minutes">%1$d min</string>
+    <string name="notebooks_hours_minutes">%1$d h %2$d min</string>
+    <string name="notebooks_hours">%1$d h</string>
+    <string name="notebooks_notes">%1$d notes</string>
+    <string name="notebooks_refined">Refined</string>
+    <string name="notebooks_lectures">%1$d lectures</string>
+    <string name="notebooks_no_lectures">No lectures yet</string>
+    <string name="notebooks_last_used">Last used</string>
+    <string name="notebooks_record_here">Record a lecture in %1$s</string>
+    <string name="notebooks_recording">Recording · %1$s</string>
+    <string name="notebooks_back_to_lecture">Back to it</string>
+    <string name="notebooks_improving">Improving the transcript · %1$d%%</string>
+    <string name="notebooks_empty_title">A notebook for each course</string>
+    <string name="notebooks_empty_note">Its lectures are recorded and transcribed on the phone, in the course\'s language, with your notes on them.</string>
+</resources>
