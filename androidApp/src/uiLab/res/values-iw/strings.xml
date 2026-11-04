@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Without it a Hebrew phone takes the app's own Hebrew name, and the lab looks like Transcriptor. -->
+    <string name="app_name">Transcriptor ui-lab</string>
+</resources>
