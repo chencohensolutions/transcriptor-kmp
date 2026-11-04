@@ -93,5 +93,5 @@ object LabData {
             "english", "Academic English", "en",
             listOf(summary("en-1", "Reading abstracts", 4, 60, 2)),
         ),
-    )
+    ).mapIndexed { i, notebook -> notebook.copy(color = i) }
 }

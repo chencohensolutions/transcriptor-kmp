@@ -9,6 +9,8 @@ data class Notebook(
     val title: String,
     val language: String,
     val lectures: List<LectureSummary>,
+    /** Its color: an index into the app's palette, picked when it was made. */
+    val color: Int = 0,
 )
 
 /** A lecture as the notebook lists it. */

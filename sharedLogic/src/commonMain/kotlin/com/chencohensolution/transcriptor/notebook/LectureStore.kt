@@ -11,10 +11,11 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * The lectures on disk: `notebooks/<notebook id>/<lecture id>/` under [root], with the audio and `lecture.json`
- * (version 1, the format in docs/design.md), written to a temp file and then renamed.
+ * The lectures on disk: `notebooks/<notebook id>/<lecture id>/` under [root], with the audio, `lecture.json` (version
+ * 1, the format in docs/design.md) and `transcript.md` (the lecture to read, [transcriptMarkdown]), each written to a
+ * temp file and then renamed. [utcOffset] is the phone's offset from UTC at a time, for the transcript's date.
  */
-class LectureStore(private val fileSystem: FileSystem, private val root: Path) {
+class LectureStore(private val fileSystem: FileSystem, private val root: Path, private val utcOffset: (Long) -> Long = { 0 }) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; prettyPrint = true }
 
     fun folder(notebookId: String, lectureId: String): Path = root / "notebooks" / notebookId / lectureId
@@ -27,6 +28,21 @@ class LectureStore(private val fileSystem: FileSystem, private val root: Path) {
         val temp = folder / "lecture.json.tmp"
         fileSystem.write(temp) { writeUtf8(json.encodeToString(LectureFileV1.of(lecture))) }
         fileSystem.atomicMove(temp, folder / "lecture.json")
+        val transcript = folder / "transcript.md.tmp"
+        fileSystem.write(transcript) { writeUtf8(transcriptMarkdown(lecture, utcOffset(lecture.startedAtMillis))) }
+        fileSystem.atomicMove(transcript, folder / TRANSCRIPT)
+    }
+
+    /**
+     * Moves a lecture's folder (its audio, transcript and versions) to another notebook, and returns it there. Not while
+     * it is being recorded or a pass runs on it.
+     */
+    fun move(lecture: Lecture, notebookId: String): Lecture {
+        if (lecture.notebookId == notebookId) return lecture
+        val to = folder(notebookId, lecture.id)
+        fileSystem.createDirectories(to.parent!!)
+        fileSystem.atomicMove(folder(lecture.notebookId, lecture.id), to)
+        return lecture.copy(notebookId = notebookId).also(::save)
     }
 
     /** The lecture; null when there is none. */
@@ -73,15 +89,18 @@ class LectureStore(private val fileSystem: FileSystem, private val root: Path) {
         return lecture.copy(versions = lecture.versions + version.info)
     }
 
-    /** Every lecture, in every notebook. */
+    /** Every lecture, in every notebook (unfiled ones included). */
     fun all(): List<Lecture> {
         val notebooks = root / "notebooks"
         if (!fileSystem.exists(notebooks)) return emptyList()
-        return fileSystem.list(notebooks).flatMap { notebook ->
-            fileSystem.list(notebook).mapNotNull { load(notebook.name, it.name) }
-        }
+        // Lecture folders only: a notebook's folder also has its voices.json.
+        fun folders(dir: okio.Path) = fileSystem.list(dir).filter { fileSystem.metadataOrNull(it)?.isDirectory == true }
+        return folders(notebooks).flatMap { notebook -> folders(notebook).mapNotNull { load(notebook.name, it.name) } }
     }
 }
+
+/** The readable transcript beside the audio. */
+const val TRANSCRIPT = "transcript.md"
 
 @Serializable
 private data class LectureFileV1(
