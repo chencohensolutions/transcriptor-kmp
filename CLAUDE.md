@@ -25,7 +25,7 @@ update those docs whenever a screen changes.
   `LectureReview` (a recorded lecture opened: playback, edits, speakers, notes), `AudioPlayer`, `ReviewState`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf`, `titleDirection`, `isolated` and `formatClock`.
-  `NotebooksScreen.kt` is the first screen; `SettingsScreen.kt` (package root) is a temporary Settings page.
+  `NotebooksScreen.kt` is the first screen; `ModelsScreen.kt` is Settings and Settings › Models (fed by `Settings.kt`).
   `storage/SafFileSystem.kt`: the lectures folder the user picks, as an okio file system under `/library`. Strings in
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
   `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models; `speech/SherpaStreamingEngine.kt`
@@ -45,7 +45,8 @@ update those docs whenever a screen changes.
   (`layoutDirectionOf`), the app's chrome in the phone's. Check every screen in Hebrew and in an English notebook.
 - Times are milliseconds from the start of the recording, everywhere.
 - Models are public files only, pinned to a commit with their sha256; nothing is hosted by us. Only models free for
-  commercial use go in `ModelCatalog`.
+  commercial use go in `ModelCatalog`; models the user adds from Hugging Face may have any license, marked and
+  asked for in Settings › Models.
 - Files other tools will read (the lecture's data file) are versioned (`"v": 1`) and written to a temp file, then
   renamed.
 

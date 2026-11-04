@@ -154,9 +154,13 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 - Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
   screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
   `lecture.json`. Stop waits for the last lines.
+- Settings › Models (round 1's b4), in the app: the models per language in use, models added from Hugging Face
+  (`HubClient`: only files the app's engines read; pinned to the repo's commit, checked by sha256 or git blob id;
+  licenses marked for commercial use, not, or unknown, and asked for), the refine model chosen per language, and each
+  NPU model tried on the NPU once downloaded. Added models are kept in `models.json` in the app's storage.
 - Notebooks (round 1's c2), in the app: the first screen, lectures first, recording with or without a notebook, filing
   unfiled lectures, the notebook guessed from when its lectures are. The gear opens a temporary Settings page (the old
-  start screen's audio format and model downloads) until Settings › Models is designed.
+  start screen's audio format and model downloads) until Settings › Models was promoted.
 - Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
   naming speakers, notes after the lecture, and the speaker pass and the refine pass from its menu. Stop opens it.
 - **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine

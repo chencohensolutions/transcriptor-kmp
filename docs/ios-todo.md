@@ -16,6 +16,15 @@ anything left to decide. Remove an entry once it is built.
 - Filing gives the notebook the named speakers' voices (Android's `Recording.file`, with `printOf`).
 - Strings: `notebooks_*`.
 
+## Settings › Models
+
+- Android: `ui/ModelsScreen.kt` (mirror it in SwiftUI), `Settings.kt` (the state and actions), `Recording.hub`,
+  `Recording.checkNpu`; `docs/screens/models.md`.
+- Shared: `HubClient(fetch)` (iOS: `fetch` on URLSession), `HubModel.toSpeechModel`, `InstalledModels`,
+  `ModelLibrary`, `SettingsStore.refineModel`/`setRefineModel`/`modelLanguages`.
+- iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
+- Strings: `models_*`.
+
 ## The lectures folder
 
 - Android: finished lectures move from the app to a folder the user picks (`Documents/Transcriptor`), through

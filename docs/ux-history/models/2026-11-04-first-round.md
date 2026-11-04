@@ -21,7 +21,7 @@ Tag: `ux/models/2026-11-04`
   this phone (SM8750)" filter; NPU builds marked for this chip, another chip, or this chip with another QNN version;
   each NPU model tried on the NPU once downloaded ("Runs on this phone's NPU" or "Didn't load", with the reason).
   `b4-sm8750` shows it as on a Snapdragon 8 Elite. *Picked*. The filter is matched by chip, not phone model: every
-  phone with the chip runs its builds (the owner asked; a plain "NPU" label was tried and turned back).
+  phone with the chip runs its builds (the owner asked; a plain "NPU" label was tried and turned back). Promoted in 05d12fa (fixes in 7d6cf37).
 
 ## What they faked
 - All: downloads (a timer, then checking), the languages (the lab notebooks'), choosing a refine model (the app uses
