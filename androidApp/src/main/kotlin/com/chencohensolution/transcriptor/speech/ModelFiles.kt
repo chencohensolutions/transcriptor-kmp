@@ -36,7 +36,8 @@ class ModelFiles(context: Context) {
         moveFromFlatLayout()
     }
 
-    fun dir(model: SpeechModel) = File(root, model.id)
+    /** A model's folder, named by its id (an added model's "hf:owner/repo:size" with `_` for `/` and `:`). */
+    fun dir(model: SpeechModel) = File(root, model.id.replace('/', '_').replace(':', '_'))
     fun file(model: SpeechModel, file: ModelFile = model.files.single()) = File(dir(model), file.name)
     private fun part(model: SpeechModel, file: ModelFile) = File(dir(model), "${file.name}.part")
     private fun marker(model: SpeechModel) = File(dir(model), ".ok")

@@ -51,6 +51,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -600,8 +601,11 @@ private fun HubSheet(m: HubModel, state: ModelsState, onDismiss: () -> Unit, onI
             dismissButton = { TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.model_cancel)) } },
         )
     }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Open all the way, so Add shows below the sizes.
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+      // The sizes scroll (whisper.cpp has 33); the buttons stay below them.
+      Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(isolated(m.repo), style = MaterialTheme.typography.titleLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 LicenseBadge(m)
@@ -653,7 +657,8 @@ private fun HubSheet(m: HubModel, state: ModelsState, onDismiss: () -> Unit, onI
                 }
             }
             if (!m.kind.runs) Text(stringResource(R.string.models_not_yet_note, kindLabel(m.kind)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        }
+            Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { uri.openUri("https://huggingface.co/${m.repo}") }) { Text(stringResource(R.string.models_page)) }
                 val already = state.added.any { it.id == m.toSpeechModel(chosen).id }
                 Button(
@@ -669,7 +674,7 @@ private fun HubSheet(m: HubModel, state: ModelsState, onDismiss: () -> Unit, onI
                     )
                 }
             }
-        }
+      }
     }
 }
 

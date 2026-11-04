@@ -108,6 +108,10 @@ class HubTest {
     fun reposTheEnginesCantReadAreLeftOut() {
         assertNull(classify("csukuangfj/sherpa-ncnn-streaming-zipformer-en-2023-02-13", listOf("encoder_jit_trace-pnnx.ncnn.bin"), emptyList()))
         assertNull(classify("openai/whisper-large-v3", listOf("model.safetensors", "config.json"), emptyList()))
+        // Found live: a language model and Parakeet's GGUF, both with ggml-*.bin files.
+        assertNull(classify("hlhr202/llama-7B-ggml-int4", listOf("ggml-model-q4_0.bin"), listOf("text-generation")))
+        assertNull(classify("ggml-org/parakeet-GGUF", listOf("ggml-parakeet-tdt-0.6b-v3.bin"), listOf("license:mit")))
+        assertEquals(HubKind.Whisper, classify("petredimov/ggml-large-v3-q8", listOf("ggml-large-v3-q8_0.bin"), listOf("automatic-speech-recognition", "whisper")))
         assertNull(classify("csukuangfj/sherpa-onnx-zipformer-en-2023-04-01", listOf("encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"), emptyList()))
         assertEquals(HubKind.Parakeet, classify("csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8", listOf("encoder.int8.onnx", "tokens.txt"), emptyList()))
         assertEquals(HubKind.SenseVoice, classify("csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17", listOf("model.int8.onnx", "tokens.txt"), emptyList()))

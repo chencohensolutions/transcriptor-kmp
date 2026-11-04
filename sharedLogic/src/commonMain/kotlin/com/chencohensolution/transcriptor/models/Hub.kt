@@ -148,7 +148,8 @@ internal fun parseSearch(body: String): List<HubSummary> = json.parseToJsonEleme
         sha = o.str("sha") ?: "main",
         downloads = (o["downloads"] as? JsonPrimitive)?.intOrNull ?: 0,
         likes = (o["likes"] as? JsonPrimitive)?.intOrNull ?: 0,
-        tags = o.strings("tags"),
+        // Its task ("automatic-speech-recognition") counts as a tag.
+        tags = o.strings("tags") + listOfNotNull(o.str("pipeline_tag")),
         files = (o["siblings"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.str("rfilename") } ?: emptyList(),
     )
 }
@@ -242,11 +243,13 @@ internal fun classify(id: String, files: List<String>, tags: List<String>): HubK
     val name = id.lowercase()
     val top = files.filter { '/' !in it }
     if (npuOf(id, top, tags) != null) return if (top.any { "joiner" in it }) HubKind.Streaming else HubKind.Whisper
-    if (top.any(::isGgml)) return HubKind.Whisper
+    // Other models ship ggml and ONNX files too (Parakeet's GGUF, language models): their names say what they are.
+    if ("parakeet" in name || "nemo" in name) return if (top.any { it.endsWith(".onnx") }) HubKind.Parakeet else null
+    val whisper = "whisper" in name || tags.any { "whisper" in it.lowercase() }
+    if (top.any(::isGgml)) return if (whisper) HubKind.Whisper else null
     val onnx = top.any { it.endsWith(".onnx") }
     if (!onnx) return null
     return when {
-        "parakeet" in name || "nemo" in name -> HubKind.Parakeet
         "sense-voice" in name || "sensevoice" in name -> HubKind.SenseVoice
         "moonshine" in name -> HubKind.Moonshine
         "paraformer" in name -> HubKind.Paraformer
