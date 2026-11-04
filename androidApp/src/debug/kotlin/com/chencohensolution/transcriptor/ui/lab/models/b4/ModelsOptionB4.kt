@@ -331,7 +331,7 @@ private fun HubSearchB4(state: ModelsState, hub: HubSearchB4, actions: HubAction
                         val chip = state.chip?.takeIf { it.startsWith("SM") }
                         FilterChip(
                             selected = npuOnly, enabled = chip != null, onClick = { npuOnly = !npuOnly },
-                            label = { Text(chip?.let { stringResource(R.string.models_b4_npu_filter, it) } ?: stringResource(R.string.models_b4_no_npu)) },
+                            label = { Text(stringResource(R.string.models_b4_npu_filter)) },
                             leadingIcon = { Icon(Icons.Filled.Memory, null, Modifier.size(18.dp)) },
                         )
                     }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="models_b4_npu_filter">NPU בטלפון הזה (%1$s)</string>
-    <string name="models_b4_no_npu">אין NPU שהאפליקציה יכולה להשתמש בו</string>
+    <string name="models_b4_npu_filter">NPU</string>
     <string name="models_b4_npu_this">NPU · %1$s, הטלפון הזה</string>
     <string name="models_b4_npu_other">NPU · %1$s, לא הטלפון הזה</string>
     <string name="models_b4_npu_note_this">נבנה בשביל ה־NPU של הטלפון הזה (%1$s, ‏QNN %2$s). הוא ייבדק על ה־NPU אחרי ההורדה.</string>
