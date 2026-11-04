@@ -6,8 +6,8 @@ package com.chencohensolution.transcriptor.ui
 
 internal val labScreens: List<LabScreen> = listOf(
     LabScreen("notebooks", "Notebooks", listOf(
-        notebooksOptionC2,
-        notebooksOptionC2NoGuess,
+        notebooksCurrent,
+        notebooksCurrentNoGuess,
     )),
     LabScreen("models", "Settings › Models", listOf(
         modelsOptionA,

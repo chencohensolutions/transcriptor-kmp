@@ -3,6 +3,8 @@ package com.chencohensolution.transcriptor
 import android.app.Application
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
+import com.chencohensolution.transcriptor.notebook.NotebookStore
+import com.chencohensolution.transcriptor.notebook.NotebooksController
 import com.chencohensolution.transcriptor.recording.AndroidRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
 import com.chencohensolution.transcriptor.recording.LectureSession
@@ -35,6 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 
@@ -61,14 +64,28 @@ object Recording {
     /** The last lecture stopped, for the start screen. */
     val lastLecture = MutableStateFlow<Lecture?>(null)
 
-    /** Compressing to FLAC: 0..1, null when not. */
-    val compressing = MutableStateFlow<Float?>(null)
-
-    /** The speaker pass: 0..1, null when not running. */
-    val findingSpeakers = MutableStateFlow<Float?>(null)
-
     /** The refine pass: the lecture it runs on and 0..1; null when not running. */
     val refining = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** Compressing to FLAC: the lecture and 0..1, null when not. */
+    val compressing = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** The speaker pass: the lecture it runs on and 0..1, null when not running. */
+    val findingSpeakers = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** The passes running, by lecture: what the Notebooks screen shows under a lecture. */
+    val working = combine(compressing, findingSpeakers, refining) { c, f, r -> listOfNotNull(c, f, r).toMap() }
+
+    lateinit var notebooks: NotebookStore
+        private set
+
+    /** The notebooks and their lectures, for the Notebooks screen. */
+    lateinit var library: NotebooksController
+        private set
+
+    /** The phone's offset from UTC at a time: weekdays and hours for the notebook guess and the transcript's date. */
+    val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
+
 
     /** The models the refine pass can use for [language]: every downloaded speech model for it, the large ones first. */
     fun refineModels(language: String): List<SpeechModel> =
@@ -161,10 +178,25 @@ object Recording {
         }
     }
 
+    /**
+     * Files an unfiled lecture into a notebook (files: not on the main thread), and gives the notebook the voices of
+     * the speakers named in it, so its next lectures label them by name.
+     */
+    fun file(lectureId: String, notebookId: String) {
+        val lecture = library.assign(lectureId, notebookId) ?: return
+        for (speaker in lecture.speakers.filter { it.name.isNotBlank() }) {
+            runCatching { printOf(lecture, speaker.id) }.getOrNull()?.let { voices.save(notebookId, Voice(speaker.name, it)) }
+        }
+    }
+
     fun init(app: Application) {
         val root = app.filesDir.toOkioPath()
-        store = LectureStore(FileSystem.SYSTEM, root)
+        store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
+        notebooks = NotebookStore(FileSystem.SYSTEM, root)
+        // Before notebooks, every lecture was in "default": they become unfiled, once.
+        runCatching { notebooks.migrate(store) }.onFailure { android.util.Log.e("Recording", "notebook migration failed", it) }
+        library = NotebooksController(notebooks, store, System::currentTimeMillis)
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(

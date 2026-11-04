@@ -1,11 +1,39 @@
 # Notebooks
 
-Planned: round 1 picked c2 (lectures first, record now, file later), to be promoted. Every lecture newest first,
-grouped today / this week / earlier, each with its notebook's color and name; chips narrow the list to a notebook or to
-the lectures not filed yet. Lectures recorded without a notebook wait on top with the notebook their weekday and time
-suggest. One Record bar at the bottom: it records in no notebook unless the lecture history guesses one for this hour
-("Usually on Monday at 10:00"), and its chip picks any notebook, none, or a new one. A lecture recording now replaces
-the bar with a banner back to it. Lab: `notebooks c2`, `notebooks c2-no-guess`.
+The app's first screen, lectures first (round 1's c2). In the app.
+
+## What it shows
+
+- **Chips** on top: All, Not filed (n) when there are unfiled lectures, one per notebook with its color, and + for a
+  new notebook. A notebook's chip narrows the list to it.
+- **Not in a notebook yet**: lectures recorded without a notebook, newest first, each with its weekday and time
+  ("Wednesday at 17:26"). When the lecture history has a notebook for that time, a **Move to <notebook>** button files
+  it there in one tap; **Other…** (or **Put in a notebook** without a suggestion) lists the notebooks, the suggested
+  one first, and New notebook. Filing moves the lecture's folder and gives the notebook the voices of the speakers
+  named in it.
+- **Today / This week / Earlier**: every filed lecture, newest first, with its notebook's color and name (not when the
+  list is narrowed to one notebook), its title, day, length, notes, Refined, and the progress of a pass running on it.
+  A title goes by its own first letter, else its notebook's direction.
+- The **Record bar** at the bottom: "Records in" and a chip with the notebook. By default it is **no notebook**,
+  unless the lecture history guesses one for this hour ("✦ Usually on Monday at 10:00": same weekday, within an hour,
+  at least two lectures), or the list is narrowed to a notebook. The chip's menu: the notebooks (the guessed one
+  first, marked ✦), No notebook, the language of a lecture in no notebook (by default the last lecture's), New
+  notebook. Record asks for the microphone, then records titled with the date.
+- While a lecture records, a red banner replaces the bar: its clock and notebook, and **Back to it**. That lecture is
+  not in the lists until it stops.
+- The gear opens Settings (for now the old start screen's settings: audio format, model downloads, the passes after
+  the lecture).
+
+Empty (no notebooks, no lectures): a line on what a notebook is; Record still works.
+
+## Code
+
+- Screen: `androidApp/.../ui/NotebooksScreen.kt` (`NotebooksScreen`, `NotebooksActions`); wired in `MainActivity`.
+- State: `sharedLogic/.../notebook/NotebooksController.kt` (`NotebooksController`: `library`, `reload`, `create`,
+  `assign`, `assignToNew`; `notebooksState(...)`, `NotebooksState`, `RecordingNow`), `NotebookGuess.kt`
+  (`guessNotebook`), `NotebookStore.kt` (`notebooks.json`, `UNFILED`, `migrate`), `LectureStore.move`.
+- Filing with voices: `Recording.file`. Passes per lecture: `Recording.working`.
+- Strings: `notebooks_*`. Lab: `notebooks current`, `notebooks current-no-guess` (`lab/notebooks/NotebooksCurrentLab.kt`).
 
 ## Design history
 

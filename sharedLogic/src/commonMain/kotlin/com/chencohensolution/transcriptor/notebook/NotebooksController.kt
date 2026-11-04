@@ -15,7 +15,7 @@ data class Library(
 )
 
 /** A lecture recording now, in a notebook or in none yet ([notebookId] null), for the Notebooks screen's banner. */
-data class RecordingNow(val notebookId: String?, val lectureTitle: String, val elapsedMillis: Long)
+data class RecordingNow(val notebookId: String?, val lectureTitle: String, val elapsedMillis: Long, val lectureId: String? = null)
 
 /** What the Notebooks screen shows. */
 data class NotebooksState(
@@ -32,10 +32,20 @@ data class NotebooksState(
     val working: Map<String, Float> = emptyMap(),
 )
 
-/** The screen's state from the [library] at [now], with what is recording and running. */
+/**
+ * The screen's state from the [library] at [now], with what is recording and running. The lecture recording now is
+ * the banner, not in the lists.
+ */
 fun notebooksState(
     library: Library, now: Long, utcOffset: (Long) -> Long,
     recording: RecordingNow? = null, working: Map<String, Float> = emptyMap(),
+): NotebooksState {
+    val shown = { l: LectureSummary -> l.id != recording?.lectureId }
+    return notebooksStateOf(library.copy(notebooks = library.notebooks.map { n -> n.copy(lectures = n.lectures.filter(shown)) }, unfiled = library.unfiled.filter(shown)), now, utcOffset, recording, working)
+}
+
+private fun notebooksStateOf(
+    library: Library, now: Long, utcOffset: (Long) -> Long, recording: RecordingNow?, working: Map<String, Float>,
 ) = NotebooksState(
     notebooks = library.notebooks,
     unfiled = library.unfiled,

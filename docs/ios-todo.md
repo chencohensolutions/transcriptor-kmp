@@ -4,6 +4,18 @@ iOS (SwiftUI, in `iosApp/`) is built after the Android app is finished. Each ent
 shared state and controller methods the SwiftUI side should call, the Android files to mirror, new strings, and
 anything left to decide. Remove an entry once it is built.
 
+## Notebooks
+
+- Android: `NotebooksScreen.kt` (mirror it in SwiftUI), `MainActivity.kt` (the screen as the root, Record with the
+  microphone permission, the banner back to the lecture), `Recording.kt` (`library`, `file`, `working`, `utcOffset`);
+  `docs/screens/notebooks.md`.
+- Shared, to call from SwiftUI: `NotebooksController` (`library`, `reload()` off the main thread, `create`, `assign`,
+  `assignToNew`), `notebooksState(library, now, utcOffset, recording, working)`, `RecordingNow`, `UNFILED`,
+  `NotebookStore.migrate` at launch. `utcOffset` on iOS: `NSTimeZone.localTimeZone.secondsFromGMTForDate` × 1000.
+- Recording in no notebook: `LectureSession.start(Notebook(UNFILED, <"Not in a notebook">, language, []), title)`.
+- Filing gives the notebook the named speakers' voices (Android's `Recording.file`, with `printOf`).
+- Strings: `notebooks_*`.
+
 ## Lecture, while recording
 
 - Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and

@@ -161,9 +161,6 @@ internal fun modelFacts(model: SpeechModel) = listOf(isolated(model.parameters),
 /** Its name, kept in its own direction in a right-to-left screen ("3D-Speaker CAM++", not "++3D-Speaker CAM"). */
 internal val SpeechModel.label get() = isolated(name)
 
-/** [text] laid out by its own first letter, whatever the direction around it (Unicode's first-strong isolate). */
-internal fun isolated(text: String) = "\u2068$text\u2069"
-
 /** Runs on this phone's NPU. */
 internal val SpeechModel.npu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
 

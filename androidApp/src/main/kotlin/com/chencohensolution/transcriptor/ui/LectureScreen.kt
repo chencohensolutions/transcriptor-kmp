@@ -125,7 +125,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.lecture_back))
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = textDirectionOf(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(state.notebookTitle, style = MaterialTheme.typography.bodySmall, color = colors.time, maxLines = 1)
                     }
                     RecordingDot(state.paused)

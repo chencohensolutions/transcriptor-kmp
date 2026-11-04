@@ -88,8 +88,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Data
 
-One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac` and `lecture.json`. The first
-format is a simple data file of times, text and notes; exports (Word, PDF, Markdown, subtitles) come later from it.
+One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
+`transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the lecture to read beside its
+audio (owner's request, Nov 4, 2026): its title, date and length, then each speaker's turn with its time and the notes
+after the turn they were written in, rewritten on every save (`transcriptMarkdown`). Other exports (Word, PDF,
+subtitles) come later from `lecture.json`.
+
+The notebooks are in `notebooks.json` (`NotebookStore`, v1: id, title, language, color, createdAt). Lectures recorded
+without a notebook are in `notebooks/unfiled/` until they are filed (`LectureStore.move`); the notebook a lecture's
+weekday and time suggest is `guessNotebook`'s (same weekday, within an hour, at least two earlier lectures). Before
+notebooks, every lecture was in `notebooks/default/`: those became unfiled on the first launch with notebooks.
 
 ```json
 {
@@ -133,8 +141,10 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 - The project, the shared data types and the model catalog, the Android UI lab.
 - Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
   screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
-  `lecture.json`. Stop waits for the last lines. The app opens on a temporary start screen (audio format, live model
-  downloads, Start lecture) until the Notebooks and Settings › Models screens are designed.
+  `lecture.json`. Stop waits for the last lines.
+- Notebooks (round 1's c2), in the app: the first screen, lectures first, recording with or without a notebook, filing
+  unfiled lectures, the notebook guessed from when its lectures are. The gear opens a temporary Settings page (the old
+  start screen's audio format and model downloads) until Settings › Models is designed.
 - Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
   naming speakers, notes after the lecture, and the speaker pass and the refine pass from its menu. Stop opens it.
 - **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine

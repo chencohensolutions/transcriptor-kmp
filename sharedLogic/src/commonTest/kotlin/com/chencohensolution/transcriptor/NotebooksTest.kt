@@ -6,6 +6,7 @@ import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Notebook
+import com.chencohensolution.transcriptor.notebook.RecordingNow
 import com.chencohensolution.transcriptor.notebook.NotebookStore
 import com.chencohensolution.transcriptor.notebook.NotebooksController
 import com.chencohensolution.transcriptor.notebook.Segment
@@ -191,6 +192,10 @@ class NotebooksTest {
         assertEquals(psych.id, state.guess?.notebookId)
         assertEquals(psych.id, state.suggested["u1"]?.notebookId)
         assertNull(state.suggested["u0"])
+
+        // The lecture recording now is the banner, not in the lists.
+        val recording = RecordingNow(null, "Lecture u1", 5_000, lectureId = "u1")
+        assertEquals(listOf("u0"), notebooksState(library, MONDAY_10, israel, recording).unfiled.map { it.id })
 
         controller.assign("u1", psych.id)
         assertEquals(listOf("u1", "p2", "p1"), controller.library.value.notebooks.single().lectures.map { it.id })

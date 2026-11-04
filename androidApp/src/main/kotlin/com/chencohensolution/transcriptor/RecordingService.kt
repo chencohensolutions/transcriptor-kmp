@@ -92,10 +92,10 @@ class RecordingService : Service() {
         startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
             var shown = -1
-            Recording.findingSpeakers.value = 0f
+            Recording.findingSpeakers.value = lecture.id to 0f
             runCatching {
                 Recording.findSpeakers(lecture) { p ->
-                    Recording.findingSpeakers.value = p
+                    Recording.findingSpeakers.value = lecture.id to p
                     val percent = (p * 100).toInt()
                     if (percent != shown) { shown = percent; notify(progressNotification(R.string.finding_speakers, p)) }
                 }
@@ -144,7 +144,7 @@ class RecordingService : Service() {
                 runCatching {
                     var shown = -1
                     Recording.compression.compress(lecture) { p ->
-                        Recording.compressing.value = p
+                        Recording.compressing.value = lecture.id to p
                         val percent = (p * 100).toInt()
                         if (percent != shown) { shown = percent; notify(progressNotification(R.string.compressing_flac, p)) }
                     }

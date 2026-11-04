@@ -68,6 +68,20 @@ fun textDirectionOf(language: String) =
     if (layoutDirectionOf(language) == androidx.compose.ui.unit.LayoutDirection.Rtl) androidx.compose.ui.text.style.TextDirection.Rtl
     else androidx.compose.ui.text.style.TextDirection.Ltr
 
+/**
+ * [text] laid out by its own first letter, whatever the direction around it (Unicode's first-strong isolate): a Hebrew
+ * notebook's name in an English sentence, or a model's name in a Hebrew one.
+ */
+fun isolated(text: String) = "\u2068$text\u2069"
+
+/**
+ * A lecture's title goes by its first letter ("26 Oct 2026" left to right, "זיכרון עבודה" right to left); a title with
+ * none, only numbers, takes its notebook's [language]'s direction.
+ */
+fun titleDirection(language: String) =
+    if (layoutDirectionOf(language) == LayoutDirection.Rtl) androidx.compose.ui.text.style.TextDirection.ContentOrRtl
+    else androidx.compose.ui.text.style.TextDirection.ContentOrLtr
+
 /** Right to left for languages written that way: a notebook's content follows its language, not the phone's. */
 fun layoutDirectionOf(language: String): LayoutDirection =
     if (language in setOf("he", "iw", "ar", "fa", "ur", "yi")) LayoutDirection.Rtl else LayoutDirection.Ltr
