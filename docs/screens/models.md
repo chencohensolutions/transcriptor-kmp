@@ -35,3 +35,5 @@ In the app (round 1's b4). The gear on Notebooks opens it.
 
 - [Round 1 (Nov 4, 2026)](../ux-history/models/2026-11-04-first-round.md): b4 — catalog + Hugging Face + NPU on this
   phone (picked); a — one page, a row per job, b — a catalog, c — set up for you, b2, b3.
+- [Round 2 (Nov 6, 2026)](../ux-history/models/2026-11-06-models-in-one-place.md): b — a page per language (picked); a — a
+  Transcription section with a row per language and job.

@@ -53,3 +53,4 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 ## Design history
 
 - [Round 1 (Nov 2, 2026)](../ux-history/review/2026-11-02-after-the-lecture.md): c2 — document with the player at the bottom (picked); a — player + timeline, b — tabs, c — document + overview.
+- [Round 2 (Nov 6, 2026)](../ux-history/review/2026-11-06-improve-by-hand.md): a — Improve transcription… always in the menu, with a sheet (picked).
