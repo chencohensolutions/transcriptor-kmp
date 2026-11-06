@@ -37,6 +37,8 @@ class LectureReview(
     private val setSpeakerTuning: (modelId: String, more: Float) -> Unit = { _, _ -> },
 ) {
     private class Open(val notebookTitle: String, val lecture: Lecture, val speed: Float) {
+        var power: com.chencohensolution.transcriptor.recording.PowerReport? = null
+        var powerRead = false
         /** The live stretches kept with the lecture (model id, stretches), read once. */
         var live: Pair<String, List<LiveStretch>>? = null
         var liveRead = false
@@ -49,6 +51,14 @@ class LectureReview(
         }
         // The speaker pass regroups every line: the stretches no longer say what live decided.
         return live?.takeIf { !lecture.speakerPass }
+    }
+
+    private fun Open.power(): com.chencohensolution.transcriptor.recording.PowerReport? {
+        if (!powerRead) {
+            power = runCatching { store.loadPower(lecture) }.getOrNull()
+            powerRead = true
+        }
+        return power
     }
 
     private var correctionsFor: Lecture? = null
@@ -84,7 +94,7 @@ class LectureReview(
                 ReviewState(
                     notebookTitle = it.notebookTitle, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
-                    improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(),
+                    improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)

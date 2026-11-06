@@ -35,6 +35,7 @@ import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.recording.ModelInUse
+import com.chencohensolution.transcriptor.recording.PowerMeter
 import com.chencohensolution.transcriptor.speech.VoicePrintFiles
 import com.chencohensolution.transcriptor.speech.LiveSpeakers
 import com.chencohensolution.transcriptor.speech.SherpaSegmenter
@@ -418,6 +419,7 @@ object Recording {
             voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
             speakerPassReady = { canFindSpeakers },
+            power = PowerMeter(AndroidPowerProbe(app)),
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
         review = LectureReview(

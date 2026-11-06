@@ -266,4 +266,6 @@
     <string name="review_tune_apply">Apply</string>
     <string name="review_tune_ok">OK</string>
     <string name="review_tune_none">Nothing to tune on: this lecture has no voice prints from live speaker turns, or no lines with speakers.</string>
+    <string name="review_power">Power: %1$.1f W avg, %2$.0f mWh/min, %3$s °C</string>
+    <string name="review_power_charging">Power: not measured (on the charger)</string>
 </resources>

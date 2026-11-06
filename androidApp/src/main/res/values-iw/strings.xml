@@ -266,4 +266,6 @@
     <string name="review_tune_apply">החלה</string>
     <string name="review_tune_ok">אישור</string>
     <string name="review_tune_none">אין לפי מה לכוונן: בהרצאה הזו אין טביעות קול מזיהוי דוברים בזמן אמת, או שורות עם דוברים.</string>
+    <string name="review_power">צריכה: %1$.1f וואט בממוצע, %2$.0f mWh לדקה, %3$s°C</string>
+    <string name="review_power_charging">צריכה: לא נמדדה (בטעינה)</string>
 </resources>

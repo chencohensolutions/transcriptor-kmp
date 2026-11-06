@@ -65,6 +65,8 @@ class LectureSession(
     private val voices: VoiceStore? = null,
     /** The speaker pass's models are on the phone (it can run after Stop). */
     private val speakerPassReady: () -> Boolean = { false },
+    /** Samples the battery while a lecture records, for its `power.json` and `power-log.csv`; null: not measured. */
+    private val power: PowerMeter? = null,
     /**
      * Starts live transcription for a language, with the voices the notebook knows; null when no live model is
      * downloaded for it.
@@ -129,6 +131,7 @@ class LectureSession(
                 }
             }
         }
+        power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
             if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
@@ -175,6 +178,22 @@ class LectureSession(
         voices?.save(r.lecture.notebookId, Voice(clean, print, tracker.model))
     }
 
+    /** The models this lecture used and where, for its power report. */
+    private fun modelsInUse(): List<PowerModel> {
+        val m = liveModel ?: return emptyList()
+        val out = mutableListOf(PowerModel("live", m.name, if ("NPU" in m.name) "NPU" else "CPU"))
+        m.voicePrints?.value?.let { v ->
+            val where = when (v.runs) {
+                ModelInUse.Runs.Npu -> "NPU"
+                ModelInUse.Runs.CpuAfterNpuFailed -> "CPU after NPU failed"
+                ModelInUse.Runs.Cpu -> "CPU"
+                ModelInUse.Runs.NotYet -> "not loaded"
+            }
+            out += PowerModel("speakers", v.name, where)
+        }
+        return out
+    }
+
     /** The lines and speakers to show: the transcriber's, or with [LiveSpeakers] its lines split and labeled by [found]. */
     private fun labeled(model: LiveModel, out: LiveOutput, found: LiveSpeakers.State): Pair<List<Segment>, List<Speaker>> {
         if (model.liveSpeakers == null) return out.segments to out.speakers
@@ -217,6 +236,14 @@ class LectureSession(
                 for (s in recording.value!!.lecture.speakers) {
                     if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it, tracker.model)) }
                 }
+            }
+        }
+        // How much power it took: power.json beside the audio, a row in power-log.csv.
+        power?.let { meter ->
+            runCatching {
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse())
+                store.savePower(r.lecture, report)
+                store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.notebookId, r.lecture.startedAtMillis, report))
             }
         }
         // What live speaker turns decided, for regrouping or tuning on this lecture later.

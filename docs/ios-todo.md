@@ -91,3 +91,7 @@ anything left to decide. Remove an entry once it is built.
 - Tuning: `SettingsStore.speakerTuning`/`setSpeakerTuning` (a slider on the speakers page) and the review's
   `LectureReview.tuneSpeakers()`/`applySpeakerTuning` with `ReviewState.speakerCorrections` (strings `review_tune_*`);
   `SettingsStore.segmentationModel` and `ModelCatalog.segmentationModels` (DiariZen).
+- Power per lecture: `PowerMeter` with a `PowerProbe` (iOS: `UIDevice` battery level and state, thermal state,
+  `ProcessInfo`/`task_info` CPU time; iOS gives no battery current, so the power figures are null there or
+  estimated), `PowerReport` in `power.json` (`LectureStore.savePower`), `power-log.csv`
+  (`LectureStore.appendPowerLog`), `ReviewState.power` and strings `review_power*`.

@@ -145,6 +145,23 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Data
 
+- **Power per lecture** (owner's request, Nov 6, 2026): while a lecture records, `PowerMeter` samples the battery every
+  10 s (`AndroidPowerProbe`):
+  - BatteryManager's CURRENT_NOW, whose size is used: the S25 reports discharge as negative;
+  - the voltage, the temperature, whether it is plugged in, and the level, all from ACTION_BATTERY_CHANGED;
+  - whether the screen is on;
+  - the app's own CPU time, from `/proc/self/stat`.
+
+  At Stop it writes `power.json` (version 1) beside the audio, and adds a row to `power-log.csv` in the app's own
+  storage. The report holds:
+  - duration, average mW, mWh in all, mWh and J per minute;
+  - battery % and °C at the start and end;
+  - the app's CPU seconds per minute, and the screen-on share;
+  - the models used and where (NPU or CPU).
+
+  The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
+  time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.
+
 One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
 `transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the lecture to read beside its
 audio (owner's request, Nov 4, 2026): its title, date and length, then each speaker's turn with its time and the notes

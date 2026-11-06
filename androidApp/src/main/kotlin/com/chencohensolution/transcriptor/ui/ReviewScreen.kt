@@ -205,6 +205,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                 }
                 (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_improving, (it.progress * 100).toInt()), it.progress) }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
+                state.power?.let { PowerLine(it) }
                 HorizontalDivider()
             }
         }
@@ -550,5 +551,20 @@ private fun TuneDialog(p: LectureReview.TuneProposal, onDismiss: () -> Unit, onA
         },
         confirmButton = { TextButton(onClick = onApply, enabled = r.more != p.now) { Text(stringResource(R.string.review_tune_apply)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
+    )
+}
+
+/** "Power: 1.2 W avg, 20 mWh/min, +4 °C" (or "on the charger: not measured"), small, under the lecture's bar. */
+@Composable
+private fun PowerLine(p: com.chencohensolution.transcriptor.recording.PowerReport) {
+    val mw = p.averageMilliwatts
+    val text = if (p.charging || mw == null) stringResource(R.string.review_power_charging)
+    else stringResource(
+        R.string.review_power, mw / 1000, p.milliwattHoursPerMinute ?: 0.0,
+        (if ((p.temperatureRise ?: 0.0) >= 0) "+" else "") + String.format(java.util.Locale.getDefault(), "%.1f", p.temperatureRise ?: 0.0),
+    )
+    Text(
+        text, style = MaterialTheme.typography.labelSmall, color = LocalTranscriptorColors.current.time,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
     )
 }

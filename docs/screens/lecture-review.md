@@ -64,3 +64,6 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
   is disabled at 0. It replays the lecture's stored voice prints across the model's "fewer ↔ more speakers" range and
   shows the best setting: "Fewer speakers than now: 52 of 60 lines would match your speakers (now 45), with 2 speakers
   (now 4)". Apply sets it, for the next lecture (`LectureReview.tuneSpeakers`, `applySpeakerTuning`).
+
+- **Power** (owner's request, Nov 6, 2026): under the lecture's bar, one small line from its `power.json`, e.g. "Power:
+  2.0 W avg, 33 mWh/min, +4.0 °C", or "Power: not measured (on the charger)". Lectures recorded before it have no line.
