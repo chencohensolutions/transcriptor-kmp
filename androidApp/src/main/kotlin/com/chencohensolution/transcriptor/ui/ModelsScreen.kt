@@ -382,13 +382,22 @@ private fun SpeakerPage(state: ModelsState, actions: ModelsActions, job: HubKind
 @Composable
 private fun speakerLine(model: SpeechModel?, state: ModelsState): Pair<String, Boolean> =
     if (model == null) stringResource(R.string.settings_no_model) to true
-    else (listOf(isolated(model.name)) + speakerFacts(model, state)).joinToString(" · ") to false
+    else (listOf(isolated(speakerName(model, state))) + speakerFacts(model, state)).joinToString(" · ") to false
+
+/**
+ * A speaker model's name with where it runs, as the speech models' "· NPU": "DiariZen meeting Base · NPU", "3D-Speaker
+ * CAM++ · CPU"; the name alone while it isn't on the phone.
+ */
+private fun speakerName(model: SpeechModel, state: ModelsState) = when {
+    model.id in state.npuVoiceModels -> "${model.name} · NPU"
+    state.status(model) == ModelStatus.Ready -> "${model.name} · CPU"
+    else -> model.name
+}
 
 /** A speaker model's facts: parameters, its NPU build here, copied by hand, from Hugging Face. */
 @Composable
 private fun speakerFacts(model: SpeechModel, state: ModelsState) = listOfNotNull(
     isolated(model.parameters).takeIf { model.parameters != "?" },
-    stringResource(R.string.models_npu_long).takeIf { model.id in state.npuVoiceModels },
     stringResource(R.string.models_by_hand).takeIf { model.manual },
     stringResource(R.string.models_from_hub).takeIf { model.fromHub },
 )
@@ -397,7 +406,7 @@ private fun speakerFacts(model: SpeechModel, state: ModelsState) = listOfNotNull
 @Composable
 private fun SpeakerChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(isolated(model.name.replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
+        Text(isolated(speakerName(model, state).replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
         val facts = speakerFacts(model, state)
         if (facts.isNotEmpty()) Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if ("-NC" in model.license.uppercase()) Text(

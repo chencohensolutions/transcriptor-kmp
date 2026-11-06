@@ -469,7 +469,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
             },
             loadEmbedder = {
                 val turns = if (segmentation == ModelCatalog.speakerSegmentation) "pyannote" else segmentation.name
-                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns ($where) + ${prints.name}", e.runs) }
+                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns · $where + ${prints.name}", e.runs) }
             },
         )
     } else {

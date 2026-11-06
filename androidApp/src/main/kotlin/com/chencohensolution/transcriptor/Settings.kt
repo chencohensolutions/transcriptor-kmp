@@ -82,8 +82,15 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
         npuVoiceModels = remember(statuses) {
-            speakerList.filter { it.kind == ModelKind.SpeakerEmbedding && statuses[it.id] == ModelStatus.Ready && Recording.voicePrintFiles(it).npu.isNotEmpty() }
-                .map { it.id }.toSet()
+            // Voice prints and speaker turns with their NPU build here for this phone's chip.
+            speakerList.filter { m ->
+                statuses[m.id] == ModelStatus.Ready && when (m.kind) {
+                    ModelKind.SpeakerEmbedding -> Recording.voicePrintFiles(m).npu.isNotEmpty()
+                    ModelKind.SpeakerSegmentation -> SherpaNpuWhisperEngine.chip == "SM8750" &&
+                        java.io.File(Recording.models.dir(m), com.chencohensolution.transcriptor.speech.SherpaSegmenter.NPU_FILE).exists()
+                    else -> false
+                }
+            }.map { it.id }.toSet()
         },
     )
     val io = { work: () -> Unit -> scope.launch(Dispatchers.IO) { work(); changed++ }; Unit }
