@@ -123,26 +123,27 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     }
 
     /**
-     * Keeps what live speaker turns decided while [lecture] was recorded (`speakers-live.json`: [model]'s id and the
-     * stretches with their prints), so its speakers can be regrouped or the thresholds tuned on it later.
+     * Keeps what live speaker turns decided while [lecture] was recorded (`speakers-live.json`: the voice-print [model]'s
+     * id, the segmentation model's ([turns], null for pyannote's) and the stretches with their prints), so its speakers
+     * can be regrouped or the thresholds tuned on it later.
      */
-    fun saveLiveSpeakers(lecture: Lecture, model: String, stretches: List<LiveStretch>) {
+    fun saveLiveSpeakers(lecture: Lecture, model: String, stretches: List<LiveStretch>, turns: String? = null) {
         val place = placeOf(lecture.notebookId, lecture.id)
         val folder = place.folder(lecture.notebookId, lecture.id)
         place.fileSystem.createDirectories(folder)
         val temp = folder / "$LIVE_SPEAKERS.tmp"
-        val file = LiveSpeakersFileV1(model = model, stretches = stretches.map { LiveStretchV1(it.startMillis, it.endMillis, it.speaker, it.print, it.follows) })
+        val file = LiveSpeakersFileV1(model = model, turns = turns, stretches = stretches.map { LiveStretchV1(it.startMillis, it.endMillis, it.speaker, it.print, it.follows) })
         place.fileSystem.write(temp) { writeUtf8(compact.encodeToString(file)) }
         place.fileSystem.atomicMove(temp, folder / LIVE_SPEAKERS)
     }
 
-    /** [saveLiveSpeakers]' model id and stretches; null for a lecture recorded without live speaker turns. */
-    fun loadLiveSpeakers(lecture: Lecture): Pair<String, List<LiveStretch>>? {
+    /** What [saveLiveSpeakers] kept; null for a lecture recorded without live speaker turns. */
+    fun loadLiveSpeakers(lecture: Lecture): KeptLiveSpeakers? {
         val place = placeOf(lecture.notebookId, lecture.id)
         val file = place.folder(lecture.notebookId, lecture.id) / LIVE_SPEAKERS
         if (!place.exists(file)) return null
         val f = compact.decodeFromString<LiveSpeakersFileV1>(place.fileSystem.read(file) { readUtf8() })
-        return f.model to f.stretches.map { LiveStretch(it.startMs, it.endMs, it.speaker, it.print, it.follows) }
+        return KeptLiveSpeakers(f.model, f.stretches.map { LiveStretch(it.startMs, it.endMs, it.speaker, it.print, it.follows) }, f.turns)
     }
 
     private val compact = Json { encodeDefaults = false; ignoreUnknownKeys = true }
@@ -308,9 +309,12 @@ private data class VersionFileV1(
     }
 }
 
-/** `speakers-live.json`: live speaker turns' stretches of a lecture, by voice-print [model]. */
+/** A lecture's live speaker turns ([LectureStore.saveLiveSpeakers]): voice-print [model], segmentation model [turns] (null: pyannote's). */
+data class KeptLiveSpeakers(val model: String, val stretches: List<LiveStretch>, val turns: String? = null)
+
+/** `speakers-live.json`: live speaker turns' stretches of a lecture, by voice-print [model] on [turns]' segmentation. */
 @Serializable
-private data class LiveSpeakersFileV1(val v: Int = 1, val model: String, val stretches: List<LiveStretchV1> = emptyList())
+private data class LiveSpeakersFileV1(val v: Int = 1, val model: String, val turns: String? = null, val stretches: List<LiveStretchV1> = emptyList())
 
 @Serializable
 private data class LiveStretchV1(

@@ -45,6 +45,8 @@ class LiveModel(
     val voicePrints: MutableStateFlow<ModelInUse>? = null,
     /** Speakers found live with segmentation ([LiveSpeakers]); null: by each line's print ([speakers]' labeler). */
     val liveSpeakers: LiveSpeakers? = null,
+    /** [liveSpeakers]' segmentation model (its id); null: pyannote's. */
+    val turns: String? = null,
 )
 
 /**
@@ -250,7 +252,7 @@ class LectureSession(
         liveModel?.let { m ->
             val found = m.liveSpeakers?.state?.value
             if (found != null && found.stretches.isNotEmpty()) {
-                runCatching { store.saveLiveSpeakers(r.lecture, m.speakers?.model.orEmpty(), found.stretches) }
+                runCatching { store.saveLiveSpeakers(r.lecture, m.speakers?.model.orEmpty(), found.stretches, m.turns) }
             }
         }
         val lecture = recording.value!!.lecture.copy(

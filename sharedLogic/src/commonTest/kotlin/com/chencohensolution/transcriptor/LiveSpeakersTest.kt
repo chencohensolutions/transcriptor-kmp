@@ -8,6 +8,7 @@ import com.chencohensolution.transcriptor.speech.Segmentation
 import com.chencohensolution.transcriptor.speech.Segmenter
 import com.chencohensolution.transcriptor.speech.SpeakerTracker
 import com.chencohensolution.transcriptor.speech.Voice
+import com.chencohensolution.transcriptor.speech.VoicePrintThresholds.Turns
 import com.chencohensolution.transcriptor.speech.liveLines
 import com.chencohensolution.transcriptor.speech.powersetToActive
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -149,6 +150,32 @@ class SpeakerTuningTest {
         )
         store.save(lecture)
         store.saveLiveSpeakers(lecture, "resnet", stretches)
-        assertEquals("resnet" to stretches, store.loadLiveSpeakers(lecture))
+        assertEquals(com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers("resnet", stretches), store.loadLiveSpeakers(lecture))
+        // With DiariZen's turns, the segmentation model is kept too: tuning uses that pair's threshold.
+        store.saveLiveSpeakers(lecture, "resnet", stretches, turns = "diarizen-wavlm-large-s80-md")
+        assertEquals("diarizen-wavlm-large-s80-md", store.loadLiveSpeakers(lecture)?.turns)
+    }
+
+    @Test
+    fun eachPairOfModelsHasItsLiveThresholdAndTheSliderMovesIt() {
+        val t = com.chencohensolution.transcriptor.speech.VoicePrintThresholds
+        val r293 = com.chencohensolution.transcriptor.models.ModelCatalog.voicePrintsResNet293.id
+        assertEquals(Turns.Pyannote, Turns.of(null))
+        assertEquals(Turns.Pyannote, Turns.of("pyannote-segmentation-3.0"))
+        assertEquals(Turns.DiariZenLarge, Turns.of("hf:hencohen83/diarizen-wavlm-large-s80-qnn-sm8750:model"))
+        assertEquals(Turns.DiariZenBase, Turns.of("diarizen-wavlm-base-s80-md"))
+        assertEquals(Turns.DiariZenMeeting, Turns.of("hf:hencohen83/diarizen-meeting-base-qnn-sm8750:model"))
+        // Pyannote's pair is the model's own live threshold.
+        assertEquals(t.of(r293).live, t.live(r293, null))
+        // ResNet293's prints of DiariZen large's pieces spread wider: a higher threshold (all one speaker at 0.15).
+        val large = t.live(r293, "hf:hencohen83/diarizen-wavlm-large-s80-qnn-sm8750:model")
+        assertTrue(large >= 0.25f, "$large")
+        // The slider is an offset on the pair's threshold.
+        assertEquals(large + t.COSINE_RANGE, t.live(r293, "diarizen-wavlm-large-s80-md", 1f), 1e-6f)
+        assertEquals(large - t.COSINE_RANGE, t.live(r293, "diarizen-wavlm-large-s80-md", -1f), 1e-6f)
+        for (m in com.chencohensolution.transcriptor.models.ModelCatalog.voicePrintModels) for (k in Turns.entries) {
+            val id = when (k) { Turns.Pyannote -> null; Turns.DiariZenBase -> "diarizen-wavlm-base-s80-md"; Turns.DiariZenLarge -> "diarizen-wavlm-large-s80-md"; Turns.DiariZenMeeting -> "diarizen-meeting-base" }
+            assertTrue(t.live(m.id, id) in 0.05f..0.8f, "${m.id} $k")
+        }
     }
 }
