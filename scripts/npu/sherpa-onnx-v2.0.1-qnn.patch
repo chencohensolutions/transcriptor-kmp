@@ -1,3 +1,15 @@
+diff --git a/sherpa-onnx/csrc/CMakeLists.txt b/sherpa-onnx/csrc/CMakeLists.txt
+index 23d5692..13c8e3e 100755
+--- a/sherpa-onnx/csrc/CMakeLists.txt
++++ b/sherpa-onnx/csrc/CMakeLists.txt
+@@ -270,6 +270,7 @@ if(SHERPA_ONNX_ENABLE_QNN)
+     ./qnn/online-zipformer-transducer-model-qnn.cc
+     ./qnn/qnn-backend.cc
+     ./qnn/qnn-model.cc
++    ./qnn/speaker-embedding-extractor-qnn-impl.cc
+     ./qnn/utils.cc
+   )
+ endif()
 diff --git a/sherpa-onnx/csrc/offline-whisper-model-config.cc b/sherpa-onnx/csrc/offline-whisper-model-config.cc
 index c9e12d4..00fc97f 100644
 --- a/sherpa-onnx/csrc/offline-whisper-model-config.cc
@@ -832,6 +844,280 @@ index d5d93c4..4a8cc51 100644
    bool Run() const;
    bool IsInitialized() const;
  
+diff --git a/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.cc b/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.cc
+new file mode 100644
+index 0000000..6e5022b
+--- /dev/null
++++ b/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.cc
+@@ -0,0 +1,187 @@
++// sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.cc
++//
++// See speaker-embedding-extractor-qnn-impl.h
++
++#include "sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h"
++
++#include <algorithm>
++#include <cmath>
++#include <memory>
++#include <stdexcept>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "sherpa-onnx/csrc/features.h"
++#include "sherpa-onnx/csrc/file-utils.h"
++#include "sherpa-onnx/csrc/macros.h"
++#include "sherpa-onnx/csrc/qnn/qnn-backend.h"
++#include "sherpa-onnx/csrc/qnn/qnn-model.h"
++#include "sherpa-onnx/csrc/text-utils.h"
++
++namespace sherpa_onnx {
++
++SpeakerEmbeddingExtractorQnnImpl::SpeakerEmbeddingExtractorQnnImpl(
++    const SpeakerEmbeddingExtractorConfig &config)
++    : config_(config) {
++  const auto &qnn = config_.qnn_config;
++  std::vector<std::string> files;
++  SplitStringToVector(qnn.context_binary, ",", true, &files);
++  if (files.empty()) {
++    throw std::runtime_error("speaker embedding (QNN): no context binary");
++  }
++
++  for (const auto &f : files) {
++    if (!FileExists(f)) {
++      throw std::runtime_error("speaker embedding (QNN): '" + f +
++                               "' does not exist");
++    }
++    Graph g;
++    g.backend = std::make_unique<QnnBackend>(qnn.backend_lib, config_.debug);
++    g.model = std::make_unique<QnnModel>(f, qnn.system_lib, g.backend.get(),
++                                         BinaryContextTag{}, config_.debug);
++    if (g.model->InputTensorNames().size() != 1 ||
++        g.model->OutputTensorNames().size() != 1) {
++      throw std::runtime_error("speaker embedding (QNN): '" + f +
++                               "' needs one input and one output");
++    }
++    g.input = g.model->InputTensorNames()[0];
++    g.output = g.model->OutputTensorNames()[0];
++
++    // [1, feat_dim, T] in, [1, dim] out
++    auto in = g.model->TensorShape(g.input);
++    auto out = g.model->TensorShape(g.output);
++    if (in.size() != 3 || in[0] != 1 || in[1] != feat_dim_ || out.empty()) {
++      throw std::runtime_error("speaker embedding (QNN): '" + f +
++                               "' input must be [1, 80, T]");
++    }
++    g.frames = in[2];
++    int32_t dim = out.back();
++    if (dim_ != 0 && dim != dim_) {
++      throw std::runtime_error(
++          "speaker embedding (QNN): the context binaries' output sizes differ");
++    }
++    dim_ = dim;
++
++    if (config_.debug) {
++      SHERPA_ONNX_LOGE("speaker embedding (QNN): '%s': %d frames, dim %d",
++                       f.c_str(), g.frames, dim_);
++    }
++    graphs_.push_back(std::move(g));
++  }
++
++  std::sort(graphs_.begin(), graphs_.end(),
++            [](const Graph &a, const Graph &b) { return a.frames < b.frames; });
++}
++
++SpeakerEmbeddingExtractorQnnImpl::~SpeakerEmbeddingExtractorQnnImpl() {
++  // models before their backends
++  for (auto &g : graphs_) g.model.reset();
++}
++
++std::unique_ptr<OnlineStream> SpeakerEmbeddingExtractorQnnImpl::CreateStream()
++    const {
++  // as for WeSpeaker models (normalize_samples = 0): 80-dim fbank at 16 kHz on
++  // samples scaled to 16-bit range; the graphs do any mean normalization.
++  FeatureExtractorConfig feat_config;
++  feat_config.sampling_rate = 16000;
++  feat_config.feature_dim = feat_dim_;
++  feat_config.normalize_samples = false;
++  return std::make_unique<OnlineStream>(feat_config);
++}
++
++bool SpeakerEmbeddingExtractorQnnImpl::IsReady(OnlineStream *s) const {
++  return s->GetNumProcessedFrames() < s->NumFramesReady();
++}
++
++std::vector<SpeakerEmbeddingExtractorQnnImpl::Window>
++SpeakerEmbeddingExtractorQnnImpl::Plan(int32_t num_frames,
++                                       const std::vector<int32_t> &lengths) {
++  if (num_frames <= 0 || lengths.empty()) return {};
++  if (num_frames <= lengths[0]) return {{0, 0}};
++
++  int32_t g = 0;
++  for (int32_t i = 0; i < static_cast<int32_t>(lengths.size()); ++i) {
++    if (lengths[i] <= num_frames) g = i;
++  }
++  int32_t len = lengths[g];
++  int32_t n = (num_frames + len - 1) / len;
++  if (n == 1) return {{g, 0}};
++
++  std::vector<Window> ans;
++  int32_t last = num_frames - len;
++  for (int32_t i = 0; i < n; ++i) {
++    ans.push_back(
++        {g, static_cast<int32_t>(std::lround(static_cast<double>(i) * last /
++                                             (n - 1)))});
++  }
++  return ans;
++}
++
++std::vector<float> SpeakerEmbeddingExtractorQnnImpl::Run(
++    const Graph &g, const float *features, int32_t num_frames,
++    int32_t start) const {
++  // [T, feat_dim] (repeating the frames if there are fewer than T) ->
++  // [feat_dim, T]
++  int32_t t = g.frames;
++  std::vector<float> x(static_cast<size_t>(t) * feat_dim_);
++  for (int32_t i = 0; i < t; ++i) {
++    int32_t src = num_frames >= start + t ? start + i : (i % num_frames);
++    const float *row = features + static_cast<size_t>(src) * feat_dim_;
++    for (int32_t k = 0; k < feat_dim_; ++k) {
++      x[static_cast<size_t>(k) * t + i] = row[k];
++    }
++  }
++
++  if (!g.model->SetInputTensorData(g.input, x.data(), x.size())) {
++    throw std::runtime_error("speaker embedding (QNN): failed to set input");
++  }
++  if (!g.model->Run()) {
++    throw std::runtime_error("speaker embedding (QNN): failed to run");
++  }
++  auto y = g.model->GetOutputTensorData(g.output);
++  if (static_cast<int32_t>(y.size()) != dim_) {
++    throw std::runtime_error("speaker embedding (QNN): unexpected output size");
++  }
++  return y;
++}
++
++std::vector<float> SpeakerEmbeddingExtractorQnnImpl::Compute(
++    OnlineStream *s) const {
++  int32_t num_frames = s->NumFramesReady() - s->GetNumProcessedFrames();
++  if (num_frames <= 0) {
++    SHERPA_ONNX_LOGE("Please make sure IsReady(s) returns true. num_frames: %d",
++                     num_frames);
++    return {};
++  }
++
++  std::vector<float> features =
++      s->GetFrames(s->GetNumProcessedFrames(), num_frames);
++  s->GetNumProcessedFrames() += num_frames;
++
++  std::vector<int32_t> lengths;
++  for (const auto &g : graphs_) lengths.push_back(g.frames);
++
++  std::lock_guard<std::mutex> lock(mutex_);
++
++  std::vector<double> sum(dim_, 0.0);
++  for (const auto &w : Plan(num_frames, lengths)) {
++    auto y = Run(graphs_[w.graph], features.data(), num_frames, w.start);
++    double n = 0;
++    for (float v : y) n += static_cast<double>(v) * v;
++    n = std::sqrt(n);
++    if (n <= 0) continue;
++    for (int32_t i = 0; i < dim_; ++i) sum[i] += y[i] / n;
++  }
++
++  double n = 0;
++  for (double v : sum) n += v * v;
++  n = std::sqrt(n);
++  std::vector<float> ans(dim_);
++  for (int32_t i = 0; i < dim_; ++i) {
++    ans[i] = n > 0 ? static_cast<float>(sum[i] / n) : 0.0f;
++  }
++  return ans;
++}
++
++}  // namespace sherpa_onnx
+diff --git a/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h b/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h
+new file mode 100644
+index 0000000..ad619b8
+--- /dev/null
++++ b/sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h
+@@ -0,0 +1,75 @@
++// sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h
++//
++// Speaker embeddings on a Qualcomm NPU (QNN HTP) from context binaries of a
++// WeSpeaker-style model compiled for fixed lengths.
++//
++// qnn_config.context_binary lists one or more context binaries, comma
++// separated, each a graph of one fixed number of frames T: input
++// [1, 80, T] (80-dim fbank, transposed, as QNN's converter lays it out; any
++// mean normalization is inside the graph), output [1, dim]. The extractor
++// covers any length with them: shorter than the smallest graph, the frames
++// are repeated to fill it; longer, windows of the largest graph that fits,
++// spread evenly from the first frame to the last (overlapping as needed).
++// The prints of the windows are L2-normalized and averaged, and the average
++// L2-normalized.
++#ifndef SHERPA_ONNX_CSRC_QNN_SPEAKER_EMBEDDING_EXTRACTOR_QNN_IMPL_H_
++#define SHERPA_ONNX_CSRC_QNN_SPEAKER_EMBEDDING_EXTRACTOR_QNN_IMPL_H_
++
++#include <memory>
++#include <mutex>  // NOLINT
++#include <vector>
++
++#include "sherpa-onnx/csrc/speaker-embedding-extractor-impl.h"
++#include "sherpa-onnx/csrc/speaker-embedding-extractor.h"
++
++namespace sherpa_onnx {
++
++class QnnBackend;
++class QnnModel;
++
++class SpeakerEmbeddingExtractorQnnImpl : public SpeakerEmbeddingExtractorImpl {
++ public:
++  explicit SpeakerEmbeddingExtractorQnnImpl(
++      const SpeakerEmbeddingExtractorConfig &config);
++  ~SpeakerEmbeddingExtractorQnnImpl() override;
++
++  int32_t Dim() const override { return dim_; }
++
++  std::unique_ptr<OnlineStream> CreateStream() const override;
++
++  bool IsReady(OnlineStream *s) const override;
++
++  std::vector<float> Compute(OnlineStream *s) const override;
++
++  // The windows [start, start + frames) covering num_frames frames with
++  // graphs of the given lengths (ascending); a single window longer than
++  // num_frames means: repeat the frames to fill it. Public for tests.
++  struct Window {
++    int32_t graph;  // index into the lengths
++    int32_t start;
++  };
++  static std::vector<Window> Plan(int32_t num_frames,
++                                  const std::vector<int32_t> &lengths);
++
++ private:
++  struct Graph {
++    std::unique_ptr<QnnBackend> backend;
++    std::unique_ptr<QnnModel> model;
++    int32_t frames = 0;
++    std::string input;
++    std::string output;
++  };
++
++  std::vector<float> Run(const Graph &g, const float *features,
++                         int32_t num_frames, int32_t start) const;
++
++  SpeakerEmbeddingExtractorConfig config_;
++  std::vector<Graph> graphs_;  // by frames, ascending
++  int32_t dim_ = 0;
++  int32_t feat_dim_ = 80;
++  mutable std::mutex mutex_;
++};
++
++}  // namespace sherpa_onnx
++
++#endif  // SHERPA_ONNX_CSRC_QNN_SPEAKER_EMBEDDING_EXTRACTOR_QNN_IMPL_H_
 diff --git a/sherpa-onnx/csrc/qnn/utils.cc b/sherpa-onnx/csrc/qnn/utils.cc
 index ee30247..94bdfee 100644
 --- a/sherpa-onnx/csrc/qnn/utils.cc
@@ -863,6 +1149,104 @@ index ee30247..94bdfee 100644
  }
  
  void PrintTensor(Qnn_TensorV2_t t) {
+diff --git a/sherpa-onnx/csrc/speaker-embedding-extractor-impl.cc b/sherpa-onnx/csrc/speaker-embedding-extractor-impl.cc
+index 2a425f0..a35c85e 100644
+--- a/sherpa-onnx/csrc/speaker-embedding-extractor-impl.cc
++++ b/sherpa-onnx/csrc/speaker-embedding-extractor-impl.cc
+@@ -22,6 +22,10 @@
+ #include "sherpa-onnx/csrc/speaker-embedding-extractor-nemo-impl.h"
+ #include "sherpa-onnx/csrc/text-utils.h"
+ 
++#if SHERPA_ONNX_ENABLE_QNN
++#include "sherpa-onnx/csrc/qnn/speaker-embedding-extractor-qnn-impl.h"
++#endif
++
+ namespace sherpa_onnx {
+ 
+ namespace {
+@@ -140,6 +144,17 @@ static ModelType GetModelType(char *model_data, size_t model_data_length,
+ std::unique_ptr<SpeakerEmbeddingExtractorImpl>
+ SpeakerEmbeddingExtractorImpl::Create(
+     const SpeakerEmbeddingExtractorConfig &config) {
++  if (!config.qnn_config.context_binary.empty()) {
++#if SHERPA_ONNX_ENABLE_QNN
++    return std::make_unique<SpeakerEmbeddingExtractorQnnImpl>(config);
++#else
++    SHERPA_ONNX_LOGE(
++        "Please rebuild sherpa-onnx with -DSHERPA_ONNX_ENABLE_QNN=ON to run "
++        "speaker embeddings on a Qualcomm NPU");
++    return nullptr;
++#endif
++  }
++
+   ModelType model_type = ModelType::kUnknown;
+ 
+   {
+@@ -166,6 +181,10 @@ template <typename Manager>
+ std::unique_ptr<SpeakerEmbeddingExtractorImpl>
+ SpeakerEmbeddingExtractorImpl::Create(
+     Manager *mgr, const SpeakerEmbeddingExtractorConfig &config) {
++  if (!config.qnn_config.context_binary.empty()) {
++    return Create(config);  // files on disk, not assets
++  }
++
+   ModelType model_type = ModelType::kUnknown;
+ 
+   {
+diff --git a/sherpa-onnx/csrc/speaker-embedding-extractor.cc b/sherpa-onnx/csrc/speaker-embedding-extractor.cc
+index 237678b..9780891 100644
+--- a/sherpa-onnx/csrc/speaker-embedding-extractor.cc
++++ b/sherpa-onnx/csrc/speaker-embedding-extractor.cc
+@@ -33,9 +33,15 @@ void SpeakerEmbeddingExtractorConfig::Register(ParseOptions *po) {
+ 
+   po->Register("provider", &provider,
+                "Specify a provider to use: cpu, cuda, coreml");
++
++  qnn_config.Register(po);
+ }
+ 
+ bool SpeakerEmbeddingExtractorConfig::Validate() const {
++  if (!qnn_config.context_binary.empty()) {
++    return qnn_config.Validate();
++  }
++
+   if (model.empty()) {
+     SHERPA_ONNX_LOGE("Please provide a speaker embedding extractor model");
+     return false;
+@@ -57,7 +63,8 @@ std::string SpeakerEmbeddingExtractorConfig::ToString() const {
+   os << "model=\"" << model << "\", ";
+   os << "num_threads=" << num_threads << ", ";
+   os << "debug=" << (debug ? "True" : "False") << ", ";
+-  os << "provider=\"" << provider << "\")";
++  os << "provider=\"" << provider << "\", ";
++  os << "qnn_config=" << qnn_config.ToString() << ")";
+ 
+   return os.str();
+ }
+diff --git a/sherpa-onnx/csrc/speaker-embedding-extractor.h b/sherpa-onnx/csrc/speaker-embedding-extractor.h
+index 068e6b8..df26f0f 100644
+--- a/sherpa-onnx/csrc/speaker-embedding-extractor.h
++++ b/sherpa-onnx/csrc/speaker-embedding-extractor.h
+@@ -11,6 +11,7 @@
+ 
+ #include "sherpa-onnx/csrc/online-stream.h"
+ #include "sherpa-onnx/csrc/parse-options.h"
++#include "sherpa-onnx/csrc/qnn-config.h"
+ 
+ namespace sherpa_onnx {
+ 
+@@ -20,6 +21,11 @@ struct SpeakerEmbeddingExtractorConfig {
+   bool debug = false;
+   std::string provider = "cpu";
+ 
++  // On a Qualcomm NPU: context binaries of one model at fixed lengths, comma
++  // separated (see qnn/speaker-embedding-extractor-qnn-impl.h); model is then
++  // not used.
++  QnnConfig qnn_config;
++
+   SpeakerEmbeddingExtractorConfig() = default;
+   SpeakerEmbeddingExtractorConfig(const std::string &model, int32_t num_threads,
+                                   bool debug, const std::string &provider)
 diff --git a/sherpa-onnx/jni/offline-recognizer.cc b/sherpa-onnx/jni/offline-recognizer.cc
 index 422f1f4..ab5948a 100644
 --- a/sherpa-onnx/jni/offline-recognizer.cc
@@ -986,6 +1370,88 @@ index 422f1f4..ab5948a 100644
    // wenet ctc
    fid = env->GetFieldID(model_config_cls, "wenetCtc",
                          "Lcom/k2fsa/sherpa/onnx/OfflineWenetCtcModelConfig;");
+diff --git a/sherpa-onnx/jni/offline-speaker-diarization.cc b/sherpa-onnx/jni/offline-speaker-diarization.cc
+index 7ba3894..ab7e470 100644
+--- a/sherpa-onnx/jni/offline-speaker-diarization.cc
++++ b/sherpa-onnx/jni/offline-speaker-diarization.cc
+@@ -65,6 +65,21 @@ static OfflineSpeakerDiarizationConfig GetOfflineSpeakerDiarizationConfig(
+   SHERPA_ONNX_JNI_READ_STRING(ans.embedding.provider, provider,
+                               embedding_config_cls, embedding_config);
+ 
++  {
++    jfieldID qfid = env->GetFieldID(embedding_config_cls, "qnnConfig",
++                                    "Lcom/k2fsa/sherpa/onnx/QnnConfig;");
++    jobject qnn_config = env->GetObjectField(embedding_config, qfid);
++    jclass qnn_config_cls = env->GetObjectClass(qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.embedding.qnn_config.backend_lib, backendLib,
++                                qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.embedding.qnn_config.context_binary,
++                                contextBinary, qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.embedding.qnn_config.system_lib, systemLib,
++                                qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_BOOL(ans.embedding.qnn_config.htp_perf_mode, htpPerfMode,
++                              qnn_config_cls, qnn_config);
++  }
++
+   fid = env->GetFieldID(cls, "clustering",
+                         "Lcom/k2fsa/sherpa/onnx/FastClusteringConfig;");
+   jobject clustering_config = env->GetObjectField(config, fid);
+@@ -141,9 +156,12 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_newFromFile(
+     return 0;
+   }
+ 
+-  auto sd = new sherpa_onnx::OfflineSpeakerDiarization(config);
+-
+-  return (jlong)sd;
++  return SafeJNI(
++      env, "OfflineSpeakerDiarization_newFromFile",
++      [&]() -> jlong {
++        return (jlong) new sherpa_onnx::OfflineSpeakerDiarization(config);
++      },
++      (jlong)0);
+ }
+ 
+ SHERPA_ONNX_EXTERN_C
+@@ -216,8 +234,16 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
+ 
+   jfloat *p = env->GetFloatArrayElements(samples, nullptr);
+   jsize n = env->GetArrayLength(samples);
+-  auto segments = sd->Process(p, n).SortByStartTime();
++  std::vector<sherpa_onnx::OfflineSpeakerDiarizationSegment> segments;
++  bool ok = SafeJNI(
++      env, "OfflineSpeakerDiarization_process",
++      [&]() -> bool {
++        segments = sd->Process(p, n).SortByStartTime();
++        return true;
++      },
++      false);
+   env->ReleaseFloatArrayElements(samples, p, JNI_ABORT);
++  if (!ok) return nullptr;
+ 
+   return ProcessImpl(env, segments);
+ }
+@@ -258,10 +284,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processWithCallback(
+ 
+   jfloat *p = env->GetFloatArrayElements(samples, nullptr);
+   jsize n = env->GetArrayLength(samples);
+-  auto segments =
+-      sd->Process(p, n, callback_wrapper, reinterpret_cast<void *>(arg))
+-          .SortByStartTime();
++  std::vector<sherpa_onnx::OfflineSpeakerDiarizationSegment> segments;
++  bool ok = SafeJNI(
++      env, "OfflineSpeakerDiarization_processWithCallback",
++      [&]() -> bool {
++        segments =
++            sd->Process(p, n, callback_wrapper, reinterpret_cast<void *>(arg))
++                .SortByStartTime();
++        return true;
++      },
++      false);
+   env->ReleaseFloatArrayElements(samples, p, JNI_ABORT);
++  if (!ok) return nullptr;
+ 
+   return ProcessImpl(env, segments);
+ }
 diff --git a/sherpa-onnx/jni/online-recognizer.cc b/sherpa-onnx/jni/online-recognizer.cc
 index 7a6af70..9abf226 100644
 --- a/sherpa-onnx/jni/online-recognizer.cc
@@ -1019,6 +1485,65 @@ index 7a6af70..9abf226 100644
  }
  
  SHERPA_ONNX_EXTERN_C
+diff --git a/sherpa-onnx/jni/speaker-embedding-extractor.cc b/sherpa-onnx/jni/speaker-embedding-extractor.cc
+index 43709fc..78d33f8 100644
+--- a/sherpa-onnx/jni/speaker-embedding-extractor.cc
++++ b/sherpa-onnx/jni/speaker-embedding-extractor.cc
+@@ -24,6 +24,21 @@ static SpeakerEmbeddingExtractorConfig GetSpeakerEmbeddingExtractorConfig(
+ 
+   SHERPA_ONNX_JNI_READ_STRING(ans.provider, provider, cls, config);
+ 
++  {
++    jfieldID qfid = env->GetFieldID(cls, "qnnConfig",
++                                    "Lcom/k2fsa/sherpa/onnx/QnnConfig;");
++    jobject qnn_config = env->GetObjectField(config, qfid);
++    jclass qnn_config_cls = env->GetObjectClass(qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.qnn_config.backend_lib, backendLib,
++                                qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.qnn_config.context_binary,
++                                contextBinary, qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_STRING(ans.qnn_config.system_lib, systemLib,
++                                qnn_config_cls, qnn_config);
++    SHERPA_ONNX_JNI_READ_BOOL(ans.qnn_config.htp_perf_mode, htpPerfMode,
++                              qnn_config_cls, qnn_config);
++  }
++
+   *ok = true;
+ 
+   return ans;
+@@ -82,9 +97,12 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_newFromFile(
+     return 0;
+   }
+ 
+-  auto extractor = new sherpa_onnx::SpeakerEmbeddingExtractor(config);
+-
+-  return (jlong)extractor;
++  return SafeJNI(
++      env, "SpeakerEmbeddingExtractor_newFromFile",
++      [&]() -> jlong {
++        return (jlong) new sherpa_onnx::SpeakerEmbeddingExtractor(config);
++      },
++      (jlong)0);
+ }
+ 
+ SHERPA_ONNX_EXTERN_C
+@@ -133,7 +151,15 @@ Java_com_k2fsa_sherpa_onnx_SpeakerEmbeddingExtractor_compute(JNIEnv *env,
+       reinterpret_cast<sherpa_onnx::SpeakerEmbeddingExtractor *>(ptr);
+   auto stream = reinterpret_cast<sherpa_onnx::OnlineStream *>(stream_ptr);
+ 
+-  std::vector<float> embedding = extractor->Compute(stream);
++  std::vector<float> embedding;
++  bool ok = SafeJNI(
++      env, "SpeakerEmbeddingExtractor_compute",
++      [&]() -> bool {
++        embedding = extractor->Compute(stream);
++        return true;
++      },
++      false);
++  if (!ok) return nullptr;
+   jfloatArray embedding_arr = env->NewFloatArray(embedding.size());
+   env->SetFloatArrayRegion(embedding_arr, 0, embedding.size(),
+                            embedding.data());
 diff --git a/sherpa-onnx/kotlin-api/OfflineRecognizer.kt b/sherpa-onnx/kotlin-api/OfflineRecognizer.kt
 index 30b1bcc..1205404 100644
 --- a/sherpa-onnx/kotlin-api/OfflineRecognizer.kt
@@ -1056,4 +1581,15 @@ index ea7aa51..8d64dd7 100644
      var contextBinary: String = "",
      var systemLib: String = "",
 +    var htpPerfMode: Boolean = false,
+ )
+diff --git a/sherpa-onnx/kotlin-api/SpeakerEmbeddingExtractorConfig.kt b/sherpa-onnx/kotlin-api/SpeakerEmbeddingExtractorConfig.kt
+index 0ae2bb9..976f77d 100644
+--- a/sherpa-onnx/kotlin-api/SpeakerEmbeddingExtractorConfig.kt
++++ b/sherpa-onnx/kotlin-api/SpeakerEmbeddingExtractorConfig.kt
+@@ -5,4 +5,6 @@ data class SpeakerEmbeddingExtractorConfig(
+     var numThreads: Int = 1,
+     var debug: Boolean = false,
+     var provider: String = "cpu",
++    // On a Qualcomm NPU: contextBinary lists the model's fixed-length graphs, comma separated; model is then unused.
++    var qnnConfig: QnnConfig = QnnConfig(),
  )

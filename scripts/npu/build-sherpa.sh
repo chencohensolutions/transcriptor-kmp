@@ -23,7 +23,7 @@ export PATH=$(ls -d $sdk/cmake/*/bin | tail -1):$PATH ANDROID_NDK=$sdk/ndk/30.0.
 ./build-android-arm64-v8a.sh > build.log 2>&1 || { tail -20 build.log; exit 1; }
 # The AAR project takes the release's JNI libraries for every ABI; ours replaces arm64's.
 aar=android/SherpaOnnxAar
-if [ ! -d $aar/sherpa_onnx/src/main/jniLibs/x86_64 ]; then
+if [ ! -f $aar/sherpa_onnx/src/main/jniLibs/arm64-v8a/libonnxruntime.so ]; then  # a fresh clone has the folders (.gitkeep), not the libraries
   rel=$q/sherpa-onnx-2.0.1.aar
   curl -sL --retry 4 -o $rel https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar
   echo "a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7  $rel" | shasum -a 256 -c -

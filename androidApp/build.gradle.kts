@@ -30,7 +30,7 @@ fun pinned(name: String, url: String, sha256: String): File = file("libs/$name")
 val sherpaOnnx = pinned(
     "sherpa-onnx-2.0.1-qnn.aar",
     "https://huggingface.co/HF_USER/sherpa-onnx-qnn-android/resolve/COMMIT/sherpa-onnx-2.0.1-qnn.aar",
-    "73f1d2a1546d4c497e5908a31279da91595b115c4d1fbd4d7820d33c34200c68",
+    "418fb10194dbec4a1150c9b30e299ab48045c0ec12bc8be48689bb81198fa6cb",
 )
 
 // Qualcomm's runtime for the NPU models, as sherpa-onnx publishes it for QAIRT 2.40 (the version the models are
