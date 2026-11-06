@@ -18,10 +18,10 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
             ModelCatalog.voicePrints.id to VoicePrintThresholds(SpeakerTracker.THRESHOLD, 0.85f, 0.3f),
             // Live: the A/B's best tracker thresholds over the three lectures (0.6/0.45/0.55 for ERes2NetV2; 0.35/0.5/0.3
             // ResNet293, 0.35/0.45/0.3 ResNet100, both mean-normalized). Clustering: lecture B's sweep (2 speakers, as
-            // labeled, at 1.0 for ERes2NetV2; the WeSpeaker models still split at 0.7, provisional until the sweep ends).
+            // labeled, at 1.0 for ERes2NetV2); the WeSpeaker models need 1.1 (lecture C: 6-7 speakers at 1.1, 10-13 at 1.0).
             ModelCatalog.voicePrintsEres2NetV2.id to VoicePrintThresholds(0.55f, 1.0f, 0.45f),
-            ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds(0.4f, 1.0f, 0.15f),
-            ModelCatalog.voicePrintsSimAmResNet100.id to VoicePrintThresholds(0.4f, 1.0f, 0.15f),
+            ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds(0.4f, 1.1f, 0.15f),
+            ModelCatalog.voicePrintsSimAmResNet100.id to VoicePrintThresholds(0.4f, 1.1f, 0.15f),
         )
 
         /** [modelId]'s thresholds; CAM++'s for a model without its own. */
