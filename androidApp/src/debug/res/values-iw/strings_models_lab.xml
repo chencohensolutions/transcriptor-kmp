@@ -21,4 +21,6 @@
     <string name="models_lab_add">הוספה</string>
     <string name="models_lab_added">נוסף</string>
     <string name="models_lab_downloading">בהורדה · %1$s</string>
+    <string name="models_lab_automatic">אוטומטי</string>
+    <string name="models_lab_auto_after_each">שיפור אוטומטי אחרי כל הרצאה</string>
 </resources>

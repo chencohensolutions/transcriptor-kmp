@@ -22,4 +22,6 @@
     <string name="models_lab_add">Add</string>
     <string name="models_lab_added">Added</string>
     <string name="models_lab_downloading">Downloading · %1$s</string>
+    <string name="models_lab_automatic">automatic</string>
+    <string name="models_lab_auto_after_each">Improve automatically after each lecture</string>
 </resources>

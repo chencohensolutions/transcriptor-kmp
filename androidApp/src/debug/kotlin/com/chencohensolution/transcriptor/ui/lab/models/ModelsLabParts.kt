@@ -306,7 +306,7 @@ internal fun LabLanguagePage(state: ModelsState, actions: ModelsActions, languag
 }
 
 @Composable
-private fun LabChoices(state: ModelsState, actions: ModelsActions, all: List<SpeechModel>, chosen: SpeechModel?, pick: (SpeechModel) -> Unit) {
+internal fun LabChoices(state: ModelsState, actions: ModelsActions, all: List<SpeechModel>, chosen: SpeechModel?, pick: (SpeechModel) -> Unit) {
     Column(Modifier.selectableGroup()) {
         all.filter { state.ready(it) }.forEach { model ->
             Row(
