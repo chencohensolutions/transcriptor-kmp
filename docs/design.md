@@ -97,8 +97,8 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     normalization WeSpeaker trains with, ResNet293's EER on the owner's lectures was 31.8% instead of 18.2%.
   - **On the NPU:** on the Snapdragon 8 Elite they run on the NPU when their folder has the NPU build (`t150.bin`,
     `t300.bin`, `t600.bin`; [npu-build.md](npu-build.md)). sherpa-onnx's extractor windows any length over those
-    graphs; if the NPU fails, the same model runs on the CPU (`SherpaVoiceEmbedder`, `SherpaDiarizer`). ResNet100 on
-    the NPU takes 16 ms per 1.5 s print.
+    graphs; if the NPU fails, the same model runs on the CPU (`SherpaVoiceEmbedder`, `SherpaDiarizer`). On the NPU a
+    1.5 s print takes 16 ms with ResNet100 and 6 ms with ResNet293.
   - **Thresholds:** each model has its own (`VoicePrintThresholds`): the tracker's cosine and the speaker pass's
     clustering distance, set from an A/B on the owner's lectures (`build/speaker-ab/results.md`, not in git).
   - **Saved voices:** `voices.json` keeps a print per model (`"model"`; prints saved before are CAM++'s). Only the

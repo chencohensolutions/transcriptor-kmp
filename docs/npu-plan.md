@@ -74,6 +74,8 @@ provider before spending time.
 speaker pass both use it.
 - **SimAM-ResNet100 on the S25's NPU:** 16 ms per 1.5 s print, 29 ms per 3 s, 59 ms per 6 s. Its prints match the
   CPU model (cosine ≥ 0.99996).
+- **ResNet293-LM on the NPU:** 6, 10 and 21 ms (wall clock), also cosine ≥ 0.99996. Its context binaries are 59 MB
+  each, against ResNet100's 103 MB.
 - **On the CPU (Mac, one thread):** about 0.3 s per second of audio.
 - **CAM++ and segmentation** stay on the CPU: they are small (CAM++ 0.02 s per second of audio).
 
