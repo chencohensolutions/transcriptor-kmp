@@ -9,6 +9,9 @@ import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.speech.LiveOutput
+import com.chencohensolution.transcriptor.speech.LiveSpeakers
+import com.chencohensolution.transcriptor.speech.liveLines
+import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.speech.LiveTranscriber
@@ -31,10 +34,18 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * The live model for a lecture: its name, for the screen, the transcriber running it, and the speakers it tells apart
- * (null without a voice-print model).
+ * The live model for a lecture: its name, for the screen, the transcriber running it, the speakers it tells apart
+ * (null without a voice-print model), and the voice-print model with where it runs once loaded ([voicePrints]; the
+ * platform sets [ModelInUse.runs] when it loads it).
  */
-class LiveModel(val name: String, val transcriber: LiveTranscriber, val speakers: SpeakerTracker? = null)
+class LiveModel(
+    val name: String,
+    val transcriber: LiveTranscriber,
+    val speakers: SpeakerTracker? = null,
+    val voicePrints: MutableStateFlow<ModelInUse>? = null,
+    /** Speakers found live with segmentation ([LiveSpeakers]); null: by each line's print ([speakers]' labeler). */
+    val liveSpeakers: LiveSpeakers? = null,
+)
 
 /**
  * Recording one lecture: the microphone to the audio file ([AudioRecorder]), the lines from live transcription
@@ -52,6 +63,10 @@ class LectureSession(
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** The notebooks' known voices: speakers the user named, labeled by name in later lectures. */
     private val voices: VoiceStore? = null,
+    /** The speaker pass's models are on the phone (it can run after Stop). */
+    private val speakerPassReady: () -> Boolean = { false },
+    /** Samples the battery while a lecture records, for its `power.json` and `power-log.csv`; null: not measured. */
+    private val power: PowerMeter? = null,
     /**
      * Starts live transcription for a language, with the voices the notebook knows; null when no live model is
      * downloaded for it.
@@ -80,6 +95,9 @@ class LectureSession(
                     partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else level,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
+                    voicePrints = liveModel?.voicePrints?.value,
+                    speakerPassOnStop = liveModel?.voicePrints != null && settings.findSpeakersOnStop && speakerPassReady(),
+                    speakersLive = liveModel?.liveSpeakers != null,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -98,18 +116,22 @@ class LectureSession(
         store.save(lecture)
         names = emptyMap()
         liveModel = live(notebook.language, scope, voices?.load(notebook.id).orEmpty())?.also { model ->
-            recorder.onPcm = model.transcriber::feed
+            val live = model.liveSpeakers
+            recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {
-                model.transcriber.output.collect { out ->
+                val speakers = live?.state ?: MutableStateFlow(LiveSpeakers.State())
+                combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
                     liveOutput.value = out
                     val r = recording.value ?: return@collect
-                    if (out.segments.size != r.lecture.segments.size || out.speakers.size != r.lecture.speakers.size) {
-                        recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
-                        saveNow()
+                    val (lines, who) = labeled(model, out, found)
+                    if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
+                        recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
+                        if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
                     }
                 }
             }
         }
+        power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
             if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
@@ -150,9 +172,32 @@ class LectureSession(
         names = names + (id to clean)
         recording.update { it?.copy(lecture = it.lecture.copy(speakers = named(it.lecture.speakers))) }
         saveNow()
-        val print = liveModel?.speakers?.print(id) ?: return
+        val tracker = liveModel?.speakers ?: return
+        val print = tracker.print(id) ?: return
         if (old.isNotEmpty() && old != clean) voices?.rename(r.lecture.notebookId, old, clean)
-        voices?.save(r.lecture.notebookId, Voice(clean, print))
+        voices?.save(r.lecture.notebookId, Voice(clean, print, tracker.model))
+    }
+
+    /** The models this lecture used and where, for its power report. */
+    private fun modelsInUse(): List<PowerModel> {
+        val m = liveModel ?: return emptyList()
+        val out = mutableListOf(PowerModel("live", m.name, if ("NPU" in m.name) "NPU" else "CPU"))
+        m.voicePrints?.value?.let { v ->
+            val where = when (v.runs) {
+                ModelInUse.Runs.Npu -> "NPU"
+                ModelInUse.Runs.CpuAfterNpuFailed -> "CPU after NPU failed"
+                ModelInUse.Runs.Cpu -> "CPU"
+                ModelInUse.Runs.NotYet -> "not loaded"
+            }
+            out += PowerModel("speakers", v.name, where)
+        }
+        return out
+    }
+
+    /** The lines and speakers to show: the transcriber's, or with [LiveSpeakers] its lines split and labeled by [found]. */
+    private fun labeled(model: LiveModel, out: LiveOutput, found: LiveSpeakers.State): Pair<List<Segment>, List<Speaker>> {
+        if (model.liveSpeakers == null) return out.segments to out.speakers
+        return liveLines(out.segments, found.turns, found.settledMillis) to (model.speakers?.speakers ?: emptyList())
     }
 
     /** A note pinned to [atMillis]: the position in the audio when the user started typing it. */
@@ -179,17 +224,33 @@ class LectureSession(
         recorder.onPcm = null
         val duration = recorder.positionMillis.value
         recording.update { it?.copy(lecture = it.lecture.copy(durationMillis = duration), finishing = true) }
-        liveModel?.transcriber?.let { transcriber ->
-            transcriber.finish()
+        liveModel?.let { model ->
+            model.transcriber.finish()
+            model.liveSpeakers?.finish()
             following?.cancel()
-            val out = transcriber.output.value
-            recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
+            val (lines, who) = labeled(model, model.transcriber.output.value, model.liveSpeakers?.state?.value ?: LiveSpeakers.State())
+            recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
             // The named speakers' voices, as this whole lecture heard them, for the notebook's next lectures.
             val tracker = liveModel?.speakers
             if (tracker != null && voices != null) {
                 for (s in recording.value!!.lecture.speakers) {
-                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it)) }
+                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it, tracker.model)) }
                 }
+            }
+        }
+        // How much power it took: power.json beside the audio, a row in power-log.csv.
+        power?.let { meter ->
+            runCatching {
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse())
+                store.savePower(r.lecture, report)
+                store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.notebookId, r.lecture.startedAtMillis, report))
+            }
+        }
+        // What live speaker turns decided, for regrouping or tuning on this lecture later.
+        liveModel?.let { m ->
+            val found = m.liveSpeakers?.state?.value
+            if (found != null && found.stretches.isNotEmpty()) {
+                runCatching { store.saveLiveSpeakers(r.lecture, m.speakers?.model.orEmpty(), found.stretches) }
             }
         }
         val lecture = recording.value!!.lecture.copy(

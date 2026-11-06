@@ -39,6 +39,13 @@ data class ReviewState(
     val improveToGet: ModelToGet? = null,
     /** Null while the speaker pass can't run (its models aren't downloaded). */
     val speakerPass: PassState?,
+    /**
+     * Lines whose speaker the user changed from what live speaker turns gave them; null when the lecture has no live
+     * stretches to tune on (recorded without live turns, or regrouped by the speaker pass since).
+     */
+    val speakerCorrections: Int? = null,
+    /** How much power recording the lecture took (`power.json`); null when it wasn't measured. */
+    val power: com.chencohensolution.transcriptor.recording.PowerReport? = null,
 ) {
     /** The line being played (or last played): the one the position is in, else the one before it. */
     val currentLine: Segment? get() = lecture.segments.lastOrNull { it.startMillis <= positionMillis }

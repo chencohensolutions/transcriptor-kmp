@@ -46,8 +46,13 @@ private data class SettingsFileV1(
      * offered). Read only, into [findSpeakersOnStop], for files written before it.
      */
     val afterLecture: Boolean = true,
-    /** The speaker pass runs when a lecture stops; null in files written before it ([afterLecture] then). */
+    /**
+     * Before Nov 6, 2026: the speaker pass ran when a lecture stopped, on unless turned off. Read by nothing now: speakers
+     * are found live ([speakerPassOnStop]).
+     */
     val findSpeakersOnStop: Boolean? = null,
+    /** The speaker pass also runs after Stop, to regroup what live found; off by default (owner's choice, Nov 6, 2026). */
+    val speakerPassOnStop: Boolean = false,
     /** A lecture is improved on its own after it stops (while charging). */
     val autoImprove: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
@@ -58,6 +63,12 @@ private data class SettingsFileV1(
     val lectureFolder: String? = null,
     /** The user was asked to pick the lectures folder (and said not now). */
     val lectureFolderAsked: Boolean = false,
+    /** The voice-print model picked for speaker labels (its id); null: the catalog's default (CAM++). */
+    val voiceModel: String? = null,
+    /** The user's "fewer ↔ more speakers" per voice-print model (its id), -1..1; a model without one: 0, its tuning. */
+    val speakerTuning: Map<String, Float> = emptyMap(),
+    /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
+    val segmentationModel: String? = null,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -74,10 +85,13 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         get() = read().flacLevel.coerceIn(FLAC_LEVELS)
         set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
 
-    /** The speaker pass runs when a lecture stops. Off: it can still be run from the lecture's screen. */
+    /**
+     * The speaker pass also runs when a lecture stops (speakers are found live while it records). Off by default: it can
+     * still be run from the lecture's screen.
+     */
     var findSpeakersOnStop: Boolean
-        get() = read().let { it.findSpeakersOnStop ?: it.afterLecture }
-        set(value) = write(read().copy(findSpeakersOnStop = value))
+        get() = read().speakerPassOnStop
+        set(value) = write(read().copy(speakerPassOnStop = value))
 
     /**
      * A lecture is improved with its language's improve model after it stops, while the phone charges (else once it
@@ -114,6 +128,26 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var lectureFolderAsked: Boolean
         get() = read().lectureFolderAsked
         set(value) = write(read().copy(lectureFolderAsked = value))
+
+    /**
+     * The voice-print model picked for speaker labels (live and the speaker pass); null: the default. Read when a
+     * lecture or a speaker pass starts, so a change applies to the next one.
+     */
+    var voiceModel: String?
+        get() = read().voiceModel
+        set(value) = write(read().copy(voiceModel = value))
+
+    /** The segmentation model picked for live speaker turns; null: the default (pyannote's). */
+    var segmentationModel: String?
+        get() = read().segmentationModel
+        set(value) = write(read().copy(segmentationModel = value))
+
+    /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
+    fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: 0f
+
+    fun setSpeakerTuning(modelId: String, more: Float) = write(read().let {
+        it.copy(speakerTuning = if (more == 0f) it.speakerTuning - modelId else it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
+    })
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
     fun liveModel(language: String): String? = read().liveModels[language]

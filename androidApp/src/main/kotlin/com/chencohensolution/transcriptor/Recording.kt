@@ -34,6 +34,14 @@ import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.models.NpuLoadGuard
+import com.chencohensolution.transcriptor.recording.ModelInUse
+import com.chencohensolution.transcriptor.recording.PowerMeter
+import com.chencohensolution.transcriptor.speech.VoicePrintFiles
+import com.chencohensolution.transcriptor.speech.LiveSpeakers
+import com.chencohensolution.transcriptor.speech.SherpaSegmenter
+import java.io.File
+import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
 import com.chencohensolution.transcriptor.review.AndroidAudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.speech.RecordingAudio
@@ -129,6 +137,14 @@ object Recording {
     lateinit var installedModels: InstalledModels
         private set
 
+    /** Loads NPU models so one too big for the phone is refused, or disabled after it got the app killed. */
+    lateinit var npuGuard: NpuLoadGuard
+        private set
+
+    /** [make]s a streaming engine, inside [npuGuard] when [model] runs on the NPU. */
+    fun <T> npuEngine(model: SpeechModel, make: () -> T): T =
+        if (model.kind == ModelKind.StreamingTransducerNpu || model.kind == ModelKind.WhisperNpu) npuGuard.load(model, make) else make()
+
     /** The catalog's models and those added from Hugging Face. */
     lateinit var modelLibrary: ModelLibrary
         private set
@@ -159,10 +175,12 @@ object Recording {
             when (model.kind) {
                 ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(dir, nativeLibDir).use { engine ->
                     val language = model.languages.firstOrNull { it != SpeechModel.MULTILINGUAL } ?: "en"
-                    engine.load(language)
-                    engine.transcribe(FloatArray(16_000), language, null)
+                    npuGuard.load(model) {
+                        engine.load(language)
+                        engine.transcribe(FloatArray(16_000), language, null)
+                    }
                 }
-                ModelKind.StreamingTransducerNpu -> SherpaStreamingEngine(dir, nativeLibDir).use { engine ->
+                ModelKind.StreamingTransducerNpu -> npuEngine(model) { SherpaStreamingEngine(dir, nativeLibDir) }.use { engine ->
                     engine.accept(FloatArray(16_000))
                     engine.text
                 }
@@ -192,9 +210,10 @@ object Recording {
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
             ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
+                npuGuard.load(model) { engine.load(lecture.language) }
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
-            else -> SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }).use { engine ->
+            else -> npuEngine(model) { SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }) }.use { engine ->
                 RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress)
             }
         }
@@ -224,7 +243,7 @@ object Recording {
      * model or enough of their speech. Reads the recording: not on the main thread for long lectures.
      */
     fun printOf(lecture: Lecture, speakerId: String): List<Float>? {
-        if (!models.isReady(ModelCatalog.voicePrints)) return null
+        val model = voiceModel ?: return null
         val path = store.audioPath(lecture)
         val audio = com.chencohensolution.transcriptor.speech.FloatBuilder()
         for (line in lecture.segments.filter { it.speakerId == speakerId }.sortedByDescending { it.endMillis - it.startMillis }) {
@@ -232,11 +251,39 @@ object Recording {
             audio.add(RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, line.startMillis, line.endMillis))
         }
         if (audio.size < SpeakerLabeler.MIN_SAMPLES) return null
-        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        val embedder = voiceEmbedder(model)
         return try { embedder.embed(audio.toArray()).toList() } finally { embedder.close() }
     }
-    /** Both models of the speaker pass are downloaded. */
-    val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && models.isReady(ModelCatalog.voicePrints)
+
+    /**
+     * The voice-print model for speaker labels: the one picked in Settings › Models if it is on the phone, else the
+     * catalog's (CAM++) if downloaded; null without one. Read when a lecture or a speaker pass starts.
+     */
+    val voiceModel: SpeechModel?
+        get() = (ModelCatalog.voicePrintModels + addedSpeakerModels(ModelKind.SpeakerEmbedding)).let { all ->
+            all.firstOrNull { it.id == settings.voiceModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
+        }
+
+    /**
+     * The segmentation model for live speaker turns: the one picked in Settings › Models if it is on the phone, else
+     * pyannote's if downloaded; null without one (speakers are then labeled by each line's print).
+     */
+    val segmentationModel: SpeechModel?
+        get() = (ModelCatalog.segmentationModels + addedSpeakerModels(ModelKind.SpeakerSegmentation)).let { all ->
+            all.firstOrNull { it.id == settings.segmentationModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
+        }
+
+    /** The speaker models of [kind] added from Hugging Face (Settings › Speaker recognition or turns › Find more). */
+    private fun addedSpeakerModels(kind: ModelKind) = installedModels.all().map { it.model }.filter { it.kind == kind }
+
+    /** [model]'s files: its ONNX, and its NPU build on the phone it was compiled for. */
+    fun voicePrintFiles(model: SpeechModel) = VoicePrintFiles.of(models.dir(model), SherpaNpuWhisperEngine.chip)
+
+    /** [model]'s voice prints, on the NPU when it has a build for this phone (else, or if it fails, on the CPU). */
+    fun voiceEmbedder(model: SpeechModel) = SherpaVoiceEmbedder(voicePrintFiles(model), nativeLibDir)
+
+    /** Both models of the speaker pass are on the phone. */
+    val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && voiceModel != null
 
     /**
      * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
@@ -244,11 +291,13 @@ object Recording {
      */
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
-        val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), models.file(ModelCatalog.voicePrints))
-        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        val model = checkNotNull(voiceModel) { "no voice-print model" }
+        val thresholds = VoicePrintThresholds.of(model.id, settings.speakerTuning(model.id))
+        val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), voicePrintFiles(model), thresholds.clustering, nativeLibDir)
+        val embedder = voiceEmbedder(model)
         try {
             RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
-                val result = SpeakerPass(diarizer, embedder).run(audio, voices.load(lecture.notebookId)) { at ->
+                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load(lecture.notebookId)) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
                 val done = lecture.withTurns(result.turns, result.speakers)
@@ -368,6 +417,13 @@ object Recording {
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
+        npuGuard = NpuLoadGuard(installedModels) {
+            val info = android.app.ActivityManager.MemoryInfo()
+            app.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(info)
+            info.availMem
+        }
+        // An NPU model whose load got the app killed last time: disabled for this phone, the pick falls back.
+        npuGuard.recover()?.let { android.util.Log.w("Transcriptor", "NPU model $it disabled: the app was killed loading it") }
         modelLibrary = ModelLibrary(installedModels)
         notebooks = NotebookStore { store.library ?: store.local }
         resolver = app.contentResolver
@@ -379,11 +435,16 @@ object Recording {
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            voices = VoiceStore { store.library ?: store.local }.also { voices = it },
+            voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
+            speakerPassReady = { canFindSpeakers },
+            power = PowerMeter(AndroidPowerProbe(app)),
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
-        review = LectureReview(store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
+        review = LectureReview(
+            store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
+            speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,
+        )
     }
 }
 
@@ -403,11 +464,39 @@ fun liveModelFor(language: String): SpeechModel? {
  */
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
     val model = liveModelFor(language) ?: return null
-    val prints = ModelCatalog.voicePrints
-    val tracker = if (Recording.models.isReady(prints)) SpeakerTracker(known) else null
-    val labeler = tracker?.let { t -> SpeakerLabeler(t) { SherpaVoiceEmbedder(Recording.models.file(prints)) } }
+    val prints = Recording.voiceModel
+    // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
+    val segmentation = Recording.segmentationModel
+    val liveTurns = prints != null && segmentation != null
+    val tracker = prints?.let { VoicePrintThresholds.of(it.id, Recording.settings.speakerTuning(it.id)).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
+    val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
+    // Speakers found live with segmentation when a model is on the phone; else by each line's print.
+    val live = if (tracker != null && segmentation != null) {
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        val speakersWorker = Dispatchers.Default.limitedParallelism(1)
+        var where = "CPU"
+        LiveSpeakers(
+            tracker, scope, speakersWorker,
+            loadSegmenter = {
+                val dir = Recording.models.dir(segmentation)
+                // pyannote is small (0.1 s a window on one core); DiariZen's WavLM needs more on the CPU.
+                val threads = if (segmentation == ModelCatalog.speakerSegmentation) 1 else 4
+                SherpaSegmenter(File(dir, "model.onnx"), File(dir, SherpaSegmenter.NPU_FILE).takeIf { SherpaNpuWhisperEngine.chip == "SM8750" }, Recording.nativeLibDir, threads)
+                    .also { where = if (it.onNpu) "NPU" else "CPU" }
+            },
+            loadEmbedder = {
+                val turns = if (segmentation == ModelCatalog.speakerSegmentation) "pyannote" else segmentation.name
+                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns · $where + ${prints.name}", e.runs) }
+            },
+        )
+    } else {
+        null
+    }
+    val labeler = if (live != null) null else tracker?.let { t ->
+        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name, e.runs) } }
+    }
     val transcriber = when (model.kind) {
         ModelKind.Whisper -> {
             val path = Recording.models.file(model).path
@@ -416,17 +505,17 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)
             UtteranceTranscriber(language, model.id, scope, worker, labeler) {
-                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).apply { load(language) }
+                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).also { e -> Recording.npuGuard.load(model) { e.load(language) } }
             }
         }
         ModelKind.StreamingTransducer, ModelKind.StreamingTransducerNpu -> {
             val dir = Recording.models.dir(model)
             val npu = Recording.nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }
-            StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir, npu) }
+            StreamingTranscriber(model.id, scope, worker, labeler) { Recording.npuEngine(model) { SherpaStreamingEngine(dir, npu) } }
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker)
+    return LiveModel(model.name, transcriber, tracker, inUse, live)
 }
 
 class TranscriptorApp : Application() {

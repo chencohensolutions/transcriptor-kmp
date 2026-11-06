@@ -22,6 +22,15 @@ is set at the first keystroke. Above the lines, a status line in the app's langu
 behind it is, "Loading…", that no live model is downloaded for the language, or that live transcription stopped (the
 recording goes on). After Stop, "Finishing the last lines…" until the waiting lines are done.
 
+Under it, the other models the recording uses (owner's request, Nov 6, 2026), in the same small grey
+(`LiveLectureState.voicePrints`, `speakerPassOnStop`; `ModelsInUse` in `LectureScreen.kt`):
+- **Voice prints:** "Speakers: WeSpeaker SimAM-ResNet100 · NPU". The end reads "with the first line" until the model
+  loads (it loads with the first line long enough for it), then NPU, or CPU. If its NPU build failed, it reads
+  "CPU (its NPU build failed)" in red.
+- **Speaker pass:** "After Stop: speaker pass, pyannote + …", when it will run after Stop.
+- **Live speaker turns:** with them, "Speakers: pyannote (NPU or CPU) + <model> · NPU, live". A line's speaker chip
+  appears 2.5–5 s after its text, and a line may then split where the speaker changed.
+
 - Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
   it names the speaker, and the notebook remembers the voice for its next lectures.
 

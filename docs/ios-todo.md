@@ -22,6 +22,13 @@ anything left to decide. Remove an entry once it is built.
   `Settings.kt` (the state and actions), `Recording.hub`, `Recording.checkNpu`; `docs/screens/models.md`.
 - A language's page: `ModelChoices.candidates(forLanguage, ModelJob.Live/Improve, ready)`, `running`, `improveToGet`;
   choosing calls `SettingsStore.setLiveModel`/`setRefineModel`. Strings `settings_*`.
+- The speaker models on Settings (Nov 6, 2026, round 3's d2): Speaker recognition (a Voice model row, the fewer ↔
+  more slider under it) and Speaker turns (a Turn model row), each row opening the same speaker page (`SpeakerPage`:
+  the note, `ModelsState.voiceModels`/`turnModels` to pick with `useVoicePrints`/`useSegmentation`, Find more on
+  Hugging Face with `HubKind.VoicePrints`/`SpeakerTurns`). `Recording.voiceModel`/`segmentationModel` include the
+  speaker models added from Hugging Face. Strings `settings_recognition*`, `settings_turns*`, `settings_voice_model`,
+  `settings_turn_model`, `settings_no_model`, `models_find_more`, `models_kind_voice_prints`,
+  `models_kind_speaker_turns`, `models_speaker_search_note`.
 - Shared: `HubClient(fetch)` (iOS: `fetch` on URLSession), `HubModel.toSpeechModel`, `InstalledModels`,
   `ModelLibrary`, `SettingsStore.refineModel`/`setRefineModel`/`modelLanguages`.
 - iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
@@ -52,6 +59,15 @@ anything left to decide. Remove an entry once it is built.
 - Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
   dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,
   strings `speaker_*`. Voice prints on iOS: sherpa-onnx's iOS build with the same CAM++ model, as a `VoiceEmbedder`.
+- The voice-print model picked (Nov 6, 2026): `SettingsStore.voiceModel`, `ModelCatalog.voicePrintModels`, each
+  model's `VoicePrintThresholds` (pass `sameSpeaker` and the model id to `SpeakerTracker`/`SpeakerPass`, `clustering`
+  to the diarizer), and `VoiceStore`'s model provider (prints per model). Android: `Recording.voiceModel`,
+  `voiceEmbedder`, `SherpaDiarizer`; the speaker page in `ModelsScreen.kt` (`useVoicePrints`, strings
+  `models_badge_speakers`, `models_by_hand`). The NPU builds are Android-only. On iOS the
+  WeSpeaker models run on the CPU, or later on Core ML.
+- The recording screen's models in use: `LiveLectureState.voicePrints` (`ModelInUse`, its `runs` set when the
+  voice-print model loads, from `LiveModel.voicePrints`) and `speakerPassOnStop`; strings `lecture_speakers_model`,
+  `lecture_model_*`, `lecture_speaker_pass_on_stop`; Android's `ModelsInUse` in `LectureScreen.kt`.
 - Lecture, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
   `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
   `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
@@ -68,3 +84,14 @@ anything left to decide. Remove an entry once it is built.
 - NPU (Android only for now): `ModelKind.WhisperNpu` models run on a Qualcomm NPU; on iOS the equivalent is Core ML
   on the Neural Engine, not built.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).
+- Live speaker turns (Nov 6, 2026): `LiveSpeakers` (shared) needs a `Segmenter` (pyannote segmentation 3.0 on one 10 s
+  window: sherpa-onnx's iOS build has the model; Android's `SherpaSegmenter` uses our patch's `SpeakerSegmentation`
+  JNI class) and a `VoiceEmbedder`; `LiveModel.liveSpeakers`, `LiveLectureState.speakersLive`, strings
+  `lecture_speakers_live`. `SettingsStore.findSpeakersOnStop` is off by default now.
+- Tuning: `SettingsStore.speakerTuning`/`setSpeakerTuning` (a slider on the speakers page) and the review's
+  `LectureReview.tuneSpeakers()`/`applySpeakerTuning` with `ReviewState.speakerCorrections` (strings `review_tune_*`);
+  `SettingsStore.segmentationModel` and `ModelCatalog.segmentationModels` (DiariZen).
+- Power per lecture: `PowerMeter` with a `PowerProbe` (iOS: `UIDevice` battery level and state, thermal state,
+  `ProcessInfo`/`task_info` CPU time; iOS gives no battery current, so the power figures are null there or
+  estimated), `PowerReport` in `power.json` (`LectureStore.savePower`), `power-log.csv`
+  (`LectureStore.appendPowerLog`), `ReviewState.power` and strings `review_power*`.

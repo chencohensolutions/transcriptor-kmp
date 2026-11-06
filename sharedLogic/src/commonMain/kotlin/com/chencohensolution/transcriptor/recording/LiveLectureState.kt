@@ -22,4 +22,23 @@ data class LiveLectureState(
     val liveError: String? = null,
     /** Stop was pressed: the recording has ended and the last lines are being transcribed. */
     val finishing: Boolean = false,
+    /** The voice-print model labeling the speakers, and where it runs; null without speaker labels. */
+    val voicePrints: ModelInUse? = null,
+    /** The speaker pass runs after Stop, with pyannote's segmentation and [voicePrints]' model. */
+    val speakerPassOnStop: Boolean = false,
+    /** Speakers are found live with segmentation ([com.chencohensolution.transcriptor.speech.LiveSpeakers]). */
+    val speakersLive: Boolean = false,
 )
+
+/** A model a recording uses ([name], for the screen) and where it runs: unknown until it loads. */
+data class ModelInUse(val name: String, val runs: Runs = Runs.NotYet) {
+    enum class Runs {
+        /** It loads with the first line long enough for it. */
+        NotYet,
+        Npu,
+        Cpu,
+
+        /** Its NPU build failed to load: the same model on the CPU. */
+        CpuAfterNpuFailed,
+    }
+}

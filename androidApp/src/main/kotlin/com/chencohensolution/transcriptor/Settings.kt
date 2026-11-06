@@ -44,9 +44,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var checking by remember { mutableStateOf(emptySet<String>()) }
     val chip = SherpaNpuWhisperEngine.chip
     val models = remember(changed) { Recording.modelLibrary.all }
+    // The catalog's speaker models and those added from Hugging Face.
+    val speakerList = remember(models) { (speakerModels + models.filter { !it.kind.transcribes }).distinctBy { it.id } }
     val statuses by produceState(emptyMap<String, ModelStatus>(), models) {
         while (true) {
-            value = withContext(Dispatchers.IO) { (models + speakerModels).associate { it.id to Recording.models.status(it) } }
+            value = withContext(Dispatchers.IO) { (models + speakerList).distinctBy { it.id }.associate { it.id to Recording.models.status(it) } }
             delay(1_000)
         }
     }
@@ -76,6 +78,20 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
+        voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
+        segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
+        speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
+        npuVoiceModels = remember(statuses) {
+            // Voice prints and speaker turns with their NPU build here for this phone's chip.
+            speakerList.filter { m ->
+                statuses[m.id] == ModelStatus.Ready && when (m.kind) {
+                    ModelKind.SpeakerEmbedding -> Recording.voicePrintFiles(m).npu.isNotEmpty()
+                    ModelKind.SpeakerSegmentation -> SherpaNpuWhisperEngine.chip == "SM8750" &&
+                        java.io.File(Recording.models.dir(m), com.chencohensolution.transcriptor.speech.SherpaSegmenter.NPU_FILE).exists()
+                    else -> false
+                }
+            }.map { it.id }.toSet()
+        },
     )
     val io = { work: () -> Unit -> scope.launch(Dispatchers.IO) { work(); changed++ }; Unit }
     ModelsScreen(
@@ -87,6 +103,10 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             delete = { m -> io { Recording.models.delete(m) } },
             useLive = { l, m -> io { Recording.settings.setLiveModel(l, m.id) } },
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
+            useVoicePrints = { m -> io { Recording.settings.voiceModel = m.id } },
+            setSpeakerTuning = { m, more -> io { Recording.settings.setSpeakerTuning(m.id, more) } },
+            useSegmentation = { m -> io { Recording.settings.segmentationModel = m.id } },
+            retryNpu = { m -> io { Recording.npuGuard.reenable(m.id) } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
@@ -97,7 +117,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
                 hub = HubSearch(query, language, kind, npuOnly, searching = true, results = hub.results)
                 scope.launch {
                     hub = runCatching { Recording.hub.search(query, language, kind, npuOnly, chip) }.fold(
-                        { (found, unusable) -> hub.copy(searching = false, results = found, unusable = unusable, error = null) },
+                        { r -> hub.copy(searching = false, results = r.models, unusable = r.unusable, others = r.others, error = null) },
                         { hub.copy(searching = false, error = it.message ?: it.toString()) },
                     )
                 }

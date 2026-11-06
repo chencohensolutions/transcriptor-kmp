@@ -11,8 +11,11 @@ What gets built, per chip (SM8750 = Snapdragon 8 Elite, Hexagon v79, the only ch
 | ivrit.ai Whisper large-v3 turbo | encoder, decoder | `ivrit-ai/whisper-large-v3-turbo` safetensors, commit f33172a8 | `ivritTurboNpu` |
 | ivrit.ai Whisper large-v3 (refine only) | encoder, decoder | `ivrit-ai/whisper-large-v3` safetensors (sharded), commit 766847c9; converted with `--no_simplification --float_bitwidth 16` | `ivritLargeV3Npu` |
 | ivrit.ai Zipformer2 66M streaming | encoder, decoder, joiner | `ivrit-ai/zipformer2-66m-streaming-he` `model.pt`, commit ee769a2a | `ivritZipformerNpu` |
+| WeSpeaker SimAM-ResNet100 (VoxBlink2 + VoxCeleb2; non-commercial) | t150, t300, t600 | WeSpeaker's runtime ONNX `voxblink2_samresnet100_ft` `avg_model.onnx`, sha256 0d92ee34 | none: copied by hand (`voicePrintsSimAmResNet100`) |
+| WeSpeaker ResNet293-LM (VoxCeleb) | t150, t300, t600 | sherpa-onnx's `wespeaker_en_voxceleb_resnet293_LM.onnx` | none: copied by hand (`voicePrintsResNet293`) |
 
-Plus one runtime: the sherpa-onnx AAR with our QNN patch.
+Plus one runtime: the sherpa-onnx AAR with our QNN patch, which also runs speaker embeddings on the NPU (any model
+compiled as fixed-length graphs, see section 2).
 
 Everything happens in `build/qnn/` (not in git; tens of GB with the SDK and exports). The scripts are in
 [scripts/npu/](../scripts/npu/).
@@ -109,6 +112,19 @@ for m in encoder decoder joiner; do cp ivrit/$m-epoch-99-avg-1-chunk-64-left-256
 ```
 The sizes come from the model card. Chunk 64 is 1.28 s of audio, with 256 frames of left context.
 
+**Voice-print models (WeSpeaker):** from the full-precision ONNX, three batch-1 graphs of 150, 300 and 600 frames
+(1.5, 3 and 6 s of 80-dim fbank). Each has the per-utterance mean normalization WeSpeaker trains with put in front
+(`ReduceMean` over time, then `Sub`), and is simplified with onnxsim.
+- **Script:** [`voiceprint_graphs.py`](../scripts/npu/voiceprint_graphs.py)` <model.onnx> <out dir> <name>`; it needs
+  onnx and onnxsim.
+- **Check:** each graph against the original on the CPU, on lecture clips. It should give cosine 1.0 (`check_cpu.py`).
+- **Compile:**
+  `scripts/npu/compile-for-phone.sh --soc SM8750 --name samresnet100 <dir>/samresnet100_t150.onnx …_t300.onnx …_t600.onnx`,
+  then copy the binaries as `t150.bin`, `t300.bin` and `t600.bin` into the model's folder on the phone.
+- **Input layout:** QNN's converter makes the input [1, 80, T] (mel bins first). sherpa-onnx's QNN extractor (our
+  patch) feeds it that way.
+- **Time:** each graph takes about 12 minutes to compile.
+
 ## 3. Compile for the chip
 
 [`compile.sh`](../scripts/npu/compile.sh) runs, for each graph:
@@ -159,6 +175,17 @@ What the patch adds to v2.0.1:
 - QNN errors throw, and the JNI turns them into Java exceptions, instead of `_Exit` closing the app.
 - QNN's log goes to logcat with tag `sherpa-onnx-qnn`.
 - The streaming decode JNI call is wrapped in `SafeJNI`.
+- Speaker embeddings on the NPU: `SpeakerEmbeddingExtractorConfig.qnnConfig` (Kotlin, JNI, C++) with the model's
+  fixed-length context binaries, comma separated (`csrc/qnn/speaker-embedding-extractor-qnn-impl.*`).
+  - **Shorter than the smallest graph:** the frames repeat.
+  - **Longer:** windows of the largest graph that fits, spread evenly, their prints averaged.
+  - **Speaker pass:** sherpa-onnx's speaker diarization takes it too.
+  - **Errors:** extractor and diarization errors throw Java exceptions instead of crashing.
+- pyannote's segmentation alone, one window at a time, for live speaker turns: `SpeakerSegmentation` (Kotlin, in
+  `OfflineSpeakerDiarization.kt`) over `csrc/speaker-segmentation-window.*`.
+  - **Where it runs:** on the CPU (ONNX Runtime), or on the NPU given a context binary compiled for the 10 s window
+    (`[1, 1, 160000]`).
+  - **Output:** each frame's powerset log-probabilities.
 
 Qualcomm's runtime libraries aren't in the AAR. Gradle takes them from sherpa-onnx's `qnn-libs-2.40.0.251030`
 (pinned in `androidApp/build.gradle.kts`).

@@ -86,10 +86,81 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
   keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
   start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
+- **Live speaker turns** (owner's request, Nov 6, 2026; diart's method): when pyannote's segmentation is on the phone,
+  speakers are found during the lecture instead of by each line's print (`LiveSpeakers`).
+  - **Each step:** every 2.5 s, segmentation reads the last 10 s (pyannote's window) and settles the part that is
+    2.5 s old or older and wasn't settled before: who speaks there, overlaps included.
+  - **Prints:** each of the window's voices there gets one print of its single-voice audio in that part (when it has
+    1 s or more) from the picked voice-print model. It joins the closest of the lecture's speakers (`SpeakerTracker`,
+    known voices first), or starts a new one, at the model's `VoicePrintThresholds.live` (short prints are noisier,
+    so it is lower than for whole lines). A voice with too little audio keeps the speaker it had in the previous
+    window, where the windows overlap.
+  - **Lines:** they split where the settled turns change, at a word (`liveLines`, `followTurns`); a line without word
+    times gets the speaker who spoke most of it.
+  - **Delay:** labels follow the text by 2.5–5 s; each moment is decided once.
+  - **The pass after Stop is off by default:** `SettingsStore.findSpeakersOnStop`, now `speakerPassOnStop`; the old
+    switch is ignored. It can still be run from the lecture's menu.
+  - **Without segmentation:** each line's print, as below.
+  - **What live decided is kept** with the lecture (`speakers-live.json`: the model, and each voice's stretch per
+    settled part with its print, or the stretch it continues; `LectureStore.saveLiveSpeakers`).
+  - **"Tune speakers on this lecture"** (the lecture's menu, with the number of lines the user gave another speaker
+    than live did) replays those prints across the model's "fewer ↔ more speakers" range (`SpeakerTuning`). It shows
+    the setting whose speakers match the user's labels best, and Apply sets it. It isn't offered after a speaker pass,
+    which regroups every line.
+  - **The segmentation model is picked** too (`SettingsStore.segmentationModel`):
+    - pyannote's (default);
+    - BUT-FIT's DiariZen (WavLM + Conformer, 4 speakers a window, 20 ms frames), copied by hand: base-s80 and
+      large-s80 (CC-BY-NC-4.0, 16 s windows), and meeting-base (8 s). meeting-base's Hugging Face page says MIT, its
+      repository CC-BY-NC-4.0, so it is treated as non-commercial.
+
+    They are exported with a fixed window and pyannote's metadata, so the same sherpa-onnx class runs them
+    (`build/diarizen/`, not in git).
+  - **Replay A/B** of the three lectures through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
+    per second of audio on one Mac CPU core, CAM++'s prints 0.02.
+- **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live
+  labels and the speaker pass; a change applies from the next lecture or speaker pass (`SettingsStore.voiceModel`,
+  `Recording.voiceModel`). CAM++ stays the default.
+  - **The choices** (`ModelCatalog.voicePrintModels`):
+    - CAM++, CPU.
+    - 3D-Speaker ERes2NetV2 (Apache-2.0, downloadable), CPU.
+    - WeSpeaker ResNet293-LM (CC-BY-4.0).
+    - WeSpeaker SimAM-ResNet100, VoxBlink2 + VoxCeleb2 (CC-BY-NC-SA-4.0, non-commercial).
+
+    The two WeSpeaker models are copied to the phone by hand (`SpeechModel.manual`, listed once their folder has `.ok`),
+    with `feature_normalize_type=global-mean` added to their ONNX. sherpa-onnx's release lacks it, and without the mean
+    normalization WeSpeaker trains with, ResNet293's EER on the owner's lectures was 31.8% instead of 18.2%.
+  - **On the NPU:** on the Snapdragon 8 Elite they run on the NPU when their folder has the NPU build (`t150.bin`,
+    `t300.bin`, `t600.bin`; [npu-build.md](npu-build.md)). sherpa-onnx's extractor windows any length over those
+    graphs; if the NPU fails, the same model runs on the CPU (`SherpaVoiceEmbedder`, `SherpaDiarizer`). On the NPU a
+    1.5 s print takes 16 ms with ResNet100 and 6 ms with ResNet293.
+  - **Thresholds:** each model has its own (`VoicePrintThresholds`): the tracker's cosine and the speaker pass's
+    clustering distance, set from an A/B on the owner's lectures (`build/speaker-ab/results.md`, not in git).
+  - **Saved voices:** `voices.json` keeps a print per model (`"model"`; prints saved before are CAM++'s). Only the
+    picked model's prints are compared; a voice without one is learned again the next time it is named.
+  - **The A/B (Nov 6):** lines of three lectures, same-vs-different-speaker EER.
+    - ResNet100 + mean normalization 17.9%, ResNet293 + mean normalization 18.2%, CAM++ 21.0%, ERes2NetV2 23.1%.
+    - The labels were CAM++'s own (no line was edited), so this favors CAM++.
 - Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
   speech (two at once) gets one speaker, the louder.
 
 ### Data
+
+- **Power per lecture** (owner's request, Nov 6, 2026): while a lecture records, `PowerMeter` samples the battery every
+  10 s (`AndroidPowerProbe`):
+  - BatteryManager's CURRENT_NOW, whose size is used: the S25 reports discharge as negative;
+  - the voltage, the temperature, whether it is plugged in, and the level, all from ACTION_BATTERY_CHANGED;
+  - whether the screen is on;
+  - the app's own CPU time, from `/proc/self/stat`.
+
+  At Stop it writes `power.json` (version 1) beside the audio, and adds a row to `power-log.csv` in the app's own
+  storage. The report holds:
+  - duration, average mW, mWh in all, mWh and J per minute;
+  - battery % and °C at the start and end;
+  - the app's CPU seconds per minute, and the screen-on share;
+  - the models used and where (NPU or CPU).
+
+  The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
+  time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.
 
 One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
 `transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the lecture to read beside its

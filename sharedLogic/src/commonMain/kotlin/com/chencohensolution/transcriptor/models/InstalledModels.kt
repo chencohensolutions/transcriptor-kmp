@@ -30,6 +30,14 @@ class InstalledModels(private val fileSystem: FileSystem, private val root: Path
 
     fun setNpu(id: String, result: NpuResult) = read().let { f -> write(f.copy(npu = f.npu + (id to NpuV1(result.runs, result.reason)))) }
 
+    /** Forgets a model's NPU result, so it is checked (and offered) again. */
+    fun clearNpu(id: String) = read().let { f -> write(f.copy(npu = f.npu - id)) }
+
+    /** The NPU model being loaded now ([NpuLoadGuard]); still set at start, its load got the app killed. */
+    fun loading(): String? = read().loading
+
+    fun setLoading(id: String?) = read().let { f -> write(f.copy(loading = id)) }
+
     private fun read(): ModelsFileV1 =
         if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else ModelsFileV1()
 
@@ -63,7 +71,13 @@ class ModelLibrary(private val installed: InstalledModels) {
 }
 
 @Serializable
-private data class ModelsFileV1(val v: Int = 1, val models: List<InstalledV1> = emptyList(), val npu: Map<String, NpuV1> = emptyMap())
+private data class ModelsFileV1(
+    val v: Int = 1,
+    val models: List<InstalledV1> = emptyList(),
+    val npu: Map<String, NpuV1> = emptyMap(),
+    /** The NPU model being loaded ([NpuLoadGuard]). */
+    val loading: String? = null,
+)
 
 @Serializable
 private data class NpuV1(val runs: Boolean, val reason: String? = null)
@@ -92,5 +106,57 @@ private data class InstalledV1(
                 files.map { FileV1(it.name, it.url, it.sha256, it.sizeBytes, it.gitSha1) }, quantizeTo, chips, i.repo, i.use,
             )
         }
+    }
+}
+
+/**
+ * Loads NPU models so that one too big for the phone can't crash the app twice: a model whose files and working
+ * memory don't fit in [freeBytes] is refused up front, and each load is marked in `models.json` while it runs.
+ *
+ * - **A load the app didn't survive:** Android ends the app with no error to catch (the low-memory killer). The mark
+ *   is then still there at the next start, and [recover] disables that model for this phone.
+ * - **Disabled:** an NPU result that failed ([NpuResult]), so the model is left out of what can run
+ *   ([ModelLibrary.forLanguage]) and the pick falls back to the next model that works. Nothing retries it on its
+ *   own; [reenable] does, when the user asks.
+ */
+class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes: () -> Long) {
+    class Refused(message: String) : Exception(message)
+
+    /** At start: disables the model whose load was running when the app was last killed; its id, or null. */
+    fun recover(): String? {
+        val id = installed.loading() ?: return null
+        installed.setNpu(id, NpuResult(runs = false, reason = KILLED))
+        installed.setLoading(null)
+        return id
+    }
+
+    /** Runs [load] (the model's NPU engine, made and loaded) for [model], or refuses it: see the class. */
+    fun <T> load(model: SpeechModel, load: () -> T): T {
+        installed.npu(model.id)?.takeIf { !it.runs }?.let { throw Refused(it.reason ?: "Disabled on this phone") }
+        val need = needs(model.sizeBytes)
+        val free = freeBytes()
+        if (need > free) {
+            val reason = "Not enough memory on this phone: needs about ${gb(need)} GB, ${gb(free)} GB free"
+            installed.setNpu(model.id, NpuResult(runs = false, reason = reason))
+            throw Refused(reason)
+        }
+        installed.setLoading(model.id)
+        try {
+            return load()
+        } finally {
+            installed.setLoading(null)
+        }
+    }
+
+    /** Lets a disabled model be tried again (after closing other apps, or with a smaller build). */
+    fun reenable(id: String) = installed.clearNpu(id)
+
+    companion object {
+        const val KILLED = "Not enough memory on this phone: the app was closed while loading it"
+
+        /** What loading [sizeBytes] of NPU files takes: the files, a quarter more while the runtime prepares them, and 512 MB. */
+        fun needs(sizeBytes: Long) = sizeBytes + sizeBytes / 4 + 512L * 1024 * 1024
+
+        private fun gb(bytes: Long) = ((bytes / 1e8).toLong() / 10.0).toString()
     }
 }

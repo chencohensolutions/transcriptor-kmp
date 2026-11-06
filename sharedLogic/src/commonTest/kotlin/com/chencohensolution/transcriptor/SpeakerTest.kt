@@ -11,6 +11,8 @@ import com.chencohensolution.transcriptor.speech.SpeakerLabeler
 import com.chencohensolution.transcriptor.speech.SpeakerTracker
 import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.Voice
+import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
+import com.chencohensolution.transcriptor.models.ModelCatalog
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -110,5 +112,99 @@ class SpeakerTest {
         val lecture = second.state.value!!.lecture
         assertEquals(listOf("speaker-1", "speaker-2"), lecture.segments.map { it.speakerId })
         assertEquals(listOf(Speaker("speaker-1", ""), Speaker("speaker-2", "המרצה")), lecture.speakers)
+    }
+
+    @Test
+    fun voicesKeepAPrintPerModelAndNeverMixThem() {
+        val fs = FakeFileSystem()
+        var model = "cam"
+        val store = VoiceStore(fs, "/v".toPath()) { model }
+        store.save("nb", Voice("המרצה", listOf(1f, 0f)))
+        model = "resnet"
+        assertEquals(emptyList(), store.load("nb"))
+        store.save("nb", Voice("המרצה", listOf(0f, 1f, 0f)))
+        assertEquals(listOf(listOf(0f, 1f, 0f)), store.load("nb").map { it.print })
+        store.rename("nb", "המרצה", "Dana")
+        assertEquals(listOf("Dana"), store.load("nb").map { it.name })
+        model = "cam"
+        assertEquals(listOf(Voice("Dana", listOf(1f, 0f), "cam")), store.load("nb"))
+        // A print made by a lecture's tracker keeps its model, whichever model is picked meanwhile.
+        store.save("nb", Voice("Noa", listOf(0f, 0f, 1f), "resnet"))
+        assertEquals(listOf("Dana"), store.load("nb").map { it.name })
+    }
+
+    @Test
+    fun voicesSavedBeforeModelsHadIdsAreCamPlusPlus() {
+        val fs = FakeFileSystem()
+        val file = "/v/notebooks/nb/voices.json".toPath()
+        fs.createDirectories(file.parent!!)
+        fs.write(file) { writeUtf8("""{"v":1,"voices":[{"name":"המרצה","print":[1.0,0.0]}]}""") }
+        assertEquals(listOf(ModelCatalog.voicePrints.id), VoiceStore(fs, "/v".toPath()).load("nb").map { it.model })
+        assertEquals(emptyList(), VoiceStore(fs, "/v".toPath()) { "other" }.load("nb"))
+    }
+
+    @Test
+    fun aTrackerComparesOnlyPrintsOfItsModel() {
+        val t = SpeakerTracker(listOf(Voice("המרצה", listOf(1f, 0f), "cam"), Voice("Dana", listOf(1f, 0f), "resnet")), model = "resnet")
+        t.assign(floatArrayOf(1f, 0.1f))
+        assertEquals(listOf(Speaker("speaker-1", "Dana")), t.speakers)
+    }
+
+    @Test
+    fun eachVoiceModelHasItsThresholds() {
+        val cam = VoicePrintThresholds.of(ModelCatalog.voicePrints.id)
+        assertEquals(SpeakerTracker.THRESHOLD, cam.sameSpeaker)
+        assertEquals(cam, VoicePrintThresholds.of("unknown"))
+        for (m in ModelCatalog.voicePrintModels) assertTrue(VoicePrintThresholds.of(m.id).sameSpeaker in 0.2f..0.9f, m.id)
+    }
+
+    @Test
+    fun theScreenShowsTheVoicePrintModelAndWhereItRuns() = runTest {
+        val recorder = FakeRecorder(fs)
+        val inUse = kotlinx.coroutines.flow.MutableStateFlow(com.chencohensolution.transcriptor.recording.ModelInUse("ResNet100"))
+        val settings = SettingsStore(fs, root).apply { findSpeakersOnStop = true }
+        val session = LectureSession(
+            recorder, store, settings, backgroundScope, now = { testScheduler.currentTime + 1 }, voices = voices,
+            speakerPassReady = { true },
+        ) { language, scope, known ->
+            val tracker = SpeakerTracker(known)
+            val labeler = SpeakerLabeler(tracker) {
+                PitchEmbedder().also { inUse.value = inUse.value.copy(runs = com.chencohensolution.transcriptor.recording.ModelInUse.Runs.Npu) }
+            }
+            LiveModel("fake", UtteranceTranscriber(language, "m", scope, StandardTestDispatcher(testScheduler), labeler) { FakeEngine() }, tracker, inUse)
+        }
+        session.start(notebook, "1")
+        runCurrent()
+        assertEquals(com.chencohensolution.transcriptor.recording.ModelInUse.Runs.NotYet, session.state.value!!.voicePrints!!.runs)
+        assertTrue(session.state.value!!.speakerPassOnStop)
+        recorder.say(3_000, 300)
+        runCurrent()
+        assertEquals(com.chencohensolution.transcriptor.recording.ModelInUse("ResNet100", com.chencohensolution.transcriptor.recording.ModelInUse.Runs.Npu), session.state.value!!.voicePrints)
+        session.stop()
+    }
+
+    @Test
+    fun moreSpeakersRaisesTheCosinesAndLowersTheClustering() {
+        val id = ModelCatalog.voicePrintsResNet293.id
+        val tuned = VoicePrintThresholds.of(id)
+        assertEquals(tuned, VoicePrintThresholds.of(id, 0f))
+        val more = VoicePrintThresholds.of(id, 1f)
+        val fewer = VoicePrintThresholds.of(id, -1f)
+        assertTrue(more.live > tuned.live && tuned.live > fewer.live)
+        assertTrue(more.sameSpeaker > tuned.sameSpeaker && more.clustering < tuned.clustering && fewer.clustering > tuned.clustering)
+        assertEquals(more, VoicePrintThresholds.of(id, 5f))
+        assertTrue(fewer.live > 0f)
+    }
+
+    @Test
+    fun theSpeakerTuningIsKeptPerModel() {
+        val settings = SettingsStore(FakeFileSystem(), "/s".toPath())
+        assertEquals(0f, settings.speakerTuning("cam"))
+        settings.setSpeakerTuning("cam", 0.5f)
+        settings.setSpeakerTuning("resnet", -1f)
+        assertEquals(0.5f, settings.speakerTuning("cam"))
+        assertEquals(-1f, settings.speakerTuning("resnet"))
+        settings.setSpeakerTuning("cam", 0f)
+        assertEquals(0f, settings.speakerTuning("cam"))
     }
 }

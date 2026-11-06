@@ -5,6 +5,9 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.chencohensolution.transcriptor.speech.LiveStretch
+import com.chencohensolution.transcriptor.recording.PowerReport
+import com.chencohensolution.transcriptor.recording.PowerLogCsv
 import okio.FileSystem
 import okio.Path
 import kotlin.time.ExperimentalTime
@@ -117,6 +120,60 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val file = place.folder(lecture.notebookId, lecture.id) / "versions" / "$id.json"
         if (!place.exists(file)) return null
         return json.decodeFromString<VersionFileV1>(place.fileSystem.read(file) { readUtf8() }).toVersion()
+    }
+
+    /**
+     * Keeps what live speaker turns decided while [lecture] was recorded (`speakers-live.json`: [model]'s id and the
+     * stretches with their prints), so its speakers can be regrouped or the thresholds tuned on it later.
+     */
+    fun saveLiveSpeakers(lecture: Lecture, model: String, stretches: List<LiveStretch>) {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val folder = place.folder(lecture.notebookId, lecture.id)
+        place.fileSystem.createDirectories(folder)
+        val temp = folder / "$LIVE_SPEAKERS.tmp"
+        val file = LiveSpeakersFileV1(model = model, stretches = stretches.map { LiveStretchV1(it.startMillis, it.endMillis, it.speaker, it.print, it.follows) })
+        place.fileSystem.write(temp) { writeUtf8(compact.encodeToString(file)) }
+        place.fileSystem.atomicMove(temp, folder / LIVE_SPEAKERS)
+    }
+
+    /** [saveLiveSpeakers]' model id and stretches; null for a lecture recorded without live speaker turns. */
+    fun loadLiveSpeakers(lecture: Lecture): Pair<String, List<LiveStretch>>? {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val file = place.folder(lecture.notebookId, lecture.id) / LIVE_SPEAKERS
+        if (!place.exists(file)) return null
+        val f = compact.decodeFromString<LiveSpeakersFileV1>(place.fileSystem.read(file) { readUtf8() })
+        return f.model to f.stretches.map { LiveStretch(it.startMs, it.endMs, it.speaker, it.print, it.follows) }
+    }
+
+    private val compact = Json { encodeDefaults = false; ignoreUnknownKeys = true }
+
+    /** Keeps how much power recording [lecture] took (`power.json`, version 1), beside its audio. */
+    fun savePower(lecture: Lecture, report: PowerReport) {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val folder = place.folder(lecture.notebookId, lecture.id)
+        place.fileSystem.createDirectories(folder)
+        val temp = folder / "$POWER.tmp"
+        place.fileSystem.write(temp) { writeUtf8(json.encodeToString(report)) }
+        place.fileSystem.atomicMove(temp, folder / POWER)
+    }
+
+    /** [savePower]'s report; null for a lecture recorded before it existed. */
+    fun loadPower(lecture: Lecture): PowerReport? {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val file = place.folder(lecture.notebookId, lecture.id) / POWER
+        if (!place.exists(file)) return null
+        return runCatching { json.decodeFromString<PowerReport>(place.fileSystem.read(file) { readUtf8() }) }.getOrNull()
+    }
+
+    /** Adds [row] to `power-log.csv` in the app's own storage (its header first, once). */
+    fun appendPowerLog(row: String) {
+        val file = local.root / POWER_LOG
+        val fs = local.fileSystem
+        val before = if (fs.exists(file)) fs.read(file) { readUtf8() } else PowerLogCsv.HEADER + "\n"
+        val temp = local.root / "$POWER_LOG.tmp"
+        fs.createDirectories(local.root)
+        fs.write(temp) { writeUtf8(before + row + "\n") }
+        fs.atomicMove(temp, file)
     }
 
     fun deleteVersion(lecture: Lecture, id: String) {
@@ -250,3 +307,20 @@ private data class VersionFileV1(
         )
     }
 }
+
+/** `speakers-live.json`: live speaker turns' stretches of a lecture, by voice-print [model]. */
+@Serializable
+private data class LiveSpeakersFileV1(val v: Int = 1, val model: String, val stretches: List<LiveStretchV1> = emptyList())
+
+@Serializable
+private data class LiveStretchV1(
+    val startMs: Long,
+    val endMs: Long,
+    val speaker: String,
+    val print: List<Float>? = null,
+    val follows: Int? = null,
+)
+
+const val LIVE_SPEAKERS = "speakers-live.json"
+const val POWER = "power.json"
+const val POWER_LOG = "power-log.csv"
