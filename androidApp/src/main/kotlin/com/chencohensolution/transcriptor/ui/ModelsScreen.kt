@@ -128,6 +128,8 @@ data class ModelsState(
     val npuVoiceModels: Set<String> = emptySet(),
     /** The user's "fewer ↔ more speakers" per voice-print model, -1..1 (0: its tuning). */
     val speakerTuning: Map<String, Float> = emptyMap(),
+    /** The segmentation model live speaker turns use (its id); null without one. */
+    val segmentationModel: String? = null,
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
@@ -158,11 +160,11 @@ data class ModelsState(
      * The speakers page: the voice-print models (the catalog's, and those copied to the phone by hand once there),
      * then the speaker pass's segmentation.
      */
-    val speakerPage get() = ModelCatalog.voicePrintModels.filter { !it.manual || status(it) == ModelStatus.Ready } + ModelCatalog.speakerSegmentation
+    val speakerPage get() = (ModelCatalog.voicePrintModels + ModelCatalog.segmentationModels).filter { !it.manual || status(it) == ModelStatus.Ready }
 }
 
 /** The models for speaker labels (live) and the speaker pass (after), every one the speakers page may list. */
-val speakerModels get() = ModelCatalog.voicePrintModels + ModelCatalog.speakerSegmentation
+val speakerModels get() = ModelCatalog.voicePrintModels + ModelCatalog.segmentationModels
 
 class ModelsActions(
     val back: () -> Unit = {},
@@ -175,6 +177,8 @@ class ModelsActions(
     val useVoicePrints: (SpeechModel) -> Unit = {},
     /** Sets how readily the voice-print model starts a new speaker, -1 (fewer) to 1 (more); 0 resets. */
     val setSpeakerTuning: (SpeechModel, Float) -> Unit = { _, _ -> },
+    /** Picks the segmentation model for live speaker turns, from the next lecture. */
+    val useSegmentation: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
@@ -513,6 +517,8 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
     val refine = language != null && state.refineFor(language) == model
     val voice = model.kind == ModelKind.SpeakerEmbedding
     val speaks = voice && state.voiceModel == model.id
+    val segments = model.kind == ModelKind.SpeakerSegmentation
+    val turns = segments && state.segmentationModel == model.id
     ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -522,6 +528,7 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                     if (live) Badge(stringResource(R.string.models_badge_live))
                     if (refine) Badge(stringResource(R.string.models_badge_refine))
                     if (speaks) Badge(stringResource(R.string.models_badge_speakers))
+                    if (turns) Badge(stringResource(R.string.models_badge_turns))
                     if (model.id in state.npuVoiceModels) Badge(stringResource(R.string.models_npu_long))
                     if ("-NC" in model.license) ColoredBadge(stringResource(R.string.models_license_nc, model.license), ok = false)
                     if (model.manual) Badge(stringResource(R.string.models_by_hand))
@@ -546,6 +553,9 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (segments && status == ModelStatus.Ready && !turns) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.models_use_for_turns)) }, onClick = { menu = false; actions.useSegmentation(model) })
+                    }
                     if (voice && status == ModelStatus.Ready && !speaks) {
                         DropdownMenuItem(text = { Text(stringResource(R.string.models_use_for_speakers)) }, onClick = { menu = false; actions.useVoicePrints(model) })
                     }

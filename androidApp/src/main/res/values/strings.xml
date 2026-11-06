@@ -140,6 +140,8 @@
     <string name="models_badge_speakers">Speakers ✓</string>
     <string name="models_use_for_speakers">Use for speaker labels</string>
     <string name="models_by_hand">Copied by hand</string>
+    <string name="models_badge_turns">Turns ✓</string>
+    <string name="models_use_for_turns">Use for live speaker turns</string>
     <string name="models_speaker_tuning">How readily it starts a new speaker</string>
     <string name="models_speaker_tuning_fewer">Fewer speakers</string>
     <string name="models_speaker_tuning_more">More speakers</string>

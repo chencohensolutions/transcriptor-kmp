@@ -76,6 +76,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
+        segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed) { speakerModels.associate { it.id to Recording.settings.speakerTuning(it.id) } },
         npuVoiceModels = remember(statuses) {
             speakerModels.filter { it.kind == ModelKind.SpeakerEmbedding && statuses[it.id] == ModelStatus.Ready && Recording.voicePrintFiles(it).npu.isNotEmpty() }
@@ -94,6 +95,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
             useVoicePrints = { m -> io { Recording.settings.voiceModel = m.id } },
             setSpeakerTuning = { m, more -> io { Recording.settings.setSpeakerTuning(m.id, more) } },
+            useSegmentation = { m -> io { Recording.settings.segmentationModel = m.id } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },

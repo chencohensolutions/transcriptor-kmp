@@ -56,6 +56,8 @@ private data class SettingsFileV1(
     val voiceModel: String? = null,
     /** The user's "fewer ↔ more speakers" per voice-print model (its id), -1..1; a model without one: 0, its tuning. */
     val speakerTuning: Map<String, Float> = emptyMap(),
+    /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
+    val segmentationModel: String? = null,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -118,6 +120,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var voiceModel: String?
         get() = read().voiceModel
         set(value) = write(read().copy(voiceModel = value))
+
+    /** The segmentation model picked for live speaker turns; null: the default (pyannote's). */
+    var segmentationModel: String?
+        get() = read().segmentationModel
+        set(value) = write(read().copy(segmentationModel = value))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
     fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: 0f

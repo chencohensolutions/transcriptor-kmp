@@ -251,6 +251,15 @@ object Recording {
             all.firstOrNull { it.id == settings.voiceModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
         }
 
+    /**
+     * The segmentation model for live speaker turns: the one picked in Settings › Models if it is on the phone, else
+     * pyannote's if downloaded; null without one (speakers are then labeled by each line's print).
+     */
+    val segmentationModel: SpeechModel?
+        get() = ModelCatalog.segmentationModels.let { all ->
+            all.firstOrNull { it.id == settings.segmentationModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
+        }
+
     /** [model]'s files: its ONNX, and its NPU build on the phone it was compiled for. */
     fun voicePrintFiles(model: SpeechModel) = VoicePrintFiles.of(models.dir(model), SherpaNpuWhisperEngine.chip)
 
@@ -430,14 +439,14 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     val model = liveModelFor(language) ?: return null
     val prints = Recording.voiceModel
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
-    val liveTurns = prints != null && Recording.models.isReady(ModelCatalog.speakerSegmentation)
+    val segmentation = Recording.segmentationModel
+    val liveTurns = prints != null && segmentation != null
     val tracker = prints?.let { VoicePrintThresholds.of(it.id, Recording.settings.speakerTuning(it.id)).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
     val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
-    // Speakers found live with pyannote's segmentation when it is on the phone; else by each line's print.
-    val segmentation = ModelCatalog.speakerSegmentation
-    val live = if (tracker != null && liveTurns) {
+    // Speakers found live with segmentation when a model is on the phone; else by each line's print.
+    val live = if (tracker != null && segmentation != null) {
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
         val speakersWorker = Dispatchers.Default.limitedParallelism(1)
         var where = "CPU"
@@ -445,11 +454,14 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
             tracker, scope, speakersWorker,
             loadSegmenter = {
                 val dir = Recording.models.dir(segmentation)
-                SherpaSegmenter(File(dir, "model.onnx"), File(dir, SherpaSegmenter.NPU_FILE).takeIf { SherpaNpuWhisperEngine.chip == "SM8750" }, Recording.nativeLibDir)
+                // pyannote is small (0.1 s a window on one core); DiariZen's WavLM needs more on the CPU.
+                val threads = if (segmentation == ModelCatalog.speakerSegmentation) 1 else 4
+                SherpaSegmenter(File(dir, "model.onnx"), File(dir, SherpaSegmenter.NPU_FILE).takeIf { SherpaNpuWhisperEngine.chip == "SM8750" }, Recording.nativeLibDir, threads)
                     .also { where = if (it.onNpu) "NPU" else "CPU" }
             },
             loadEmbedder = {
-                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("pyannote ($where) + ${prints.name}", e.runs) }
+                val turns = if (segmentation == ModelCatalog.speakerSegmentation) "pyannote" else segmentation.name
+                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns ($where) + ${prints.name}", e.runs) }
             },
         )
     } else {

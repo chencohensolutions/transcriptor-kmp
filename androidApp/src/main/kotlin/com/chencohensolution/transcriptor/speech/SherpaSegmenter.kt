@@ -6,10 +6,11 @@ import com.k2fsa.sherpa.onnx.SpeakerSegmentation
 import java.io.File
 
 /**
- * pyannote's segmentation 3.0 ([model], ONNX) on sherpa-onnx, one 10 s window at a time, for live speaker turns: on
- * the Qualcomm NPU when its NPU build ([npu], compiled for that window) is given and loads, else on the CPU.
+ * A segmentation model ([model], ONNX with pyannote's metadata: pyannote's segmentation 3.0, or DiariZen) on
+ * sherpa-onnx, one window at a time (10 s, DiariZen's 8 or 16 s), for live speaker turns: on the Qualcomm NPU when its
+ * NPU build ([npu], compiled for that window) is given and loads, else on the CPU with [threads].
  */
-class SherpaSegmenter(model: File, npu: File? = null, libDir: String? = null) : Segmenter {
+class SherpaSegmenter(model: File, npu: File? = null, libDir: String? = null, threads: Int = 1) : Segmenter {
     private val segmentation: SpeakerSegmentation
 
     /** It runs on the NPU. */
@@ -30,7 +31,7 @@ class SherpaSegmenter(model: File, npu: File? = null, libDir: String? = null) : 
             }
         }
         this.onNpu = onNpu != null
-        segmentation = onNpu ?: SpeakerSegmentation(model.path, 1)
+        segmentation = onNpu ?: SpeakerSegmentation(model.path, threads)
         Log.i(SherpaVoiceEmbedder.TAG, "segmentation on the ${if (this.onNpu) "NPU" else "CPU"}")
     }
 

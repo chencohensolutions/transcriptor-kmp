@@ -312,10 +312,39 @@ object ModelCatalog {
         ),
     )
 
+    private fun diarizen(id: String, name: String, parameters: String, license: String, credit: String) = SpeechModel(
+        id = id, name = name, languages = listOf(SpeechModel.MULTILINGUAL), parameters = parameters, license = license,
+        fitsLive = true, source = "https://huggingface.co/BUT-FIT/$id", kind = ModelKind.SpeakerSegmentation,
+        files = listOf(ModelFile("model.onnx", "", "", 0)), credit = credit, manual = true,
+    )
+
+    /**
+     * BUT-FIT's DiariZen (WavLM + Conformer) segmentation models, for live speaker turns in place of pyannote's,
+     * copied by hand: `model.onnx` (exported with a fixed chunk and pyannote's metadata, so sherpa-onnx loads it) and
+     * on the Snapdragon 8 Elite `window.bin`, its NPU build. Up to 4 speakers per chunk, 2 at once, 20 ms frames.
+     */
+    val diarizenBaseS80 = diarizen(
+        "diarizen-wavlm-base-s80-md", "DiariZen WavLM Base s80", "25M", "CC-BY-NC-4.0",
+        "DiariZen by BUT-FIT (CC-BY-NC-4.0: not for commercial use); 16 s chunks",
+    )
+    val diarizenLargeS80 = diarizen(
+        "diarizen-wavlm-large-s80-md", "DiariZen WavLM Large s80", "70M", "CC-BY-NC-4.0",
+        "DiariZen by BUT-FIT (CC-BY-NC-4.0: not for commercial use); 16 s chunks",
+    )
+
+    /** Its Hugging Face page says MIT, DiariZen's repository says all its weights are CC-BY-NC-4.0: treated as the latter. */
+    val diarizenMeetingBase = diarizen(
+        "diarizen-meeting-base", "DiariZen meeting Base", "101M", "CC-BY-NC-4.0",
+        "DiariZen by BUT-FIT (MIT on Hugging Face, CC-BY-NC-4.0 in its repository: treated as non-commercial); 8 s chunks",
+    )
+
+    /** The segmentation models for speaker turns, the default (pyannote) first. */
+    val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
+
     val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
-    fun nameOf(id: String): String = (all + voicePrintModels + speakerSegmentation).firstOrNull { it.id == id }?.name ?: id
+    fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id
 
     /**
      * The models that know [language] and run on [chip] (the phone's): the ones made for it first, then the
