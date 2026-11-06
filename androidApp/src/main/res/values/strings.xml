@@ -19,6 +19,12 @@
     <string name="format_wav">WAV (largest, about 690 MB an hour)</string>
     <string name="format_wav_then_flac">WAV, then compress to FLAC after the lecture</string>
     <string name="format_flac_live">FLAC while recording</string>
+    <string name="flac_effort">FLAC compression effort</string>
+    <string name="flac_effort_value">%1$d of %2$d</string>
+    <string name="flac_effort_fast">Faster</string>
+    <string name="flac_effort_small">Smaller file</string>
+    <string name="flac_effort_note_after">The sound is the same at every level. Higher makes the file a few percent smaller and compressing after the lecture take longer.</string>
+    <string name="flac_effort_note_live">The sound is the same at every level. Higher makes the file a few percent smaller and uses more of the phone while recording (and battery).</string>
     <string name="start_lecture">Start lecture</string>
     <string name="start_default_notebook">My notebook</string>
     <string name="start_last">Last lecture: %1$s · %2$s · %3$d notes · %4$s</string>

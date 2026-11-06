@@ -2,6 +2,8 @@ package com.chencohensolution.transcriptor.recording
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
+import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -10,9 +12,11 @@ import java.nio.ByteBuffer
  * PCM (16 bit, interleaved) to a .flac file, with Android's built-in FLAC encoder. The encoder hands out the stream's
  * header first (`fLaC` and STREAMINFO, maybe more metadata after it); this writes `fLaC` and STREAMINFO alone, marked
  * as the last metadata block, then the frames, and on [close] puts the total sample count into STREAMINFO.
+ * [level] is FLAC's compression level, 0 (fastest) to 8 (smallest).
  */
 class FlacEncoder(
     file: File,
+    private val level: Int = FLAC_DEFAULT_LEVEL,
     private val sampleRate: Int = WavWriter.SAMPLE_RATE,
     private val channels: Int = WavWriter.CHANNELS,
 ) : PcmSink {
@@ -20,7 +24,7 @@ class FlacEncoder(
     private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_FLAC).apply {
         configure(
             MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_FLAC, sampleRate, channels).apply {
-                setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, 5)
+                setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, level.coerceIn(FLAC_LEVELS))
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, INPUT_SIZE)
             },
             null, null, MediaCodec.CONFIGURE_FLAG_ENCODE,
@@ -142,9 +146,9 @@ class FlacEncoder(
 }
 
 /** [FlacEncode] with [FlacEncoder]: the WAV's PCM in 64 KB pieces. */
-val androidFlacEncode = FlacEncode { wav, flac, progress ->
+val androidFlacEncode = FlacEncode { wav, flac, level, progress ->
     val wavFile = wav.toFile()
-    val encoder = FlacEncoder(flac.toFile())
+    val encoder = FlacEncoder(flac.toFile(), level)
     RandomAccessFile(wavFile, "r").use { input ->
         val total = input.length() - WavWriter.HEADER_SIZE
         input.seek(WavWriter.HEADER_SIZE)

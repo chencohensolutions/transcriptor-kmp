@@ -416,7 +416,7 @@ object Recording {
             live = ::liveModel,
             speakerPassReady = { canFindSpeakers },
         )
-        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
+        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

@@ -56,6 +56,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     media-processing foreground service), checked to hold every sample, then the WAV is deleted. An interrupted
     compression stays `pendingFlac` in `lecture.json` and is redone when the app next opens.
   - **FLAC live**: `audio.flac` as it records, with Android's built-in FLAC encoder.
+  - Both FLAC formats encode at the **compression effort** set in Settings (`SettingsStore.flacLevel`, 0–8, 5 by
+    default; Nov 6, 2026). Every level is lossless; higher ones make the file a few percent smaller and take longer.
+    The encoder is Android's MediaCodec FLAC, which runs on the CPU: the NPU and GPU have no FLAC encoder.
   - FLAC is about 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are alike).
 - `lecture.json`'s `"audio"` names the file, and `"pendingFlac"` marks a WAV waiting to be compressed.
 - The models get a copy downmixed to mono and resampled to 16 kHz, in memory.

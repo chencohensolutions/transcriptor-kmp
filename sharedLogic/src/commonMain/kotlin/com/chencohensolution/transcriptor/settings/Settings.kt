@@ -20,10 +20,21 @@ enum class AudioFormat {
     @SerialName("flac-live") FlacLive,
 }
 
+/**
+ * FLAC's compression levels: 0 is the fastest, 8 the smallest file. Every level keeps the same sound (FLAC is lossless);
+ * from 0 to 8 the file shrinks by a few percent and encoding takes several times longer.
+ */
+val FLAC_LEVELS = 0..8
+
+/** The level used before it was a setting, and the reference encoder's default. */
+const val FLAC_DEFAULT_LEVEL = 5
+
 @Serializable
 private data class SettingsFileV1(
     val v: Int = 1,
     val audioFormat: AudioFormat = AudioFormat.Wav,
+    /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
+    val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** The live model chosen per language (BCP-47 tag to model id). */
     val liveModels: Map<String, String> = emptyMap(),
     /** The refine model chosen per language; a language without one refines with its first ready large model. */
@@ -68,6 +79,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var audioFormat: AudioFormat
         get() = read().audioFormat
         set(value) = write(read().copy(audioFormat = value))
+
+    /** The FLAC compression level for "WAV, then FLAC" and "FLAC live": 0 the fastest, 8 the smallest ([FLAC_LEVELS]). */
+    var flacLevel: Int
+        get() = read().flacLevel.coerceIn(FLAC_LEVELS)
+        set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
 
     /**
      * The speaker pass also runs when a lecture stops (speakers are found live while it records). Off by default: it can

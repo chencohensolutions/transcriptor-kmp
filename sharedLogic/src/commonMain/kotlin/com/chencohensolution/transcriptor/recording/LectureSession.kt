@@ -132,6 +132,7 @@ class LectureSession(
         recorder.start(
             store.audioPath(lecture),
             if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
+            settings.flacLevel,
         )
         recording.value = Recording(notebook.title, lecture, paused = false)
         saving = scope.launch {

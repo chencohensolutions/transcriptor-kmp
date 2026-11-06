@@ -60,6 +60,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -94,7 +95,10 @@ import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
+import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import com.chencohensolution.transcriptor.speech.ModelStatus
+import kotlin.math.roundToInt
 
 /** The one-time check of an NPU model once it is downloaded. */
 sealed interface NpuCheck {
@@ -117,6 +121,8 @@ data class ModelsState(
     val refine: Map<String, String> = emptyMap(),
     val npu: Map<String, NpuCheck> = emptyMap(),
     val audioFormat: AudioFormat,
+    /** FLAC's compression level ([FLAC_LEVELS]), for both FLAC formats. */
+    val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** The speaker pass runs when a lecture stops. */
     val findSpeakersOnStop: Boolean,
     /** Lectures are improved on their own after they stop (improving by hand is always on the lecture's menu). */
@@ -180,6 +186,7 @@ class ModelsActions(
     /** Picks the segmentation model for live speaker turns, from the next lecture. */
     val useSegmentation: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
+    val setFlacLevel: (Int) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val chooseFolder: () -> Unit = {},
@@ -300,6 +307,7 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
                     }
                 }
             }
+            if (state.audioFormat != AudioFormat.Wav) FlacEffort(state.flacLevel, state.audioFormat, actions.setFlacLevel)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -393,6 +401,31 @@ private fun ChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifie
 @Composable
 private fun PageNote(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+}
+
+/** FLAC's compression level, 0 (fastest) to 8 (smallest), under the audio formats that make a FLAC. */
+@Composable
+private fun FlacEffort(level: Int, format: AudioFormat, set: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.flac_effort), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.flac_effort_value, level, FLAC_LEVELS.last), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(
+            value = level.toFloat(),
+            onValueChange = { v -> v.roundToInt().let { if (it != level) set(it) } },
+            valueRange = FLAC_LEVELS.first.toFloat()..FLAC_LEVELS.last.toFloat(),
+            steps = FLAC_LEVELS.last - FLAC_LEVELS.first - 1,
+        )
+        Row {
+            Text(stringResource(R.string.flac_effort_fast), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.flac_effort_small), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            stringResource(if (format == AudioFormat.FlacLive) R.string.flac_effort_note_live else R.string.flac_effort_note_after),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 @Composable

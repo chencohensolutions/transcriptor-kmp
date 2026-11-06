@@ -52,6 +52,7 @@ private fun ModelsLab(chip: String?) {
     var live by remember { mutableStateOf(emptyMap<String, String>()) }
     var refine by remember { mutableStateOf(emptyMap<String, String>()) }
     var format by remember { mutableStateOf(AudioFormat.WavThenFlac) }
+    var flacLevel by remember { mutableStateOf(5) }
     var speakers by remember { mutableStateOf(true) }
     var auto by remember { mutableStateOf(false) }
     var hub by remember { mutableStateOf(HubSearch()) }
@@ -97,7 +98,7 @@ private fun ModelsLab(chip: String?) {
     ModelsScreen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
-            audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto,
+            audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto,
         ),
         ModelsActions(
             download = download,
@@ -106,6 +107,7 @@ private fun ModelsLab(chip: String?) {
             useLive = { l, m -> live = live + (l to m.id) },
             useRefine = { l, m -> refine = refine + (l to m.id) },
             setAudioFormat = { format = it },
+            setFlacLevel = { flacLevel = it },
             setFindSpeakersOnStop = { speakers = it },
             setAutoImprove = { auto = it },
             addLanguage = { if (it !in languages) languages = languages + it },

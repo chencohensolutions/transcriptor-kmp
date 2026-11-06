@@ -30,11 +30,11 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
     private var reads = 0
 
     @SuppressLint("MissingPermission")
-    override fun start(file: Path, format: AudioFileFormat) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int) {
         check(record == null) { "Already recording" }
         sink = when (format) {
             AudioFileFormat.Wav -> WavWriter(fileSystem, file)
-            AudioFileFormat.Flac -> FlacEncoder(file.toFile())
+            AudioFileFormat.Flac -> FlacEncoder(file.toFile(), flacLevel)
         }
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
         record = AudioRecord(
