@@ -109,7 +109,7 @@ object ModelCatalog {
     // ivritTurbo (commit f33172a8) compiled with QAIRT 2.40.0.251030 for the Snapdragon 8 Elite's NPU (Hexagon v79):
     // 16-bit, encoder and decoder graphs as sherpa-onnx's Whisper QNN export makes them. Not published yet (Nov 4,
     // 2026): until it is on Hugging Face the files are copied to the phone by hand.
-    private const val NPU_SM8750 = "https://huggingface.co/HF_USER/ivrit-whisper-large-v3-turbo-qnn-sm8750/resolve/COMMIT"
+    private const val NPU_SM8750 = "https://huggingface.co/hencohen83/ivrit-whisper-large-v3-turbo-qnn-sm8750/resolve/d5997a9642f2dc7ca388f4c4eaf527c2b2fda218"
     val ivritTurboNpu = SpeechModel(
         id = "ivrit-whisper-large-v3-turbo-npu-sm8750",
         name = "ivrit.ai Whisper large-v3 turbo · NPU",
@@ -252,10 +252,12 @@ object ModelCatalog {
     )
 
     /**
-     * WeSpeaker ResNet293-LM (VoxCeleb, 28.6M), copied by hand: sherpa-onnx's release with `feature_normalize_type`
-     * `global-mean` added (WeSpeaker trains on mean-normalized features; without it its prints are much worse), and
-     * on the Snapdragon 8 Elite its NPU build (`t150.bin`, `t300.bin`, `t600.bin`; docs/npu-build.md). Not in [all].
+     * WeSpeaker ResNet293-LM (VoxCeleb, 28.6M; CC-BY-4.0), from the owner's Hugging Face: sherpa-onnx's release with
+     * `feature_normalize_type` `global-mean` added (WeSpeaker trains on mean-normalized features; without it its prints
+     * are much worse), and its NPU build for the Snapdragon 8 Elite (`t150.bin`, `t300.bin`, `t600.bin`, used on that
+     * chip only; docs/npu-build.md). Not in [all].
      */
+    private const val RESNET293 = "https://huggingface.co/hencohen83/wespeaker-resnet293-lm-qnn-sm8750/resolve/75258f7acf21cff8478ee219a06d82eafdf4b630"
     val voicePrintsResNet293 = SpeechModel(
         id = "wespeaker-resnet293-lm",
         name = "WeSpeaker ResNet293-LM",
@@ -265,9 +267,13 @@ object ModelCatalog {
         fitsLive = true,
         source = "https://github.com/wenet-e2e/wespeaker",
         kind = ModelKind.SpeakerEmbedding,
-        files = listOf(ModelFile("model.onnx", "", "2aabeca5e19cc249b2cffe709953ca7302e7eb6477b9e2ce81ab919be7e9ddcd", 114_336_566)),
+        files = listOf(
+            ModelFile("model.onnx", "$RESNET293/model.onnx", "2aabeca5e19cc249b2cffe709953ca7302e7eb6477b9e2ce81ab919be7e9ddcd", 114_336_566),
+            ModelFile("t150.bin", "$RESNET293/t150.bin", "7638b878bf4412ec0412bf3e30c3f2ec14bdcf4c778ff71a2eaaef9bfa7cb70b", 58_650_624),
+            ModelFile("t300.bin", "$RESNET293/t300.bin", "79baafcf3c9623af83a13107274c876f697f03b448c2b00e3e32a0318fc8b8e1", 59_072_512),
+            ModelFile("t600.bin", "$RESNET293/t600.bin", "59a4c6c75c663989113b2c1aac7398067786e90c82f977a97f4e115a76de9e7d", 59_961_344),
+        ),
         credit = "WeSpeaker (wenet-e2e), trained on VoxCeleb (CC-BY-4.0)",
-        manual = true,
     )
 
     /**
@@ -284,6 +290,7 @@ object ModelCatalog {
         fitsLive = true,
         source = "https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md",
         kind = ModelKind.SpeakerEmbedding,
+        // Published (non-commercial), copied by hand: https://huggingface.co/hencohen83/wespeaker-samresnet100-voxblink2-qnn-sm8750
         files = listOf(ModelFile("model.onnx", "", "094f9d4476a61c1595a0c01bd26a9aa80d98c8b5398f2f57334a41b4e0701e0c", 201_116_099)),
         credit = "WeSpeaker (wenet-e2e), trained on VoxBlink2 and VoxCeleb2 (CC-BY-NC-SA-4.0: not for commercial use)",
         manual = true,
@@ -312,6 +319,7 @@ object ModelCatalog {
         ),
     )
 
+    /** Their NPU builds are published (non-commercial) at `https://huggingface.co/hencohen83/<id>-qnn-sm8750`. */
     private fun diarizen(id: String, name: String, parameters: String, license: String, credit: String) = SpeechModel(
         id = id, name = name, languages = listOf(SpeechModel.MULTILINGUAL), parameters = parameters, license = license,
         fitsLive = true, source = "https://huggingface.co/BUT-FIT/$id", kind = ModelKind.SpeakerSegmentation,

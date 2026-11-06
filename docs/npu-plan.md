@@ -120,8 +120,7 @@ model library is over 2 GB: "relocation truncated to fit"). encoder.bin 1.53 GB,
 `build/qnn/out-large-SM8750/binary/`, on the phone in `…/models/ivrit-whisper-large-v3-npu-sm8750/`. Not timed or
 checked against the acceptance bar (step 4) yet.
 
-**Not published yet** (owner's decision: on the owner's Hugging Face; the Zipformer's NPU build is published, see
-below): the three model files (encoder.bin,
+**Published since** (see the table below); before that: the three model files (encoder.bin,
 decoder.bin, tokens.txt; `ModelCatalog` has their sha256) and the sherpa-onnx AAR. Until then both are built here
 and put in place by hand (the procedure: [npu-build.md](npu-build.md)):
 - **Model:** sherpa-onnx's `scripts/whisper/qnn/` export of ivrit.ai turbo (commit f33172a8) through QAIRT
@@ -160,5 +159,24 @@ stream), both far faster than real time. Likely the decoder and joiner, called f
 the NPU's round trip; to try: the encoder on the NPU and the decoder and joiner on the CPU, and measure the battery
 before choosing it over the CPU.
 
-**Published** (Nov 6, 2026): [hencohen83/zipformer2-66m-streaming-he-qnn-sm8750](https://huggingface.co/hencohen83/zipformer2-66m-streaming-he-qnn-sm8750)
+**Published** (Nov 6, 2026, owner's go), all public on the owner's Hugging Face, each with a model card (license,
+credit, what was changed, the sha256 of every file); Qualcomm's runtime libraries are in none of them:
+
+| Repo | Commit | License | In the app |
+|---|---|---|---|
+| [sherpa-onnx-qnn-android](https://huggingface.co/hencohen83/sherpa-onnx-qnn-android) (the AAR and our patch) | be1e2340 | Apache-2.0 | `build.gradle.kts` downloads it |
+| [ivrit-whisper-large-v3-turbo-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-turbo-qnn-sm8750) | d5997a96 | Apache-2.0 | `ivritTurboNpu` |
+| [ivrit-whisper-large-v3-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750) (16-bit) | (uploading) | Apache-2.0 | `ivritLargeV3Npu` |
+| [wespeaker-resnet293-lm-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-resnet293-lm-qnn-sm8750) | 75258f7a | CC-BY-4.0 | `voicePrintsResNet293`, downloadable |
+| [wespeaker-samresnet100-voxblink2-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-samresnet100-voxblink2-qnn-sm8750) | 337cffaa | CC-BY-NC-SA-4.0 | copied by hand (non-commercial) |
+| [diarizen-wavlm-base-s80-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750) | 4e87d479 | CC-BY-NC-4.0 | copied by hand |
+| [diarizen-wavlm-large-s80-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-wavlm-large-s80-qnn-sm8750) | bbcdfb1c | CC-BY-NC-4.0 | copied by hand |
+| [diarizen-meeting-base-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-meeting-base-qnn-sm8750) | 69bd3e07 | CC-BY-NC-4.0 (see its card) | copied by hand |
+
+The non-commercial ones aren't offered in the catalog (CLAUDE.md). The app's "add from Hugging Face" route takes
+speech-recognition models only so far, so they are copied by hand: their folder and an empty `.ok`. ResNet100's card
+says it was built from a Hugging Face mirror, not yet checked against WeSpeaker's own download (wenet.org.cn's
+certificate expired in May 2026).
+
+[hencohen83/zipformer2-66m-streaming-he-qnn-sm8750](https://huggingface.co/hencohen83/zipformer2-66m-streaming-he-qnn-sm8750)
 (commit 284f0a33, public, CC-BY-4.0 with credit to Yakov Kolani and ivrit.ai). `ivritZipformerNpu` downloads from it.
