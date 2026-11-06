@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.settings
 
+import com.chencohensolution.transcriptor.models.ModelChoices
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -29,8 +30,19 @@ private data class SettingsFileV1(
     val refineModels: Map<String, String> = emptyMap(),
     /** Languages shown in Settings › Models beside the notebooks' (added there). */
     val modelLanguages: List<String> = emptyList(),
-    /** The passes after the lecture: the speaker pass when it stops, and the refine pass on its review screen. */
+    /**
+     * The one switch before Nov 2026, "Improve after the lecture": the speaker pass when it stops (and the refine pass
+     * offered). Read only, into [findSpeakersOnStop], for files written before it.
+     */
     val afterLecture: Boolean = true,
+    /** The speaker pass runs when a lecture stops; null in files written before it ([afterLecture] then). */
+    val findSpeakersOnStop: Boolean? = null,
+    /** A lecture is improved on its own after it stops (while charging). */
+    val autoImprove: Boolean = false,
+    /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
+    val improveSpeeds: Map<String, Double> = emptyMap(),
+    /** Lectures to improve on their own once the phone is charging ("notebookId/lectureId"). */
+    val improvePending: List<String> = emptyList(),
     /** The lectures folder outside the app (Android: a document URI under the picked tree); null before one is picked. */
     val lectureFolder: String? = null,
     /** The user was asked to pick the lectures folder (and said not now). */
@@ -46,13 +58,37 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         get() = read().audioFormat
         set(value) = write(read().copy(audioFormat = value))
 
+    /** The speaker pass runs when a lecture stops. Off: it can still be run from the lecture's screen. */
+    var findSpeakersOnStop: Boolean
+        get() = read().let { it.findSpeakersOnStop ?: it.afterLecture }
+        set(value) = write(read().copy(findSpeakersOnStop = value))
+
     /**
-     * The passes after the lecture are offered: the speaker pass runs when it stops, and its review screen can refine
-     * it. Off: the lecture keeps its live transcript (the speakers can still be found from the review screen).
+     * A lecture is improved with its language's improve model after it stops, while the phone charges (else once it
+     * does). Off: improving is by hand, from the lecture's screen, which offers it either way.
      */
-    var afterLecture: Boolean
-        get() = read().afterLecture
-        set(value) = write(read().copy(afterLecture = value))
+    var autoImprove: Boolean
+        get() = read().autoImprove
+        set(value) = write(read().copy(autoImprove = value))
+
+    /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
+    fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]
+
+    /** Keeps how long improving [audioMillis] of audio with [modelId] took ([workMillis]). */
+    fun recordImproveSpeed(modelId: String, workMillis: Long, audioMillis: Long) {
+        if (audioMillis <= 0 || workMillis <= 0) return
+        write(read().let { it.copy(improveSpeeds = it.improveSpeeds + (modelId to workMillis.toDouble() / audioMillis)) })
+    }
+
+    /** Lectures waiting to be improved on their own, as (notebook id, lecture id), oldest first. */
+    val improvePending: List<Pair<String, String>>
+        get() = read().improvePending.mapNotNull { it.split('/').takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
+
+    fun addImprovePending(notebookId: String, lectureId: String) =
+        write(read().let { it.copy(improvePending = (it.improvePending + "$notebookId/$lectureId").distinct()) })
+
+    fun removeImprovePending(notebookId: String, lectureId: String) =
+        write(read().let { it.copy(improvePending = it.improvePending - "$notebookId/$lectureId") })
 
     /** Where finished lectures are kept, outside the app; null keeps them in the app's storage. */
     var lectureFolder: String?
@@ -68,7 +104,7 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     fun setLiveModel(language: String, modelId: String) = write(read().let { it.copy(liveModels = it.liveModels + (language to modelId)) })
 
-    /** The refine model chosen for [language]; null when none was chosen. */
+    /** The improve model chosen for [language]; null when none was chosen (the first ready one in [ModelChoices]). */
     fun refineModel(language: String): String? = read().refineModels[language]
 
     fun setRefineModel(language: String, modelId: String) = write(read().let { it.copy(refineModels = it.refineModels + (language to modelId)) })

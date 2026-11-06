@@ -83,11 +83,35 @@ class RecordingTest {
     }
 
     @Test
-    fun thePassesAfterTheLectureAreOnUntilTurnedOff() {
-        assertTrue(settings.afterLecture)
-        settings.afterLecture = false
-        assertEquals(false, SettingsStore(fs, root).afterLecture)
+    fun theSpeakersAreFoundOnStopUntilTurnedOffAndNothingImprovesOnItsOwn() {
+        assertTrue(settings.findSpeakersOnStop)
+        assertFalse(settings.autoImprove)
+        settings.findSpeakersOnStop = false
+        settings.autoImprove = true
+        assertEquals(false, SettingsStore(fs, root).findSpeakersOnStop)
+        assertEquals(true, SettingsStore(fs, root).autoImprove)
         assertEquals(AudioFormat.Wav, SettingsStore(fs, root).audioFormat)
+    }
+
+    @Test
+    fun aSettingsFileFromBeforeTheSplitKeepsItsSpeakerSwitch() {
+        fs.createDirectories(root)
+        fs.write(root / "settings.json") { writeUtf8("""{"v":1,"audioFormat":"wav","afterLecture":false}""") }
+        assertFalse(SettingsStore(fs, root).findSpeakersOnStop)
+        assertFalse(SettingsStore(fs, root).autoImprove)
+    }
+
+    @Test
+    fun anImproveModelsSpeedAndTheLecturesWaitingAreKept() {
+        assertNull(settings.improveSpeed("ivrit-whisper-large-v3"))
+        settings.recordImproveSpeed("ivrit-whisper-large-v3", workMillis = 1_200_000, audioMillis = 3_000_000)
+        assertEquals(0.4, SettingsStore(fs, root).improveSpeed("ivrit-whisper-large-v3"))
+        settings.addImprovePending("psych", "l1")
+        settings.addImprovePending("psych", "l2")
+        settings.addImprovePending("psych", "l1")
+        assertEquals(listOf("psych" to "l1", "psych" to "l2"), SettingsStore(fs, root).improvePending)
+        settings.removeImprovePending("psych", "l1")
+        assertEquals(listOf("psych" to "l2"), SettingsStore(fs, root).improvePending)
     }
 
     @Test

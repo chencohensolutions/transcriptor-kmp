@@ -26,7 +26,10 @@ import com.chencohensolution.transcriptor.notebook.RecordingNow
 import com.chencohensolution.transcriptor.notebook.UNFILED
 import com.chencohensolution.transcriptor.notebook.notebooksState
 import com.chencohensolution.transcriptor.review.LectureReview
+import com.chencohensolution.transcriptor.models.ModelChoices
+import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.review.ModelChoice
+import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
 import com.chencohensolution.transcriptor.ui.LiveLectureActions
@@ -49,6 +52,31 @@ import java.util.Date
  * start screen's settings, until Settings › Models is designed).
  */
 class MainActivity : ComponentActivity() {
+    /** Plugged in while the app is open: the lectures waiting for the charger are improved. */
+    private val powerConnected = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: android.content.Intent) = improvePendingIfCharging()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        registerReceiver(powerConnected, android.content.IntentFilter(android.content.Intent.ACTION_POWER_CONNECTED), RECEIVER_NOT_EXPORTED)
+        improvePendingIfCharging()
+    }
+
+    override fun onStop() {
+        unregisterReceiver(powerConnected)
+        super.onStop()
+    }
+
+    /** Lectures wait to be improved on their own until the phone charges with the app open (a foreground start). */
+    private fun improvePendingIfCharging() {
+        lifecycleScope.launch {
+            val waiting = withContext(Dispatchers.IO) { Recording.settings.improvePending.isNotEmpty() }
+            val charging = getSystemService(android.os.BatteryManager::class.java).isCharging
+            if (waiting && charging && !Recording.session.isRecording && Recording.refining.value == null) RecordingService.improvePending(this@MainActivity)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -119,7 +147,10 @@ class MainActivity : ComponentActivity() {
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
-                                refine = { model -> RecordingService.refine(this, review.lecture, model) },
+                                improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
+                                getModel = { id ->
+                                    lifecycleScope.launch(Dispatchers.IO) { Recording.modelLibrary.all.firstOrNull { it.id == id }?.let { Recording.models.download(it) } }
+                                },
                                 switchVersion = r::switchTo,
                                 addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
                             ),
@@ -216,7 +247,10 @@ private fun CompressPending() {
     }
 }
 
-/** Feeds the open lecture's passes from the recording service: running, done, or unavailable without their models. */
+/**
+ * Feeds the open lecture's passes from the recording service: running, done, or (the speaker pass) unavailable without
+ * its models; the models to improve with, their estimates and the Settings default, or the model to get.
+ */
 @Composable
 private fun ReviewPasses() {
     val finding by Recording.findingSpeakers.collectAsStateWithLifecycle()
@@ -227,7 +261,9 @@ private fun ReviewPasses() {
         if (lecture == null) { Recording.review.passes.value = LectureReview.Passes(); return@LaunchedEffect }
         val speakers = finding?.takeIf { it.first == lecture.id }?.second
         val refine = refining?.takeIf { it.first == lecture.id }?.second
-        val models = Recording.refineModels(lecture.language)
+        val models = withContext(Dispatchers.IO) { Recording.refineModels(lecture.language) }
+        val default = withContext(Dispatchers.IO) { Recording.improveModelFor(lecture.language) }
+        val toGet = if (models.isEmpty()) withContext(Dispatchers.IO) { Recording.improveSuggestion(lecture.language) } else null
         Recording.review.passes.value = LectureReview.Passes(
             speakers = when {
                 !Recording.canFindSpeakers -> null
@@ -236,12 +272,18 @@ private fun ReviewPasses() {
                 else -> PassState.NotRun
             },
             refine = when {
-                models.isEmpty() || !Recording.settings.afterLecture -> null
                 refine != null -> PassState.Running(refine)
                 lecture.refinedWith != null -> PassState.Done
                 else -> PassState.NotRun
             },
-            refineModels = models.map { ModelChoice(it.id, it.name) },
+            refineModels = models.map {
+                ModelChoice(
+                    it.id, it.name, ModelChoices.estimateMinutes(Recording.settings.improveSpeed(it.id), lecture.durationMillis),
+                    npu = it.kind == ModelKind.WhisperNpu,
+                )
+            },
+            improveDefault = default?.id,
+            improveToGet = toGet?.let { ModelToGet(it.id, it.name, it.sizeBytes) },
         )
     }
 }

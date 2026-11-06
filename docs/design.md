@@ -156,19 +156,22 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   `lecture.json`. Stop waits for the last lines.
 - Settings › Models (round 1's b4), in the app: the models per language in use, models added from Hugging Face
   (`HubClient`: only files the app's engines read; pinned to the repo's commit, checked by sha256 or git blob id;
-  licenses marked for commercial use, not, or unknown, and asked for), the refine model chosen per language, and each
-  NPU model tried on the NPU once downloaded. Added models are kept in `models.json` in the app's storage.
+  licenses marked for commercial use, not, or unknown, and asked for), and each NPU model tried on the NPU once
+  downloaded. Since Nov 6 (round 2's b) Settings has a page per language, the one place its live and improve models
+  are chosen, and two switches after a lecture: find the speakers when it stops, improve automatically (while
+  charging). Added models are kept in `models.json` in the app's storage.
 - Notebooks (round 1's c2), in the app: the first screen, lectures first, recording with or without a notebook, filing
   unfiled lectures, the notebook guessed from when its lectures are. The gear opens a temporary Settings page (the old
   start screen's audio format and model downloads) until Settings › Models was promoted.
 - Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
-  naming speakers, notes after the lecture, and the speaker pass and the refine pass from its menu. Stop opens it.
+  naming speakers, notes after the lecture, and the speaker pass and the refine pass ("Improve transcription…", always
+  offered, with an estimate per model from its last run) from its menu. Stop opens it.
 - **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
   model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
   non-speech pieces, no impossible word counts, loops collapsed). Lines keep their times and speakers; edited lines and
-  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. Any downloaded speech
-  model for the language can refine (owner's request): Whisper models through `transcribeLine`, the Zipformer a line at
-  a time (`transcribeLineStreaming`). Before a pass, the current transcript is kept as a **version**
+  lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. The UI calls it Improve.
+  Any downloaded Whisper model for the language can improve (`ModelChoices`; the Zipformer could, a line at a time with
+  `transcribeLineStreaming`, but is no longer offered since Nov 6: it writes the live text again). Before a pass, the current transcript is kept as a **version**
   (`versions/<id>.json` in the lecture's folder: its lines, speakers and edits; `lecture.json` lists them under
   `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).

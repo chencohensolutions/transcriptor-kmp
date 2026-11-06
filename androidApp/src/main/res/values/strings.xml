@@ -36,7 +36,6 @@
     <string name="model_cancel">Cancel</string>
     <string name="model_delete">Delete</string>
     <string name="model_in_use">Used for live transcription</string>
-    <string name="model_use_live">Use for live</string>
     <string name="start_speakers">Speaker labels</string>
     <string name="start_speakers_note">Each line gets the speaker whose voice is closest, during the lecture; after it, a speaker pass finds who spoke when, overlaps included, and fixes the lines. Name a speaker once and the notebook\'s next lectures know them.</string>
     <string name="speaker_n">Speaker %1$d</string>
@@ -53,7 +52,6 @@
     <string name="review_play">Play</string>
     <string name="review_pause">Pause</string>
     <string name="review_speed">%1$sx</string>
-    <string name="review_refining">Refining… %1$d%%</string>
     <string name="review_find_speakers">Find the speakers</string>
     <string name="review_finding_speakers">Finding the speakers… %1$d%%</string>
     <string name="review_save">Save</string>
@@ -66,20 +64,13 @@
     <string name="review_move_line">Who said the line at %1$s?</string>
     <string name="start_lectures">Lectures</string>
     <string name="start_speakers_count">%1$d speakers</string>
-    <string name="refining">Refining the transcript…</string>
-    <string name="start_after_lecture">Improve after the lecture</string>
-    <string name="start_after_lecture_note">When a lecture stops, the speaker pass fixes who said each line, and the lecture\'s screen can refine the transcript with a larger model. Off: the lecture keeps what was written live (you can still find the speakers from its screen).</string>
-    <string name="start_refine_models">After the lecture: refine (%1$s)</string>
-    <string name="start_refine_note">Transcribes a lecture again with the larger model, from its review screen\'s menu: more accurate, with punctuation, and slower than the lecture itself. Lines you edited stay.</string>
-    <string name="model_in_use_refine">Used to refine</string>
-    <string name="review_refine_with">Refine with…</string>
-    <string name="review_refine_note">Every line is transcribed again with the model you pick; lines you edited stay. The transcript now is kept, under Versions.</string>
+    <string name="refining">Improving the transcript…</string>
     <string name="review_versions">Versions (%1$d)</string>
     <string name="review_version_now">Now</string>
     <string name="review_version_lines">%1$d lines · %2$d edited</string>
     <string name="review_versions_note">Tap one to bring it back; the transcript now is kept as a version. Notes stay as they are.</string>
     <string name="review_version_live">Live · %1$s</string>
-    <string name="review_version_refined">Refined · %1$s</string>
+    <string name="review_version_refined">Improved · %1$s</string>
     <!-- Notebooks -->
     <string name="notebooks_settings">Settings</string>
     <string name="notebooks_records_in">Records in</string>
@@ -108,7 +99,7 @@
     <string name="notebooks_hours">%1$d h</string>
     <string name="notebooks_hours_minutes">%1$d h %2$d min</string>
     <string name="notebooks_notes">%1$d notes</string>
-    <string name="notebooks_refined">Refined</string>
+    <string name="notebooks_refined">Improved</string>
     <string name="notebooks_improving">Improving the transcript · %1$d%%</string>
     <string name="notebooks_recording">Recording · %1$s</string>
     <string name="notebooks_back_to_lecture">Back to it</string>
@@ -135,13 +126,11 @@
     <string name="folder_failed">Couldn\'t use that folder: %1$s</string>
     <!-- Settings › Models -->
     <string name="models_add_language">Add a language</string>
-    <string name="models_after_note">The speaker pass when a lecture stops, and refining from its screen.</string>
-    <string name="models_after_only">After the lecture only</string>
+    <string name="models_after_only">For improving only</string>
     <string name="models_all_kinds">All kinds</string>
-    <string name="models_all_set">Every language in use has a live model</string>
     <string name="models_any_language">Any language</string>
     <string name="models_badge_live">Live ✓</string>
-    <string name="models_badge_refine">Refine ✓</string>
+    <string name="models_badge_refine">Improve ✓</string>
     <string name="models_choose_size">Size</string>
     <string name="models_confirm_nc">This model\'s license allows personal and study use only. Add it anyway?</string>
     <string name="models_confirm_nc_title">Not for commercial use</string>
@@ -169,7 +158,6 @@
     <string name="models_license_unknown">No license on its card</string>
     <string name="models_license_unknown_note">Its card names no license: its author hasn\'t said how it may be used.</string>
     <string name="models_likes">%1$s likes</string>
-    <string name="models_missing">No live model for %1$s</string>
     <string name="models_more">More</string>
     <string name="models_multilingual">Many languages</string>
     <string name="models_multilingual_note">%1$s has no models of its own here: the multilingual ones transcribe it. Find more on Hugging Face.</string>
@@ -201,5 +189,40 @@
     <string name="models_speakers">Speakers</string>
     <string name="models_title">Models</string>
     <string name="models_unusable">%1$d more repos matched, in formats the app can\'t run.</string>
-    <string name="models_use_refine">Use to refine</string>
+    <!-- Settings: the languages and their models, the switches after a lecture. -->
+    <string name="settings_languages">Languages</string>
+    <string name="settings_live_is">Live: %1$s</string>
+    <string name="settings_live_none">Live: no model downloaded</string>
+    <string name="settings_improve_is">Improve: %1$s</string>
+    <string name="settings_improve_none">Improve: no model downloaded</string>
+    <string name="settings_after">After a lecture</string>
+    <string name="settings_find_speakers">Find the speakers when it stops</string>
+    <string name="settings_find_speakers_note">Fixes who said each line, in a minute or two.</string>
+    <string name="settings_auto_improve">Improve automatically</string>
+    <string name="settings_auto_improve_on">Each lecture is transcribed again with its improve model after it stops, while the phone charges. If it isn\'t charging, the lecture waits until the app is open on the charger.</string>
+    <string name="settings_auto_improve_off">Off: improve any lecture from its menu, when you want.</string>
+    <string name="settings_storage">Models and storage</string>
+    <string name="settings_manage">Manage models</string>
+    <string name="settings_manage_note">Download, delete, find on Hugging Face</string>
+    <string name="settings_live_title">Live transcription</string>
+    <string name="settings_live_note">Writes the lines during the lecture.</string>
+    <string name="settings_improve_title">Improve transcription</string>
+    <string name="settings_improve_note">Transcribes a lecture again after it, by hand from its menu or automatically. You can pick another model for a single lecture.</string>
+    <string name="settings_more">Find more models for %1$s</string>
+    <string name="settings_streaming">Words as they\'re spoken</string>
+    <!-- The lecture: improving its transcription. -->
+    <string name="review_improve">Improve transcription…</string>
+    <string name="review_improving">Improving the transcription · %1$d%%</string>
+    <string name="review_improve_title">Improve transcription</string>
+    <string name="review_improve_about">%1$d min · %2$s · now: %3$s</string>
+    <string name="review_no_model">No model for %1$s is downloaded yet.</string>
+    <string name="review_get_model">Get %1$s · %2$s</string>
+    <string name="review_default">Default</string>
+    <string name="review_minutes">about %1$d min</string>
+    <string name="review_npu">NPU</string>
+    <string name="review_cpu">CPU</string>
+    <string name="review_speakers_first">Find the speakers first</string>
+    <string name="review_speakers_first_note">Improving drops the word times the speaker pass needs.</string>
+    <string name="review_kept">Lines you edited stay. The transcript now is kept, under Versions.</string>
+    <string name="review_improve_button">Improve</string>
 </resources>

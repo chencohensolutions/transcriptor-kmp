@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -33,19 +36,26 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -62,6 +72,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -95,8 +106,13 @@ class ReviewActions(
     /** Moves a line to another speaker. */
     val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
-    /** Runs the refine pass with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id). */
-    val refine: (modelId: String) -> Unit = {},
+    /**
+     * Improves the lecture with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id), after the
+     * speaker pass when [speakersFirst].
+     */
+    val improve: (modelId: String, speakersFirst: Boolean) -> Unit = { _, _ -> },
+    /** Downloads the model to get ([ReviewState.improveToGet]). */
+    val getModel: (modelId: String) -> Unit = {},
     /** Makes an earlier transcript (a version's id) the current one, keeping this one as a version. */
     val switchVersion: (id: String) -> Unit = {},
     val findSpeakers: () -> Unit = {},
@@ -110,7 +126,8 @@ class ReviewActions(
  * a speaker's chip to name them. The pencil turns the paragraphs into fields (each line with its speaker, to move it)
  * that are saved on Done. Notes are pills after the paragraph they were written in (tap the time to jump, hold to edit
  * or delete). At the bottom, the overview of the whole lecture (a lane per speaker, the notes, the playhead; tap to
- * jump) and the player. The passes over the recording are in the menu, with a progress banner while one runs.
+ * jump) and the player. The passes over the recording are in the menu, with a progress banner while one runs:
+ * Improve transcription… is always there, whether or not lectures are improved on their own.
  */
 @Composable
 fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
@@ -128,7 +145,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     renaming?.let { s -> RenameSpeakerDialog(s, onDismiss = { renaming = null }) { actions.renameSpeaker(s.id, it); renaming = null } }
     moving?.let { line -> MoveLineDialog(line, state.lecture.speakers, onDismiss = { moving = null }) { actions.setLineSpeaker(line.id, it); moving = null } }
     note?.let { n -> NoteDialog(stringResource(R.string.review_note_here, formatClock(n.atMillis)), n.text, onDelete = { actions.deleteNote(n.id); note = null }, onDismiss = { note = null }) { actions.editNote(n.id, it); note = null } }
-    if (pickingModel) RefineDialog(state, onDismiss = { pickingModel = false }) { actions.refine(it); pickingModel = false }
+    if (pickingModel) ImproveSheet(state, actions, onDismiss = { pickingModel = false })
     if (showingVersions) VersionsDialog(state, onDismiss = { showingVersions = false }) { actions.switchVersion(it); showingVersions = false }
     noting?.let { at -> NoteDialog(stringResource(R.string.review_note_here, formatClock(at)), "", onDelete = null, onDismiss = { noting = null }) { actions.addNote(at, it); noting = null } }
 
@@ -150,11 +167,11 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                     }) {
                         Icon(if (editing) Icons.Filled.Check else Icons.Filled.Edit, stringResource(if (editing) R.string.review_done else R.string.review_edit_text))
                     }
-                    if (state.refine != null || state.speakerPass != null || state.lecture.versions.isNotEmpty()) {
+                    Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            if (state.refine != null) DropdownMenuItem(
-                                text = { Text(stringResource(R.string.review_refine_with)) }, enabled = state.refine !is PassState.Running,
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.review_improve)) }, enabled = state.refine !is PassState.Running,
                                 onClick = { pickingModel = true; menu = false },
                             )
                             if (state.lecture.versions.isNotEmpty()) DropdownMenuItem(
@@ -169,7 +186,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         }
                     }
                 }
-                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_refining, (it.progress * 100).toInt()), it.progress) }
+                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_improving, (it.progress * 100).toInt()), it.progress) }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
                 HorizontalDivider()
             }
@@ -371,24 +388,84 @@ private fun NoteDialog(title: String, initial: String, onDelete: (() -> Unit)?, 
     )
 }
 
-/** The models the refine pass can use here; the large ones first. */
+/**
+ * Improve transcription: the lecture's length and what wrote it now, the models with an estimate each (the Settings
+ * default picked), the speaker pass first when it hasn't run, and what is kept. With no model downloaded for the
+ * language, the one to get.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RefineDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (String) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.review_refine_with)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.review_refine_note), style = MaterialTheme.typography.bodySmall)
-                state.refineModels.forEach { m ->
-                    TextButton(onClick = { onPick(m.id) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(m.name, modifier = Modifier.fillMaxWidth())
+private fun ImproveSheet(state: ReviewState, actions: ReviewActions, onDismiss: () -> Unit) {
+    var picked by remember { mutableStateOf(state.improveDefault ?: state.refineModels.firstOrNull()?.id) }
+    // Improving drops the word times the speaker pass reads: offer it first when it can run and hasn't.
+    val offerSpeakersFirst = state.speakerPass == PassState.NotRun
+    var speakersFirst by remember { mutableStateOf(offerSpeakersFirst) }
+    val lecture = state.lecture
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
+            Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.review_improve_title), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(R.string.review_improve_about, (lecture.durationMillis / 60_000).toInt(), languageName(lecture.language), LocalModelNames.current(lecture.refinedWith ?: lecture.segments.firstOrNull()?.modelId.orEmpty())),
+                    style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
+                )
+            }
+            if (state.refineModels.isEmpty()) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.review_no_model, languageName(lecture.language)), style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) }
+                        state.improveToGet?.let { m ->
+                            Button(onClick = { actions.getModel(m.id); onDismiss() }) { Text(stringResource(R.string.review_get_model, isolated(m.name), modelsSize(m.sizeBytes))) }
+                        }
+                    }
+                }
+                return@Column
+            }
+            Column(Modifier.selectableGroup().padding(top = 8.dp)) {
+                state.refineModels.forEach { c ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = picked == c.id, role = Role.RadioButton) { picked = c.id }.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = picked == c.id, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(isolated(c.name), style = MaterialTheme.typography.bodyLarge)
+                            val facts = listOfNotNull(
+                                stringResource(R.string.review_default).takeIf { c.id == state.improveDefault },
+                                c.minutes?.let { stringResource(R.string.review_minutes, it) },
+                                stringResource(if (c.npu) R.string.review_npu else R.string.review_cpu),
+                            )
+                            Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+                        }
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) } },
-    )
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            if (offerSpeakersFirst) {
+                Row(
+                    Modifier.fillMaxWidth().toggleable(speakersFirst, role = Role.Checkbox) { speakersFirst = it }.padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = speakersFirst, onCheckedChange = null, modifier = Modifier.padding(horizontal = 12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.review_speakers_first), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.review_speakers_first_note), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+                    }
+                }
+            }
+            Text(
+                stringResource(R.string.review_kept), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) }
+                Button(onClick = { picked?.let { actions.improve(it, speakersFirst && offerSpeakersFirst) }; onDismiss() }, enabled = picked != null) {
+                    Text(stringResource(R.string.review_improve_button))
+                }
+            }
+        }
+    }
 }
 
 /** The transcript now and the earlier ones, newest first: who wrote each, when it was kept, its lines and edits. */

@@ -5,6 +5,7 @@ import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.review.AudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
+import com.chencohensolution.transcriptor.review.PassState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -52,7 +53,7 @@ class ReviewTest {
         runCurrent()
         assertEquals(lecture.segments, review.state.value?.lecture?.segments)
         assertEquals(store.audioPath(lecture), player.loaded)
-        assertNull(review.state.value?.refine)
+        assertEquals(PassState.NotRun, review.state.value?.refine)
         review.close()
         runCurrent()
         assertTrue(player.released)

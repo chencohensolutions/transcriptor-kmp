@@ -34,8 +34,17 @@ class LectureReview(
 
     private val open = MutableStateFlow<Open?>(null)
 
-    /** The passes over the recording for the open lecture, fed by the app: each null when it can't run here. */
-    data class Passes(val speakers: PassState? = null, val refine: PassState? = null, val refineModels: List<ModelChoice> = emptyList())
+    /**
+     * The passes over the recording for the open lecture, fed by the app: the speaker pass null when it can't run
+     * here; the improve pass with its models, the Settings default and the model to get when there is none.
+     */
+    data class Passes(
+        val speakers: PassState? = null,
+        val refine: PassState = PassState.NotRun,
+        val refineModels: List<ModelChoice> = emptyList(),
+        val improveDefault: String? = null,
+        val improveToGet: ModelToGet? = null,
+    )
 
     val passes = MutableStateFlow(Passes())
 
@@ -45,6 +54,7 @@ class LectureReview(
                 ReviewState(
                     notebookTitle = it.notebookTitle, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
+                    improveDefault = p.improveDefault, improveToGet = p.improveToGet,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)

@@ -27,6 +27,8 @@ import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.models.ModelLibrary
 import com.chencohensolution.transcriptor.models.NpuResult
 import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.ModelChoices
+import com.chencohensolution.transcriptor.models.ModelJob
 import com.chencohensolution.transcriptor.recording.LiveModel
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
@@ -113,14 +115,16 @@ object Recording {
     val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
 
 
-    /**
-     * The models the refine pass can use for [language]: every downloaded speech model for it, the one chosen in
-     * Settings › Models first, then the large ones.
-     */
+    /** The models a lecture in [language] can be improved with: the downloaded Whisper models, the large ones first. */
     fun refineModels(language: String): List<SpeechModel> =
-        modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip)
-            .filter { it.kind.transcribes && models.isReady(it) }
-            .sortedWith(compareBy<SpeechModel> { it.id != settings.refineModel(language) }.thenBy { it.fitsLive })
+        ModelChoices.candidates(modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip), ModelJob.Improve, models::isReady).filter(models::isReady)
+
+    /** The model that improves [language]: the one chosen in Settings if it is downloaded, else the first that is. */
+    fun improveModelFor(language: String): SpeechModel? = ModelChoices.running(refineModels(language), settings.refineModel(language), models::isReady)
+
+    /** With nothing downloaded to improve [language] with: the model to get. */
+    fun improveSuggestion(language: String): SpeechModel? =
+        ModelChoices.improveSuggestion(modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip), models::isReady)
 
     lateinit var installedModels: InstalledModels
         private set
@@ -182,6 +186,7 @@ object Recording {
         kept()
         val path = store.audioPath(lecture)
         val audio = { a: Long, b: Long -> RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, a, b) }
+        val started = System.currentTimeMillis()
         val done = when (model.kind) {
             ModelKind.Whisper -> WhisperEngine(models.file(model).path).use { engine ->
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
@@ -193,6 +198,8 @@ object Recording {
                 RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress)
             }
         }
+        // Its speed on this phone, for the next estimate.
+        settings.recordImproveSpeed(model.id, System.currentTimeMillis() - started, lecture.durationMillis)
         // Saved over what is on disk now, with its edits since (the review screen may have changed it meanwhile):
         // only the lines' texts the pass wrote are taken.
         val now = store.load(lecture.notebookId, lecture.id) ?: withVersion

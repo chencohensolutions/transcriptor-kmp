@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -84,6 +86,8 @@ import com.chencohensolution.transcriptor.models.HubVariant
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.models.LicenseUse
 import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.ModelChoices
+import com.chencohensolution.transcriptor.models.ModelJob
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
@@ -111,7 +115,10 @@ data class ModelsState(
     val refine: Map<String, String> = emptyMap(),
     val npu: Map<String, NpuCheck> = emptyMap(),
     val audioFormat: AudioFormat,
-    val afterLecture: Boolean,
+    /** The speaker pass runs when a lecture stops. */
+    val findSpeakersOnStop: Boolean,
+    /** Lectures are improved on their own after they stop (improving by hand is always on the lecture's menu). */
+    val autoImprove: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
@@ -122,18 +129,22 @@ data class ModelsState(
         all.filter { language in it.languages } + all.filter { SpeechModel.MULTILINGUAL in it.languages && language !in it.languages }
     }
 
-    fun liveModels(language: String) = forLanguage(language).filter { it.fitsLive }
+    /** The models for [language] in the catalog: every one, the live ones first. */
+    fun catalog(language: String) = forLanguage(language).sortedByDescending { it.fitsLive }
 
-    /** The models that can refine [language]: any that transcribes it, the large ones first. */
-    fun refineModels(language: String) = forLanguage(language).sortedBy { it.fitsLive }
+    /** The models that can write [language] live: the ready ones first ([ModelChoices]). */
+    fun liveModels(language: String) = ModelChoices.candidates(forLanguage(language), ModelJob.Live, ::ready)
 
-    fun liveFor(language: String): SpeechModel? = pick(liveModels(language), live[language])
-    fun refineFor(language: String): SpeechModel? = pick(refineModels(language), refine[language])
+    /** The models that can improve [language] (Whisper), the ready ones first, the large ones before the fast. */
+    fun refineModels(language: String) = ModelChoices.candidates(forLanguage(language), ModelJob.Improve, ::ready)
+
+    /** The models to get listed under Improve on a language's page: not those already listed under Live. */
+    fun improveToGet(language: String) = ModelChoices.improveToGet(forLanguage(language), ::ready)
+
+    fun liveFor(language: String): SpeechModel? = ModelChoices.running(liveModels(language), live[language], ::ready)
+    fun refineFor(language: String): SpeechModel? = ModelChoices.running(refineModels(language), refine[language], ::ready)
 
     val added get() = models.filter { it.fromHub }
-
-    private fun pick(models: List<SpeechModel>, chosen: String?) =
-        models.firstOrNull { it.id == chosen && ready(it) } ?: models.firstOrNull { ready(it) }
 }
 
 /** The models for speaker labels (live) and the speaker pass (after): every language's. */
@@ -147,7 +158,8 @@ class ModelsActions(
     val useLive: (language: String, SpeechModel) -> Unit = { _, _ -> },
     val useRefine: (language: String, SpeechModel) -> Unit = { _, _ -> },
     val setAudioFormat: (AudioFormat) -> Unit = {},
-    val setAfterLecture: (Boolean) -> Unit = {},
+    val setFindSpeakersOnStop: (Boolean) -> Unit = {},
+    val setAutoImprove: (Boolean) -> Unit = {},
     val chooseFolder: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
@@ -160,27 +172,35 @@ class ModelsActions(
 )
 
 /**
- * Settings (the lectures folder, the audio, the passes after the lecture, and a Models row), then Settings › Models:
- * a catalog per language in use (Add a language for any other), each model a card with its facts, badges (Live,
- * Refine, NPU, Many languages, From Hugging Face, the NPU check), its download and a menu. **Find on Hugging Face**
- * searches for models the app's engines read, filtered by language, kind and NPU builds for this phone; licenses are
- * marked for commercial use, not, or unknown (asked first); a size is installed pinned to the repo's commit; an NPU
- * model is tried on the NPU once downloaded. No storage bar: the phone's free space isn't this screen's business.
+ * Settings: the languages in use, each with the model that writes it live and the one that improves its lectures;
+ * a language's page picks both (the models to get under them). Then the switches after a lecture (find the speakers
+ * when it stops, improve automatically), Manage models, the lectures folder and the audio. **Manage models** is the
+ * catalog: per language (Add a language for any other), each model a card with its facts, badges (Live, Improve, NPU,
+ * Many languages, From Hugging Face, the NPU check), its download and a menu. **Find on Hugging Face** searches for
+ * models the app's engines read, filtered by language, kind and NPU builds for this phone; licenses are marked for
+ * commercial use, not, or unknown (asked first); a size is installed pinned to the repo's commit; an NPU model is
+ * tried on the NPU once downloaded. No storage bar: the phone's free space isn't this screen's business.
  */
 @Composable
 fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
     var page by rememberSaveable { mutableStateOf(0) }
     var shown by rememberSaveable { mutableStateOf(state.languages.first()) }
-    when (page) {
-        2 -> {
+    var language by rememberSaveable { mutableStateOf<String?>(null) }
+    val openCatalog = { l: String? -> if (l != null) shown = l; page = 1 }
+    when {
+        page == 2 -> {
             BackHandler { page = 1 }
             HubPage(state, hub, actions, startLanguage = shown.takeIf { it != SPEAKERS }) { page = 1 }
         }
-        1 -> {
+        page == 1 -> {
             BackHandler { page = 0 }
             CatalogPage(state, actions, shown, { shown = it }, onSearch = { page = 2 }) { page = 0 }
         }
-        else -> SettingsPage(state, actions) { page = 1 }
+        language != null -> {
+            BackHandler { language = null }
+            LanguagePage(state, actions, language!!, openCatalog) { language = null }
+        }
+        else -> SettingsPage(state, actions, openLanguage = { language = it }, openCatalog = { openCatalog(null) })
     }
 }
 
@@ -191,7 +211,9 @@ const val APP_QNN = "2.40"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsPage(state: ModelsState, actions: ModelsActions, openModels: () -> Unit) {
+private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openCatalog: () -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); picking = false; openLanguage(it) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -201,11 +223,46 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openModels:
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-            SectionTitle(stringResource(R.string.folder_title))
-            LecturesFolder(state.folder, actions.chooseFolder)
+            SectionTitle(stringResource(R.string.settings_languages))
+            state.languages.forEach { l ->
+                val live = state.liveFor(l)
+                val improve = state.refineFor(l)
+                Row(Modifier.fillMaxWidth().clickable { openLanguage(l) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(languageName(l), style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            if (live != null) stringResource(R.string.settings_live_is, isolated(live.name)) else stringResource(R.string.settings_live_none),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (live != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                        Text(
+                            if (improve != null) stringResource(R.string.settings_improve_is, isolated(improve.name)) else stringResource(R.string.settings_improve_none),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (improve != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                }
+            }
+            TextButton(onClick = { picking = true }, modifier = Modifier.padding(horizontal = 12.dp)) {
+                Icon(Icons.Filled.Add, null)
+                Text(stringResource(R.string.models_add_language), Modifier.padding(start = 8.dp))
+            }
             HorizontalDivider(Modifier.padding(top = 8.dp))
-            SectionTitle(stringResource(R.string.start_format))
+            SectionTitle(stringResource(R.string.settings_after))
+            SwitchRow(stringResource(R.string.settings_find_speakers), stringResource(R.string.settings_find_speakers_note), state.findSpeakersOnStop, actions.setFindSpeakersOnStop)
+            SwitchRow(
+                stringResource(R.string.settings_auto_improve),
+                stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),
+                state.autoImprove, actions.setAutoImprove,
+            )
+            HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_storage))
+            NavRow(stringResource(R.string.settings_manage), stringResource(R.string.settings_manage_note), openCatalog)
+            Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
+            LecturesFolder(state.folder, actions.chooseFolder)
             Column(Modifier.selectableGroup()) {
+                Text(stringResource(R.string.start_format), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, top = 16.dp))
                 listOf(
                     AudioFormat.Wav to R.string.format_wav,
                     AudioFormat.WavThenFlac to R.string.format_wav_then_flac,
@@ -217,37 +274,127 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openModels:
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = state.audioFormat == option, onClick = null)
-                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** A language's page: the model that writes it live and the one that improves its lectures, each a list to pick. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguagePage(state: ModelsState, actions: ModelsActions, language: String, openCatalog: (String) -> Unit, onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
+                title = { Text(languageName(language)) },
+            )
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            SectionTitle(stringResource(R.string.settings_live_title))
+            PageNote(stringResource(R.string.settings_live_note))
+            Choices(state, actions, state.liveModels(language), state.liveFor(language)) { actions.useLive(language, it) }
             HorizontalDivider(Modifier.padding(top = 8.dp))
-            Row(
-                Modifier.fillMaxWidth().toggleable(value = state.afterLecture, role = Role.Switch, onValueChange = actions.setAfterLecture)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.start_after_lecture), style = MaterialTheme.typography.bodyLarge)
-                    Text(stringResource(R.string.models_after_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = state.afterLecture, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
-            }
-            HorizontalDivider()
-            Row(Modifier.fillMaxWidth().clickable(onClick = openModels).padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.models_title), style = MaterialTheme.typography.bodyLarge)
-                    val missing = state.languages.filter { state.liveFor(it) == null }
-                    Text(
-                        if (missing.isEmpty()) stringResource(R.string.models_all_set)
-                        else stringResource(R.string.models_missing, missing.map { languageName(it) }.joinToString()),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (missing.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+            SectionTitle(stringResource(R.string.settings_improve_title))
+            PageNote(stringResource(R.string.settings_improve_note))
+            Choices(
+                state, actions, state.refineModels(language).filter { state.ready(it) } + state.improveToGet(language), state.refineFor(language),
+            ) { actions.useRefine(language, it) }
+            TextButton(onClick = { openCatalog(language) }, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(stringResource(R.string.settings_more, languageName(language)))
             }
         }
+    }
+}
+
+/** The ready models to pick from, then the others with their download (or why one can't be picked). */
+@Composable
+private fun Choices(state: ModelsState, actions: ModelsActions, all: List<SpeechModel>, chosen: SpeechModel?, pick: (SpeechModel) -> Unit) {
+    Column(Modifier.selectableGroup()) {
+        all.filter { state.ready(it) }.forEach { model ->
+            Row(
+                Modifier.fillMaxWidth().selectable(selected = chosen == model, role = Role.RadioButton) { pick(model) }.padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = chosen == model, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
+                ChoiceText(model, state)
+            }
+        }
+        all.filter { !state.ready(it) }.forEach { model ->
+            val status = state.status(model)
+            Row(Modifier.fillMaxWidth().padding(start = 56.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ChoiceText(model, state)
+                    // Downloaded but not loading on this NPU: why, under its name; it can't be picked.
+                    if (status == ModelStatus.Ready) Text(
+                        stringResource(if (state.npu[model.id] == NpuCheck.Checking) R.string.models_npu_checking else R.string.models_npu_fails),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.npu[model.id] == NpuCheck.Checking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
+                }
+                when (status) {
+                    is ModelStatus.Downloading -> CircularProgressIndicator(progress = { status.progress }, modifier = Modifier.padding(horizontal = 8.dp).size(24.dp), strokeWidth = 3.dp)
+                    ModelStatus.Checking -> CircularProgressIndicator(Modifier.padding(horizontal = 8.dp).size(24.dp), strokeWidth = 3.dp)
+                    ModelStatus.WaitingForWifi -> Text(stringResource(R.string.model_waiting_wifi), style = MaterialTheme.typography.labelSmall)
+                    ModelStatus.Ready -> {}
+                    is ModelStatus.Failed -> TextButton(onClick = { actions.download(model) }) { Text(stringResource(R.string.models_retry), color = MaterialTheme.colorScheme.error) }
+                    // A text button, so a long name keeps the row's width.
+                    ModelStatus.Missing -> TextButton(onClick = { actions.download(model) }) {
+                        Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
+                        Text(modelsSize(model.sizeBytes), Modifier.padding(start = 4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A model in a list to pick: its name ("· NPU" kept with it), streaming or many languages, its size once it is here. */
+@Composable
+private fun ChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(isolated(model.name.replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
+        val facts = listOfNotNull(
+            stringResource(R.string.settings_streaming).takeIf { model.kind == ModelKind.StreamingTransducer || model.kind == ModelKind.StreamingTransducerNpu },
+            stringResource(R.string.models_multilingual).takeIf { SpeechModel.MULTILINGUAL in model.languages },
+            modelsSize(model.sizeBytes).takeIf { state.status(model) == ModelStatus.Ready },
+        )
+        if (facts.isNotEmpty()) Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PageNote(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+}
+
+@Composable
+private fun SwitchRow(title: String, note: String, on: Boolean, set: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = set).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+@Composable
+private fun NavRow(title: String, note: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
     }
 }
 
@@ -290,7 +437,7 @@ private fun CatalogPage(state: ModelsState, actions: ModelsActions, shown: Strin
     var picking by remember { mutableStateOf(false) }
     if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); show(it); picking = false }
     val speakers = shown == SPEAKERS
-    val models = if (speakers) speakerModels else state.refineModels(shown).sortedByDescending { it.fitsLive }
+    val models = if (speakers) speakerModels else state.catalog(shown)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -345,7 +492,7 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
     var menu by remember { mutableStateOf(false) }
     val uri = LocalUriHandler.current
     val live = language != null && state.liveFor(language) == model
-    val refine = language != null && state.afterLecture && state.refineFor(language) == model
+    val refine = language != null && state.refineFor(language) == model
     ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -374,10 +521,6 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (language != null && state.ready(model)) {
-                        if (model.fitsLive && !live) DropdownMenuItem(text = { Text(stringResource(R.string.model_use_live)) }, onClick = { menu = false; actions.useLive(language, model) })
-                        if (!refine && state.afterLecture) DropdownMenuItem(text = { Text(stringResource(R.string.models_use_refine)) }, onClick = { menu = false; actions.useRefine(language, model) })
-                    }
                     if (status == ModelStatus.Ready && !model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.model_delete)) }, onClick = { menu = false; actions.delete(model) })
                     if (model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.models_remove)) }, onClick = { menu = false; actions.remove(model) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.models_page)) }, onClick = { menu = false; uri.openUri(model.source) })
