@@ -27,18 +27,26 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
         /** [modelId]'s thresholds; CAM++'s for a model without its own. */
         fun of(modelId: String): VoicePrintThresholds = byModel[modelId] ?: byModel.getValue(ModelCatalog.voicePrints.id)
 
+        /**
+         * Live speaker turns' threshold for [modelId]'s prints of the pieces [segmentationId]'s model cuts (null:
+         * pyannote's), moved by the user's [more] (-1..1). Each segmentation model cuts differently (DiariZen's pieces
+         * are cleaner and its prints spread wider than pyannote's), so each pair has its own: [LIVE].
+         */
+        fun live(modelId: String, segmentationId: String?, more: Float = 0f): Float =
+            shift(LIVE[modelId to Turns.of(segmentationId)] ?: of(modelId).live, more)
+
         /** How far the cosines move at the slider's ends, and the clustering distance. */
         const val COSINE_RANGE = 0.15f
         const val CLUSTERING_RANGE = 0.25f
+
+        /** A tuned cosine [threshold] moved by the user's [more] (-1..1). */
+        fun shift(threshold: Float, more: Float) = (threshold + more.coerceIn(-1f, 1f) * COSINE_RANGE).coerceIn(0.05f, 0.95f)
 
         /**
          * [modelId]'s thresholds moved by the user's setting [more], -1 (fewer speakers: a voice joins a speaker more
          * readily) to 1 (more speakers), 0 the tuned values: the cosines up by [COSINE_RANGE] at 1, the clustering
          * distance down by [CLUSTERING_RANGE].
          */
-        /** A tuned cosine [threshold] moved by the user's [more] (-1..1). */
-        fun shift(threshold: Float, more: Float) = (threshold + more.coerceIn(-1f, 1f) * COSINE_RANGE).coerceIn(0.05f, 0.95f)
-
         fun of(modelId: String, more: Float): VoicePrintThresholds {
             val t = of(modelId)
             val m = more.coerceIn(-1f, 1f)
@@ -49,4 +57,31 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
             )
         }
     }
+
+    /** The segmentation models live speaker turns can run, by their thresholds. */
+    enum class Turns {
+        Pyannote, DiariZenBase, DiariZenLarge, DiariZenMeeting;
+
+        companion object {
+            /** [segmentationId]'s kind: DiariZen's by name (from the catalog or Hugging Face); anything else pyannote's. */
+            fun of(segmentationId: String?): Turns {
+                val id = segmentationId?.lowercase() ?: return Pyannote
+                return when {
+                    "diarizen" !in id -> Pyannote
+                    "meeting" in id -> DiariZenMeeting
+                    "large" in id -> DiariZenLarge
+                    else -> DiariZenBase
+                }
+            }
+        }
+    }
 }
+
+/**
+ * Live thresholds per (voice-print model, segmentation model), from replaying the owner's lectures through the live
+ * path with each pair (build/speaker-ab/live_ab3.py; the table in docs/design.md, Speakers). Pyannote's pairs are
+ * [VoicePrintThresholds.live].
+ */
+private val LIVE: Map<Pair<String, VoicePrintThresholds.Turns>, Float> = mapOf(
+    (ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds.Turns.DiariZenLarge) to 0.3f,
+)

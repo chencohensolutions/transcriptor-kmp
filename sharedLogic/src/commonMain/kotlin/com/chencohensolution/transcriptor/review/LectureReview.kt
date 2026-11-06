@@ -40,11 +40,11 @@ class LectureReview(
         var power: com.chencohensolution.transcriptor.recording.PowerReport? = null
         var powerRead = false
         /** The live stretches kept with the lecture (model id, stretches), read once. */
-        var live: Pair<String, List<LiveStretch>>? = null
+        var live: com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? = null
         var liveRead = false
     }
 
-    private fun Open.liveSpeakers(): Pair<String, List<LiveStretch>>? {
+    private fun Open.liveSpeakers(): com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? {
         if (!liveRead) {
             live = runCatching { store.loadLiveSpeakers(lecture) }.getOrNull()
             liveRead = true
@@ -66,7 +66,7 @@ class LectureReview(
 
     private fun Open.corrections(): Int? {
         if (correctionsFor !== lecture) {
-            corrections = liveSpeakers()?.let { (_, stretches) -> SpeakerTuning.corrections(lecture.segments, stretches) }
+            corrections = liveSpeakers()?.let { kept -> SpeakerTuning.corrections(lecture.segments, kept.stretches) }
             correctionsFor = lecture
         }
         return corrections
@@ -197,10 +197,12 @@ class LectureReview(
      */
     fun tuneSpeakers(): TuneProposal? {
         val o = open.value ?: return null
-        val (model, stretches) = o.liveSpeakers() ?: return null
+        val kept = o.liveSpeakers() ?: return null
+        val model = kept.model
         if (model.isEmpty()) return null
         val now = speakerTuning(model)
-        val result = SpeakerTuning.tune(o.lecture.segments, stretches, VoicePrintThresholds.of(model).live, now) ?: return null
+        // Tuned against the threshold of the pair it was recorded with: the slider is an offset on it.
+        val result = SpeakerTuning.tune(o.lecture.segments, kept.stretches, VoicePrintThresholds.live(model, kept.turns), now) ?: return null
         return TuneProposal(model, now, result)
     }
 

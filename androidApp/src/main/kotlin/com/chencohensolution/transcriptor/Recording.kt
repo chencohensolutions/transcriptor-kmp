@@ -468,8 +468,15 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
     val segmentation = Recording.segmentationModel
     val liveTurns = prints != null && segmentation != null
-    val tracker = prints?.let { VoicePrintThresholds.of(it.id, Recording.settings.speakerTuning(it.id)).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
-    val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
+    // With live turns: the threshold of this pair of models (VoicePrintThresholds.live), the user's slider on top.
+    val threshold = prints?.let {
+        val more = Recording.settings.speakerTuning(it.id)
+        if (liveTurns) VoicePrintThresholds.live(it.id, segmentation!!.id, more) else VoicePrintThresholds.of(it.id, more).sameSpeaker
+    }
+    val tracker = prints?.let { SpeakerTracker(known, threshold!!, it.id) }
+    // The model line shows the threshold in use: what to compare when speakers merge or split.
+    val at = threshold?.let { " · " + "%.2f".format(java.util.Locale.ROOT, it) }.orEmpty()
+    val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name + at)) }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
     // Speakers found live with segmentation when a model is on the phone; else by each line's print.
@@ -488,14 +495,14 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
             },
             loadEmbedder = {
                 val turns = if (segmentation == ModelCatalog.speakerSegmentation) "pyannote" else segmentation.name
-                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns · $where + ${prints.name}", e.runs) }
+                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("$turns · $where + ${prints.name}$at", e.runs) }
             },
         )
     } else {
         null
     }
     val labeler = if (live != null) null else tracker?.let { t ->
-        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name, e.runs) } }
+        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name + at, e.runs) } }
     }
     val transcriber = when (model.kind) {
         ModelKind.Whisper -> {
@@ -515,7 +522,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker, inUse, live)
+    return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation })
 }
 
 class TranscriptorApp : Application() {
