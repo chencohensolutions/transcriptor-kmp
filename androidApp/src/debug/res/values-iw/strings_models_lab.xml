@@ -16,4 +16,9 @@
     <string name="models_lab_turns">חילופי דוברים</string>
     <string name="models_lab_storage_row">הקלטה ואחסון</string>
     <string name="models_lab_storage_note">שיפור אוטומטי, מודלים, תיקיית ההרצאות, שמע</string>
+    <string name="models_lab_turn_model">מודל החילופים</string>
+    <string name="models_lab_find_more">חיפוש מודלים נוספים ב-Hugging Face</string>
+    <string name="models_lab_add">הוספה</string>
+    <string name="models_lab_added">נוסף</string>
+    <string name="models_lab_downloading">בהורדה · %1$s</string>
 </resources>

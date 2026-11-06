@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -91,8 +92,9 @@ private fun bName(model: SpeechModel?, none: Int): Pair<String, Boolean> =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BSheet(title: String, note: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+    // Full height at once, and the list scrolls: half open, the sheet cut off its last models.
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp))
             LabPageNote(note)
             content()
