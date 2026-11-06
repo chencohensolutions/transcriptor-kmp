@@ -251,4 +251,7 @@
     <string name="review_tune_apply">החלה</string>
     <string name="review_tune_ok">אישור</string>
     <string name="review_tune_none">אין לפי מה לכוונן: בהרצאה הזו אין טביעות קול מזיהוי דוברים בזמן אמת, או שורות עם דוברים.</string>
+    <string name="settings_flac_level">מאמץ דחיסת FLAC: %1$d</string>
+    <string name="settings_flac_faster">מהיר יותר</string>
+    <string name="settings_flac_smaller">קבצים קטנים יותר</string>
 </resources>

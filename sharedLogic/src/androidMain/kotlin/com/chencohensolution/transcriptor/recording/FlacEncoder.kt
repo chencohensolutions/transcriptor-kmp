@@ -15,12 +15,14 @@ class FlacEncoder(
     file: File,
     private val sampleRate: Int = WavWriter.SAMPLE_RATE,
     private val channels: Int = WavWriter.CHANNELS,
+    /** FLAC's compression level, 0 (fastest) to 8 (smallest). */
+    level: Int = 5,
 ) : PcmSink {
     private val out = RandomAccessFile(file, "rw").apply { setLength(0) }
     private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_FLAC).apply {
         configure(
             MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_FLAC, sampleRate, channels).apply {
-                setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, 5)
+                setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, level.coerceIn(0, 8))
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, INPUT_SIZE)
             },
             null, null, MediaCodec.CONFIGURE_FLAG_ENCODE,
@@ -141,10 +143,10 @@ class FlacEncoder(
     }
 }
 
-/** [FlacEncode] with [FlacEncoder]: the WAV's PCM in 64 KB pieces. */
-val androidFlacEncode = FlacEncode { wav, flac, progress ->
+/** [FlacEncode] with [FlacEncoder] at [level] (read for each file): the WAV's PCM in 64 KB pieces. */
+fun androidFlacEncode(level: () -> Int = { 5 }) = FlacEncode { wav, flac, progress ->
     val wavFile = wav.toFile()
-    val encoder = FlacEncoder(flac.toFile())
+    val encoder = FlacEncoder(flac.toFile(), level = level())
     RandomAccessFile(wavFile, "r").use { input ->
         val total = input.length() - WavWriter.HEADER_SIZE
         input.seek(WavWriter.HEADER_SIZE)
