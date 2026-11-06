@@ -12,7 +12,7 @@ off. The lecture screen's side of the round is [review/2026-11-06](../review/202
   its model and opening a sheet to pick one (downloaded first, the others with Get); Manage models is a library only.
   *Turned down* (close to round 1's a).
 - **b — A page per language**: Settings lists the languages in use, each with its live and improve models
-  ("Live: … / Improve: …"); a language's page has both choices as lists, the models to get under them. *Picked*.
+  ("Live: … / Improve: …"); a language's page has both choices as lists, the models to get under them. *Picked*, promoted in 12d0d8a.
 - Both: "Improve after the lecture" becomes two switches, Find the speakers when a lecture stops and Improve
   automatically; Improve lists Whisper models only (the streaming ones re-transcribe nothing better); the role items
   (Use for live, Use to refine) leave the Models cards.

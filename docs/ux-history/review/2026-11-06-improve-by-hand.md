@@ -8,7 +8,7 @@ Part of the round on [choosing models in one place](../models/2026-11-06-models-
 - **a — Improve transcription… always in the menu**: the ⋮ item is there whether or not lectures improve
   automatically, and opens a sheet: the lecture's length, language and what wrote it now; the downloaded models for its
   language with an estimate each (the Settings default picked; another one is a one-off); Find the speakers first when
-  that pass hasn't run; what is kept. **a-none**: no model downloaded, the sheet offers the one to get. *Picked*.
+  that pass hasn't run; what is kept. **a-none**: no model downloaded, the sheet offers the one to get. *Picked*, promoted in 12d0d8a.
 
 ## What they faked
 - "Improve automatically" off; the estimates (made up, as the app would measure each model's speed on this phone);
