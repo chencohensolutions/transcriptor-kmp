@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.transcriptor.models.speakerNpuFiles
 import com.chencohensolution.transcriptor.models.HubClient
 import com.chencohensolution.transcriptor.models.HubKind
 import com.chencohensolution.transcriptor.models.InstalledModel
@@ -275,5 +276,21 @@ class HubTest {
         assertTrue("segmentation" in HubClient.defaultTerms(HubKind.SpeakerTurns))
         assertEquals(listOf("ggml", "sherpa-onnx", "qnn"), HubClient.defaultTerms(null))
         assertTrue(HubKind.speech.none { it.speakers })
+    }
+
+    @Test
+    fun speakerNpuBuildsTaggedSherpaOnnxAreFoundWithTheirNpuFiles() {
+        val dz = listOf("README.md", "model.onnx", "window.bin")
+        val dzTags = listOf("speaker-diarization", "diarizen", "sherpa-onnx", "qnn", "license:cc-by-nc-4.0")
+        assertEquals(HubKind.SpeakerTurns, classify("hencohen83/diarizen-wavlm-base-s80-qnn-sm8750", dz, dzTags))
+        assertEquals(listOf("window.bin"), speakerNpuFiles("hencohen83/diarizen-wavlm-base-s80-qnn-sm8750", dz, dzTags))
+        val rn = listOf("model.onnx", "t150.bin", "t300.bin", "t600.bin")
+        val rnTags = listOf("speaker-embedding", "wespeaker", "sherpa-onnx", "qnn")
+        assertEquals(HubKind.VoicePrints, classify("hencohen83/wespeaker-resnet293-lm-qnn-sm8750", rn, rnTags))
+        assertEquals(listOf("t150.bin", "t300.bin", "t600.bin"), speakerNpuFiles("hencohen83/wespeaker-resnet293-lm-qnn-sm8750", rn, rnTags))
+        // Without sherpa-onnx in its name, author or tags it isn't one sherpa-onnx can read.
+        assertNull(classify("someone/diarizen-wavlm-base-s80", listOf("model.onnx"), listOf("speaker-diarization")))
+        // An ONNX speaker model without an NPU build brings no .bin.
+        assertEquals(emptyList(), speakerNpuFiles("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", listOf("model.onnx", "x.bin"), emptyList()))
     }
 }

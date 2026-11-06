@@ -249,9 +249,13 @@ internal fun hubModel(s: HubSummary, d: HubDetail): HubModel? {
             }
         }
         // A speaker model per ONNX file (a repo may hold several models, or fp32 and int8), installed as model.onnx.
-        kind.speakers -> names.filter { it.endsWith(".onnx") }.map { n ->
-            HubVariant(n.removeSuffix(".onnx"), listOf(file(n, "model.onnx")), parametersOf(s.id), fitsLive = true)
-        }.sortedBy { it.sizeBytes }
+        // With its NPU build when the repo has one (the app uses it on that chip, the ONNX elsewhere).
+        kind.speakers -> {
+            val npuFiles = speakerNpuFiles(s.id, names, tags).map { file(it) }
+            names.filter { it.endsWith(".onnx") }.map { n ->
+                HubVariant(n.removeSuffix(".onnx") + if (npuFiles.isEmpty()) "" else " + NPU", listOf(file(n, "model.onnx")) + npuFiles, parametersOf(s.id), fitsLive = true)
+            }.sortedBy { it.sizeBytes }
+        }
         // Not run by the app yet: listed with their ONNX files.
         else -> listOf(HubVariant("onnx", names.filter { it.endsWith(".onnx") || it.endsWith("tokens.txt") }.map { file(it) }, parametersOf(s.id), fitsLive = true))
     }.filter { it.files.isNotEmpty() }
@@ -270,7 +274,7 @@ internal fun classify(id: String, files: List<String>, tags: List<String>): HubK
     val top = files.filter { '/' !in it }
     if (npuOf(id, top, tags) != null) return if (top.any { "joiner" in it }) HubKind.Streaming else HubKind.Whisper
     // Other models ship ggml and ONNX files too (Parakeet's GGUF, language models): their names say what they are.
-    speakerKind(id, top)?.let { return it }
+    speakerKind(id, top, tags)?.let { return it }
     if ("parakeet" in name || "nemo" in name) return if (top.any { it.endsWith(".onnx") }) HubKind.Parakeet else null
     val whisper = "whisper" in name || tags.any { "whisper" in it.lowercase() }
     if (top.any(::isGgml)) return if (whisper) HubKind.Whisper else null
@@ -287,20 +291,35 @@ internal fun classify(id: String, files: List<String>, tags: List<String>): HubK
 }
 
 /**
- * A speaker model sherpa-onnx reads: ONNX files in a sherpa-onnx export (its name, or its author's, says so; other
- * exports lack the metadata sherpa-onnx needs), named for voice prints (speaker embedding, recognition, verification,
- * WeSpeaker, 3D-Speaker, CAM++, ERes2Net, TitaNet, ECAPA) or for speaker turns (segmentation, diarization).
+ * A speaker model sherpa-onnx reads: ONNX files in a sherpa-onnx export (its name, its author or its card's
+ * `sherpa-onnx` tag says so; other exports lack the metadata sherpa-onnx needs).
+ * - **Speaker turns:** named or tagged for segmentation or diarization (pyannote, DiariZen).
+ * - **Voice prints:** named or tagged for speaker embedding, recognition or verification (WeSpeaker, 3D-Speaker,
+ *   CAM++, ERes2Net, TitaNet, ECAPA).
  */
-internal fun speakerKind(id: String, top: List<String>): HubKind? {
+internal fun speakerKind(id: String, top: List<String>, tags: List<String> = emptyList()): HubKind? {
     val name = id.lowercase()
+    val tagged = tags.map { it.lowercase() }
     if (top.none { it.endsWith(".onnx") }) return null
-    if ("sherpa" !in name && id.substringBefore('/') !in SHERPA_AUTHORS) return null
+    if ("sherpa" !in name && id.substringBefore('/') !in SHERPA_AUTHORS && "sherpa-onnx" !in tagged) return null
+    val text = name + " " + tagged.joinToString(" ")
     return when {
-        listOf("segmentation", "diarization", "pyannote").any { it in name } -> HubKind.SpeakerTurns
-        listOf("speaker-embedding", "speaker-recognition", "speaker-verification", "wespeaker", "3dspeaker", "campplus", "eres2net", "titanet", "ecapa").any { it in name } ->
+        listOf("segmentation", "diarization", "pyannote", "diarizen").any { it in text } -> HubKind.SpeakerTurns
+        listOf("speaker-embedding", "speaker-recognition", "speaker-verification", "wespeaker", "3dspeaker", "campplus", "eres2net", "titanet", "ecapa").any { it in text } ->
             HubKind.VoicePrints
         else -> null
     }
+}
+
+/**
+ * A speaker model's NPU build beside its ONNX (Transcriptor's: QNN context binaries for one chip, the chip in the
+ * repo's name or tags): the voice-print graphs `t150.bin`, `t300.bin`, `t600.bin`, or the segmentation window
+ * `window.bin`. Empty without one.
+ */
+internal fun speakerNpuFiles(id: String, top: List<String>, tags: List<String>): List<String> {
+    val text = (id + " " + tags.joinToString(" ")).lowercase()
+    if ("qnn" !in text || Regex("""sm\d{4}""").find(text) == null) return emptyList()
+    return top.filter { it in listOf("t150.bin", "t300.bin", "t600.bin", "window.bin") }
 }
 
 /** Who publishes sherpa-onnx's exports (its author, the project). */
