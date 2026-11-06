@@ -51,8 +51,22 @@ fun powersetToActive(logProbs: FloatArray, numClasses: Int, speakers: Int = 3, m
     }
 }
 
-/** A stretch of the recording ([startMillis] to [endMillis]) said by [speaker], with the voice print it was given, if any. */
+/** A stretch of the recording ([startMillis] to [endMillis]) said by [speaker]. */
 data class LiveTurn(val startMillis: Long, val endMillis: Long, val speaker: String)
+
+/**
+ * One voice in one settled part, as [LiveSpeakers] decided it: from [startMillis] to [endMillis] (its turns there),
+ * the lecture's [speaker], and either its [print] or, without enough audio for one, the earlier stretch it continues
+ * ([follows], an index). Kept with the lecture, so its speakers can be regrouped at other thresholds without the audio
+ * ([replayStretches]).
+ */
+data class LiveStretch(
+    val startMillis: Long,
+    val endMillis: Long,
+    val speaker: String,
+    val print: List<Float>? = null,
+    val follows: Int? = null,
+)
 
 /**
  * Speaker labels while recording, diart's way: every [STEP] of audio the segmentation model reads the last [Segmenter.windowSize]
@@ -73,7 +87,12 @@ class LiveSpeakers(
     private val loadSegmenter: () -> Segmenter,
     private val loadEmbedder: () -> VoiceEmbedder,
 ) {
-    class State(val turns: List<LiveTurn> = emptyList(), val settledMillis: Long = 0, val error: String? = null)
+    class State(
+        val turns: List<LiveTurn> = emptyList(),
+        val settledMillis: Long = 0,
+        val error: String? = null,
+        val stretches: List<LiveStretch> = emptyList(),
+    )
 
     private val downsampler = Downsampler()
     private val lock = SynchronizedObject()
@@ -89,8 +108,9 @@ class LiveSpeakers(
     private var total = 0L
     private var settled = 0L
     private var nextRun = 0L
-    /** The previous window's voices: (local speaker, its frames as recording samples) to the lecture's speaker. */
-    private var previous: Map<Int, Pair<List<Long>, String>> = emptyMap()
+    /** The previous window's voices: local speaker to its frames (recording samples), speaker and stretch index. */
+    private var previous: Map<Int, Triple<List<Long>, String, Int>> = emptyMap()
+    private val stretches = mutableListOf<LiveStretch>()
     private var segmenter: Segmenter? = null
     private var embedder: VoiceEmbedder? = null
 
@@ -121,7 +141,7 @@ class LiveSpeakers(
             segmenter = loadSegmenter()
             embedder = loadEmbedder()
         } catch (e: Throwable) {
-            _state.update { State(it.turns, it.settledMillis, e.message ?: e.toString()) }
+            _state.update { State(it.turns, it.settledMillis, e.message ?: e.toString(), it.stretches) }
             close()
             return
         }
@@ -145,7 +165,7 @@ class LiveSpeakers(
                 wake.receive()
             }
         } catch (e: Throwable) {
-            _state.update { State(it.turns, it.settledMillis, e.message ?: e.toString()) }
+            _state.update { State(it.turns, it.settledMillis, e.message ?: e.toString(), it.stretches) }
         } finally {
             close()
         }
@@ -177,7 +197,7 @@ class LiveSpeakers(
             audio.dropFirst((keep - audioStart).toInt())
             audioStart = keep
         }
-        _state.update { State(it.turns + turns, settled / 16, it.error) }
+        _state.update { State(it.turns + turns, settled / 16, it.error, stretches.toList()) }
     }
 
     /** The window's voices in [from, until) (recording samples), as the lecture's speakers. */
@@ -185,7 +205,7 @@ class LiveSpeakers(
         if (until <= from) return emptyList()
         val frames = s.active.indices.filter { start + s.center(it) in from until until }
         val ids = mutableMapOf<Int, String>()
-        val now = mutableMapOf<Int, Pair<List<Long>, String>>()
+        val now = mutableMapOf<Int, Triple<List<Long>, String, Int>>()
         for (k in 0 until s.speakers) {
             val own = s.active.indices.filter { s.active[it][k] }.map { start + s.center(it) }
             val inPart = frames.filter { s.active[it][k] }
@@ -199,16 +219,21 @@ class LiveSpeakers(
                 if (a < audioStart || b > audioStart + audio.size) continue
                 clean.add(audio.slice((a - audioStart).toInt(), (b - audioStart).toInt()))
             }
-            val id = if (clean.size >= MIN_PRINT) {
+            val partStart = (inPart.minOf { start + s.center(it) } - s.frameShift / 2).coerceAtLeast(from) / 16
+            val partEnd = (inPart.maxOf { start + s.center(it) } + s.frameShift / 2).coerceAtMost(until) / 16
+            val stretch = if (clean.size >= MIN_PRINT) {
                 prints++
-                tracker.assign(embedder!!.embed(clean.toArray()))
+                val print = embedder!!.embed(clean.toArray())
+                LiveStretch(partStart, partEnd, tracker.assign(print), print = print.toList())
             } else {
                 // The previous window's voice this one overlaps most.
-                previous.values.maxByOrNull { (times, _) -> times.count { it in own } }
-                    ?.takeIf { (times, _) -> times.any { it in own } }?.second
-            } ?: continue
-            ids[k] = id
-            now[k] = own to id
+                val before = previous.values.maxByOrNull { (times, _, _) -> times.count { it in own } }
+                    ?.takeIf { (times, _, _) -> times.any { it in own } } ?: continue
+                LiveStretch(partStart, partEnd, before.second, follows = before.third)
+            }
+            stretches += stretch
+            ids[k] = stretch.speaker
+            now[k] = Triple(own, stretch.speaker, stretches.lastIndex)
         }
         previous = now
         // Turns: runs of frames with the same speaker, per speaker.
@@ -255,4 +280,17 @@ fun liveLines(lines: List<Segment>, turns: List<LiveTurn>, settledMillis: Long):
         val near = asTurns.filter { it.endMillis >= line.startMillis && it.startMillis <= line.endMillis }
         listOf(line).followTurns(near).mapIndexed { i, s -> s.copy(id = if (i == 0) line.id else "${line.id}.${i + 1}") }
     }
+}
+
+/**
+ * [stretches]' speakers again, as a [SpeakerTracker] at [threshold] would have made them live: the printed stretches
+ * in order, each following one taking its earlier stretch's speaker. Speaker ids are the tracker's ("speaker-N").
+ */
+fun replayStretches(stretches: List<LiveStretch>, threshold: Float): List<String?> {
+    val tracker = SpeakerTracker(threshold = threshold)
+    val out = arrayOfNulls<String>(stretches.size)
+    stretches.forEachIndexed { i, s ->
+        out[i] = s.print?.let { tracker.assign(it.toFloatArray()) } ?: s.follows?.let { f -> out.getOrNull(f) }
+    }
+    return out.toList()
 }

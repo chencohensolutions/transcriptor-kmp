@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.ui
 
+import com.chencohensolution.transcriptor.review.LectureReview
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -116,6 +117,9 @@ class ReviewActions(
     /** Makes an earlier transcript (a version's id) the current one, keeping this one as a version. */
     val switchVersion: (id: String) -> Unit = {},
     val findSpeakers: () -> Unit = {},
+    /** "Tune on this lecture": the proposal by the user's corrections ([LectureReview.tuneSpeakers]); null: none. */
+    val tuneSpeakers: () -> LectureReview.TuneProposal? = { null },
+    val applySpeakerTuning: (LectureReview.TuneProposal) -> Unit = {},
     val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
     val editNote: (id: String, text: String) -> Unit = { _, _ -> },
     val deleteNote: (id: String) -> Unit = {},
@@ -140,6 +144,13 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     var noting by remember { mutableStateOf<Long?>(null) }
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
+    var tuning by remember { mutableStateOf<LectureReview.TuneProposal?>(null) }
+    var noTuning by remember { mutableStateOf(false) }
+    tuning?.let { p -> TuneDialog(p, onDismiss = { tuning = null }) { actions.applySpeakerTuning(p); tuning = null } }
+    if (noTuning) AlertDialog(
+        onDismissRequest = { noTuning = false }, confirmButton = { TextButton(onClick = { noTuning = false }) { Text(stringResource(R.string.review_tune_ok)) } },
+        text = { Text(stringResource(R.string.review_tune_none)) },
+    )
     val turns = remember(state.lecture.segments) { turnsOf(state.lecture.segments) }
 
     renaming?.let { s -> RenameSpeakerDialog(s, onDismiss = { renaming = null }) { actions.renameSpeaker(s.id, it); renaming = null } }
@@ -179,6 +190,12 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                                 enabled = state.refine !is PassState.Running,
                                 onClick = { showingVersions = true; menu = false },
                             )
+                            state.speakerCorrections?.let { n ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.review_tune_speakers, n)) }, enabled = n > 0,
+                                    onClick = { menu = false; actions.tuneSpeakers()?.let { tuning = it } ?: run { noTuning = true } },
+                                )
+                            }
                             if (state.speakerPass != null) DropdownMenuItem(
                                 text = { Text(stringResource(R.string.review_find_speakers)) }, enabled = state.speakerPass !is PassState.Running,
                                 onClick = { actions.findSpeakers(); menu = false },
@@ -511,4 +528,27 @@ private fun VersionRow(title: String, model: String, lines: String, current: Boo
         Text(model, style = MaterialTheme.typography.bodyMedium)
         Text(lines, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
     }
+}
+
+/**
+ * "Tune on this lecture"'s result: fewer or more speakers than the setting now (or the same), how many of the lecture's
+ * lines would match the user's labels then and now, and Apply (the voice-print model's setting, from the next lecture).
+ */
+@Composable
+private fun TuneDialog(p: LectureReview.TuneProposal, onDismiss: () -> Unit, onApply: () -> Unit) {
+    val r = p.result
+    val direction = when {
+        r.more < p.now -> stringResource(R.string.review_tune_fewer)
+        r.more > p.now -> stringResource(R.string.review_tune_more)
+        else -> stringResource(R.string.review_tune_same)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.review_tune_title)) },
+        text = {
+            Text(stringResource(R.string.review_tune_result, direction, r.matches, r.lines, r.matchesNow, r.speakers, r.speakersNow))
+        },
+        confirmButton = { TextButton(onClick = onApply, enabled = r.more != p.now) { Text(stringResource(R.string.review_tune_apply)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
+    )
 }

@@ -5,6 +5,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.chencohensolution.transcriptor.speech.LiveStretch
 import okio.FileSystem
 import okio.Path
 import kotlin.time.ExperimentalTime
@@ -118,6 +119,31 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         if (!place.exists(file)) return null
         return json.decodeFromString<VersionFileV1>(place.fileSystem.read(file) { readUtf8() }).toVersion()
     }
+
+    /**
+     * Keeps what live speaker turns decided while [lecture] was recorded (`speakers-live.json`: [model]'s id and the
+     * stretches with their prints), so its speakers can be regrouped or the thresholds tuned on it later.
+     */
+    fun saveLiveSpeakers(lecture: Lecture, model: String, stretches: List<LiveStretch>) {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val folder = place.folder(lecture.notebookId, lecture.id)
+        place.fileSystem.createDirectories(folder)
+        val temp = folder / "$LIVE_SPEAKERS.tmp"
+        val file = LiveSpeakersFileV1(model = model, stretches = stretches.map { LiveStretchV1(it.startMillis, it.endMillis, it.speaker, it.print, it.follows) })
+        place.fileSystem.write(temp) { writeUtf8(compact.encodeToString(file)) }
+        place.fileSystem.atomicMove(temp, folder / LIVE_SPEAKERS)
+    }
+
+    /** [saveLiveSpeakers]' model id and stretches; null for a lecture recorded without live speaker turns. */
+    fun loadLiveSpeakers(lecture: Lecture): Pair<String, List<LiveStretch>>? {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val file = place.folder(lecture.notebookId, lecture.id) / LIVE_SPEAKERS
+        if (!place.exists(file)) return null
+        val f = compact.decodeFromString<LiveSpeakersFileV1>(place.fileSystem.read(file) { readUtf8() })
+        return f.model to f.stretches.map { LiveStretch(it.startMs, it.endMs, it.speaker, it.print, it.follows) }
+    }
+
+    private val compact = Json { encodeDefaults = false; ignoreUnknownKeys = true }
 
     fun deleteVersion(lecture: Lecture, id: String) {
         val place = placeOf(lecture.notebookId, lecture.id)
@@ -250,3 +276,18 @@ private data class VersionFileV1(
         )
     }
 }
+
+/** `speakers-live.json`: live speaker turns' stretches of a lecture, by voice-print [model]. */
+@Serializable
+private data class LiveSpeakersFileV1(val v: Int = 1, val model: String, val stretches: List<LiveStretchV1> = emptyList())
+
+@Serializable
+private data class LiveStretchV1(
+    val startMs: Long,
+    val endMs: Long,
+    val speaker: String,
+    val print: List<Float>? = null,
+    val follows: Int? = null,
+)
+
+const val LIVE_SPEAKERS = "speakers-live.json"

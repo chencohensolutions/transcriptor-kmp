@@ -107,3 +107,48 @@ class LiveSpeakersTest {
         assertEquals(listOf("שלום לכולם", "שאלה קטנה", "עוד"), out.map { it.text })
     }
 }
+
+class SpeakerTuningTest {
+    /** Two voices, A near (1, 0) and B near (0, 1); live gave A's second half a speaker of its own. */
+    private val stretches = listOf(
+        com.chencohensolution.transcriptor.speech.LiveStretch(0, 2_000, "speaker-1", listOf(1f, 0.05f)),
+        com.chencohensolution.transcriptor.speech.LiveStretch(2_000, 4_000, "speaker-2", listOf(0.05f, 1f)),
+        com.chencohensolution.transcriptor.speech.LiveStretch(4_000, 6_000, "speaker-3", listOf(0.8f, 0.45f)),
+        com.chencohensolution.transcriptor.speech.LiveStretch(6_000, 7_000, "speaker-3", follows = 2),
+    )
+    private fun line(id: String, a: Long, b: Long, who: String) = Segment(id, a, b, "x", "m", speakerId = who)
+
+    @Test
+    fun theUsersMergeIsACorrectionAndFewerSpeakersMatchIt() {
+        // The user merged speaker-3 into speaker-1.
+        val lines = listOf(line("s1", 0, 2_000, "speaker-1"), line("s2", 2_000, 4_000, "speaker-2"), line("s3", 4_000, 7_000, "speaker-1"))
+        assertEquals(1, com.chencohensolution.transcriptor.speech.SpeakerTuning.corrections(lines, stretches))
+        // Tuned at a cosine of 0.9: speaker-3 stays apart (its cosine with A is about 0.87).
+        val r = com.chencohensolution.transcriptor.speech.SpeakerTuning.tune(lines, stretches, tuned = 0.9f, now = 0f)!!
+        assertEquals(2, r.matchesNow)
+        assertEquals(3, r.matches)
+        assertEquals(3, r.speakersNow)
+        assertEquals(2, r.speakers)
+        assertTrue(r.more < 0f, "fewer speakers")
+    }
+
+    @Test
+    fun followingStretchesTakeTheirSpeakerInReplay() {
+        val replayed = com.chencohensolution.transcriptor.speech.replayStretches(stretches, 0.5f)
+        assertEquals(replayed[2], replayed[3])
+        assertEquals(replayed[0], replayed[2])
+    }
+
+    @Test
+    fun liveStretchesAreKeptWithTheLecture() {
+        val fs = okio.fakefilesystem.FakeFileSystem()
+        val store = com.chencohensolution.transcriptor.notebook.LectureStore(fs, okio.Path.Companion.run { "/d".toPath() })
+        val lecture = com.chencohensolution.transcriptor.notebook.Lecture(
+            id = "l1", notebookId = "nb", title = "t", language = "he", startedAtMillis = 0, durationMillis = 7_000,
+            segments = emptyList(), notes = emptyList(),
+        )
+        store.save(lecture)
+        store.saveLiveSpeakers(lecture, "resnet", stretches)
+        assertEquals("resnet" to stretches, store.loadLiveSpeakers(lecture))
+    }
+}

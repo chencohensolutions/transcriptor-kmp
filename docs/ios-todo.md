@@ -81,3 +81,6 @@ anything left to decide. Remove an entry once it is built.
   window: sherpa-onnx's iOS build has the model; Android's `SherpaSegmenter` uses our patch's `SpeakerSegmentation`
   JNI class) and a `VoiceEmbedder`; `LiveModel.liveSpeakers`, `LiveLectureState.speakersLive`, strings
   `lecture_speakers_live`. `SettingsStore.findSpeakersOnStop` is off by default now.
+- Tuning: `SettingsStore.speakerTuning`/`setSpeakerTuning` (a slider on the speakers page) and the review's
+  `LectureReview.tuneSpeakers()`/`applySpeakerTuning` with `ReviewState.speakerCorrections` (strings `review_tune_*`);
+  `SettingsStore.segmentationModel` and `ModelCatalog.segmentationModels` (DiariZen).

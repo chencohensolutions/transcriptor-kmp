@@ -98,6 +98,20 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   - **The pass after Stop is off by default:** `SettingsStore.findSpeakersOnStop`, now `speakerPassOnStop`; the old
     switch is ignored. It can still be run from the lecture's menu.
   - **Without segmentation:** each line's print, as below.
+  - **What live decided is kept** with the lecture (`speakers-live.json`: the model, and each voice's stretch per
+    settled part with its print, or the stretch it continues; `LectureStore.saveLiveSpeakers`).
+  - **"Tune speakers on this lecture"** (the lecture's menu, with the number of lines the user gave another speaker
+    than live did) replays those prints across the model's "fewer ↔ more speakers" range (`SpeakerTuning`). It shows
+    the setting whose speakers match the user's labels best, and Apply sets it. It isn't offered after a speaker pass,
+    which regroups every line.
+  - **The segmentation model is picked** too (`SettingsStore.segmentationModel`):
+    - pyannote's (default);
+    - BUT-FIT's DiariZen (WavLM + Conformer, 4 speakers a window, 20 ms frames), copied by hand: base-s80 and
+      large-s80 (CC-BY-NC-4.0, 16 s windows), and meeting-base (8 s). meeting-base's Hugging Face page says MIT, its
+      repository CC-BY-NC-4.0, so it is treated as non-commercial.
+
+    They are exported with a fixed window and pyannote's metadata, so the same sherpa-onnx class runs them
+    (`build/diarizen/`, not in git).
   - **Replay A/B** of the three lectures through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
     per second of audio on one Mac CPU core, CAM++'s prints 0.02.
 - **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live

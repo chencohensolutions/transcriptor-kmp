@@ -21,6 +21,10 @@ Settings.
     badge and no download or delete.
   - **Badges:** "Speakers ✓" marks the one in use. "NPU" marks one with its NPU build on this phone. A non-commercial
     license shows in amber.
+  - **Segmentation models:** pyannote's, and DiariZen's once copied by hand. Their menu has "Use for live speaker
+    turns", and the one in use shows "Turns ✓".
+  - **Fewer ↔ more speakers:** the voice-print model in use has a slider, "How readily it starts a new speaker",
+    with Reset. It holds one value per model (`SettingsStore.speakerTuning`).
   - **Picking:** the card's menu has "Use for speaker labels" (`ModelsActions.useVoicePrints`,
     `SettingsStore.voiceModel`). It applies from the next lecture or speaker pass.
 - **Manage models**: chips for the languages in use and Speakers; **Add a language** finds any language Whisper knows

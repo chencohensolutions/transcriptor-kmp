@@ -241,4 +241,14 @@
     <string name="review_speakers_first_note">Improving drops the word times the speaker pass needs.</string>
     <string name="review_kept">Lines you edited stay. The transcript now is kept, under Versions.</string>
     <string name="review_improve_button">Improve</string>
+
+    <string name="review_tune_speakers">Tune speakers on this lecture (%1$d corrections)</string>
+    <string name="review_tune_title">Tune on this lecture</string>
+    <string name="review_tune_fewer">Fewer speakers than now</string>
+    <string name="review_tune_more">More speakers than now</string>
+    <string name="review_tune_same">Your setting now is already the best</string>
+    <string name="review_tune_result">%1$s: %2$d of %3$d lines would match your speakers (now %4$d), with %5$d speakers (now %6$d). Applies from the next lecture.</string>
+    <string name="review_tune_apply">Apply</string>
+    <string name="review_tune_ok">OK</string>
+    <string name="review_tune_none">Nothing to tune on: this lecture has no voice prints from live speaker turns, or no lines with speakers.</string>
 </resources>

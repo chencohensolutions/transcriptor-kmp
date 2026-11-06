@@ -417,7 +417,10 @@ object Recording {
             speakerPassReady = { canFindSpeakers },
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
-        review = LectureReview(store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
+        review = LectureReview(
+            store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
+            speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,
+        )
     }
 }
 

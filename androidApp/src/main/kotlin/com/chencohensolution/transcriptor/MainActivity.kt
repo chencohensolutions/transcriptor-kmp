@@ -147,6 +147,7 @@ class MainActivity : ComponentActivity() {
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
+                                tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
                                 improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
                                 getModel = { id ->
                                     lifecycleScope.launch(Dispatchers.IO) { Recording.modelLibrary.all.firstOrNull { it.id == id }?.let { Recording.models.download(it) } }

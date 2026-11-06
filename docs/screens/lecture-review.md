@@ -58,3 +58,9 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 
 - [Round 1 (Nov 2, 2026)](../ux-history/review/2026-11-02-after-the-lecture.md): c2 — document with the player at the bottom (picked); a — player + timeline, b — tabs, c — document + overview.
 - [Round 2 (Nov 6, 2026)](../ux-history/review/2026-11-06-improve-by-hand.md): a — Improve transcription… always in the menu, with a sheet (picked).
+
+- **Tune speakers on this lecture (N corrections)**, in the menu, for a lecture recorded with live speaker turns
+  (owner's request, Nov 6, 2026). N is the number of lines the user gave another speaker than live did, and the item
+  is disabled at 0. It replays the lecture's stored voice prints across the model's "fewer ↔ more speakers" range and
+  shows the best setting: "Fewer speakers than now: 52 of 60 lines would match your speakers (now 45), with 2 speakers
+  (now 4)". Apply sets it, for the next lecture (`LectureReview.tuneSpeakers`, `applySpeakerTuning`).

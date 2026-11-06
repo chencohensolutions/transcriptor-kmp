@@ -36,6 +36,9 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
          * readily) to 1 (more speakers), 0 the tuned values: the cosines up by [COSINE_RANGE] at 1, the clustering
          * distance down by [CLUSTERING_RANGE].
          */
+        /** A tuned cosine [threshold] moved by the user's [more] (-1..1). */
+        fun shift(threshold: Float, more: Float) = (threshold + more.coerceIn(-1f, 1f) * COSINE_RANGE).coerceIn(0.05f, 0.95f)
+
         fun of(modelId: String, more: Float): VoicePrintThresholds {
             val t = of(modelId)
             val m = more.coerceIn(-1f, 1f)

@@ -218,6 +218,13 @@ class LectureSession(
                 }
             }
         }
+        // What live speaker turns decided, for regrouping or tuning on this lecture later.
+        liveModel?.let { m ->
+            val found = m.liveSpeakers?.state?.value
+            if (found != null && found.stretches.isNotEmpty()) {
+                runCatching { store.saveLiveSpeakers(r.lecture, m.speakers?.model.orEmpty(), found.stretches) }
+            }
+        }
         val lecture = recording.value!!.lecture.copy(
             durationMillis = duration,
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenFlac,
