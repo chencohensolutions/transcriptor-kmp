@@ -22,6 +22,13 @@ anything left to decide. Remove an entry once it is built.
   `Settings.kt` (the state and actions), `Recording.hub`, `Recording.checkNpu`; `docs/screens/models.md`.
 - A language's page: `ModelChoices.candidates(forLanguage, ModelJob.Live/Improve, ready)`, `running`, `improveToGet`;
   choosing calls `SettingsStore.setLiveModel`/`setRefineModel`. Strings `settings_*`.
+- The speaker models on Settings (Nov 6, 2026, round 3's d2): Speaker recognition (a Voice model row, the fewer ↔
+  more slider under it) and Speaker turns (a Turn model row), each row opening the same speaker page (`SpeakerPage`:
+  the note, `ModelsState.voiceModels`/`turnModels` to pick with `useVoicePrints`/`useSegmentation`, Find more on
+  Hugging Face with `HubKind.VoicePrints`/`SpeakerTurns`). `Recording.voiceModel`/`segmentationModel` include the
+  speaker models added from Hugging Face. Strings `settings_recognition*`, `settings_turns*`, `settings_voice_model`,
+  `settings_turn_model`, `settings_no_model`, `models_find_more`, `models_kind_voice_prints`,
+  `models_kind_speaker_turns`, `models_speaker_search_note`.
 - Shared: `HubClient(fetch)` (iOS: `fetch` on URLSession), `HubModel.toSpeechModel`, `InstalledModels`,
   `ModelLibrary`, `SettingsStore.refineModel`/`setRefineModel`/`modelLanguages`.
 - iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
@@ -55,8 +62,8 @@ anything left to decide. Remove an entry once it is built.
 - The voice-print model picked (Nov 6, 2026): `SettingsStore.voiceModel`, `ModelCatalog.voicePrintModels`, each
   model's `VoicePrintThresholds` (pass `sameSpeaker` and the model id to `SpeakerTracker`/`SpeakerPass`, `clustering`
   to the diarizer), and `VoiceStore`'s model provider (prints per model). Android: `Recording.voiceModel`,
-  `voiceEmbedder`, `SherpaDiarizer`; the Speakers page in `ModelsScreen.kt` (`useVoicePrints`, strings
-  `models_badge_speakers`, `models_use_for_speakers`, `models_by_hand`). The NPU builds are Android-only. On iOS the
+  `voiceEmbedder`, `SherpaDiarizer`; the speaker page in `ModelsScreen.kt` (`useVoicePrints`, strings
+  `models_badge_speakers`, `models_by_hand`). The NPU builds are Android-only. On iOS the
   WeSpeaker models run on the CPU, or later on Core ML.
 - The recording screen's models in use: `LiveLectureState.voicePrints` (`ModelInUse`, its `runs` set when the
   voice-print model loads, from `LiveModel.voicePrints`) and `speakerPassOnStop`; strings `lecture_speakers_model`,

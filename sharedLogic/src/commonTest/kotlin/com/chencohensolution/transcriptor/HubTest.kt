@@ -222,4 +222,58 @@ class HubTest {
         assertEquals("ivrit-whisper-large-v3", again.refineModel("he"))
         assertEquals(listOf("fr", "de"), again.modelLanguages)
     }
+
+    private val segId = "csukuangfj/sherpa-onnx-pyannote-segmentation-3-0"
+    private val segSearch = summary(segId, listOf("README.md", "model.onnx", "model.int8.onnx", "export-onnx.py"), listOf("license:mit"), sha = "s1")
+    private val segRepo = """{"id":"$segId","sha":"s1","cardData":{"license":"mit"},"siblings":[
+        ${small("README.md", 400)}, ${lfs("model.onnx", 5_992_913, "220a")}, ${lfs("model.int8.onnx", 1_500_000, "15aa")}, ${small("export-onnx.py", 2_000)}]}"""
+
+    private val printsId = "csukuangfj/speaker-embedding-models"
+    private val printsRepo = """{"id":"$printsId","sha":"p1","cardData":{"license":"apache-2.0"},"siblings":[
+        ${lfs("3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx", 28_281_164, "aa3c")}, ${lfs("wespeaker_en_voxceleb_resnet34_LM.onnx", 26_500_000, "w34")},
+        ${small("README.md", 300)}]}"""
+
+    @Test
+    fun speakerModelsAreClassifiedByTheirNamesAndFiles() {
+        assertEquals(HubKind.SpeakerTurns, classify(segId, listOf("model.onnx", "model.int8.onnx"), emptyList()))
+        assertEquals(HubKind.SpeakerTurns, classify("csukuangfj/sherpa-onnx-reverb-diarization-v1", listOf("model.onnx"), emptyList()))
+        assertEquals(HubKind.VoicePrints, classify(printsId, listOf("wespeaker_en_voxceleb_resnet34_LM.onnx"), emptyList()))
+        assertEquals(HubKind.VoicePrints, classify("k2-fsa/sherpa-onnx-nemo-titanet-small", listOf("nemo_en_titanet_small.onnx"), emptyList()))
+        // Not a sherpa-onnx export: its ONNX lacks the metadata sherpa-onnx reads.
+        assertNull(classify("Wespeaker/wespeaker-voxceleb-resnet34-LM", listOf("voxceleb_resnet34_LM.onnx", "avg_model.pt"), emptyList()))
+        // PyTorch only.
+        assertNull(classify("pyannote/segmentation-3.0", listOf("pytorch_model.bin", "config.yaml"), emptyList()))
+        assertNull(classify("BUT-FIT/diarizen-wavlm-large-s80-md", listOf("pytorch_model.bin"), emptyList()))
+        // A speech model by the same author is still one.
+        assertEquals(HubKind.Streaming, classify(zipId, zipFiles, emptyList()))
+    }
+
+    @Test
+    fun aSpeakerRepoInstallsEachOnnxAsASpeakerModel() {
+        val seg = assertNotNull(hubModel(parseSearch("[$segSearch]").single(), parseRepo(segRepo)))
+        assertEquals(HubKind.SpeakerTurns, seg.kind)
+        assertEquals(LicenseUse.Commercial, seg.use)
+        assertEquals(listOf("model.int8", "model"), seg.variants.map { it.label })
+        val model = seg.toSpeechModel(seg.variants.last())
+        assertEquals(ModelKind.SpeakerSegmentation, model.kind)
+        assertEquals(listOf(SpeechModel.MULTILINGUAL), model.languages)
+        val file = model.files.single()
+        assertEquals("model.onnx", file.name)
+        assertEquals("https://huggingface.co/$segId/resolve/s1/model.onnx", file.url)
+        assertEquals("220a", file.sha256)
+
+        val prints = assertNotNull(hubModel(parseSearch("[${summary(printsId, emptyList(), emptyList(), sha = "p1")}]").single(), parseRepo(printsRepo)))
+        assertEquals(HubKind.VoicePrints, prints.kind)
+        assertEquals(2, prints.variants.size)
+        assertTrue(prints.variants.all { v -> prints.toSpeechModel(v).kind == ModelKind.SpeakerEmbedding && v.files.single().name == "model.onnx" })
+        assertEquals("hf:$printsId:wespeaker_en_voxceleb_resnet34_LM", prints.toSpeechModel(prints.variants.first()).id)
+    }
+
+    @Test
+    fun aBlankSpeakerSearchLooksForSpeakerRepos() {
+        assertTrue("wespeaker" in HubClient.defaultTerms(HubKind.VoicePrints))
+        assertTrue("segmentation" in HubClient.defaultTerms(HubKind.SpeakerTurns))
+        assertEquals(listOf("ggml", "sherpa-onnx", "qnn"), HubClient.defaultTerms(null))
+        assertTrue(HubKind.speech.none { it.speakers })
+    }
 }

@@ -17,10 +17,23 @@ import kotlinx.serialization.json.longOrNull
 enum class LicenseUse { Commercial, NonCommercial, Unknown }
 
 /**
- * The kinds of speech model found on Hugging Face as files the app's engines read: whisper.cpp's for [Whisper],
- * sherpa-onnx's for the rest. [runs]: the app runs it now; the others need sherpa-onnx's offline recognizer in the app.
+ * The kinds of model found on Hugging Face as files the app's engines read: whisper.cpp's for [Whisper], sherpa-onnx's
+ * for the rest. [runs]: the app runs it now; the others need sherpa-onnx's offline recognizer in the app.
+ * [VoicePrints] (a speaker-embedding ONNX, exported for sherpa-onnx) and [SpeakerTurns] (a segmentation ONNX it reads,
+ * pyannote's kind) are the speaker models: they transcribe nothing ([speakers]).
  */
-enum class HubKind(val runs: Boolean) { Whisper(true), Streaming(true), Parakeet(false), SenseVoice(false), Moonshine(false), Paraformer(false) }
+enum class HubKind(val runs: Boolean) {
+    Whisper(true), Streaming(true), Parakeet(false), SenseVoice(false), Moonshine(false), Paraformer(false),
+    VoicePrints(true), SpeakerTurns(true),
+    ;
+
+    val speakers get() = this == VoicePrints || this == SpeakerTurns
+
+    companion object {
+        /** The speech kinds, for the general search's filters. */
+        val speech get() = entries.filter { !it.speakers }
+    }
+}
 
 /**
  * A build for one NPU: compiled for [chip] (Android's `Build.SOC_MODEL`, "SM8750") with Qualcomm's QNN [runtime]
@@ -79,6 +92,8 @@ data class HubModel(
         fitsLive = variant.fitsLive,
         source = "https://huggingface.co/$repo/tree/$commit",
         kind = when (kind) {
+            HubKind.VoicePrints -> ModelKind.SpeakerEmbedding
+            HubKind.SpeakerTurns -> ModelKind.SpeakerSegmentation
             HubKind.Streaming -> if (npu != null) ModelKind.StreamingTransducerNpu else ModelKind.StreamingTransducer
             else -> if (npu != null) ModelKind.WhisperNpu else ModelKind.Whisper
         },
@@ -115,7 +130,7 @@ class HubClient(private val fetch: suspend (url: String) -> String) {
      * files, sherpa-onnx models and NPU builds.
      */
     suspend fun search(query: String, language: String?, kind: HubKind?, npuOnly: Boolean, chip: String?): Pair<List<HubModel>, Int> = coroutineScope {
-        val terms = query.trim().ifBlank { null }?.let { listOf(it) } ?: listOf("ggml", "sherpa-onnx", "qnn")
+        val terms = query.trim().ifBlank { null }?.let { listOf(it) } ?: defaultTerms(kind)
         val found = terms.flatMap { parseSearch(fetch("$API/models?search=${encode(it)}&limit=50&full=true")) }.distinctBy { it.id }
         val readable = found.filter { classify(it.id, it.files, it.tags) != null }
         val details = readable.take(MAX_READ).map { s -> async { runCatching { hubModel(s, parseRepo(fetch("$API/models/${s.id}/revision/main?blobs=true"))) }.getOrNull() } }
@@ -128,6 +143,13 @@ class HubClient(private val fetch: suspend (url: String) -> String) {
     companion object {
         const val API = "https://huggingface.co/api"
         private const val MAX_READ = 20
+
+        /** What a blank query looks for: a speaker kind's repos by their names, else speech models' files and NPU builds. */
+        internal fun defaultTerms(kind: HubKind?) = when (kind) {
+            HubKind.VoicePrints -> listOf("speaker-embedding", "speaker-recognition", "wespeaker", "3dspeaker")
+            HubKind.SpeakerTurns -> listOf("segmentation", "diarization")
+            else -> listOf("ggml", "sherpa-onnx", "qnn")
+        }
     }
 }
 
@@ -226,6 +248,10 @@ internal fun hubModel(s: HubSummary, d: HubDetail): HubModel? {
                 )
             }
         }
+        // A speaker model per ONNX file (a repo may hold several models, or fp32 and int8), installed as model.onnx.
+        kind.speakers -> names.filter { it.endsWith(".onnx") }.map { n ->
+            HubVariant(n.removeSuffix(".onnx"), listOf(file(n, "model.onnx")), parametersOf(s.id), fitsLive = true)
+        }.sortedBy { it.sizeBytes }
         // Not run by the app yet: listed with their ONNX files.
         else -> listOf(HubVariant("onnx", names.filter { it.endsWith(".onnx") || it.endsWith("tokens.txt") }.map { file(it) }, parametersOf(s.id), fitsLive = true))
     }.filter { it.files.isNotEmpty() }
@@ -244,6 +270,7 @@ internal fun classify(id: String, files: List<String>, tags: List<String>): HubK
     val top = files.filter { '/' !in it }
     if (npuOf(id, top, tags) != null) return if (top.any { "joiner" in it }) HubKind.Streaming else HubKind.Whisper
     // Other models ship ggml and ONNX files too (Parakeet's GGUF, language models): their names say what they are.
+    speakerKind(id, top)?.let { return it }
     if ("parakeet" in name || "nemo" in name) return if (top.any { it.endsWith(".onnx") }) HubKind.Parakeet else null
     val whisper = "whisper" in name || tags.any { "whisper" in it.lowercase() }
     if (top.any(::isGgml)) return if (whisper) HubKind.Whisper else null
@@ -258,6 +285,26 @@ internal fun classify(id: String, files: List<String>, tags: List<String>): HubK
         else -> null
     }
 }
+
+/**
+ * A speaker model sherpa-onnx reads: ONNX files in a sherpa-onnx export (its name, or its author's, says so; other
+ * exports lack the metadata sherpa-onnx needs), named for voice prints (speaker embedding, recognition, verification,
+ * WeSpeaker, 3D-Speaker, CAM++, ERes2Net, TitaNet, ECAPA) or for speaker turns (segmentation, diarization).
+ */
+internal fun speakerKind(id: String, top: List<String>): HubKind? {
+    val name = id.lowercase()
+    if (top.none { it.endsWith(".onnx") }) return null
+    if ("sherpa" !in name && id.substringBefore('/') !in SHERPA_AUTHORS) return null
+    return when {
+        listOf("segmentation", "diarization", "pyannote").any { it in name } -> HubKind.SpeakerTurns
+        listOf("speaker-embedding", "speaker-recognition", "speaker-verification", "wespeaker", "3dspeaker", "campplus", "eres2net", "titanet", "ecapa").any { it in name } ->
+            HubKind.VoicePrints
+        else -> null
+    }
+}
+
+/** Who publishes sherpa-onnx's exports (its author, the project). */
+private val SHERPA_AUTHORS = setOf("csukuangfj", "k2-fsa")
 
 /** An NPU build: QNN context binaries (`.bin`, no `.onnx` beside them) with the chip in the repo's name or tags. */
 internal fun npuOf(id: String, files: List<String>, tags: List<String>): NpuBuild? {

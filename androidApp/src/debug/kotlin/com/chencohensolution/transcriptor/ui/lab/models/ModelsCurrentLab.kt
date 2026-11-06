@@ -24,7 +24,7 @@ import kotlinx.coroutines.delay
 // those added), the Hugging Face search (no network: a second's wait, then a fixed list filtered as the app filters;
 // the repos are real but their likes, commits and sha256 are made up, lab-example/ repos are made up whole), and the NPU
 // check (three seconds, then a made-up outcome; the catalog's NPU models pass at once). To start with: Hebrew's turbo
-// and the speaker models are ready, Whisper turbo waits for Wi-Fi and Whisper large-v3 failed. `current` uses this
+// the speaker models and ResNet293 (copied by hand) are ready, Whisper turbo waits for Wi-Fi and Whisper large-v3 failed. `current` uses this
 // device's chip (none on the emulator); `current-sm8750` pretends it is a Snapdragon 8 Elite.
 internal val modelsCurrent = LabOption("current", "A page per language + the catalog (the app's)", "ModelsScreen with faked downloads, search and NPU checks") {
     ModelsLab(chip = SherpaNpuWhisperEngine.chip)
@@ -34,14 +34,19 @@ internal val modelsCurrentSm8750 = LabOption("current-sm8750", "The app's, on a 
     ModelsLab(chip = "SM8750")
 }
 
+/** The fake behind every `models` option: [screen] is drawn with its state and actions (the app's screen by default). */
 @Composable
-private fun ModelsLab(chip: String?) {
+internal fun ModelsLab(
+    chip: String?,
+    screen: @Composable (ModelsState, ModelsActions, HubSearch) -> Unit = { s, a, h -> ModelsScreen(s, a, h) },
+) {
     var statuses by remember {
         mutableStateOf(
             mapOf(
                 ModelCatalog.ivritTurbo.id to ModelStatus.Ready,
                 ModelCatalog.voicePrints.id to ModelStatus.Ready,
                 ModelCatalog.speakerSegmentation.id to ModelStatus.Ready,
+                ModelCatalog.voicePrintsResNet293.id to ModelStatus.Ready,
                 ModelCatalog.whisperTurbo.id to ModelStatus.WaitingForWifi,
                 ModelCatalog.whisperLargeV3.id to ModelStatus.Failed("download error 1008"),
             ),
@@ -53,11 +58,14 @@ private fun ModelsLab(chip: String?) {
     var refine by remember { mutableStateOf(emptyMap<String, String>()) }
     var format by remember { mutableStateOf(AudioFormat.WavThenFlac) }
     var flacLevel by remember { mutableStateOf(5) }
-    var speakers by remember { mutableStateOf(true) }
+    var speakers by remember { mutableStateOf(false) }
     var auto by remember { mutableStateOf(false) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var asked by remember { mutableStateOf<HubSearch?>(null) }
     var npu by remember { mutableStateOf(emptyMap<String, NpuCheck>()) }
+    var voiceModel by remember { mutableStateOf<String?>(ModelCatalog.voicePrints.id) }
+    var segmentation by remember { mutableStateOf<String?>(ModelCatalog.speakerSegmentation.id) }
+    var tuning by remember { mutableStateOf(emptyMap<String, Float>()) }
     val models = ModelCatalog.all + added
     val known = models + speakerModels
     LaunchedEffect(statuses.values.any { it is ModelStatus.Downloading || it == ModelStatus.Checking }) {
@@ -95,10 +103,12 @@ private fun ModelsLab(chip: String?) {
         asked = null
     }
     val download = { m: SpeechModel -> statuses = statuses + (m.id to ModelStatus.Downloading(0f)) }
-    ModelsScreen(
+    screen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
             audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto,
+            voiceModel = voiceModel, npuVoiceModels = if (chip == "SM8750") setOf(ModelCatalog.voicePrintsResNet293.id) else emptySet(),
+            speakerTuning = tuning, segmentationModel = segmentation,
         ),
         ModelsActions(
             download = download,
@@ -109,6 +119,9 @@ private fun ModelsLab(chip: String?) {
             setAudioFormat = { format = it },
             setFlacLevel = { flacLevel = it },
             setFindSpeakersOnStop = { speakers = it },
+            useVoicePrints = { voiceModel = it.id },
+            setSpeakerTuning = { m, v -> tuning = tuning + (m.id to v) },
+            useSegmentation = { segmentation = it.id },
             setAutoImprove = { auto = it },
             addLanguage = { if (it !in languages) languages = languages + it },
             search = { query, language, kind, npuOnly -> asked = HubSearch(query.trim(), language, kind, npuOnly) },
@@ -160,5 +173,21 @@ private val labHub = listOf(
         "lab-example/zipformer-en-qnn-sm8650", HubKind.Streaming, "apache-2.0", LicenseUse.Commercial, listOf("en"), 300, 2, "c0ffee03",
         listOf(HubVariant("SM8650 · QNN 2.40", files("lab-example/zipformer-en-qnn-sm8650", "c0ffee03", "encoder.bin" to 150_000_000L, "decoder.bin" to 2_100_000L, "joiner.bin" to 1_600_000L, "tokens.txt" to 5_000L), "70M", true)),
         NpuBuild("SM8650", "2.40"),
+    ),
+    // Speaker models (Settings › Speaker recognition or Speaker turns › Find more on Hugging Face).
+    HubModel(
+        "csukuangfj/speaker-embedding-models", HubKind.VoicePrints, "apache-2.0", LicenseUse.Commercial, emptyList(), 0, 31, "5e1f2a3b",
+        listOf(
+            HubVariant("wespeaker_en_voxceleb_resnet34_LM", files("csukuangfj/speaker-embedding-models", "5e1f2a3b", "model.onnx" to 26_500_000L), "?", true),
+            HubVariant("nemo_en_titanet_large", files("csukuangfj/speaker-embedding-models", "5e1f2a3b", "model.onnx" to 97_600_000L), "?", true),
+        ),
+    ),
+    HubModel(
+        "csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", HubKind.SpeakerTurns, "mit", LicenseUse.Commercial, emptyList(), 0, 8, "9403a690",
+        listOf(HubVariant("model.int8", files("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", "9403a690", "model.onnx" to 1_500_000L), "1.5M", true)),
+    ),
+    HubModel(
+        "csukuangfj/sherpa-onnx-reverb-diarization-v1", HubKind.SpeakerTurns, "cc-by-nc-4.0", LicenseUse.NonCommercial, emptyList(), 0, 4, "7a6b5c4d",
+        listOf(HubVariant("model", files("csukuangfj/sherpa-onnx-reverb-diarization-v1", "7a6b5c4d", "model.onnx" to 9_400_000L), "?", true)),
     ),
 )
