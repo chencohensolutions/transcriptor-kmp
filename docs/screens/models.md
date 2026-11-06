@@ -61,3 +61,5 @@ Settings.
   phone (picked); a — one page, a row per job, b — a catalog, c — set up for you, b2, b3.
 - [Round 2 (Nov 6, 2026)](../ux-history/models/2026-11-06-models-in-one-place.md): b — a page per language (picked); a — a
   Transcription section with a row per language and job.
+- [Round 3 (Nov 6, 2026)](../ux-history/models/2026-11-06-speakers-in-view.md): d2 — a section per speaker job, picked on
+  its own page with a Hugging Face search (picked); a, b, c, d, d3 — the speaker models in other places on Settings.
