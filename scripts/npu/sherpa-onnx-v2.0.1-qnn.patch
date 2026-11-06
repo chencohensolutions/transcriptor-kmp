@@ -1,5 +1,5 @@
 diff --git a/sherpa-onnx/csrc/CMakeLists.txt b/sherpa-onnx/csrc/CMakeLists.txt
-index 23d5692..13c8e3e 100755
+index 23d5692..e1deffe 100755
 --- a/sherpa-onnx/csrc/CMakeLists.txt
 +++ b/sherpa-onnx/csrc/CMakeLists.txt
 @@ -270,6 +270,7 @@ if(SHERPA_ONNX_ENABLE_QNN)
@@ -10,6 +10,14 @@ index 23d5692..13c8e3e 100755
      ./qnn/utils.cc
    )
  endif()
+@@ -343,6 +344,7 @@ if(SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION)
+     offline-speaker-segmentation-model-config.cc
+     offline-speaker-segmentation-pyannote-model-config.cc
+     offline-speaker-segmentation-pyannote-model.cc
++    speaker-segmentation-window.cc
+   )
+ endif()
+ 
 diff --git a/sherpa-onnx/csrc/offline-whisper-model-config.cc b/sherpa-onnx/csrc/offline-whisper-model-config.cc
 index c9e12d4..00fc97f 100644
 --- a/sherpa-onnx/csrc/offline-whisper-model-config.cc
@@ -1247,6 +1255,193 @@ index 068e6b8..df26f0f 100644
    SpeakerEmbeddingExtractorConfig() = default;
    SpeakerEmbeddingExtractorConfig(const std::string &model, int32_t num_threads,
                                    bool debug, const std::string &provider)
+diff --git a/sherpa-onnx/csrc/speaker-segmentation-window.cc b/sherpa-onnx/csrc/speaker-segmentation-window.cc
+new file mode 100644
+index 0000000..6f0bbe0
+--- /dev/null
++++ b/sherpa-onnx/csrc/speaker-segmentation-window.cc
+@@ -0,0 +1,133 @@
++// sherpa-onnx/csrc/speaker-segmentation-window.cc
++//
++// See speaker-segmentation-window.h
++
++#include "sherpa-onnx/csrc/speaker-segmentation-window.h"
++
++#include <algorithm>
++#include <array>
++#include <memory>
++#include <stdexcept>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "sherpa-onnx/csrc/offline-speaker-segmentation-pyannote-model.h"
++
++#if SHERPA_ONNX_ENABLE_QNN
++#include "sherpa-onnx/csrc/qnn/qnn-backend.h"
++#include "sherpa-onnx/csrc/qnn/qnn-model.h"
++#endif
++
++namespace sherpa_onnx {
++
++class SpeakerSegmentationWindow::Impl {
++ public:
++  Impl(const OfflineSpeakerSegmentationModelConfig &config,
++       const QnnConfig &qnn)
++      : model_(config) {
++    window_size_ = model_.GetModelMetaData().window_size;
++#if SHERPA_ONNX_ENABLE_QNN
++    if (!qnn.context_binary.empty()) {
++      backend_ = std::make_unique<QnnBackend>(qnn.backend_lib, config.debug);
++      qnn_ = std::make_unique<QnnModel>(qnn.context_binary, qnn.system_lib,
++                                        backend_.get(), BinaryContextTag{},
++                                        config.debug);
++      if (qnn_->InputTensorNames().size() != 1 ||
++          qnn_->OutputTensorNames().size() != 1) {
++        throw std::runtime_error(
++            "speaker segmentation (QNN): needs one input and one output");
++      }
++      int32_t n = 1;
++      for (int32_t d : qnn_->TensorShape(qnn_->InputTensorNames()[0])) n *= d;
++      if (n != window_size_) {
++        throw std::runtime_error(
++            "speaker segmentation (QNN): the context binary's input is " +
++            std::to_string(n) + " samples, the model's window " +
++            std::to_string(window_size_));
++      }
++    }
++#else
++    if (!qnn.context_binary.empty()) {
++      throw std::runtime_error("speaker segmentation: built without QNN");
++    }
++#endif
++  }
++
++  ~Impl() {
++#if SHERPA_ONNX_ENABLE_QNN
++    qnn_.reset();
++    backend_.reset();
++#endif
++  }
++
++  const OfflineSpeakerSegmentationPyannoteModelMetaData &Meta() const {
++    return model_.GetModelMetaData();
++  }
++
++  bool OnNpu() const {
++#if SHERPA_ONNX_ENABLE_QNN
++    return qnn_ != nullptr;
++#else
++    return false;
++#endif
++  }
++
++  std::vector<float> Forward(const float *samples, int32_t n,
++                             int32_t *num_frames) const {
++    std::vector<float> x(window_size_, 0.0f);
++    std::copy(samples, samples + std::min(n, window_size_), x.begin());
++#if SHERPA_ONNX_ENABLE_QNN
++    if (qnn_) {
++      const auto &in = qnn_->InputTensorNames()[0];
++      const auto &out = qnn_->OutputTensorNames()[0];
++      if (!qnn_->SetInputTensorData(in, x.data(), x.size()) || !qnn_->Run()) {
++        throw std::runtime_error("speaker segmentation (QNN): failed to run");
++      }
++      auto y = qnn_->GetOutputTensorData(out);
++      int32_t classes = Meta().num_classes;
++      *num_frames = static_cast<int32_t>(y.size() / classes);
++      return y;
++    }
++#endif
++    auto memory_info =
++        Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
++    std::array<int64_t, 3> shape = {1, 1, window_size_};
++    Ort::Value t = Ort::Value::CreateTensor(memory_info, x.data(), x.size(),
++                                            shape.data(), shape.size());
++    Ort::Value y = model_.Forward(std::move(t));
++    auto s = y.GetTensorTypeAndShapeInfo().GetShape();
++    *num_frames = static_cast<int32_t>(s[1]);
++    const float *p = y.GetTensorData<float>();
++    return std::vector<float>(p, p + s[1] * s[2]);
++  }
++
++ private:
++  OfflineSpeakerSegmentationPyannoteModel model_;
++  int32_t window_size_ = 0;
++#if SHERPA_ONNX_ENABLE_QNN
++  std::unique_ptr<QnnBackend> backend_;
++  std::unique_ptr<QnnModel> qnn_;
++#endif
++};
++
++SpeakerSegmentationWindow::SpeakerSegmentationWindow(
++    const OfflineSpeakerSegmentationModelConfig &config, const QnnConfig &qnn)
++    : impl_(std::make_unique<Impl>(config, qnn)) {}
++
++SpeakerSegmentationWindow::~SpeakerSegmentationWindow() = default;
++
++const OfflineSpeakerSegmentationPyannoteModelMetaData &
++SpeakerSegmentationWindow::Meta() const {
++  return impl_->Meta();
++}
++
++bool SpeakerSegmentationWindow::OnNpu() const { return impl_->OnNpu(); }
++
++std::vector<float> SpeakerSegmentationWindow::Forward(const float *samples,
++                                                      int32_t n,
++                                                      int32_t *num_frames) const {
++  return impl_->Forward(samples, n, num_frames);
++}
++
++}  // namespace sherpa_onnx
+diff --git a/sherpa-onnx/csrc/speaker-segmentation-window.h b/sherpa-onnx/csrc/speaker-segmentation-window.h
+new file mode 100644
+index 0000000..31b853c
+--- /dev/null
++++ b/sherpa-onnx/csrc/speaker-segmentation-window.h
+@@ -0,0 +1,42 @@
++// sherpa-onnx/csrc/speaker-segmentation-window.h
++//
++// pyannote's segmentation model on one window at a time, for live use: on the
++// CPU (ONNX Runtime) or, given a QNN context binary of it compiled for that
++// window, on a Qualcomm NPU. The ONNX model is always loaded: its metadata
++// (window, frame shift, classes) applies to both. Forward() gives the window's
++// frames, each with the powerset classes' log-probabilities.
++#ifndef SHERPA_ONNX_CSRC_SPEAKER_SEGMENTATION_WINDOW_H_
++#define SHERPA_ONNX_CSRC_SPEAKER_SEGMENTATION_WINDOW_H_
++
++#include <memory>
++#include <vector>
++
++#include "sherpa-onnx/csrc/offline-speaker-segmentation-model-config.h"
++#include "sherpa-onnx/csrc/offline-speaker-segmentation-pyannote-model-meta-data.h"
++#include "sherpa-onnx/csrc/qnn-config.h"
++
++namespace sherpa_onnx {
++
++class SpeakerSegmentationWindow {
++ public:
++  SpeakerSegmentationWindow(const OfflineSpeakerSegmentationModelConfig &config,
++                            const QnnConfig &qnn);
++  ~SpeakerSegmentationWindow();
++
++  const OfflineSpeakerSegmentationPyannoteModelMetaData &Meta() const;
++
++  bool OnNpu() const;
++
++  // n samples (fewer than the window are padded with zeros);
++  // returns num_frames * num_classes values
++  std::vector<float> Forward(const float *samples, int32_t n,
++                             int32_t *num_frames) const;
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++};
++
++}  // namespace sherpa_onnx
++
++#endif  // SHERPA_ONNX_CSRC_SPEAKER_SEGMENTATION_WINDOW_H_
 diff --git a/sherpa-onnx/jni/offline-recognizer.cc b/sherpa-onnx/jni/offline-recognizer.cc
 index 422f1f4..ab5948a 100644
 --- a/sherpa-onnx/jni/offline-recognizer.cc
@@ -1371,10 +1566,26 @@ index 422f1f4..ab5948a 100644
    fid = env->GetFieldID(model_config_cls, "wenetCtc",
                          "Lcom/k2fsa/sherpa/onnx/OfflineWenetCtcModelConfig;");
 diff --git a/sherpa-onnx/jni/offline-speaker-diarization.cc b/sherpa-onnx/jni/offline-speaker-diarization.cc
-index 7ba3894..ab7e470 100644
+index 7ba3894..e40e80b 100644
 --- a/sherpa-onnx/jni/offline-speaker-diarization.cc
 +++ b/sherpa-onnx/jni/offline-speaker-diarization.cc
-@@ -65,6 +65,21 @@ static OfflineSpeakerDiarizationConfig GetOfflineSpeakerDiarizationConfig(
+@@ -4,9 +4,15 @@
+ 
+ #include "sherpa-onnx/csrc/offline-speaker-diarization.h"
+ 
++#include <algorithm>
++#include <array>
++#include <memory>
++#include <stdexcept>
++#include <string>
+ #include <vector>
+ 
+ #include "sherpa-onnx/csrc/macros.h"
++#include "sherpa-onnx/csrc/speaker-segmentation-window.h"
+ #include "sherpa-onnx/jni/common.h"
+ 
+ namespace sherpa_onnx {
+@@ -65,6 +71,21 @@ static OfflineSpeakerDiarizationConfig GetOfflineSpeakerDiarizationConfig(
    SHERPA_ONNX_JNI_READ_STRING(ans.embedding.provider, provider,
                                embedding_config_cls, embedding_config);
  
@@ -1396,7 +1607,7 @@ index 7ba3894..ab7e470 100644
    fid = env->GetFieldID(cls, "clustering",
                          "Lcom/k2fsa/sherpa/onnx/FastClusteringConfig;");
    jobject clustering_config = env->GetObjectField(config, fid);
-@@ -141,9 +156,12 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_newFromFile(
+@@ -141,9 +162,12 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_newFromFile(
      return 0;
    }
  
@@ -1412,7 +1623,7 @@ index 7ba3894..ab7e470 100644
  }
  
  SHERPA_ONNX_EXTERN_C
-@@ -216,8 +234,16 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
+@@ -216,8 +240,16 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_process(
  
    jfloat *p = env->GetFloatArrayElements(samples, nullptr);
    jsize n = env->GetArrayLength(samples);
@@ -1430,7 +1641,7 @@ index 7ba3894..ab7e470 100644
  
    return ProcessImpl(env, segments);
  }
-@@ -258,10 +284,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processWithCallback(
+@@ -258,10 +290,18 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_processWithCallback(
  
    jfloat *p = env->GetFloatArrayElements(samples, nullptr);
    jsize n = env->GetArrayLength(samples);
@@ -1452,6 +1663,90 @@ index 7ba3894..ab7e470 100644
  
    return ProcessImpl(env, segments);
  }
+@@ -273,3 +313,83 @@ Java_com_k2fsa_sherpa_onnx_OfflineSpeakerDiarization_getSampleRate(
+   return reinterpret_cast<sherpa_onnx::OfflineSpeakerDiarization *>(ptr)
+       ->SampleRate();
+ }
++
++// ---------- speaker segmentation alone (pyannote), for live use ----------
++//
++// pyannote's segmentation model on one window at a time, on the CPU (ONNX
++// Runtime) or, given a QNN context binary of it compiled for that window, on
++// a Qualcomm NPU. The ONNX model is always loaded: its metadata (window,
++// frame shift, classes) applies to both. Output: the window's frames, each
++// with the powerset classes' log-probabilities.
++
++
++SHERPA_ONNX_EXTERN_C
++JNIEXPORT jlong JNICALL Java_com_k2fsa_sherpa_onnx_SpeakerSegmentation_newFromFile(
++    JNIEnv *env, jobject /*obj*/, jstring model, jint num_threads,
++    jstring backend_lib, jstring context_binary, jstring system_lib) {
++  auto str = [env](jstring s) {
++    const char *p = env->GetStringUTFChars(s, nullptr);
++    std::string ans = p;
++    env->ReleaseStringUTFChars(s, p);
++    return ans;
++  };
++  sherpa_onnx::OfflineSpeakerSegmentationModelConfig config;
++  config.pyannote.model = str(model);
++  config.num_threads = num_threads;
++  sherpa_onnx::QnnConfig qnn;
++  qnn.backend_lib = str(backend_lib);
++  qnn.context_binary = str(context_binary);
++  qnn.system_lib = str(system_lib);
++  return SafeJNI(
++      env, "SpeakerSegmentation_newFromFile",
++      [&]() -> jlong {
++        return (jlong) new sherpa_onnx::SpeakerSegmentationWindow(config, qnn);
++      },
++      (jlong)0);
++}
++
++SHERPA_ONNX_EXTERN_C
++JNIEXPORT void JNICALL Java_com_k2fsa_sherpa_onnx_SpeakerSegmentation_delete(
++    JNIEnv * /*env*/, jobject /*obj*/, jlong ptr) {
++  delete reinterpret_cast<sherpa_onnx::SpeakerSegmentationWindow *>(ptr);
++}
++
++// [window_size, frame_size, frame_shift, num_classes, num_speakers,
++//  powerset_max_classes, on_npu]
++SHERPA_ONNX_EXTERN_C
++JNIEXPORT jintArray JNICALL Java_com_k2fsa_sherpa_onnx_SpeakerSegmentation_info(
++    JNIEnv *env, jobject /*obj*/, jlong ptr) {
++  auto s = reinterpret_cast<sherpa_onnx::SpeakerSegmentationWindow *>(ptr);
++  const auto &m = s->Meta();
++  jint v[7] = {m.window_size,  m.receptive_field_size, m.receptive_field_shift,
++               m.num_classes,  m.num_speakers,         m.powerset_max_classes,
++               s->OnNpu() ? 1 : 0};
++  jintArray ans = env->NewIntArray(7);
++  env->SetIntArrayRegion(ans, 0, 7, v);
++  return ans;
++}
++
++SHERPA_ONNX_EXTERN_C
++JNIEXPORT jfloatArray JNICALL
++Java_com_k2fsa_sherpa_onnx_SpeakerSegmentation_forward(JNIEnv *env,
++                                                       jobject /*obj*/,
++                                                       jlong ptr,
++                                                       jfloatArray samples) {
++  auto s = reinterpret_cast<sherpa_onnx::SpeakerSegmentationWindow *>(ptr);
++  jfloat *p = env->GetFloatArrayElements(samples, nullptr);
++  jsize n = env->GetArrayLength(samples);
++  std::vector<float> y;
++  int32_t frames = 0;
++  bool ok = SafeJNI(
++      env, "SpeakerSegmentation_forward",
++      [&]() -> bool {
++        y = s->Forward(p, n, &frames);
++        return true;
++      },
++      false);
++  env->ReleaseFloatArrayElements(samples, p, JNI_ABORT);
++  if (!ok) return nullptr;
++  jfloatArray ans = env->NewFloatArray(y.size());
++  env->SetFloatArrayRegion(ans, 0, y.size(), y.data());
++  return ans;
++}
 diff --git a/sherpa-onnx/jni/online-recognizer.cc b/sherpa-onnx/jni/online-recognizer.cc
 index 7a6af70..9abf226 100644
 --- a/sherpa-onnx/jni/online-recognizer.cc
@@ -1572,6 +1867,59 @@ index 30b1bcc..1205404 100644
  )
  
  data class OfflineSenseVoiceModelConfig(
+diff --git a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
+index 8c15b2e..59c17d5 100644
+--- a/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
++++ b/sherpa-onnx/kotlin-api/OfflineSpeakerDiarization.kt
+@@ -108,3 +108,48 @@ class OfflineSpeakerDiarization(
+         }
+     }
+ }
++
++/**
++ * pyannote's segmentation model alone, one window at a time ([windowSize] samples at 16 kHz), for live use: on the
++ * CPU, or on a Qualcomm NPU given its context binary compiled for that window ([qnnConfig]; [model] still gives the
++ * metadata). [forward] gives each frame's powerset classes' log-probabilities, [numClasses] per frame; frame i covers
++ * samples i * [frameShift] to i * [frameShift] + [frameSize].
++ */
++class SpeakerSegmentation(model: String, numThreads: Int = 1, qnnConfig: QnnConfig = QnnConfig()) {
++    private var ptr: Long = newFromFile(model, numThreads, qnnConfig.backendLib, qnnConfig.contextBinary, qnnConfig.systemLib)
++
++    init {
++        require(ptr != 0L) { "Failed to create SpeakerSegmentation" }
++    }
++
++    private val info = info(ptr)
++    val windowSize get() = info[0]
++    val frameSize get() = info[1]
++    val frameShift get() = info[2]
++    val numClasses get() = info[3]
++    val numSpeakers get() = info[4]
++    val powersetMaxClasses get() = info[5]
++    val onNpu get() = info[6] == 1
++
++    fun forward(samples: FloatArray): FloatArray = forward(ptr, samples)
++
++    protected fun finalize() {
++        if (ptr != 0L) {
++            delete(ptr)
++            ptr = 0
++        }
++    }
++
++    fun release() = finalize()
++
++    private external fun newFromFile(model: String, numThreads: Int, backendLib: String, contextBinary: String, systemLib: String): Long
++    private external fun delete(ptr: Long)
++    private external fun info(ptr: Long): IntArray
++    private external fun forward(ptr: Long, samples: FloatArray): FloatArray
++
++    companion object {
++        init {
++            System.loadLibrary("sherpa-onnx-jni")
++        }
++    }
++}
 diff --git a/sherpa-onnx/kotlin-api/QnnConfig.kt b/sherpa-onnx/kotlin-api/QnnConfig.kt
 index ea7aa51..8d64dd7 100644
 --- a/sherpa-onnx/kotlin-api/QnnConfig.kt
