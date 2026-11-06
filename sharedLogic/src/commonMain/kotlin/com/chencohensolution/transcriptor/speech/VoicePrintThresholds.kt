@@ -79,9 +79,26 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
 
 /**
  * Live thresholds per (voice-print model, segmentation model), from replaying the owner's lectures through the live
- * path with each pair (build/speaker-ab/live_ab3.py; the table in docs/design.md, Speakers). Pyannote's pairs are
- * [VoicePrintThresholds.live].
+ * path with each pair on the Mac (build/speaker-ab/live_ab3.py, live_ab3_table.md; docs/design.md, Speakers): per
+ * pair, the highest threshold whose lines are at most 2 points more often wrong (labeled lectures A, B, C) than at the
+ * pair's best, since voices merged into one speaker is the failure seen while recording. A pair missing here uses the
+ * model's [VoicePrintThresholds.live].
  */
-private val LIVE: Map<Pair<String, VoicePrintThresholds.Turns>, Float> = mapOf(
-    (ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds.Turns.DiariZenLarge) to 0.3f,
-)
+private val LIVE: Map<Pair<String, VoicePrintThresholds.Turns>, Float> = run {
+    val cam = ModelCatalog.voicePrints.id
+    val eres = ModelCatalog.voicePrintsEres2NetV2.id
+    val r293 = ModelCatalog.voicePrintsResNet293.id
+    val r100 = ModelCatalog.voicePrintsSimAmResNet100.id
+    val p = VoicePrintThresholds.Turns.Pyannote
+    val base = VoicePrintThresholds.Turns.DiariZenBase
+    val large = VoicePrintThresholds.Turns.DiariZenLarge
+    val meeting = VoicePrintThresholds.Turns.DiariZenMeeting
+    mapOf(
+        // Wrong lines at these: pyannote 13.7 / 17.2 / 17.6 / 13.5 %; DiariZen base 11.4 / 12.9 / 12.8 / 18.1 %;
+        // large 13.5 / 17.6 / 19.5 / 19.8 %; meeting 12.3 / 15.7 / 18.2 / 17.5 % (CAM++ / ERes2NetV2 / ResNet293 / ResNet100).
+        (cam to p) to 0.35f, (eres to p) to 0.5f, (r293 to p) to 0.2f, (r100 to p) to 0.1f,
+        (cam to base) to 0.35f, (eres to base) to 0.4f, (r293 to base) to 0.1f, (r100 to base) to 0.15f,
+        (cam to large) to 0.35f, (eres to large) to 0.55f, (r293 to large) to 0.25f, (r100 to large) to 0.25f,
+        (cam to meeting) to 0.35f, (eres to meeting) to 0.5f, (r293 to meeting) to 0.3f, (r100 to meeting) to 0.15f,
+    )
+}

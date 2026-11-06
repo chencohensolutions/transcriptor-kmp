@@ -117,6 +117,14 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     (`build/diarizen/`, not in git).
   - **Replay A/B** of the three lectures through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
     per second of audio on one Mac CPU core, CAM++'s prints 0.02.
+  - **A live threshold per pair** of voice-print model and segmentation model (`VoicePrintThresholds.live`; Nov 7,
+    2026). With DiariZen large, ResNet293 at its pyannote threshold (0.15) put both voices of a 4.7 min recording in
+    one speaker. All 16 pairs were replayed on the Mac over the three labeled lectures and the owner's two latest
+    (`build/speaker-ab/live_ab3.py`, `live_ab3_table.md`). Each pair takes the highest threshold whose lines are at
+    most 2 points more often wrong than at its best: merging voices is what users notice. CAM++ is the most accurate
+    live with every segmentation model (11–14% of lines wrong; DiariZen base + CAM++ 11.4%); the WeSpeaker models
+    17–20% with DiariZen large. The "fewer ↔ more speakers" slider moves the pair's threshold, the recording screen's
+    model line shows the one in use, and `speakers-live.json` keeps the segmentation model (`turns`) for tuning.
 - **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live
   labels and the speaker pass; a change applies from the next lecture or speaker pass (`SettingsStore.voiceModel`,
   `Recording.voiceModel`). CAM++ stays the default.
