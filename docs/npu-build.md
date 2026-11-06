@@ -181,6 +181,11 @@ What the patch adds to v2.0.1:
   - **Longer:** windows of the largest graph that fits, spread evenly, their prints averaged.
   - **Speaker pass:** sherpa-onnx's speaker diarization takes it too.
   - **Errors:** extractor and diarization errors throw Java exceptions instead of crashing.
+- pyannote's segmentation alone, one window at a time, for live speaker turns: `SpeakerSegmentation` (Kotlin, in
+  `OfflineSpeakerDiarization.kt`) over `csrc/speaker-segmentation-window.*`.
+  - **Where it runs:** on the CPU (ONNX Runtime), or on the NPU given a context binary compiled for the 10 s window
+    (`[1, 1, 160000]`).
+  - **Output:** each frame's powerset log-probabilities.
 
 Qualcomm's runtime libraries aren't in the AAR. Gradle takes them from sherpa-onnx's `qnn-libs-2.40.0.251030`
 (pinned in `androidApp/build.gradle.kts`).

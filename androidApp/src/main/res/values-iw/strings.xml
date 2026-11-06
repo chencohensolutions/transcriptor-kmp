@@ -25,6 +25,7 @@
     <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
     <string name="lecture_speakers_model">דוברים: %1$s · %2$s</string>
+    <string name="lecture_speakers_live">דוברים: %1$s · %2$s, בזמן אמת</string>
     <string name="lecture_model_first_line">נטען עם השורה הראשונה</string>
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
@@ -206,7 +207,7 @@
     <string name="settings_improve_none">שיפור: לא הורד מודל</string>
     <string name="settings_after">אחרי הרצאה</string>
     <string name="settings_find_speakers">זיהוי הדוברים כשהיא נעצרת</string>
-    <string name="settings_find_speakers_note">מתקן מי אמר כל שורה, תוך דקה או שתיים.</string>
+    <string name="settings_find_speakers_note">כבוי: הדוברים מזוהים בזמן ההקלטה. מופעל: זיהוי הדוברים גם מקבץ אותם מחדש אחרי העצירה, תוך דקה או שתיים.</string>
     <string name="settings_auto_improve">שיפור אוטומטי</string>
     <string name="settings_auto_improve_on">כל הרצאה מתומללת שוב עם מודל השיפור שלה אחרי שהיא נעצרת, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, ההרצאה מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
     <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל הרצאה מהתפריט שלה, מתי שרוצים.</string>

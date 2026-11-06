@@ -162,8 +162,9 @@ class SpeakerTest {
     fun theScreenShowsTheVoicePrintModelAndWhereItRuns() = runTest {
         val recorder = FakeRecorder(fs)
         val inUse = kotlinx.coroutines.flow.MutableStateFlow(com.chencohensolution.transcriptor.recording.ModelInUse("ResNet100"))
+        val settings = SettingsStore(fs, root).apply { findSpeakersOnStop = true }
         val session = LectureSession(
-            recorder, store, SettingsStore(fs, root), backgroundScope, now = { testScheduler.currentTime + 1 }, voices = voices,
+            recorder, store, settings, backgroundScope, now = { testScheduler.currentTime + 1 }, voices = voices,
             speakerPassReady = { true },
         ) { language, scope, known ->
             val tracker = SpeakerTracker(known)

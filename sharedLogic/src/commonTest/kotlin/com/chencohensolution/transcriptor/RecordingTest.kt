@@ -83,20 +83,20 @@ class RecordingTest {
     }
 
     @Test
-    fun theSpeakersAreFoundOnStopUntilTurnedOffAndNothingImprovesOnItsOwn() {
-        assertTrue(settings.findSpeakersOnStop)
+    fun noSpeakerPassOnStopUntilTurnedOnAndNothingImprovesOnItsOwn() {
+        assertFalse(settings.findSpeakersOnStop)
         assertFalse(settings.autoImprove)
-        settings.findSpeakersOnStop = false
+        settings.findSpeakersOnStop = true
         settings.autoImprove = true
-        assertEquals(false, SettingsStore(fs, root).findSpeakersOnStop)
+        assertEquals(true, SettingsStore(fs, root).findSpeakersOnStop)
         assertEquals(true, SettingsStore(fs, root).autoImprove)
         assertEquals(AudioFormat.Wav, SettingsStore(fs, root).audioFormat)
     }
 
     @Test
-    fun aSettingsFileFromBeforeTheSplitKeepsItsSpeakerSwitch() {
+    fun theOldSpeakerSwitchNoLongerRunsThePassOnStop() {
         fs.createDirectories(root)
-        fs.write(root / "settings.json") { writeUtf8("""{"v":1,"audioFormat":"wav","afterLecture":false}""") }
+        fs.write(root / "settings.json") { writeUtf8("""{"v":1,"audioFormat":"wav","afterLecture":true,"findSpeakersOnStop":true}""") }
         assertFalse(SettingsStore(fs, root).findSpeakersOnStop)
         assertFalse(SettingsStore(fs, root).autoImprove)
     }

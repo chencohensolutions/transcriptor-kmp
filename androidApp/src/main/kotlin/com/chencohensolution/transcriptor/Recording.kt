@@ -36,6 +36,9 @@ import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.recording.ModelInUse
 import com.chencohensolution.transcriptor.speech.VoicePrintFiles
+import com.chencohensolution.transcriptor.speech.LiveSpeakers
+import com.chencohensolution.transcriptor.speech.SherpaSegmenter
+import java.io.File
 import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
 import com.chencohensolution.transcriptor.review.AndroidAudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
@@ -426,13 +429,35 @@ fun liveModelFor(language: String): SpeechModel? {
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
     val model = liveModelFor(language) ?: return null
     val prints = Recording.voiceModel
-    val tracker = prints?.let { SpeakerTracker(known, VoicePrintThresholds.of(it.id).sameSpeaker, it.id) }
+    // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
+    val liveTurns = prints != null && Recording.models.isReady(ModelCatalog.speakerSegmentation)
+    val tracker = prints?.let { VoicePrintThresholds.of(it.id).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
     val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
-    val labeler = tracker?.let { t ->
-        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name, e.runs) } }
-    }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
+    // Speakers found live with pyannote's segmentation when it is on the phone; else by each line's print.
+    val segmentation = ModelCatalog.speakerSegmentation
+    val live = if (tracker != null && liveTurns) {
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        val speakersWorker = Dispatchers.Default.limitedParallelism(1)
+        var where = "CPU"
+        LiveSpeakers(
+            tracker, scope, speakersWorker,
+            loadSegmenter = {
+                val dir = Recording.models.dir(segmentation)
+                SherpaSegmenter(File(dir, "model.onnx"), File(dir, SherpaSegmenter.NPU_FILE).takeIf { SherpaNpuWhisperEngine.chip == "SM8750" }, Recording.nativeLibDir)
+                    .also { where = if (it.onNpu) "NPU" else "CPU" }
+            },
+            loadEmbedder = {
+                Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse("pyannote ($where) + ${prints.name}", e.runs) }
+            },
+        )
+    } else {
+        null
+    }
+    val labeler = if (live != null) null else tracker?.let { t ->
+        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name, e.runs) } }
+    }
     val transcriber = when (model.kind) {
         ModelKind.Whisper -> {
             val path = Recording.models.file(model).path
@@ -451,7 +476,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker, inUse)
+    return LiveModel(model.name, transcriber, tracker, inUse, live)
 }
 
 class TranscriptorApp : Application() {

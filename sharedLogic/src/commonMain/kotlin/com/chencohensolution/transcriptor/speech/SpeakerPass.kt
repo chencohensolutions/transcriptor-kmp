@@ -80,12 +80,22 @@ class SpeakerPass(
  * of it. Lines the user edited keep their text and get the main speaker. Lines are numbered again.
  */
 fun Lecture.withTurns(turns: List<Turn>, speakers: List<Speaker>): Lecture {
+    val lines = segments.followTurns(turns).mapIndexed { i, s -> s.copy(id = "s${i + 1}") }
+    val used = lines.mapNotNull { it.speakerId }.toSet()
+    return copy(segments = lines, speakers = speakers.filter { it.id in used }, speakerPass = true)
+}
+
+/**
+ * [Lecture.withTurns]'s relabeling, of these lines: split where the turns' speaker changes (lines with word times),
+ * else the speaker who spoke most of the line; edited lines keep their text. The parts keep the line's id.
+ */
+fun List<Segment>.followTurns(turns: List<Turn>): List<Segment> {
     fun overlap(t: Turn, a: Long, b: Long) = (minOf(t.endMillis, b) - maxOf(t.startMillis, a)).coerceAtLeast(0)
     fun mainSpeaker(a: Long, b: Long) =
         turns.groupBy { it.speaker }.mapValues { (_, own) -> own.sumOf { overlap(it, a, b) } }
             .filterValues { it > 0 }.maxByOrNull { it.value }?.key
 
-    val lines = segments.flatMap { line ->
+    return flatMap { line ->
         if (line.words.isEmpty() || line.edited) return@flatMap listOf(line.copy(speakerId = mainSpeaker(line.startMillis, line.endMillis) ?: line.speakerId))
         // Each word's speaker: the turn it falls in (the one already speaking, in an overlap), else the one before.
         var previous: String? = null
@@ -112,13 +122,11 @@ fun Lecture.withTurns(turns: List<Turn>, speakers: List<Speaker>): Lecture {
         if (runs.size > 1 && runs[0].size == 1) { runs[1].addAll(0, runs[0].map { (w, _) -> w to runs[1].first().second }); runs.removeAt(0) }
         runs.mapIndexed { k, run ->
             Segment(
-                id = "", startMillis = if (k == 0) line.startMillis else run.first().first.atMillis,
+                id = line.id, startMillis = if (k == 0) line.startMillis else run.first().first.atMillis,
                 endMillis = if (k == runs.lastIndex) line.endMillis else runs[k + 1].first().first.atMillis,
                 text = if (runs.size == 1) line.text else run.joinToString(" ") { it.first.text },
                 modelId = line.modelId, speakerId = run.first().second ?: line.speakerId, words = run.map { it.first },
             )
         }
-    }.mapIndexed { i, s -> s.copy(id = "s${i + 1}") }
-    val used = lines.mapNotNull { it.speakerId }.toSet()
-    return copy(segments = lines, speakers = speakers.filter { it.id in used }, speakerPass = true)
+    }
 }

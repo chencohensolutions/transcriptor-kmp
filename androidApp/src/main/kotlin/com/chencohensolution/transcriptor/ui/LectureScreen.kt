@@ -362,7 +362,7 @@ private fun ModelsInUse(state: LiveLectureState) {
         ModelInUse.Runs.CpuAfterNpuFailed -> stringResource(R.string.lecture_model_npu_failed)
     }
     val lines = listOfNotNull(
-        stringResource(R.string.lecture_speakers_model, isolated(prints.name), runs),
+        stringResource(if (state.speakersLive) R.string.lecture_speakers_live else R.string.lecture_speakers_model, isolated(prints.name), runs),
         if (state.speakerPassOnStop) stringResource(R.string.lecture_speaker_pass_on_stop, isolated(prints.name)) else null,
     )
     for (line in lines) {

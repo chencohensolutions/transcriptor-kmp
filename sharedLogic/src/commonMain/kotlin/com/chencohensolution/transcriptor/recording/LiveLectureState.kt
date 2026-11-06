@@ -26,6 +26,8 @@ data class LiveLectureState(
     val voicePrints: ModelInUse? = null,
     /** The speaker pass runs after Stop, with pyannote's segmentation and [voicePrints]' model. */
     val speakerPassOnStop: Boolean = false,
+    /** Speakers are found live with segmentation ([com.chencohensolution.transcriptor.speech.LiveSpeakers]). */
+    val speakersLive: Boolean = false,
 )
 
 /** A model a recording uses ([name], for the screen) and where it runs: unknown until it loads. */

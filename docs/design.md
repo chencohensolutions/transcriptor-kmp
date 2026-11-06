@@ -83,6 +83,23 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
   keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
   start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
+- **Live speaker turns** (owner's request, Nov 6, 2026; diart's method): when pyannote's segmentation is on the phone,
+  speakers are found during the lecture instead of by each line's print (`LiveSpeakers`).
+  - **Each step:** every 2.5 s, segmentation reads the last 10 s (pyannote's window) and settles the part that is
+    2.5 s old or older and wasn't settled before: who speaks there, overlaps included.
+  - **Prints:** each of the window's voices there gets one print of its single-voice audio in that part (when it has
+    1 s or more) from the picked voice-print model. It joins the closest of the lecture's speakers (`SpeakerTracker`,
+    known voices first), or starts a new one, at the model's `VoicePrintThresholds.live` (short prints are noisier,
+    so it is lower than for whole lines). A voice with too little audio keeps the speaker it had in the previous
+    window, where the windows overlap.
+  - **Lines:** they split where the settled turns change, at a word (`liveLines`, `followTurns`); a line without word
+    times gets the speaker who spoke most of it.
+  - **Delay:** labels follow the text by 2.5–5 s; each moment is decided once.
+  - **The pass after Stop is off by default:** `SettingsStore.findSpeakersOnStop`, now `speakerPassOnStop`; the old
+    switch is ignored. It can still be run from the lecture's menu.
+  - **Without segmentation:** each line's print, as below.
+  - **Replay A/B** of the three lectures through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
+    per second of audio on one Mac CPU core, CAM++'s prints 0.02.
 - **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live
   labels and the speaker pass; a change applies from the next lecture or speaker pass (`SettingsStore.voiceModel`,
   `Recording.voiceModel`). CAM++ stays the default.

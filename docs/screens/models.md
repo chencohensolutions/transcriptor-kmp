@@ -8,7 +8,7 @@ Settings.
 - **Settings**: **Languages**, one row per language in use (the notebooks', a lecture in none, the phone's, those
   added) with the model that writes it live and the one that improves its lectures ("Live: … / Improve: …", red when
   none is downloaded), and Add a language. **After a lecture**: Find the speakers when it stops
-  (`SettingsStore.findSpeakersOnStop`), Improve automatically (`autoImprove`, off by default). **Models and storage**:
+  (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
   Manage models, the lectures folder (Choose a folder / Change), the audio format.
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
   to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the

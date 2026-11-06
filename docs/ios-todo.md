@@ -77,3 +77,7 @@ anything left to decide. Remove an entry once it is built.
 - NPU (Android only for now): `ModelKind.WhisperNpu` models run on a Qualcomm NPU; on iOS the equivalent is Core ML
   on the Neural Engine, not built.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).
+- Live speaker turns (Nov 6, 2026): `LiveSpeakers` (shared) needs a `Segmenter` (pyannote segmentation 3.0 on one 10 s
+  window: sherpa-onnx's iOS build has the model; Android's `SherpaSegmenter` uses our patch's `SpeakerSegmentation`
+  JNI class) and a `VoiceEmbedder`; `LiveModel.liveSpeakers`, `LiveLectureState.speakersLive`, strings
+  `lecture_speakers_live`. `SettingsStore.findSpeakersOnStop` is off by default now.

@@ -125,4 +125,18 @@ class FloatBuilder {
 
     /** The values so far, and empties the builder. */
     fun drain(): FloatArray = toArray().also { size = 0 }
+
+    /** Values [from] until [to]. */
+    fun slice(from: Int, to: Int): FloatArray = data.copyOfRange(from, to)
+
+    /** Copies values [from] until [to] into [destination] at [at]. */
+    fun copyInto(destination: FloatArray, at: Int, from: Int, to: Int) {
+        data.copyInto(destination, at, from, to)
+    }
+
+    /** Drops the first [n] values. */
+    fun dropFirst(n: Int) {
+        data.copyInto(data, 0, n, size)
+        size -= n
+    }
 }

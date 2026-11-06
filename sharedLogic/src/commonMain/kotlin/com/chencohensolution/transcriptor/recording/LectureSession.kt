@@ -9,6 +9,9 @@ import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.speech.LiveOutput
+import com.chencohensolution.transcriptor.speech.LiveSpeakers
+import com.chencohensolution.transcriptor.speech.liveLines
+import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.speech.LiveTranscriber
@@ -40,6 +43,8 @@ class LiveModel(
     val transcriber: LiveTranscriber,
     val speakers: SpeakerTracker? = null,
     val voicePrints: MutableStateFlow<ModelInUse>? = null,
+    /** Speakers found live with segmentation ([LiveSpeakers]); null: by each line's print ([speakers]' labeler). */
+    val liveSpeakers: LiveSpeakers? = null,
 )
 
 /**
@@ -90,6 +95,7 @@ class LectureSession(
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
                     voicePrints = liveModel?.voicePrints?.value,
                     speakerPassOnStop = liveModel?.voicePrints != null && settings.findSpeakersOnStop && speakerPassReady(),
+                    speakersLive = liveModel?.liveSpeakers != null,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -108,14 +114,17 @@ class LectureSession(
         store.save(lecture)
         names = emptyMap()
         liveModel = live(notebook.language, scope, voices?.load(notebook.id).orEmpty())?.also { model ->
-            recorder.onPcm = model.transcriber::feed
+            val live = model.liveSpeakers
+            recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {
-                model.transcriber.output.collect { out ->
+                val speakers = live?.state ?: MutableStateFlow(LiveSpeakers.State())
+                combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
                     liveOutput.value = out
                     val r = recording.value ?: return@collect
-                    if (out.segments.size != r.lecture.segments.size || out.speakers.size != r.lecture.speakers.size) {
-                        recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
-                        saveNow()
+                    val (lines, who) = labeled(model, out, found)
+                    if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
+                        recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
+                        if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
                     }
                 }
             }
@@ -165,6 +174,12 @@ class LectureSession(
         voices?.save(r.lecture.notebookId, Voice(clean, print, tracker.model))
     }
 
+    /** The lines and speakers to show: the transcriber's, or with [LiveSpeakers] its lines split and labeled by [found]. */
+    private fun labeled(model: LiveModel, out: LiveOutput, found: LiveSpeakers.State): Pair<List<Segment>, List<Speaker>> {
+        if (model.liveSpeakers == null) return out.segments to out.speakers
+        return liveLines(out.segments, found.turns, found.settledMillis) to (model.speakers?.speakers ?: emptyList())
+    }
+
     /** A note pinned to [atMillis]: the position in the audio when the user started typing it. */
     fun addNote(atMillis: Long, text: String) {
         if (text.isBlank() || recording.value == null) return
@@ -189,11 +204,12 @@ class LectureSession(
         recorder.onPcm = null
         val duration = recorder.positionMillis.value
         recording.update { it?.copy(lecture = it.lecture.copy(durationMillis = duration), finishing = true) }
-        liveModel?.transcriber?.let { transcriber ->
-            transcriber.finish()
+        liveModel?.let { model ->
+            model.transcriber.finish()
+            model.liveSpeakers?.finish()
             following?.cancel()
-            val out = transcriber.output.value
-            recording.update { it?.copy(lecture = it.lecture.copy(segments = out.segments, speakers = named(out.speakers))) }
+            val (lines, who) = labeled(model, model.transcriber.output.value, model.liveSpeakers?.state?.value ?: LiveSpeakers.State())
+            recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
             // The named speakers' voices, as this whole lecture heard them, for the notebook's next lectures.
             val tracker = liveModel?.speakers
             if (tracker != null && voices != null) {

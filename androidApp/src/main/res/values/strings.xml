@@ -25,6 +25,7 @@
     <string name="lecture_no_live_model">No live model for this notebook\'s language yet: download one in Settings. Recording and notes work.</string>
     <string name="lecture_live_loading">Loading %1$s…</string>
     <string name="lecture_speakers_model">Speakers: %1$s · %2$s</string>
+    <string name="lecture_speakers_live">Speakers: %1$s · %2$s, live</string>
     <string name="lecture_model_first_line">with the first line</string>
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
@@ -206,7 +207,7 @@
     <string name="settings_improve_none">Improve: no model downloaded</string>
     <string name="settings_after">After a lecture</string>
     <string name="settings_find_speakers">Find the speakers when it stops</string>
-    <string name="settings_find_speakers_note">Fixes who said each line, in a minute or two.</string>
+    <string name="settings_find_speakers_note">Off: speakers are found live while recording. On: the speaker pass also regroups them after Stop, in a minute or two.</string>
     <string name="settings_auto_improve">Improve automatically</string>
     <string name="settings_auto_improve_on">Each lecture is transcribed again with its improve model after it stops, while the phone charges. If it isn\'t charging, the lecture waits until the app is open on the charger.</string>
     <string name="settings_auto_improve_off">Off: improve any lecture from its menu, when you want.</string>
