@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Settings and Settings › Models, fed from [Recording]: the models' downloads (read every second while it is open),
+ * Settings (its languages' pages) and Manage models, fed from [Recording]: the models' downloads (read every second while it is open),
  * the settings, the languages in use, the Hugging Face search, models added and removed, and each NPU model's
  * one-time check once it is downloaded.
  */
@@ -36,7 +36,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val folder by Recording.folder.collectAsStateWithLifecycle()
     var changed by remember { mutableStateOf(0) }
     var format by remember { mutableStateOf(Recording.settings.audioFormat) }
-    var after by remember { mutableStateOf(Recording.settings.afterLecture) }
+    var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
+    var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var checking by remember { mutableStateOf(emptySet<String>()) }
@@ -73,7 +74,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, afterLecture = after, folder = folder,
+        npu = npu, audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
     )
     val io = { work: () -> Unit -> scope.launch(Dispatchers.IO) { work(); changed++ }; Unit }
     ModelsScreen(
@@ -86,7 +87,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             useLive = { l, m -> io { Recording.settings.setLiveModel(l, m.id) } },
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
-            setAfterLecture = { after = it; io { Recording.settings.afterLecture = it } },
+            setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
+            setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->

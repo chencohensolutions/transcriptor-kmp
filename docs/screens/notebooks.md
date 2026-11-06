@@ -12,7 +12,7 @@ The app's first screen, lectures first (round 1's c2). In the app.
   one first, and New notebook. Filing moves the lecture's folder and gives the notebook the voices of the speakers
   named in it.
 - **Today / This week / Earlier**: every filed lecture, newest first, with its notebook's color and name (not when the
-  list is narrowed to one notebook), its title, day, length, notes, Refined, and the progress of a pass running on it.
+  list is narrowed to one notebook), its title, day, length, notes, Improved, and the progress of a pass running on it.
   A title goes by its own first letter, else its notebook's direction.
 - The **Record bar** at the bottom: "Records in" and a chip with the notebook. By default it is **no notebook**,
   unless the lecture history guesses one for this hour ("✦ Usually on Monday at 10:00": same weekday, within an hour,

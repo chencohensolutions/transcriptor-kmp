@@ -57,13 +57,22 @@ class RecordingService : Service() {
             ACTION_STOP -> scope.launch {
                 // Returns once live transcription has finished the last lines.
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
-                if (lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.afterLecture) findSpeakers(lecture) else compressPending()
+                val improve = lecture?.takeIf { it.segments.isNotEmpty() && Recording.settings.autoImprove }?.let { Recording.improveModelFor(it.language) }
+                // Improving on its own waits for the charger.
+                if (lecture != null && improve != null && !charging()) Recording.settings.addImprovePending(lecture.notebookId, lecture.id)
+                val then = improve?.takeIf { charging() }?.let { model -> { done: Lecture -> refine(done, model.id) } }
+                when {
+                    lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.findSpeakersOnStop -> findSpeakers(lecture, then)
+                    lecture != null && then != null -> then(lecture)
+                    else -> compressPending()
+                }
             }
             ACTION_REFINE -> {
                 val lecture = Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_LECTURE)!!)
                 val model = intent.getStringExtra(EXTRA_MODEL)!!
+                val speakersFirst = intent.getBooleanExtra(EXTRA_SPEAKERS_FIRST, false) && Recording.canFindSpeakers
                 if (lecture != null && !session.isRecording && !compressing && Recording.refineModels(lecture.language).any { it.id == model }) {
-                    refine(lecture, model)
+                    if (speakersFirst) findSpeakers(lecture) { done -> refine(done, model) } else refine(lecture, model)
                 } else {
                     startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
                     finish()
@@ -82,12 +91,19 @@ class RecordingService : Service() {
                 }
             }
             ACTION_COMPRESS -> compressPending()
+            ACTION_IMPROVE_PENDING -> {
+                startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                if (!session.isRecording && !compressing && !improveNextPending()) finish()
+            }
         }
         return START_NOT_STICKY
     }
 
-    /** The speaker pass on [lecture], as a media-processing foreground service; then any FLAC compression. */
-    private fun findSpeakers(lecture: Lecture) {
+    /**
+     * The speaker pass on [lecture], as a media-processing foreground service; then [then] with the lecture it wrote
+     * (the improve pass), else any FLAC compression.
+     */
+    private fun findSpeakers(lecture: Lecture, then: ((Lecture) -> Unit)? = null) {
         compressing = true
         startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
@@ -106,11 +122,15 @@ class RecordingService : Service() {
                 .onFailure { android.util.Log.e("RecordingService", "speaker pass failed", it) }
             Recording.findingSpeakers.value = null
             compressing = false
-            launch(Dispatchers.Main) { compressPending() }
+            val next = Recording.store.load(lecture.notebookId, lecture.id) ?: lecture
+            launch(Dispatchers.Main) { if (then != null) then(next) else compressPending() }
         }
     }
 
-    /** The refine pass on [lecture], as a media-processing foreground service; then any FLAC compression. */
+    /**
+     * The improve pass on [lecture], as a media-processing foreground service; then the next lecture waiting to be
+     * improved while the phone still charges, else any FLAC compression.
+     */
     private fun refine(lecture: Lecture, modelId: String) {
         compressing = true
         startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
@@ -127,10 +147,30 @@ class RecordingService : Service() {
                 if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
             }.onFailure { android.util.Log.e("RecordingService", "refine pass failed", it) }
+            Recording.settings.removeImprovePending(lecture.notebookId, lecture.id)
             Recording.refining.value = null
             compressing = false
-            launch(Dispatchers.Main) { compressPending() }
+            launch(Dispatchers.Main) { if (!improveNextPending()) compressPending() }
         }
+    }
+
+    /** The phone is on the charger. */
+    private fun charging() = getSystemService(android.os.BatteryManager::class.java).isCharging
+
+    /**
+     * Improves the next lecture waiting for the charger, if the phone charges and its language has a model; drops
+     * ones that are gone or can't be improved. False when there is none to start.
+     */
+    private fun improveNextPending(): Boolean {
+        if (!charging() || Recording.session.isRecording) return false
+        for ((notebookId, lectureId) in Recording.settings.improvePending) {
+            val lecture = Recording.store.load(notebookId, lectureId)
+            val model = lecture?.let { Recording.improveModelFor(it.language) }
+            if (lecture == null || model == null || lecture.refinedWith != null) { Recording.settings.removeImprovePending(notebookId, lectureId); continue }
+            refine(lecture, model.id)
+            return true
+        }
+        return false
     }
 
     private fun compressPending() {
@@ -222,6 +262,8 @@ class RecordingService : Service() {
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_LECTURE = "lecture"
         private const val EXTRA_MODEL = "model"
+        private const val EXTRA_SPEAKERS_FIRST = "speakersFirst"
+        private const val ACTION_IMPROVE_PENDING = "improvePending"
 
         fun start(context: Context, notebook: Notebook, title: String) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
@@ -232,11 +274,16 @@ class RecordingService : Service() {
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
 
-        /** Runs the refine pass on [lecture] with [modelId]. */
-        fun refine(context: Context, lecture: Lecture, modelId: String) = context.startForegroundService(
+        /** Improves [lecture] with [modelId], after the speaker pass when [speakersFirst]. */
+        fun refine(context: Context, lecture: Lecture, modelId: String, speakersFirst: Boolean = false) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_REFINE)
-                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId).putExtra(EXTRA_MODEL, modelId),
+                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId).putExtra(EXTRA_MODEL, modelId)
+                .putExtra(EXTRA_SPEAKERS_FIRST, speakersFirst),
         )
+
+        /** Improves the lectures waiting for the charger; from the app, while it is in the foreground and charging. */
+        fun improvePending(context: Context) =
+            context.startForegroundService(Intent(context, RecordingService::class.java).setAction(ACTION_IMPROVE_PENDING))
 
         /** Runs the speaker pass on [lecture] (again), or on [Recording.lastLecture]. */
         fun findSpeakers(context: Context, lecture: Lecture? = null) = context.startForegroundService(

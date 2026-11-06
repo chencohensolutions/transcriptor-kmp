@@ -16,10 +16,12 @@ anything left to decide. Remove an entry once it is built.
 - Filing gives the notebook the named speakers' voices (Android's `Recording.file`, with `printOf`).
 - Strings: `notebooks_*`.
 
-## Settings › Models
+## Settings and Manage models
 
-- Android: `ui/ModelsScreen.kt` (mirror it in SwiftUI), `Settings.kt` (the state and actions), `Recording.hub`,
-  `Recording.checkNpu`; `docs/screens/models.md`.
+- Android: `ui/ModelsScreen.kt` (mirror it in SwiftUI: Settings with a page per language, then the catalog),
+  `Settings.kt` (the state and actions), `Recording.hub`, `Recording.checkNpu`; `docs/screens/models.md`.
+- A language's page: `ModelChoices.candidates(forLanguage, ModelJob.Live/Improve, ready)`, `running`, `improveToGet`;
+  choosing calls `SettingsStore.setLiveModel`/`setRefineModel`. Strings `settings_*`.
 - Shared: `HubClient(fetch)` (iOS: `fetch` on URLSession), `HubModel.toSpeechModel`, `InstalledModels`,
   `ModelLibrary`, `SettingsStore.refineModel`/`setRefineModel`/`modelLanguages`.
 - iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
@@ -54,9 +56,15 @@ anything left to decide. Remove an entry once it is built.
   `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
   `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
   `review_*`.
-- Improve after the lecture: `SettingsStore.afterLecture` (on by default). Off: no speaker pass when the lecture stops
-  (`RecordingService`'s stop), no Refine with… on the lecture's screen (`passes.refine` null), and the start screen
-  hides the refine models. Strings `start_after_lecture`, `start_after_lecture_note`.
+- After a lecture: `SettingsStore.findSpeakersOnStop` (the speaker pass when it stops, on by default; files from before
+  read the old `afterLecture`) and `autoImprove` (off by default): after Stop and the speaker pass, improve with the
+  language's model if charging, else `addImprovePending` until the app is open on the charger (Android:
+  `RecordingService` ACTION_STOP and `improveNextPending`, `MainActivity.improvePendingIfCharging`).
+- Improve transcription… on the lecture, always offered: `ReviewState.refineModels` (`ModelChoice` with `minutes`
+  and `npu`), `improveDefault`, `improveToGet`; the sheet in `ReviewScreen.kt` (`ImproveSheet`); speakers first then
+  improve (`RecordingService.refine(…, speakersFirst)`); `SettingsStore.recordImproveSpeed`/`improveSpeed` and
+  `ModelChoices.estimateMinutes` for the estimates. Strings `review_improve*`, `review_speakers_first*`, `review_kept`,
+  `review_get_model`, `review_no_model`, `review_default`, `review_minutes`, `review_npu`, `review_cpu`.
 - NPU (Android only for now): `ModelKind.WhisperNpu` models run on a Qualcomm NPU; on iOS the equivalent is Core ML
   on the Neural Engine, not built.
 - To decide: where compression runs on iOS (a background task may be cut short; maybe only while the app is open).

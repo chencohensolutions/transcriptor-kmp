@@ -26,7 +26,7 @@ import kotlinx.coroutines.delay
 // check (three seconds, then a made-up outcome; the catalog's NPU models pass at once). To start with: Hebrew's turbo
 // and the speaker models are ready, Whisper turbo waits for Wi-Fi and Whisper large-v3 failed. `current` uses this
 // device's chip (none on the emulator); `current-sm8750` pretends it is a Snapdragon 8 Elite.
-internal val modelsCurrent = LabOption("current", "Catalog + Hugging Face + NPU (the app's)", "ModelsScreen with faked downloads, search and NPU checks") {
+internal val modelsCurrent = LabOption("current", "A page per language + the catalog (the app's)", "ModelsScreen with faked downloads, search and NPU checks") {
     ModelsLab(chip = SherpaNpuWhisperEngine.chip)
 }
 
@@ -52,7 +52,8 @@ private fun ModelsLab(chip: String?) {
     var live by remember { mutableStateOf(emptyMap<String, String>()) }
     var refine by remember { mutableStateOf(emptyMap<String, String>()) }
     var format by remember { mutableStateOf(AudioFormat.WavThenFlac) }
-    var after by remember { mutableStateOf(true) }
+    var speakers by remember { mutableStateOf(true) }
+    var auto by remember { mutableStateOf(false) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var asked by remember { mutableStateOf<HubSearch?>(null) }
     var npu by remember { mutableStateOf(emptyMap<String, NpuCheck>()) }
@@ -96,7 +97,7 @@ private fun ModelsLab(chip: String?) {
     ModelsScreen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
-            audioFormat = format, afterLecture = after,
+            audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto,
         ),
         ModelsActions(
             download = download,
@@ -105,7 +106,8 @@ private fun ModelsLab(chip: String?) {
             useLive = { l, m -> live = live + (l to m.id) },
             useRefine = { l, m -> refine = refine + (l to m.id) },
             setAudioFormat = { format = it },
-            setAfterLecture = { after = it },
+            setFindSpeakersOnStop = { speakers = it },
+            setAutoImprove = { auto = it },
             addLanguage = { if (it !in languages) languages = languages + it },
             search = { query, language, kind, npuOnly -> asked = HubSearch(query.trim(), language, kind, npuOnly) },
             install = { m, v -> val model = m.toSpeechModel(v); if (added.none { it.id == model.id }) added = added + model; download(model) },

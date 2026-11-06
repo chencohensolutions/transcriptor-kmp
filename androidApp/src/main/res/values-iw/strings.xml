@@ -36,7 +36,6 @@
     <string name="model_cancel">ביטול</string>
     <string name="model_delete">מחיקה</string>
     <string name="model_in_use">משמש לתמלול חי</string>
-    <string name="model_use_live">לשימוש בתמלול חי</string>
     <string name="start_speakers">זיהוי דוברים</string>
     <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך ההרצאה; אחריה, מעבר נוסף מוצא מי דיבר מתי, גם כשמדברים יחד, ומתקן את השורות. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו בהרצאות הבאות.</string>
     <string name="speaker_n">דובר %1$d</string>
@@ -53,7 +52,6 @@
     <string name="review_play">ניגון</string>
     <string name="review_pause">השהיה</string>
     <string name="review_speed">%1$sx</string>
-    <string name="review_refining">משפר… %1$d%%</string>
     <string name="review_find_speakers">זיהוי הדוברים</string>
     <string name="review_finding_speakers">מזהה את הדוברים… %1$d%%</string>
     <string name="review_save">שמירה</string>
@@ -67,13 +65,6 @@
     <string name="start_lectures">הרצאות</string>
     <string name="start_speakers_count">%1$d דוברים</string>
     <string name="refining">משפר את התמלול…</string>
-    <string name="start_after_lecture">שיפור אחרי ההרצאה</string>
-    <string name="start_after_lecture_note">כשההרצאה נעצרת, זיהוי הדוברים מתקן מי אמר כל שורה, ובמסך ההרצאה אפשר לשפר את התמלול עם מודל גדול יותר. כבוי: ההרצאה נשארת כפי שנכתבה בזמן אמת (את הדוברים עדיין אפשר לזהות ממסך ההרצאה).</string>
-    <string name="start_refine_models">אחרי ההרצאה: שיפור (%1$s)</string>
-    <string name="start_refine_note">מתמלל הרצאה מחדש עם המודל הגדול, מהתפריט של מסך ההרצאה: מדויק יותר, עם פיסוק, ואיטי יותר מההרצאה עצמה. שורות שערכתם נשארות.</string>
-    <string name="model_in_use_refine">משמש לשיפור</string>
-    <string name="review_refine_with">שיפור עם…</string>
-    <string name="review_refine_note">כל שורה מתומללת מחדש עם המודל שתבחרו; שורות שערכתם נשארות. התמלול הנוכחי נשמר, תחת גרסאות.</string>
     <string name="review_versions">גרסאות (%1$d)</string>
     <string name="review_version_now">עכשיו</string>
     <string name="review_version_lines">%1$d שורות · %2$d נערכו</string>
@@ -135,10 +126,8 @@
     <string name="folder_failed">אי אפשר להשתמש בתיקייה הזו: %1$s</string>
     <!-- Settings › Models -->
     <string name="models_add_language">הוספת שפה</string>
-    <string name="models_after_note">מעבר הדוברים כשההרצאה נעצרת, ושיפור התמלול מהמסך שלה.</string>
-    <string name="models_after_only">רק אחרי ההרצאה</string>
+    <string name="models_after_only">לשיפור בלבד</string>
     <string name="models_all_kinds">כל הסוגים</string>
-    <string name="models_all_set">לכל שפה בשימוש יש מודל חי</string>
     <string name="models_any_language">כל שפה</string>
     <string name="models_badge_live">חי ✓</string>
     <string name="models_badge_refine">שיפור ✓</string>
@@ -169,7 +158,6 @@
     <string name="models_license_unknown">אין רישיון בכרטיס</string>
     <string name="models_license_unknown_note">בכרטיס אין רישיון: היוצר לא אמר איך מותר להשתמש בו.</string>
     <string name="models_likes">%1$s לייקים</string>
-    <string name="models_missing">אין מודל חי ל%1$s</string>
     <string name="models_more">עוד</string>
     <string name="models_multilingual">שפות רבות</string>
     <string name="models_multilingual_note">ל%1$s אין כאן מודלים משלה: הרב־לשוניים מתמללים אותה. אפשר למצוא עוד ב־Hugging Face.</string>
@@ -201,5 +189,41 @@
     <string name="models_speakers">דוברים</string>
     <string name="models_title">מודלים</string>
     <string name="models_unusable">עוד %1$d מאגרים נמצאו, בפורמטים שהאפליקציה לא מריצה.</string>
-    <string name="models_use_refine">לשימוש בשיפור</string>
+    <!-- Settings: the languages and their models, the switches after a lecture. -->
+    <string name="settings_languages">שפות</string>
+    <string name="settings_live_is">בזמן אמת: %1$s</string>
+    <string name="settings_live_none">בזמן אמת: לא הורד מודל</string>
+    <string name="settings_improve_is">שיפור: %1$s</string>
+    <string name="settings_improve_none">שיפור: לא הורד מודל</string>
+    <string name="settings_after">אחרי הרצאה</string>
+    <string name="settings_find_speakers">זיהוי הדוברים כשהיא נעצרת</string>
+    <string name="settings_find_speakers_note">מתקן מי אמר כל שורה, תוך דקה או שתיים.</string>
+    <string name="settings_auto_improve">שיפור אוטומטי</string>
+    <string name="settings_auto_improve_on">כל הרצאה מתומללת שוב עם מודל השיפור שלה אחרי שהיא נעצרת, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, ההרצאה מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
+    <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל הרצאה מהתפריט שלה, מתי שרוצים.</string>
+    <string name="settings_storage">מודלים ואחסון</string>
+    <string name="settings_manage">ניהול מודלים</string>
+    <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
+    <string name="settings_live_title">תמלול בזמן אמת</string>
+    <string name="settings_live_note">כותב את השורות במהלך ההרצאה.</string>
+    <string name="settings_improve_title">שיפור התמלול</string>
+    <string name="settings_improve_note">מתמלל הרצאה שוב אחריה, ידנית מהתפריט שלה או אוטומטית. אפשר לבחור מודל אחר להרצאה אחת.</string>
+    <string name="settings_more">חיפוש מודלים נוספים ל%1$s</string>
+    <string name="settings_get">הורדה · %1$s</string>
+    <string name="settings_streaming">מילים תוך כדי דיבור</string>
+    <!-- The lecture: improving its transcription. -->
+    <string name="review_improve">שיפור התמלול…</string>
+    <string name="review_improving">משפר את התמלול · %1$d%%</string>
+    <string name="review_improve_title">שיפור התמלול</string>
+    <string name="review_improve_about">%1$d דק׳ · %2$s · עכשיו: %3$s</string>
+    <string name="review_no_model">עוד לא הורד מודל ל%1$s.</string>
+    <string name="review_get_model">הורדת %1$s · %2$s</string>
+    <string name="review_default">ברירת מחדל</string>
+    <string name="review_minutes">כ-%1$d דק׳</string>
+    <string name="review_npu">NPU</string>
+    <string name="review_cpu">CPU</string>
+    <string name="review_speakers_first">קודם לזהות את הדוברים</string>
+    <string name="review_speakers_first_note">השיפור מוחק את זמני המילים שזיהוי הדוברים צריך.</string>
+    <string name="review_kept">שורות שערכת נשארות. התמלול הנוכחי נשמר, תחת גרסאות.</string>
+    <string name="review_improve_button">שיפור</string>
 </resources>

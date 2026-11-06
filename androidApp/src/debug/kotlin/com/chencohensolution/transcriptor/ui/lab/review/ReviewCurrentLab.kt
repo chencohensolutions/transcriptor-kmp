@@ -9,26 +9,35 @@ import androidx.compose.runtime.setValue
 import com.chencohensolution.transcriptor.lab.LabData
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Speaker
+import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.review.ModelChoice
+import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
 import kotlinx.coroutines.delay
 
-// Fakes: playback (a clock; no audio), the refine pass (not built in the app yet) and the speaker pass (progress,
-// then made-up results), the lecture's speakers and lines. Seeking, playing a sentence, editing, moving a line,
-// renaming, notes and the speed work in memory.
+// Fakes: playback (a clock; no audio), the improve pass and the speaker pass (progress, then made-up results), the
+// lecture's speakers and lines, the models to improve with and their estimates (as if each had run once on this
+// phone; the sample is three minutes long). Seeking, playing a sentence, editing, moving a line, renaming, notes and
+// the speed work in memory.
 internal val reviewCurrent = LabOption("current", "Document + player below (the app's)", "ReviewScreen with faked playback and passes") {
-    val (state, actions) = rememberReviewLab()
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true)
+    ReviewScreen(state, actions)
+}
+
+// Fakes: as `current`, with no model to improve Hebrew with downloaded: Improve transcription… offers the one to get.
+internal val reviewCurrentNoModel = LabOption("current-none", "The app's, nothing to improve with", "Improve transcription… with no model downloaded") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = false)
     ReviewScreen(state, actions)
 }
 
 /**
- * Fakes for the lab: playback (a clock that runs at the speed), the refine pass (six seconds, then the lines as the
+ * Fakes for the lab: playback (a clock that runs at the speed), the improve pass (six seconds, then the lines as the
  * large model wrote them, edited lines kept) and the speaker pass (four seconds, then the student's question split
  * off and named speakers kept); edits, notes and renames in memory.
  */
 @Composable
-private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
+private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, ReviewActions> {
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
     var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)) }
     var position by remember { mutableStateOf(65_000L) }
@@ -36,6 +45,7 @@ private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
     var speed by remember { mutableStateOf(1f) }
     var refine by remember { mutableStateOf<PassState>(PassState.NotRun) }
     var speakers by remember { mutableStateOf<PassState>(PassState.NotRun) }
+    var thenImprove by remember { mutableStateOf(false) }
     LaunchedEffect(playing, speed) {
         while (playing) {
             delay(100)
@@ -55,10 +65,19 @@ private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
         for (i in 1..40) { delay(100); speakers = PassState.Running(i / 40f) }
         lecture = lecture.copy(segments = lecture.segments.map { if (it.id == "s9") it.copy(speakerId = "speaker-3") else it }, speakers = lecture.speakers + Speaker("speaker-3", ""))
         speakers = PassState.Done
+        if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
         notebookTitle = LabData.notebooks.first().title, lecture = lecture, positionMillis = position, playing = playing,
-        speed = speed, refineModels = listOf(ModelChoice("ivrit-whisper-large-v3", "ivrit.ai Whisper large-v3"), ModelChoice("whisper-large-v3", "Whisper large-v3")), refine = refine, speakerPass = speakers,
+        speed = speed, refine = refine, speakerPass = speakers,
+        refineModels = if (!modelsDownloaded) emptyList() else listOf(
+            ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
+            ModelChoice(ModelCatalog.whisperLargeV3.id, ModelCatalog.whisperLargeV3.name, minutes = 4),
+            ModelChoice(ModelCatalog.ivritTurboNpu.id, ModelCatalog.ivritTurboNpu.name, npu = true),
+            ModelChoice(ModelCatalog.ivritTurbo.id, ModelCatalog.ivritTurbo.name, minutes = 1),
+        ),
+        improveDefault = ModelCatalog.ivritLargeV3Npu.id.takeIf { modelsDownloaded },
+        improveToGet = ModelToGet(ModelCatalog.ivritLargeV3.id, ModelCatalog.ivritLargeV3.name, ModelCatalog.ivritLargeV3.sizeBytes).takeIf { !modelsDownloaded },
     )
     val actions = ReviewActions(
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
@@ -68,7 +87,9 @@ private fun rememberReviewLab(): Pair<ReviewState, ReviewActions> {
         editLine = { id, text -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == id) it.copy(text = text.trim(), edited = true) else it }) },
         setLineSpeaker = { line, speaker -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == line) it.copy(speakerId = speaker) else it }) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it }) },
-        refine = { if (refine !is PassState.Running) refine = PassState.Running(0f) },
+        improve = { _, first ->
+            if (first) { thenImprove = true; speakers = PassState.Running(0f) } else if (refine !is PassState.Running) refine = PassState.Running(0f)
+        },
         switchVersion = {},
         findSpeakers = { if (speakers !is PassState.Running) speakers = PassState.Running(0f) },
         addNote = { at, text -> lecture = lecture.copy(notes = (lecture.notes + Note("n${lecture.notes.size + 1}", at, text.trim())).sortedBy { it.atMillis }) },
