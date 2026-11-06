@@ -54,6 +54,8 @@ private data class SettingsFileV1(
     val lectureFolderAsked: Boolean = false,
     /** The voice-print model picked for speaker labels (its id); null: the catalog's default (CAM++). */
     val voiceModel: String? = null,
+    /** The user's "fewer ↔ more speakers" per voice-print model (its id), -1..1; a model without one: 0, its tuning. */
+    val speakerTuning: Map<String, Float> = emptyMap(),
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -116,6 +118,13 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var voiceModel: String?
         get() = read().voiceModel
         set(value) = write(read().copy(voiceModel = value))
+
+    /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
+    fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: 0f
+
+    fun setSpeakerTuning(modelId: String, more: Float) = write(read().let {
+        it.copy(speakerTuning = if (more == 0f) it.speakerTuning - modelId else it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
+    })
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
     fun liveModel(language: String): String? = read().liveModels[language]

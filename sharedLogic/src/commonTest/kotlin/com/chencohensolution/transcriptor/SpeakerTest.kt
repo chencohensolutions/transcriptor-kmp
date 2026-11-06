@@ -182,4 +182,29 @@ class SpeakerTest {
         assertEquals(com.chencohensolution.transcriptor.recording.ModelInUse("ResNet100", com.chencohensolution.transcriptor.recording.ModelInUse.Runs.Npu), session.state.value!!.voicePrints)
         session.stop()
     }
+
+    @Test
+    fun moreSpeakersRaisesTheCosinesAndLowersTheClustering() {
+        val id = ModelCatalog.voicePrintsResNet293.id
+        val tuned = VoicePrintThresholds.of(id)
+        assertEquals(tuned, VoicePrintThresholds.of(id, 0f))
+        val more = VoicePrintThresholds.of(id, 1f)
+        val fewer = VoicePrintThresholds.of(id, -1f)
+        assertTrue(more.live > tuned.live && tuned.live > fewer.live)
+        assertTrue(more.sameSpeaker > tuned.sameSpeaker && more.clustering < tuned.clustering && fewer.clustering > tuned.clustering)
+        assertEquals(more, VoicePrintThresholds.of(id, 5f))
+        assertTrue(fewer.live > 0f)
+    }
+
+    @Test
+    fun theSpeakerTuningIsKeptPerModel() {
+        val settings = SettingsStore(FakeFileSystem(), "/s".toPath())
+        assertEquals(0f, settings.speakerTuning("cam"))
+        settings.setSpeakerTuning("cam", 0.5f)
+        settings.setSpeakerTuning("resnet", -1f)
+        assertEquals(0.5f, settings.speakerTuning("cam"))
+        assertEquals(-1f, settings.speakerTuning("resnet"))
+        settings.setSpeakerTuning("cam", 0f)
+        assertEquals(0f, settings.speakerTuning("cam"))
+    }
 }

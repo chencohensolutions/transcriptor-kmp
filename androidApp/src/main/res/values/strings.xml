@@ -140,6 +140,10 @@
     <string name="models_badge_speakers">Speakers ✓</string>
     <string name="models_use_for_speakers">Use for speaker labels</string>
     <string name="models_by_hand">Copied by hand</string>
+    <string name="models_speaker_tuning">How readily it starts a new speaker</string>
+    <string name="models_speaker_tuning_fewer">Fewer speakers</string>
+    <string name="models_speaker_tuning_more">More speakers</string>
+    <string name="models_speaker_tuning_reset">Reset</string>
     <string name="models_badge_refine">Improve ✓</string>
     <string name="models_choose_size">Size</string>
     <string name="models_confirm_nc">This model\'s license allows personal and study use only. Add it anyway?</string>

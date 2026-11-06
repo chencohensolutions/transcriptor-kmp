@@ -13,17 +13,37 @@ data class VoicePrintThresholds(val sameSpeaker: Float, val clustering: Float, v
     companion object {
         private val byModel = mapOf(
             // Live (segmentation): the replay of the three lectures through LiveSpeakers (build/speaker-ab/live_ab.log):
-            // CAM++ at 0.3 made 3/3/4 speakers (2/2/3 with 5% of the talk or more), ERes2NetV2 at 0.45 2/3/3.
+            // CAM++ at 0.3 made 3/3/4 speakers (2/2/3 with 5% of the talk or more), ERes2NetV2 at 0.45 2/3/3; the
+            // WeSpeaker models' short prints spread more: ResNet293 at 0.15 made 3/2/4 (0.3: 10/5/19).
             ModelCatalog.voicePrints.id to VoicePrintThresholds(SpeakerTracker.THRESHOLD, 0.85f, 0.3f),
             // Live: the A/B's best tracker thresholds over the three lectures (0.6/0.45/0.55 for ERes2NetV2; 0.35/0.5/0.3
             // ResNet293, 0.35/0.45/0.3 ResNet100, both mean-normalized). Clustering: lecture B's sweep (2 speakers, as
             // labeled, at 1.0 for ERes2NetV2; the WeSpeaker models still split at 0.7, provisional until the sweep ends).
             ModelCatalog.voicePrintsEres2NetV2.id to VoicePrintThresholds(0.55f, 1.0f, 0.45f),
-            ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds(0.4f, 1.0f, 0.2f),
-            ModelCatalog.voicePrintsSimAmResNet100.id to VoicePrintThresholds(0.4f, 1.0f, 0.2f),
+            ModelCatalog.voicePrintsResNet293.id to VoicePrintThresholds(0.4f, 1.0f, 0.15f),
+            ModelCatalog.voicePrintsSimAmResNet100.id to VoicePrintThresholds(0.4f, 1.0f, 0.15f),
         )
 
         /** [modelId]'s thresholds; CAM++'s for a model without its own. */
         fun of(modelId: String): VoicePrintThresholds = byModel[modelId] ?: byModel.getValue(ModelCatalog.voicePrints.id)
+
+        /** How far the cosines move at the slider's ends, and the clustering distance. */
+        const val COSINE_RANGE = 0.15f
+        const val CLUSTERING_RANGE = 0.25f
+
+        /**
+         * [modelId]'s thresholds moved by the user's setting [more], -1 (fewer speakers: a voice joins a speaker more
+         * readily) to 1 (more speakers), 0 the tuned values: the cosines up by [COSINE_RANGE] at 1, the clustering
+         * distance down by [CLUSTERING_RANGE].
+         */
+        fun of(modelId: String, more: Float): VoicePrintThresholds {
+            val t = of(modelId)
+            val m = more.coerceIn(-1f, 1f)
+            return VoicePrintThresholds(
+                sameSpeaker = (t.sameSpeaker + m * COSINE_RANGE).coerceIn(0.05f, 0.95f),
+                clustering = (t.clustering - m * CLUSTERING_RANGE).coerceIn(0.1f, 2f),
+                live = (t.live + m * COSINE_RANGE).coerceIn(0.05f, 0.95f),
+            )
+        }
     }
 }

@@ -140,6 +140,10 @@
     <string name="models_badge_speakers">דוברים ✓</string>
     <string name="models_use_for_speakers">להשתמש לזיהוי דוברים</string>
     <string name="models_by_hand">הועתק ידנית</string>
+    <string name="models_speaker_tuning">כמה בקלות הוא מזהה דובר חדש</string>
+    <string name="models_speaker_tuning_fewer">פחות דוברים</string>
+    <string name="models_speaker_tuning_more">יותר דוברים</string>
+    <string name="models_speaker_tuning_reset">איפוס</string>
     <string name="models_badge_refine">שיפור ✓</string>
     <string name="models_choose_size">גודל</string>
     <string name="models_confirm_nc">הרישיון של המודל מתיר רק שימוש אישי ולימודי. להוסיף בכל זאת?</string>

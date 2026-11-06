@@ -267,7 +267,7 @@ object Recording {
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
         val model = checkNotNull(voiceModel) { "no voice-print model" }
-        val thresholds = VoicePrintThresholds.of(model.id)
+        val thresholds = VoicePrintThresholds.of(model.id, settings.speakerTuning(model.id))
         val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), voicePrintFiles(model), thresholds.clustering, nativeLibDir)
         val embedder = voiceEmbedder(model)
         try {
@@ -431,7 +431,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     val prints = Recording.voiceModel
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
     val liveTurns = prints != null && Recording.models.isReady(ModelCatalog.speakerSegmentation)
-    val tracker = prints?.let { VoicePrintThresholds.of(it.id).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
+    val tracker = prints?.let { VoicePrintThresholds.of(it.id, Recording.settings.speakerTuning(it.id)).let { t -> SpeakerTracker(known, if (liveTurns) t.live else t.sameSpeaker, it.id) } }
     val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)

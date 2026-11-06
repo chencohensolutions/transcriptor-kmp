@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.ui
 
+import kotlin.math.roundToInt
+import androidx.compose.material3.Slider
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -124,6 +126,8 @@ data class ModelsState(
     val voiceModel: String? = null,
     /** The voice-print models with an NPU build for this phone in their folder. */
     val npuVoiceModels: Set<String> = emptySet(),
+    /** The user's "fewer ↔ more speakers" per voice-print model, -1..1 (0: its tuning). */
+    val speakerTuning: Map<String, Float> = emptyMap(),
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
@@ -169,6 +173,8 @@ class ModelsActions(
     val useRefine: (language: String, SpeechModel) -> Unit = { _, _ -> },
     /** Picks the voice-print model for speaker labels, from the next lecture or speaker pass. */
     val useVoicePrints: (SpeechModel) -> Unit = {},
+    /** Sets how readily the voice-print model starts a new speaker, -1 (fewer) to 1 (more); 0 resets. */
+    val setSpeakerTuning: (SpeechModel, Float) -> Unit = { _, _ -> },
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
@@ -533,6 +539,7 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                 }
                 model.credit?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time) }
                 if (npu is NpuCheck.Fails) Text(npu.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                if (speaks) SpeakerTuning(state.speakerTuning[model.id] ?: 0f) { actions.setSpeakerTuning(model, it) }
                 Progress(status)
             }
             DownloadControl(model, status, actions)
@@ -897,5 +904,25 @@ private fun Progress(status: ModelStatus) {
         ModelStatus.Checking -> Text(stringResource(R.string.model_checking), style = MaterialTheme.typography.bodySmall)
         is ModelStatus.Failed -> Text(stringResource(R.string.model_failed, status.reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         else -> {}
+    }
+}
+
+/**
+ * How readily the voice-print model in use starts a new speaker: a slider from "Fewer speakers" to "More speakers",
+ * the middle its tuned thresholds, with Reset when moved. Applies from the next recording or speaker pass.
+ */
+@Composable
+private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
+    var v by remember(value) { mutableStateOf(value) }
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text(stringResource(R.string.models_speaker_tuning), style = MaterialTheme.typography.labelMedium)
+        Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange((v * 10).roundToInt() / 10f) }, valueRange = -1f..1f, steps = 19)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.models_speaker_tuning_fewer), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+            Spacer(Modifier.weight(1f))
+            if (v != 0f) TextButton(onClick = { v = 0f; onChange(0f) }) { Text(stringResource(R.string.models_speaker_tuning_reset)) }
+            Spacer(Modifier.weight(1f))
+            Text(stringResource(R.string.models_speaker_tuning_more), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+        }
     }
 }
