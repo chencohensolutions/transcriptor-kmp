@@ -391,8 +391,14 @@ private fun speakerLine(model: SpeechModel?, state: ModelsState): Pair<String, B
 private fun speakerName(model: SpeechModel, state: ModelsState) = when {
     model.id in state.npuVoiceModels -> "${model.name} · NPU"
     state.status(model) == ModelStatus.Ready -> "${model.name} · CPU"
+    // Not here yet: "· NPU" when what it downloads includes an NPU build for this phone's chip.
+    state.chip == NPU_CHIP && model.files.any { it.name in NPU_SPEAKER_FILES } -> "${model.name} · NPU"
     else -> model.name
 }
+
+/** The chip the speaker models' NPU builds are for, and their files ([com.chencohensolution.transcriptor.speech.VoicePrintFiles], window.bin). */
+private const val NPU_CHIP = "SM8750"
+private val NPU_SPEAKER_FILES = setOf("t150.bin", "t300.bin", "t600.bin", "window.bin")
 
 /** A speaker model's facts: parameters, its NPU build here, copied by hand, from Hugging Face. */
 @Composable
