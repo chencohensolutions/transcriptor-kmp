@@ -1,13 +1,18 @@
 # Settings and Manage models
 
-In the app: Settings is round 2's b (a page per language), Manage models round 1's b4. The gear on Notebooks opens
+In the app: Settings is round 2's b (a page per language) with round 3's d2 (the speaker models in view), Manage
+models round 1's b4. The gear on Notebooks opens
 Settings.
 
 ## What it shows
 
 - **Settings**: **Languages**, one row per language in use (the notebooks', a lecture in none, the phone's, those
   added) with the model that writes it live and the one that improves its lectures ("Live: … / Improve: …", red when
-  none is downloaded), and Add a language. **After a lecture**: Find the speakers when it stops
+  none is downloaded), and Add a language. **Speaker recognition**: its note, a **Voice model** row with the model in
+  use and its facts ("3D-Speaker CAM++ · 7M", red "No model downloaded" without one), and under it the slider "How
+  readily it starts a new speaker", Fewer ↔ More speakers, with Reset (one value per model,
+  `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a lecture**: Find the
+  speakers again after Stop
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
   Manage models, the lectures folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
   slider for the FLAC compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`;
@@ -18,18 +23,20 @@ Settings.
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
   once, under Live. One that fails the NPU check says so and can't be picked. "Find more models for …" opens the
   catalog on the language. The lists come from `ModelChoices` (shared).
-- **Speakers** (the chip in Manage models): the voice-print models, then pyannote's segmentation.
-  - **Which models:** the catalog's voice-print models (CAM++, ERes2NetV2) are always listed. The ones copied by hand
-    (WeSpeaker ResNet293-LM, SimAM-ResNet100) are listed once their folder is on the phone, with a "Copied by hand"
-    badge and no download or delete.
-  - **Badges:** "Speakers ✓" marks the one in use. "NPU" marks one with its NPU build on this phone. A non-commercial
-    license shows in amber.
-  - **Segmentation models:** pyannote's, and DiariZen's once copied by hand. Their menu has "Use for live speaker
-    turns", and the one in use shows "Turns ✓".
-  - **Fewer ↔ more speakers:** the voice-print model in use has a slider, "How readily it starts a new speaker",
-    with Reset. It holds one value per model (`SettingsStore.speakerTuning`).
-  - **Picking:** the card's menu has "Use for speaker labels" (`ModelsActions.useVoicePrints`,
-    `SettingsStore.voiceModel`). It applies from the next lecture or speaker pass.
+- **A speaker page** (the Voice model or Turn model row): the same page for both jobs, titled Speaker recognition or
+  Speaker turns, with the job's note, its models (the downloaded ones to pick with a radio, the others with their
+  download), then **Find more on Hugging Face**. Picking marks the model and stays on the page; it applies from the
+  next lecture or speaker pass (`ModelsActions.useVoicePrints` / `useSegmentation`, `SettingsStore.voiceModel` /
+  `segmentationModel`). Each model shows its parameters, "NPU" when its NPU build is on this phone, "Copied by hand",
+  "From Hugging Face", and a non-commercial license in amber.
+  - **Which models:** voice prints: the catalog's (CAM++, ERes2NetV2), those copied by hand (WeSpeaker ResNet293-LM,
+    SimAM-ResNet100) once their folder is on the phone, and those added from Hugging Face. Turns: pyannote's,
+    DiariZen's once copied by hand, and those added from Hugging Face (`ModelsState.voiceModels`, `turnModels`).
+  - **Find more on Hugging Face** opens the search for that job only (Voice prints or Speaker turns; no language or
+    NPU filter): sherpa-onnx exports, found by their names, each ONNX file a model to pick in the sheet, installed as
+    `model.onnx`. Other ONNX exports lack the metadata sherpa-onnx reads and are counted, not listed.
+- **Speakers** (the chip in Manage models): a library of the speaker models (download, delete, remove, model page),
+  with "Speakers ✓" and "Turns ✓" on the ones in use. Picking and the slider are on Settings.
 - **Manage models**: chips for the languages in use and Speakers; **Add a language** finds any language Whisper knows
   by name. Each model is a card: its facts, badges (Live, Improve, NPU, Many languages, From Hugging Face, the NPU
   check), its download at the end, and a menu (delete or remove from the list, model page). A language with no models of its own says the
@@ -49,9 +56,11 @@ Settings.
 
 - Screen: `androidApp/.../ui/ModelsScreen.kt` (`ModelsScreen`, `ModelsState`, `ModelsActions`, `NpuCheck`); fed by
   `Settings.kt` (package root). `Recording.hub` (the API over HTTPS), `Recording.checkNpu`, `Recording.modelLibrary`.
+- Settings' speaker models: `Recording.voiceModel` and `segmentationModel` read the catalog's and those added from
+  Hugging Face.
 - Shared: `models/ModelChoices.kt` (`ModelJob`, the lists per job, the model that runs, the one to suggest, the
-  estimate), `models/Hub.kt` (`HubClient`, `HubModel`, `HubVariant`, `HubKind`, `NpuBuild`, `LicenseUse`, the file
-  classification), `models/InstalledModels.kt` (`models.json`, `ModelLibrary`), `SettingsStore.refineModel`, `findSpeakersOnStop`, `autoImprove` and
+  estimate), `models/Hub.kt` (`HubClient`, `HubModel`, `HubVariant`, `HubKind` (with `VoicePrints`, `SpeakerTurns`), `NpuBuild`,
+  `LicenseUse`, the file classification, `speakerKind`), `models/InstalledModels.kt` (`models.json`, `ModelLibrary`), `SettingsStore.refineModel`, `findSpeakersOnStop`, `autoImprove` and
   `modelLanguages`. `ModelFiles` checks a small Hub file by its git blob id.
 - Strings: `models_*`, `folder_*`. Strings also `settings_*`. Lab: `models current`, `models current-sm8750` (`lab/models/ModelsCurrentLab.kt`).
 

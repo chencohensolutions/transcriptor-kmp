@@ -174,4 +174,20 @@ private val labHub = listOf(
         listOf(HubVariant("SM8650 · QNN 2.40", files("lab-example/zipformer-en-qnn-sm8650", "c0ffee03", "encoder.bin" to 150_000_000L, "decoder.bin" to 2_100_000L, "joiner.bin" to 1_600_000L, "tokens.txt" to 5_000L), "70M", true)),
         NpuBuild("SM8650", "2.40"),
     ),
+    // Speaker models (Settings › Speaker recognition or Speaker turns › Find more on Hugging Face).
+    HubModel(
+        "csukuangfj/speaker-embedding-models", HubKind.VoicePrints, "apache-2.0", LicenseUse.Commercial, emptyList(), 0, 31, "5e1f2a3b",
+        listOf(
+            HubVariant("wespeaker_en_voxceleb_resnet34_LM", files("csukuangfj/speaker-embedding-models", "5e1f2a3b", "model.onnx" to 26_500_000L), "?", true),
+            HubVariant("nemo_en_titanet_large", files("csukuangfj/speaker-embedding-models", "5e1f2a3b", "model.onnx" to 97_600_000L), "?", true),
+        ),
+    ),
+    HubModel(
+        "csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", HubKind.SpeakerTurns, "mit", LicenseUse.Commercial, emptyList(), 0, 8, "9403a690",
+        listOf(HubVariant("model.int8", files("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", "9403a690", "model.onnx" to 1_500_000L), "1.5M", true)),
+    ),
+    HubModel(
+        "csukuangfj/sherpa-onnx-reverb-diarization-v1", HubKind.SpeakerTurns, "cc-by-nc-4.0", LicenseUse.NonCommercial, emptyList(), 0, 4, "7a6b5c4d",
+        listOf(HubVariant("model", files("csukuangfj/sherpa-onnx-reverb-diarization-v1", "7a6b5c4d", "model.onnx" to 9_400_000L), "?", true)),
+    ),
 )

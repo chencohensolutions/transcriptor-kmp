@@ -18,7 +18,7 @@ screen for both speaker jobs.
   to pick. *Turned down*: the owner wanted a picker, not a list on Settings.
 - **d2 — A section per speaker job, picked on its own page**: as d, but each section is one row with the chosen model
   (Voice model, Turn model) opening one shared model page (its note, the models to pick, Find more on Hugging Face);
-  the slider stays on Settings under the Voice model row. *Picked*, promoted in (see below).
+  the slider stays on Settings under the Voice model row. *Picked*, promoted in e02070d (Find more on Hugging Face searches for real: sherpa-onnx speaker exports).
 - **d3 — No After a lecture section**: as d2, with Improve automatically on a language's page and Find the speakers
   again under Speaker turns. *Turned down*: the owner didn't like it.
 
@@ -29,7 +29,8 @@ screen for both speaker jobs.
   words; Add only listed the repo as downloading.
 - d3: Improve automatically stayed one setting for all languages, though each language's page showed it.
 
-Screenshots (emulator): [2026-11-06-speakers-shots/](2026-11-06-speakers-shots/).
+Screenshots (emulator): the mocks in [2026-11-06-speakers-shots/](2026-11-06-speakers-shots/), the promoted screen (in
+the lab's `models current-sm8750`) in [2026-11-06-promoted/](2026-11-06-promoted/).
 
 ## Reviving an option
     git checkout ux/models/2026-11-06-2 -- androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/models/<option> androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/models/ModelsLabParts.kt androidApp/src/debug/res/values/strings_models_lab.xml androidApp/src/debug/res/values-iw/strings_models_lab.xml

@@ -968,7 +968,7 @@ private fun HubSheet(m: HubModel, state: ModelsState, onDismiss: () -> Unit, onI
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
                             Text(isolated(v.label), style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                listOfNotNull(isolated(v.parameters), modelsSize(v.sizeBytes), if (!v.fitsLive) stringResource(R.string.models_after_only) else null).joinToString(" · "),
+                                listOfNotNull(isolated(v.parameters).takeIf { v.parameters != "?" }, modelsSize(v.sizeBytes), if (!v.fitsLive) stringResource(R.string.models_after_only) else null).joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
                             )
                         }
