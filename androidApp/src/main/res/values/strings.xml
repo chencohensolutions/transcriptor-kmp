@@ -209,7 +209,6 @@
     <string name="settings_improve_title">Improve transcription</string>
     <string name="settings_improve_note">Transcribes a lecture again after it, by hand from its menu or automatically. You can pick another model for a single lecture.</string>
     <string name="settings_more">Find more models for %1$s</string>
-    <string name="settings_get">Get · %1$s</string>
     <string name="settings_streaming">Words as they\'re spoken</string>
     <!-- The lecture: improving its transcription. -->
     <string name="review_improve">Improve transcription…</string>

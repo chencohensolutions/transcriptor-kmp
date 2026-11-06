@@ -326,19 +326,28 @@ private fun Choices(state: ModelsState, actions: ModelsActions, all: List<Speech
             }
         }
         all.filter { !state.ready(it) }.forEach { model ->
-            Row(Modifier.fillMaxWidth().padding(start = 56.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ChoiceText(model, state, Modifier.weight(1f))
-                when (val s = state.status(model)) {
-                    is ModelStatus.Downloading -> CircularProgressIndicator(progress = { s.progress }, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                    ModelStatus.Checking -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
-                    ModelStatus.WaitingForWifi -> Text(stringResource(R.string.model_waiting_wifi), style = MaterialTheme.typography.labelSmall)
-                    ModelStatus.Ready -> Text(
+            val status = state.status(model)
+            Row(Modifier.fillMaxWidth().padding(start = 56.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    ChoiceText(model, state)
+                    // Downloaded but not loading on this NPU: why, under its name; it can't be picked.
+                    if (status == ModelStatus.Ready) Text(
                         stringResource(if (state.npu[model.id] == NpuCheck.Checking) R.string.models_npu_checking else R.string.models_npu_fails),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = if (state.npu[model.id] == NpuCheck.Checking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     )
+                }
+                when (status) {
+                    is ModelStatus.Downloading -> CircularProgressIndicator(progress = { status.progress }, modifier = Modifier.padding(horizontal = 8.dp).size(24.dp), strokeWidth = 3.dp)
+                    ModelStatus.Checking -> CircularProgressIndicator(Modifier.padding(horizontal = 8.dp).size(24.dp), strokeWidth = 3.dp)
+                    ModelStatus.WaitingForWifi -> Text(stringResource(R.string.model_waiting_wifi), style = MaterialTheme.typography.labelSmall)
+                    ModelStatus.Ready -> {}
                     is ModelStatus.Failed -> TextButton(onClick = { actions.download(model) }) { Text(stringResource(R.string.models_retry), color = MaterialTheme.colorScheme.error) }
-                    ModelStatus.Missing -> FilledTonalButton(onClick = { actions.download(model) }) { Text(stringResource(R.string.settings_get, modelsSize(model.sizeBytes))) }
+                    // A text button, so a long name keeps the row's width.
+                    ModelStatus.Missing -> TextButton(onClick = { actions.download(model) }) {
+                        Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
+                        Text(modelsSize(model.sizeBytes), Modifier.padding(start = 4.dp))
+                    }
                 }
             }
         }

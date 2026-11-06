@@ -209,7 +209,6 @@
     <string name="settings_improve_title">שיפור התמלול</string>
     <string name="settings_improve_note">מתמלל הרצאה שוב אחריה, ידנית מהתפריט שלה או אוטומטית. אפשר לבחור מודל אחר להרצאה אחת.</string>
     <string name="settings_more">חיפוש מודלים נוספים ל%1$s</string>
-    <string name="settings_get">הורדה · %1$s</string>
     <string name="settings_streaming">מילים תוך כדי דיבור</string>
     <!-- The lecture: improving its transcription. -->
     <string name="review_improve">שיפור התמלול…</string>
