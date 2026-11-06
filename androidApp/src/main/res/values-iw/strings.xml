@@ -19,6 +19,12 @@
     <string name="format_wav">WAV (הכי גדול, כ־690MB לשעה)</string>
     <string name="format_wav_then_flac">WAV, ודחיסה ל־FLAC אחרי ההרצאה</string>
     <string name="format_flac_live">FLAC בזמן ההקלטה</string>
+    <string name="flac_effort">מאמץ הדחיסה ל־FLAC</string>
+    <string name="flac_effort_value">%1$d מתוך %2$d</string>
+    <string name="flac_effort_fast">מהיר יותר</string>
+    <string name="flac_effort_small">קובץ קטן יותר</string>
+    <string name="flac_effort_note_after">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, והדחיסה אחרי ההרצאה לוקחת יותר זמן.</string>
+    <string name="flac_effort_note_live">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, ומעמיסה יותר על הטלפון בזמן ההקלטה (וגם על הסוללה).</string>
     <string name="start_lecture">התחלת הרצאה</string>
     <string name="start_default_notebook">המחברת שלי</string>
     <string name="start_last">ההרצאה האחרונה: %1$s · %2$s · %3$d הערות · %4$s</string>

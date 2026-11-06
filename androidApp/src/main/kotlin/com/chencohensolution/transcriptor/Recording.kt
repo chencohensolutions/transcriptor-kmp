@@ -382,7 +382,7 @@ object Recording {
             voices = VoiceStore { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
         )
-        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
+        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
         review = LectureReview(store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
     }
 }

@@ -20,7 +20,8 @@ interface AudioRecorder {
     /** Gets every buffer written (48 kHz stereo 16 bit), on the recorder's thread: live transcription. */
     var onPcm: ((pcm: ByteArray, size: Int) -> Unit)?
 
-    fun start(file: Path, format: AudioFileFormat)
+    /** Starts recording to [file]; a FLAC is encoded at [flacLevel] (0 the fastest, 8 the smallest). */
+    fun start(file: Path, format: AudioFileFormat, flacLevel: Int)
     fun pause()
     fun resume()
 

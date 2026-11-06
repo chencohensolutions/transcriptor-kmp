@@ -11,6 +11,7 @@ import com.chencohensolution.transcriptor.recording.FlacEncode
 import com.chencohensolution.transcriptor.recording.LectureSession
 import com.chencohensolution.transcriptor.recording.WavWriter
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
@@ -36,13 +37,15 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override var onPcm: ((ByteArray, Int) -> Unit)? = null
     var file: Path? = null
     var format: AudioFileFormat? = null
+    var flacLevel: Int? = null
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int) {
         this.file = file
         this.format = format
+        this.flacLevel = flacLevel
         if (format == AudioFileFormat.Wav) wav = WavWriter(fileSystem, file) else fileSystem.write(file) {}
         level.value = 0.5f
     }
@@ -130,6 +133,22 @@ class RecordingTest {
         val lecture = session().start(notebook, "t")
         assertEquals(AUDIO_FLAC, lecture.audioFile)
         assertEquals(AudioFileFormat.Flac, recorder.format)
+        assertEquals(FLAC_DEFAULT_LEVEL, recorder.flacLevel)
+    }
+
+    @Test
+    fun theFlacLevelIsKeptWithinZeroToEight() = runTest {
+        assertEquals(FLAC_DEFAULT_LEVEL, settings.flacLevel)
+        settings.flacLevel = 8
+        assertEquals(8, SettingsStore(fs, root).flacLevel)
+        settings.flacLevel = 12
+        assertEquals(8, SettingsStore(fs, root).flacLevel)
+        settings.flacLevel = -1
+        assertEquals(0, SettingsStore(fs, root).flacLevel)
+        settings.flacLevel = 2
+        settings.audioFormat = AudioFormat.FlacLive
+        session().start(notebook, "t")
+        assertEquals(2, recorder.flacLevel)
     }
 
     @Test
@@ -215,13 +234,17 @@ class RecordingTest {
         recorder.advance(2_000)
         val stopped = assertNotNull(session.stop())
         assertTrue(stopped.pendingFlac)
-        val compression = FlacCompression(fs, store) { _, flac, progress ->
+        settings.flacLevel = 7
+        var level: Int? = null
+        val compression = FlacCompression(fs, store, { _, flac, l, progress ->
+            level = l
             fs.write(flac) { writeUtf8("fLaC") }
             progress(1f)
             96_000
-        }
+        }, settings::flacLevel)
         assertEquals(listOf(stopped.id), compression.pending().map { it.id })
         val done = compression.compress(stopped)
+        assertEquals(7, level)
         assertEquals(AUDIO_FLAC, done.audioFile)
         assertEquals(AUDIO_FLAC, store.load("psych", stopped.id)?.audioFile)
         assertFalse(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
@@ -235,7 +258,7 @@ class RecordingTest {
         session.start(notebook, "t")
         recorder.advance(1_000)
         val stopped = assertNotNull(session.stop())
-        val compression = FlacCompression(fs, store) { _, flac, _ -> fs.write(flac) {}; 10 }
+        val compression = FlacCompression(fs, store, { _, flac, _, _ -> fs.write(flac) {}; 10 })
         assertFailsWith<IllegalStateException> { compression.compress(stopped) }
         assertTrue(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
         assertEquals(true, store.load("psych", stopped.id)?.pendingFlac)
