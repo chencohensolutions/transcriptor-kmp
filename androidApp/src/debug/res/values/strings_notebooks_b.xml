@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the notebooks screen's option b. -->
+<resources>
+    <string name="notebooks_b_deleted_one">Lecture deleted</string>
+    <string name="notebooks_b_deleted_many">%1$d lectures deleted</string>
+    <string name="notebooks_b_undo">Undo</string>
+    <string name="notebooks_b_delete">Delete</string>
+    <string name="notebooks_b_clear">Clear selection</string>
+    <string name="notebooks_b_selected">%1$d selected</string>
+</resources>

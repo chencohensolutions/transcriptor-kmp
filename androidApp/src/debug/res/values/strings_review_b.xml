@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the lecture (after) screen's option b. -->
+<resources>
+    <string name="review_b_share">Share as Word</string>
+    <string name="review_b_save_word">Save as Word</string>
+    <string name="review_b_delete_item">Delete lecture…</string>
+    <string name="review_b_delete_title">Delete %1$s?</string>
+    <string name="review_b_delete_text">Its recording, transcript and notes are deleted from the lectures folder. This can\'t be undone.</string>
+    <string name="review_b_delete">Delete</string>
+    <string name="review_b_cancel">Cancel</string>
+</resources>

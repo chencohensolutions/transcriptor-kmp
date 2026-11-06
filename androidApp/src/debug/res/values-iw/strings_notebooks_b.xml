@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the notebooks screen's option b. -->
+<resources>
+    <string name="notebooks_b_deleted_one">ההרצאה נמחקה</string>
+    <string name="notebooks_b_deleted_many">%1$d הרצאות נמחקו</string>
+    <string name="notebooks_b_undo">ביטול</string>
+    <string name="notebooks_b_delete">מחיקה</string>
+    <string name="notebooks_b_clear">ניקוי הבחירה</string>
+    <string name="notebooks_b_selected">%1$d נבחרו</string>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the lecture screen's option b. -->
+<resources>
+    <string name="lecture_b_line_at">Line at %1$s</string>
+    <string name="lecture_b_previous">Line before</string>
+    <string name="lecture_b_next">Line after</string>
+    <string name="lecture_b_done">Done</string>
+</resources>
