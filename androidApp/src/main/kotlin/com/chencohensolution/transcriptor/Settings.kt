@@ -106,6 +106,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             useVoicePrints = { m -> io { Recording.settings.voiceModel = m.id } },
             setSpeakerTuning = { m, more -> io { Recording.settings.setSpeakerTuning(m.id, more) } },
             useSegmentation = { m -> io { Recording.settings.segmentationModel = m.id } },
+            retryNpu = { m -> io { Recording.npuGuard.reenable(m.id) } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },

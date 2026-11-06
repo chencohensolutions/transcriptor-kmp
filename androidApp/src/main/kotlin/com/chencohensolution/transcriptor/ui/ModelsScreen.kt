@@ -194,6 +194,8 @@ class ModelsActions(
     val setSpeakerTuning: (SpeechModel, Float) -> Unit = { _, _ -> },
     /** Picks the segmentation model for live speaker turns, from the next lecture. */
     val useSegmentation: (SpeechModel) -> Unit = {},
+    /** Lets an NPU model that failed or was disabled on this phone be tried again. */
+    val retryNpu: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFlacLevel: (Int) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
@@ -491,6 +493,11 @@ private fun Choices(
                         style = MaterialTheme.typography.bodySmall,
                         color = if (state.npu[model.id] == NpuCheck.Checking) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     )
+                    // Why (e.g. not enough memory on this phone), and trying it again on the user's word.
+                    (state.npu[model.id] as? NpuCheck.Fails)?.let { fails ->
+                        if (fails.reason.isNotBlank()) Text(fails.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { actions.retryNpu(model) }) { Text(stringResource(R.string.models_npu_retry)) }
+                    }
                 }
                 when (status) {
                     is ModelStatus.Downloading -> CircularProgressIndicator(progress = { status.progress }, modifier = Modifier.padding(horizontal = 8.dp).size(24.dp), strokeWidth = 3.dp)

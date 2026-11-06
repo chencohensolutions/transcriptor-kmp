@@ -34,6 +34,7 @@ import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.models.NpuLoadGuard
 import com.chencohensolution.transcriptor.recording.ModelInUse
 import com.chencohensolution.transcriptor.recording.PowerMeter
 import com.chencohensolution.transcriptor.speech.VoicePrintFiles
@@ -136,6 +137,14 @@ object Recording {
     lateinit var installedModels: InstalledModels
         private set
 
+    /** Loads NPU models so one too big for the phone is refused, or disabled after it got the app killed. */
+    lateinit var npuGuard: NpuLoadGuard
+        private set
+
+    /** [make]s a streaming engine, inside [npuGuard] when [model] runs on the NPU. */
+    fun <T> npuEngine(model: SpeechModel, make: () -> T): T =
+        if (model.kind == ModelKind.StreamingTransducerNpu || model.kind == ModelKind.WhisperNpu) npuGuard.load(model, make) else make()
+
     /** The catalog's models and those added from Hugging Face. */
     lateinit var modelLibrary: ModelLibrary
         private set
@@ -166,10 +175,12 @@ object Recording {
             when (model.kind) {
                 ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(dir, nativeLibDir).use { engine ->
                     val language = model.languages.firstOrNull { it != SpeechModel.MULTILINGUAL } ?: "en"
-                    engine.load(language)
-                    engine.transcribe(FloatArray(16_000), language, null)
+                    npuGuard.load(model) {
+                        engine.load(language)
+                        engine.transcribe(FloatArray(16_000), language, null)
+                    }
                 }
-                ModelKind.StreamingTransducerNpu -> SherpaStreamingEngine(dir, nativeLibDir).use { engine ->
+                ModelKind.StreamingTransducerNpu -> npuEngine(model) { SherpaStreamingEngine(dir, nativeLibDir) }.use { engine ->
                     engine.accept(FloatArray(16_000))
                     engine.text
                 }
@@ -199,9 +210,10 @@ object Recording {
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
             ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
+                npuGuard.load(model) { engine.load(lecture.language) }
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
-            else -> SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }).use { engine ->
+            else -> npuEngine(model) { SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }) }.use { engine ->
                 RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress)
             }
         }
@@ -405,6 +417,13 @@ object Recording {
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
+        npuGuard = NpuLoadGuard(installedModels) {
+            val info = android.app.ActivityManager.MemoryInfo()
+            app.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(info)
+            info.availMem
+        }
+        // An NPU model whose load got the app killed last time: disabled for this phone, the pick falls back.
+        npuGuard.recover()?.let { android.util.Log.w("Transcriptor", "NPU model $it disabled: the app was killed loading it") }
         modelLibrary = ModelLibrary(installedModels)
         notebooks = NotebookStore { store.library ?: store.local }
         resolver = app.contentResolver
@@ -486,13 +505,13 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)
             UtteranceTranscriber(language, model.id, scope, worker, labeler) {
-                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).apply { load(language) }
+                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).also { e -> Recording.npuGuard.load(model) { e.load(language) } }
             }
         }
         ModelKind.StreamingTransducer, ModelKind.StreamingTransducerNpu -> {
             val dir = Recording.models.dir(model)
             val npu = Recording.nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }
-            StreamingTranscriber(model.id, scope, worker, labeler) { SherpaStreamingEngine(dir, npu) }
+            StreamingTranscriber(model.id, scope, worker, labeler) { Recording.npuEngine(model) { SherpaStreamingEngine(dir, npu) } }
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }

@@ -180,3 +180,15 @@ certificate expired in May 2026).
 
 [hencohen83/zipformer2-66m-streaming-he-qnn-sm8750](https://huggingface.co/hencohen83/zipformer2-66m-streaming-he-qnn-sm8750)
 (commit 284f0a33, public, CC-BY-4.0 with credit to Yakov Kolani and ivrit.ai). `ivritZipformerNpu` downloads from it.
+
+### A model too big for the phone (Nov 6, 2026)
+
+The 16-bit Whisper large-v3 NPU build (3.3 GB) got the app killed by Android's low-memory killer on the S25 (12 GB,
+about 4.4 GB free): no error to catch, and the next try did the same. `NpuLoadGuard` prevents both.
+- **Before loading,** it refuses a model whose files plus a quarter, plus 512 MB, exceed the free memory
+  (`ActivityManager.MemoryInfo.availMem`).
+- **While loading,** it marks the model in `models.json` (`loading`) and clears the mark after. A mark still there at
+  the next start means the load killed the app.
+- **Either way,** the model is disabled on this phone. A failed `NpuResult` with the reason leaves it out of what can
+  run, so the pick falls back to the next working model, and nothing retries it on its own.
+- **Settings** shows the reason under the model, and "Try again" re-enables it.
