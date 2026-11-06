@@ -411,12 +411,12 @@ object Recording {
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
-            AndroidRecorder(flacLevel = { settings.flacLevel }), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
             voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
             speakerPassReady = { canFindSpeakers },
         )
-        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode { settings.flacLevel })
+        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

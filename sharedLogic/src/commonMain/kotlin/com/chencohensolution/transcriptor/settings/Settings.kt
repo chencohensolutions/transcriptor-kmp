@@ -58,8 +58,6 @@ private data class SettingsFileV1(
     val speakerTuning: Map<String, Float> = emptyMap(),
     /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
     val segmentationModel: String? = null,
-    /** FLAC's compression level, 0 (fastest) to 8 (smallest); Android's encoder, 5 by default. */
-    val flacLevel: Int = 5,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -70,14 +68,6 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var audioFormat: AudioFormat
         get() = read().audioFormat
         set(value) = write(read().copy(audioFormat = value))
-
-    /**
-     * How hard FLAC compresses, 0 (fastest) to 8 (smallest files); the difference in size is a few percent. Used for
-     * the next recording (FLAC live) and the next compression after one (WAV, then FLAC).
-     */
-    var flacLevel: Int
-        get() = read().flacLevel.coerceIn(0, 8)
-        set(value) = write(read().copy(flacLevel = value.coerceIn(0, 8)))
 
     /**
      * The speaker pass also runs when a lecture stops (speakers are found live while it records). Off by default: it can

@@ -117,8 +117,6 @@ data class ModelsState(
     val refine: Map<String, String> = emptyMap(),
     val npu: Map<String, NpuCheck> = emptyMap(),
     val audioFormat: AudioFormat,
-    /** FLAC's compression level, 0 (fastest) to 8 (smallest). */
-    val flacLevel: Int = 5,
     /** The speaker pass runs when a lecture stops. */
     val findSpeakersOnStop: Boolean,
     /** Lectures are improved on their own after they stop (improving by hand is always on the lecture's menu). */
@@ -182,7 +180,6 @@ class ModelsActions(
     /** Picks the segmentation model for live speaker turns, from the next lecture. */
     val useSegmentation: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
-    val setFlacLevel: (Int) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val chooseFolder: () -> Unit = {},
@@ -303,7 +300,6 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
                     }
                 }
             }
-            if (state.audioFormat != AudioFormat.Wav) FlacLevel(state.flacLevel, actions.setFlacLevel)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -937,21 +933,6 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
             if (v != 0f) TextButton(onClick = { v = 0f; onChange(0f) }) { Text(stringResource(R.string.models_speaker_tuning_reset)) }
             Spacer(Modifier.weight(1f))
             Text(stringResource(R.string.models_speaker_tuning_more), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
-        }
-    }
-}
-
-/** FLAC's compression effort, 0 to 8: "Faster" to "Smaller files" (a few percent apart), Android's default 5. */
-@Composable
-private fun FlacLevel(level: Int, onChange: (Int) -> Unit) {
-    var v by remember(level) { mutableStateOf(level.toFloat()) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)) {
-        Text(stringResource(R.string.settings_flac_level, v.roundToInt()), style = MaterialTheme.typography.bodyMedium)
-        Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(v.roundToInt()) }, valueRange = 0f..8f, steps = 7)
-        Row {
-            Text(stringResource(R.string.settings_flac_faster), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
-            Spacer(Modifier.weight(1f))
-            Text(stringResource(R.string.settings_flac_smaller), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
         }
     }
 }

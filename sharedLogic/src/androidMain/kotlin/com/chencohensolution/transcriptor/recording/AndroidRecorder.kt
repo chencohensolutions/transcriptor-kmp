@@ -14,11 +14,7 @@ import kotlin.math.sqrt
  * The phone's microphone, 48 kHz stereo 16 bit, read on its own thread into a [WavWriter] or a [FlacEncoder].
  * Needs the RECORD_AUDIO permission, and a foreground service of the microphone type to go on with the screen off.
  */
-class AndroidRecorder(
-    private val fileSystem: FileSystem = FileSystem.SYSTEM,
-    /** FLAC's compression level for a FLAC recording, read when it starts. */
-    private val flacLevel: () -> Int = { 5 },
-) : AudioRecorder {
+class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : AudioRecorder {
     private val position = MutableStateFlow(0L)
     private val meter = MutableStateFlow(0f)
     override val positionMillis: StateFlow<Long> = position
@@ -38,7 +34,7 @@ class AndroidRecorder(
         check(record == null) { "Already recording" }
         sink = when (format) {
             AudioFileFormat.Wav -> WavWriter(fileSystem, file)
-            AudioFileFormat.Flac -> FlacEncoder(file.toFile(), level = flacLevel())
+            AudioFileFormat.Flac -> FlacEncoder(file.toFile())
         }
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
         record = AudioRecord(

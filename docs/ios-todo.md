@@ -84,4 +84,3 @@ anything left to decide. Remove an entry once it is built.
 - Tuning: `SettingsStore.speakerTuning`/`setSpeakerTuning` (a slider on the speakers page) and the review's
   `LectureReview.tuneSpeakers()`/`applySpeakerTuning` with `ReviewState.speakerCorrections` (strings `review_tune_*`);
   `SettingsStore.segmentationModel` and `ModelCatalog.segmentationModels` (DiariZen).
-- FLAC compression level: `SettingsStore.flacLevel` (0–8), the slider under the audio format (strings `settings_flac_*`).

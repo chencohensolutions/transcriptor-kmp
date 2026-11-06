@@ -58,7 +58,3 @@ Settings.
   phone (picked); a — one page, a row per job, b — a catalog, c — set up for you, b2, b3.
 - [Round 2 (Nov 6, 2026)](../ux-history/models/2026-11-06-models-in-one-place.md): b — a page per language (picked); a — a
   Transcription section with a row per language and job.
-
-- **FLAC compression effort** (owner's request, Nov 6, 2026): under the audio format, when it uses FLAC, a slider from 0
-  ("Faster") to 8 ("Smaller files"), Android's default 5 (`SettingsStore.flacLevel`). It applies to the next recording
-  and the next compression after one. The size difference is a few percent.
