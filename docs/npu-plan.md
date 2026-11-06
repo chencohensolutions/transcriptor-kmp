@@ -166,7 +166,7 @@ credit, what was changed, the sha256 of every file); Qualcomm's runtime librarie
 |---|---|---|---|
 | [sherpa-onnx-qnn-android](https://huggingface.co/hencohen83/sherpa-onnx-qnn-android) (the AAR and our patch) | be1e2340 | Apache-2.0 | `build.gradle.kts` downloads it |
 | [ivrit-whisper-large-v3-turbo-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-turbo-qnn-sm8750) | d5997a96 | Apache-2.0 | `ivritTurboNpu` |
-| [ivrit-whisper-large-v3-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750) (16-bit) | (uploading) | Apache-2.0 | `ivritLargeV3Npu` |
+| [ivrit-whisper-large-v3-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750) (16-bit) | a5c541a9 | Apache-2.0 | `ivritLargeV3Npu` |
 | [wespeaker-resnet293-lm-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-resnet293-lm-qnn-sm8750) | 75258f7a | CC-BY-4.0 | `voicePrintsResNet293`, downloadable |
 | [wespeaker-samresnet100-voxblink2-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-samresnet100-voxblink2-qnn-sm8750) | 337cffaa | CC-BY-NC-SA-4.0 | copied by hand (non-commercial) |
 | [diarizen-wavlm-base-s80-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750) | 4e87d479 | CC-BY-NC-4.0 | copied by hand |

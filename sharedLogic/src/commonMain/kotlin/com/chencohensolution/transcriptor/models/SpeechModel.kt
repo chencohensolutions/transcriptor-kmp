@@ -129,7 +129,7 @@ object ModelCatalog {
     // ivritLargeV3 (commit 766847c9) compiled the same way, for the refine pass only: 16-bit weights
     // (`--float_bitwidth 16`; at 32-bit the encoder's library is over 2 GB and won't link) and no ONNX simplification
     // (it fails on graphs over 2 GB). Not published yet (Nov 5, 2026): copied to the phone by hand.
-    private const val LARGE_NPU_SM8750 = "https://huggingface.co/HF_USER/ivrit-whisper-large-v3-qnn-sm8750/resolve/COMMIT"
+    private const val LARGE_NPU_SM8750 = "https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750/resolve/a5c541a9ce0ea9b8fa4754808d5f6ab8720353bc"
     val ivritLargeV3Npu = SpeechModel(
         id = "ivrit-whisper-large-v3-npu-sm8750",
         name = "ivrit.ai Whisper large-v3 · NPU",
