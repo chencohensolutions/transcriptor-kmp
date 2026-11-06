@@ -94,15 +94,6 @@ class RecordingTest {
     }
 
     @Test
-    fun flacCompressesAtLevelFiveUntilChangedWithinZeroToEight() {
-        assertEquals(5, settings.flacLevel)
-        settings.flacLevel = 1
-        assertEquals(1, SettingsStore(fs, root).flacLevel)
-        settings.flacLevel = 12
-        assertEquals(8, SettingsStore(fs, root).flacLevel)
-    }
-
-    @Test
     fun theOldSpeakerSwitchNoLongerRunsThePassOnStop() {
         fs.createDirectories(root)
         fs.write(root / "settings.json") { writeUtf8("""{"v":1,"audioFormat":"wav","afterLecture":true,"findSpeakersOnStop":true}""") }
@@ -279,5 +270,14 @@ class LiveRecordingTest {
         assertEquals(listOf("line 1", "line 2"), stopped.segments.map { it.text })
         assertEquals(listOf("line 1", "line 2"), store.load("psych", lecture.id)?.segments?.map { it.text })
         assertTrue(engine.closed)
+    }
+
+    @Test
+    fun flacCompressesAtLevelFiveUntilChangedWithinZeroToEight() {
+        assertEquals(5, settings.flacLevel)
+        settings.flacLevel = 1
+        assertEquals(1, SettingsStore(fs, root).flacLevel)
+        settings.flacLevel = 12
+        assertEquals(8, SettingsStore(fs, root).flacLevel)
     }
 }
