@@ -69,6 +69,16 @@ CPU and battery. Worth it only if step 0 shows the live model costs enough.
 pyannote segmentation 3.0 and CAM++ are small; check whether sherpa-onnx's speaker diarization accepts a QNN
 provider before spending time.
 
+**Done for the larger voice-print models (Nov 6, 2026).** sherpa-onnx had no QNN speaker path. Our patch adds one
+(`SpeakerEmbeddingExtractorQnnImpl`): fixed-length graphs, any length covered by windows. The extractor and the
+speaker pass both use it.
+- **SimAM-ResNet100 on the S25's NPU:** 16 ms per 1.5 s print, 29 ms per 3 s, 59 ms per 6 s. Its prints match the
+  CPU model (cosine ≥ 0.99996).
+- **On the CPU (Mac, one thread):** about 0.3 s per second of audio.
+- **CAM++ and segmentation** stay on the CPU: they are small (CAM++ 0.02 s per second of audio).
+
+See design.md (Speakers) and npu-build.md.
+
 ### 5. In the app
 
 - Choose per phone: `ro.soc.model` = SM8750 and the QNN libraries load → NPU build; otherwise the CPU models as

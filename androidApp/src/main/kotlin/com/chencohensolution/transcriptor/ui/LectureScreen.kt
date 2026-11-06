@@ -71,6 +71,7 @@ import androidx.compose.material3.TextButton
 import com.chencohensolution.transcriptor.notebook.TimelineEntry
 import com.chencohensolution.transcriptor.notebook.timelineOf
 import com.chencohensolution.transcriptor.recording.LiveLectureState
+import com.chencohensolution.transcriptor.recording.ModelInUse
 import kotlinx.coroutines.launch
 
 class LiveLectureActions(
@@ -168,12 +169,15 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                             state.liveLoading -> stringResource(R.string.lecture_live_loading, model)
                             else -> stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)
                         }
-                        CompositionLocalProvider(LocalLayoutDirection provides appDirection) { Text(
-                            status,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (state.liveError != null) MaterialTheme.colorScheme.error else colors.time,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        ) }
+                        CompositionLocalProvider(LocalLayoutDirection provides appDirection) { Column {
+                            Text(
+                                status,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (state.liveError != null) MaterialTheme.colorScheme.error else colors.time,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                            if (!state.finishing) ModelsInUse(state)
+                        } }
                     }
                     items(entries, key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
                         when (entry) {
@@ -341,5 +345,32 @@ private fun NoteBar(state: LiveLectureState, actions: LiveLectureActions) {
                 enabled = text.isNotBlank(),
             ) { Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.lecture_save_note)) }
         }
+    }
+}
+
+/**
+ * The other models the recording uses, under the live model's line: the voice-print model and where it runs (the NPU,
+ * the CPU, or the CPU because its NPU build failed), and the speaker pass after Stop.
+ */
+@Composable
+private fun ModelsInUse(state: LiveLectureState) {
+    val prints = state.voicePrints ?: return
+    val runs = when (prints.runs) {
+        ModelInUse.Runs.NotYet -> stringResource(R.string.lecture_model_first_line)
+        ModelInUse.Runs.Npu -> stringResource(R.string.lecture_model_npu)
+        ModelInUse.Runs.Cpu -> stringResource(R.string.lecture_model_cpu)
+        ModelInUse.Runs.CpuAfterNpuFailed -> stringResource(R.string.lecture_model_npu_failed)
+    }
+    val lines = listOfNotNull(
+        stringResource(R.string.lecture_speakers_model, isolated(prints.name), runs),
+        if (state.speakerPassOnStop) stringResource(R.string.lecture_speaker_pass_on_stop, isolated(prints.name)) else null,
+    )
+    for (line in lines) {
+        Text(
+            line,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (prints.runs == ModelInUse.Runs.CpuAfterNpuFailed) MaterialTheme.colorScheme.error else LocalTranscriptorColors.current.time,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
     }
 }

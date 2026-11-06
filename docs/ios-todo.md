@@ -52,6 +52,15 @@ anything left to decide. Remove an entry once it is built.
 - Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
   dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,
   strings `speaker_*`. Voice prints on iOS: sherpa-onnx's iOS build with the same CAM++ model, as a `VoiceEmbedder`.
+- The voice-print model picked (Nov 6, 2026): `SettingsStore.voiceModel`, `ModelCatalog.voicePrintModels`, each
+  model's `VoicePrintThresholds` (pass `sameSpeaker` and the model id to `SpeakerTracker`/`SpeakerPass`, `clustering`
+  to the diarizer), and `VoiceStore`'s model provider (prints per model). Android: `Recording.voiceModel`,
+  `voiceEmbedder`, `SherpaDiarizer`; the Speakers page in `ModelsScreen.kt` (`useVoicePrints`, strings
+  `models_badge_speakers`, `models_use_for_speakers`, `models_by_hand`). The NPU builds are Android-only. On iOS the
+  WeSpeaker models run on the CPU, or later on Core ML.
+- The recording screen's models in use: `LiveLectureState.voicePrints` (`ModelInUse`, its `runs` set when the
+  voice-print model loads, from `LiveModel.voicePrints`) and `speakerPassOnStop`; strings `lecture_speakers_model`,
+  `lecture_model_*`, `lecture_speaker_pass_on_stop`; Android's `ModelsInUse` in `LectureScreen.kt`.
 - Lecture, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
   `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
   `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings

@@ -83,6 +83,29 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
   keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
   start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
+- **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live
+  labels and the speaker pass; a change applies from the next lecture or speaker pass (`SettingsStore.voiceModel`,
+  `Recording.voiceModel`). CAM++ stays the default.
+  - **The choices** (`ModelCatalog.voicePrintModels`):
+    - CAM++, CPU.
+    - 3D-Speaker ERes2NetV2 (Apache-2.0, downloadable), CPU.
+    - WeSpeaker ResNet293-LM (CC-BY-4.0).
+    - WeSpeaker SimAM-ResNet100, VoxBlink2 + VoxCeleb2 (CC-BY-NC-SA-4.0, non-commercial).
+
+    The two WeSpeaker models are copied to the phone by hand (`SpeechModel.manual`, listed once their folder has `.ok`),
+    with `feature_normalize_type=global-mean` added to their ONNX. sherpa-onnx's release lacks it, and without the mean
+    normalization WeSpeaker trains with, ResNet293's EER on the owner's lectures was 31.8% instead of 18.2%.
+  - **On the NPU:** on the Snapdragon 8 Elite they run on the NPU when their folder has the NPU build (`t150.bin`,
+    `t300.bin`, `t600.bin`; [npu-build.md](npu-build.md)). sherpa-onnx's extractor windows any length over those
+    graphs; if the NPU fails, the same model runs on the CPU (`SherpaVoiceEmbedder`, `SherpaDiarizer`). ResNet100 on
+    the NPU takes 16 ms per 1.5 s print.
+  - **Thresholds:** each model has its own (`VoicePrintThresholds`): the tracker's cosine and the speaker pass's
+    clustering distance, set from an A/B on the owner's lectures (`build/speaker-ab/results.md`, not in git).
+  - **Saved voices:** `voices.json` keeps a print per model (`"model"`; prints saved before are CAM++'s). Only the
+    picked model's prints are compared; a voice without one is learned again the next time it is named.
+  - **The A/B (Nov 6):** lines of three lectures, same-vs-different-speaker EER.
+    - ResNet100 + mean normalization 17.9%, ResNet293 + mean normalization 18.2%, CAM++ 21.0%, ERes2NetV2 23.1%.
+    - The labels were CAM++'s own (no line was edited), so this favors CAM++.
 - Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
   speech (two at once) gets one speaker, the louder.
 

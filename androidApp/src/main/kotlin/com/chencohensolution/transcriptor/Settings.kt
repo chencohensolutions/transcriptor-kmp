@@ -75,6 +75,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
+        voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
+        npuVoiceModels = remember(statuses) {
+            speakerModels.filter { it.kind == ModelKind.SpeakerEmbedding && statuses[it.id] == ModelStatus.Ready && Recording.voicePrintFiles(it).npu.isNotEmpty() }
+                .map { it.id }.toSet()
+        },
     )
     val io = { work: () -> Unit -> scope.launch(Dispatchers.IO) { work(); changed++ }; Unit }
     ModelsScreen(
@@ -86,6 +91,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             delete = { m -> io { Recording.models.delete(m) } },
             useLive = { l, m -> io { Recording.settings.setLiveModel(l, m.id) } },
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
+            useVoicePrints = { m -> io { Recording.settings.voiceModel = m.id } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },

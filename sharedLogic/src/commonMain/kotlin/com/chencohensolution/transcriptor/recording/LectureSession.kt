@@ -31,10 +31,16 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * The live model for a lecture: its name, for the screen, the transcriber running it, and the speakers it tells apart
- * (null without a voice-print model).
+ * The live model for a lecture: its name, for the screen, the transcriber running it, the speakers it tells apart
+ * (null without a voice-print model), and the voice-print model with where it runs once loaded ([voicePrints]; the
+ * platform sets [ModelInUse.runs] when it loads it).
  */
-class LiveModel(val name: String, val transcriber: LiveTranscriber, val speakers: SpeakerTracker? = null)
+class LiveModel(
+    val name: String,
+    val transcriber: LiveTranscriber,
+    val speakers: SpeakerTracker? = null,
+    val voicePrints: MutableStateFlow<ModelInUse>? = null,
+)
 
 /**
  * Recording one lecture: the microphone to the audio file ([AudioRecorder]), the lines from live transcription
@@ -52,6 +58,8 @@ class LectureSession(
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** The notebooks' known voices: speakers the user named, labeled by name in later lectures. */
     private val voices: VoiceStore? = null,
+    /** The speaker pass's models are on the phone (it can run after Stop). */
+    private val speakerPassReady: () -> Boolean = { false },
     /**
      * Starts live transcription for a language, with the voices the notebook knows; null when no live model is
      * downloaded for it.
@@ -80,6 +88,8 @@ class LectureSession(
                     partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else level,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
+                    voicePrints = liveModel?.voicePrints?.value,
+                    speakerPassOnStop = liveModel?.voicePrints != null && settings.findSpeakersOnStop && speakerPassReady(),
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -149,9 +159,10 @@ class LectureSession(
         names = names + (id to clean)
         recording.update { it?.copy(lecture = it.lecture.copy(speakers = named(it.lecture.speakers))) }
         saveNow()
-        val print = liveModel?.speakers?.print(id) ?: return
+        val tracker = liveModel?.speakers ?: return
+        val print = tracker.print(id) ?: return
         if (old.isNotEmpty() && old != clean) voices?.rename(r.lecture.notebookId, old, clean)
-        voices?.save(r.lecture.notebookId, Voice(clean, print))
+        voices?.save(r.lecture.notebookId, Voice(clean, print, tracker.model))
     }
 
     /** A note pinned to [atMillis]: the position in the audio when the user started typing it. */
@@ -187,7 +198,7 @@ class LectureSession(
             val tracker = liveModel?.speakers
             if (tracker != null && voices != null) {
                 for (s in recording.value!!.lecture.speakers) {
-                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it)) }
+                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it, tracker.model)) }
                 }
             }
         }

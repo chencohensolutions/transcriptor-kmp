@@ -47,6 +47,8 @@ private data class SettingsFileV1(
     val lectureFolder: String? = null,
     /** The user was asked to pick the lectures folder (and said not now). */
     val lectureFolderAsked: Boolean = false,
+    /** The voice-print model picked for speaker labels (its id); null: the catalog's default (CAM++). */
+    val voiceModel: String? = null,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -98,6 +100,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var lectureFolderAsked: Boolean
         get() = read().lectureFolderAsked
         set(value) = write(read().copy(lectureFolderAsked = value))
+
+    /**
+     * The voice-print model picked for speaker labels (live and the speaker pass); null: the default. Read when a
+     * lecture or a speaker pass starts, so a change applies to the next one.
+     */
+    var voiceModel: String?
+        get() = read().voiceModel
+        set(value) = write(read().copy(voiceModel = value))
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
     fun liveModel(language: String): String? = read().liveModels[language]

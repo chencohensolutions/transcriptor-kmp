@@ -34,6 +34,9 @@ import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.recording.ModelInUse
+import com.chencohensolution.transcriptor.speech.VoicePrintFiles
+import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
 import com.chencohensolution.transcriptor.review.AndroidAudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.speech.RecordingAudio
@@ -224,7 +227,7 @@ object Recording {
      * model or enough of their speech. Reads the recording: not on the main thread for long lectures.
      */
     fun printOf(lecture: Lecture, speakerId: String): List<Float>? {
-        if (!models.isReady(ModelCatalog.voicePrints)) return null
+        val model = voiceModel ?: return null
         val path = store.audioPath(lecture)
         val audio = com.chencohensolution.transcriptor.speech.FloatBuilder()
         for (line in lecture.segments.filter { it.speakerId == speakerId }.sortedByDescending { it.endMillis - it.startMillis }) {
@@ -232,11 +235,27 @@ object Recording {
             audio.add(RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, line.startMillis, line.endMillis))
         }
         if (audio.size < SpeakerLabeler.MIN_SAMPLES) return null
-        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        val embedder = voiceEmbedder(model)
         return try { embedder.embed(audio.toArray()).toList() } finally { embedder.close() }
     }
-    /** Both models of the speaker pass are downloaded. */
-    val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && models.isReady(ModelCatalog.voicePrints)
+
+    /**
+     * The voice-print model for speaker labels: the one picked in Settings › Models if it is on the phone, else the
+     * catalog's (CAM++) if downloaded; null without one. Read when a lecture or a speaker pass starts.
+     */
+    val voiceModel: SpeechModel?
+        get() = ModelCatalog.voicePrintModels.let { all ->
+            all.firstOrNull { it.id == settings.voiceModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
+        }
+
+    /** [model]'s files: its ONNX, and its NPU build on the phone it was compiled for. */
+    fun voicePrintFiles(model: SpeechModel) = VoicePrintFiles.of(models.dir(model), SherpaNpuWhisperEngine.chip)
+
+    /** [model]'s voice prints, on the NPU when it has a build for this phone (else, or if it fails, on the CPU). */
+    fun voiceEmbedder(model: SpeechModel) = SherpaVoiceEmbedder(voicePrintFiles(model), nativeLibDir)
+
+    /** Both models of the speaker pass are on the phone. */
+    val canFindSpeakers get() = models.isReady(ModelCatalog.speakerSegmentation) && voiceModel != null
 
     /**
      * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
@@ -244,11 +263,13 @@ object Recording {
      */
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
-        val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), models.file(ModelCatalog.voicePrints))
-        val embedder = SherpaVoiceEmbedder(models.file(ModelCatalog.voicePrints))
+        val model = checkNotNull(voiceModel) { "no voice-print model" }
+        val thresholds = VoicePrintThresholds.of(model.id)
+        val diarizer = SherpaDiarizer(models.file(ModelCatalog.speakerSegmentation), voicePrintFiles(model), thresholds.clustering, nativeLibDir)
+        val embedder = voiceEmbedder(model)
         try {
             RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
-                val result = SpeakerPass(diarizer, embedder).run(audio, voices.load(lecture.notebookId)) { at ->
+                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load(lecture.notebookId)) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
                 val done = lecture.withTurns(result.turns, result.speakers)
@@ -379,8 +400,9 @@ object Recording {
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
             AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            voices = VoiceStore { store.library ?: store.local }.also { voices = it },
+            voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
+            speakerPassReady = { canFindSpeakers },
         )
         compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode)
         review = LectureReview(store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf)
@@ -403,9 +425,12 @@ fun liveModelFor(language: String): SpeechModel? {
  */
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
     val model = liveModelFor(language) ?: return null
-    val prints = ModelCatalog.voicePrints
-    val tracker = if (Recording.models.isReady(prints)) SpeakerTracker(known) else null
-    val labeler = tracker?.let { t -> SpeakerLabeler(t) { SherpaVoiceEmbedder(Recording.models.file(prints)) } }
+    val prints = Recording.voiceModel
+    val tracker = prints?.let { SpeakerTracker(known, VoicePrintThresholds.of(it.id).sameSpeaker, it.id) }
+    val inUse = prints?.let { MutableStateFlow(ModelInUse(it.name)) }
+    val labeler = tracker?.let { t ->
+        SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name, e.runs) } }
+    }
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val worker = Dispatchers.Default.limitedParallelism(1)
     val transcriber = when (model.kind) {
@@ -426,7 +451,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker)
+    return LiveModel(model.name, transcriber, tracker, inUse)
 }
 
 class TranscriptorApp : Application() {

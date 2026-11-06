@@ -15,6 +15,14 @@ Settings.
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
   once, under Live. One that fails the NPU check says so and can't be picked. "Find more models for …" opens the
   catalog on the language. The lists come from `ModelChoices` (shared).
+- **Speakers** (the chip in Manage models): the voice-print models, then pyannote's segmentation.
+  - **Which models:** the catalog's voice-print models (CAM++, ERes2NetV2) are always listed. The ones copied by hand
+    (WeSpeaker ResNet293-LM, SimAM-ResNet100) are listed once their folder is on the phone, with a "Copied by hand"
+    badge and no download or delete.
+  - **Badges:** "Speakers ✓" marks the one in use. "NPU" marks one with its NPU build on this phone. A non-commercial
+    license shows in amber.
+  - **Picking:** the card's menu has "Use for speaker labels" (`ModelsActions.useVoicePrints`,
+    `SettingsStore.voiceModel`). It applies from the next lecture or speaker pass.
 - **Manage models**: chips for the languages in use and Speakers; **Add a language** finds any language Whisper knows
   by name. Each model is a card: its facts, badges (Live, Improve, NPU, Many languages, From Hugging Face, the NPU
   check), its download at the end, and a menu (delete or remove from the list, model page). A language with no models of its own says the

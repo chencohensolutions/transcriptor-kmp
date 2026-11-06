@@ -11,8 +11,11 @@ interface VoiceEmbedder : AutoCloseable {
     fun embed(samples: FloatArray): FloatArray
 }
 
-/** A person whose voice the notebook knows, from a lecture where the user named them. */
-data class Voice(val name: String, val print: List<Float>)
+/**
+ * A person whose voice the notebook knows, from a lecture where the user named them: their [print] by voice-print
+ * [model] (a model's id; empty: the one in use). Prints of different models never compare.
+ */
+data class Voice(val name: String, val print: List<Float>, val model: String = "")
 
 /**
  * Tells speakers apart during a lecture, a line at a time: each line's voice print joins the speaker whose average
@@ -20,11 +23,16 @@ data class Voice(val name: String, val print: List<Float>)
  * the user later). Voices the notebook knows come first, under their names, but join the lecture's speakers only
  * once they speak. Thread-safe: lines come from the transcription worker, renames from the UI.
  */
-class SpeakerTracker(known: List<Voice> = emptyList(), private val threshold: Float = THRESHOLD) {
+class SpeakerTracker(
+    known: List<Voice> = emptyList(),
+    private val threshold: Float = THRESHOLD,
+    /** The voice-print model whose prints it compares (its id); known voices of another model are left out. */
+    val model: String = "",
+) {
     private class Cluster(val voiceName: String?, var sum: FloatArray, var lines: Int, var id: String? = null)
 
     private val lock = SynchronizedObject()
-    private val clusters = known.map { Cluster(it.name, normalized(it.print.toFloatArray()), 1) }.toMutableList()
+    private val clusters = known.filter { model.isEmpty() || it.model.isEmpty() || it.model == model }.map { Cluster(it.name, normalized(it.print.toFloatArray()), 1) }.toMutableList()
     private var next = 1
 
     /** The lecture's speakers, in the order they first spoke; known voices with their names, others unnamed. */
@@ -77,7 +85,10 @@ class SpeakerTracker(known: List<Voice> = emptyList(), private val threshold: Fl
     fun print(id: String): List<Float>? = synchronized(lock) { clusters.firstOrNull { it.id == id }?.let { normalized(it.sum).toList() } }
 
     companion object {
-        /** Cosine similarity at which two CAM++ prints count as one speaker (same-speaker pairs are mostly above). */
+        /**
+         * Cosine similarity at which two CAM++ prints count as one speaker (same-speaker pairs are mostly above). Other
+         * models have their own ([VoicePrintThresholds]).
+         */
         const val THRESHOLD = 0.5f
 
         private fun normalized(v: FloatArray): FloatArray {

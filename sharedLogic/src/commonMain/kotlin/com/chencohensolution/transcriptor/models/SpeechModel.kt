@@ -63,6 +63,11 @@ data class SpeechModel(
     val quantizeTo: String? = null,
     /** The chips it runs on (Android's `Build.SOC_MODEL`, "SM8750"); empty for any phone. */
     val chips: List<String> = emptyList(),
+    /**
+     * Copied to the phone by hand (its folder with an empty `.ok`), not downloaded: a model the catalog may not offer
+     * (a non-commercial license) or that has no public home yet. Its files' urls are empty; it is listed once there.
+     */
+    val manual: Boolean = false,
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
 
@@ -227,6 +232,66 @@ object ModelCatalog {
         ),
     )
 
+    /** 3D-Speaker ERes2NetV2 (Chinese training, 17.8M): another voice-print model to pick. Not in [all]. */
+    val voicePrintsEres2NetV2 = SpeechModel(
+        id = "3dspeaker-eres2netv2-zh-cn",
+        name = "3D-Speaker ERes2NetV2",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "18M",
+        license = "Apache-2.0",
+        fitsLive = true,
+        source = "https://github.com/modelscope/3D-Speaker",
+        kind = ModelKind.SpeakerEmbedding,
+        files = listOf(
+            ModelFile(
+                "model.onnx",
+                "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx",
+                "bf1a75b9930474cf3389ef415e6e5d38ca96fea4a3a00f7e301d080a58ee2239", 71_441_526,
+            ),
+        ),
+    )
+
+    /**
+     * WeSpeaker ResNet293-LM (VoxCeleb, 28.6M), copied by hand: sherpa-onnx's release with `feature_normalize_type`
+     * `global-mean` added (WeSpeaker trains on mean-normalized features; without it its prints are much worse), and
+     * on the Snapdragon 8 Elite its NPU build (`t150.bin`, `t300.bin`, `t600.bin`; docs/npu-build.md). Not in [all].
+     */
+    val voicePrintsResNet293 = SpeechModel(
+        id = "wespeaker-resnet293-lm",
+        name = "WeSpeaker ResNet293-LM",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "29M",
+        license = "CC-BY-4.0",
+        fitsLive = true,
+        source = "https://github.com/wenet-e2e/wespeaker",
+        kind = ModelKind.SpeakerEmbedding,
+        files = listOf(ModelFile("model.onnx", "", "2aabeca5e19cc249b2cffe709953ca7302e7eb6477b9e2ce81ab919be7e9ddcd", 114_336_566)),
+        credit = "WeSpeaker (wenet-e2e), trained on VoxCeleb (CC-BY-4.0)",
+        manual = true,
+    )
+
+    /**
+     * WeSpeaker SimAM-ResNet100 (VoxBlink2, fine-tuned on VoxCeleb2; 50.2M), copied by hand: non-commercial
+     * (CC-BY-NC-SA-4.0, VoxBlink2's), so never offered here. The ONNX with mean normalization, and its NPU build
+     * as for [voicePrintsResNet293]. Not in [all].
+     */
+    val voicePrintsSimAmResNet100 = SpeechModel(
+        id = "wespeaker-samresnet100-voxblink2",
+        name = "WeSpeaker SimAM-ResNet100",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "50M",
+        license = "CC-BY-NC-SA-4.0",
+        fitsLive = true,
+        source = "https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md",
+        kind = ModelKind.SpeakerEmbedding,
+        files = listOf(ModelFile("model.onnx", "", "094f9d4476a61c1595a0c01bd26a9aa80d98c8b5398f2f57334a41b4e0701e0c", 201_116_099)),
+        credit = "WeSpeaker (wenet-e2e), trained on VoxBlink2 and VoxCeleb2 (CC-BY-NC-SA-4.0: not for commercial use)",
+        manual = true,
+    )
+
+    /** The voice-print models to pick from, today's default first. */
+    val voicePrintModels get() = listOf(voicePrints, voicePrintsEres2NetV2, voicePrintsResNet293, voicePrintsSimAmResNet100)
+
     /** pyannote's segmentation 3.0, for the speaker pass after the lecture (with [voicePrints]). Not in [all]. */
     val speakerSegmentation = SpeechModel(
         id = "pyannote-segmentation-3.0",
@@ -250,7 +315,7 @@ object ModelCatalog {
     val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
-    fun nameOf(id: String): String = (all + voicePrints + speakerSegmentation).firstOrNull { it.id == id }?.name ?: id
+    fun nameOf(id: String): String = (all + voicePrintModels + speakerSegmentation).firstOrNull { it.id == id }?.name ?: id
 
     /**
      * The models that know [language] and run on [chip] (the phone's): the ones made for it first, then the

@@ -24,6 +24,12 @@
     <string name="start_last">ההרצאה האחרונה: %1$s · %2$s · %3$d הערות · %4$s</string>
     <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
+    <string name="lecture_speakers_model">דוברים: %1$s · %2$s</string>
+    <string name="lecture_model_first_line">נטען עם השורה הראשונה</string>
+    <string name="lecture_model_npu">NPU</string>
+    <string name="lecture_model_cpu">CPU</string>
+    <string name="lecture_model_npu_failed">CPU (בניית ה־NPU נכשלה)</string>
+    <string name="lecture_speaker_pass_on_stop">אחרי עצירה: זיהוי דוברים, pyannote + %1$s</string>
     <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
     <string name="lecture_finishing">מסיים את השורות האחרונות…</string>
     <string name="start_live_models">תמלול חי (%1$s)</string>
@@ -130,6 +136,9 @@
     <string name="models_all_kinds">כל הסוגים</string>
     <string name="models_any_language">כל שפה</string>
     <string name="models_badge_live">חי ✓</string>
+    <string name="models_badge_speakers">דוברים ✓</string>
+    <string name="models_use_for_speakers">להשתמש לזיהוי דוברים</string>
+    <string name="models_by_hand">הועתק ידנית</string>
     <string name="models_badge_refine">שיפור ✓</string>
     <string name="models_choose_size">גודל</string>
     <string name="models_confirm_nc">הרישיון של המודל מתיר רק שימוש אישי ולימודי. להוסיף בכל זאת?</string>

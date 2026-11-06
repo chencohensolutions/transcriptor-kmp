@@ -120,6 +120,10 @@ data class ModelsState(
     /** Lectures are improved on their own after they stop (improving by hand is always on the lecture's menu). */
     val autoImprove: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
+    /** The voice-print model speaker labels use (its id; [Recording.voiceModel]); null without one. */
+    val voiceModel: String? = null,
+    /** The voice-print models with an NPU build for this phone in their folder. */
+    val npuVoiceModels: Set<String> = emptySet(),
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
@@ -145,10 +149,16 @@ data class ModelsState(
     fun refineFor(language: String): SpeechModel? = ModelChoices.running(refineModels(language), refine[language], ::ready)
 
     val added get() = models.filter { it.fromHub }
+
+    /**
+     * The speakers page: the voice-print models (the catalog's, and those copied to the phone by hand once there),
+     * then the speaker pass's segmentation.
+     */
+    val speakerPage get() = ModelCatalog.voicePrintModels.filter { !it.manual || status(it) == ModelStatus.Ready } + ModelCatalog.speakerSegmentation
 }
 
-/** The models for speaker labels (live) and the speaker pass (after): every language's. */
-val speakerModels = listOf(ModelCatalog.voicePrints, ModelCatalog.speakerSegmentation)
+/** The models for speaker labels (live) and the speaker pass (after), every one the speakers page may list. */
+val speakerModels get() = ModelCatalog.voicePrintModels + ModelCatalog.speakerSegmentation
 
 class ModelsActions(
     val back: () -> Unit = {},
@@ -157,6 +167,8 @@ class ModelsActions(
     val delete: (SpeechModel) -> Unit = {},
     val useLive: (language: String, SpeechModel) -> Unit = { _, _ -> },
     val useRefine: (language: String, SpeechModel) -> Unit = { _, _ -> },
+    /** Picks the voice-print model for speaker labels, from the next lecture or speaker pass. */
+    val useVoicePrints: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
@@ -437,7 +449,7 @@ private fun CatalogPage(state: ModelsState, actions: ModelsActions, shown: Strin
     var picking by remember { mutableStateOf(false) }
     if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); show(it); picking = false }
     val speakers = shown == SPEAKERS
-    val models = if (speakers) speakerModels else state.catalog(shown)
+    val models = if (speakers) state.speakerPage else state.catalog(shown)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -493,6 +505,8 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
     val uri = LocalUriHandler.current
     val live = language != null && state.liveFor(language) == model
     val refine = language != null && state.refineFor(language) == model
+    val voice = model.kind == ModelKind.SpeakerEmbedding
+    val speaks = voice && state.voiceModel == model.id
     ElevatedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
         Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -501,6 +515,10 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (live) Badge(stringResource(R.string.models_badge_live))
                     if (refine) Badge(stringResource(R.string.models_badge_refine))
+                    if (speaks) Badge(stringResource(R.string.models_badge_speakers))
+                    if (model.id in state.npuVoiceModels) Badge(stringResource(R.string.models_npu_long))
+                    if ("-NC" in model.license) ColoredBadge(stringResource(R.string.models_license_nc, model.license), ok = false)
+                    if (model.manual) Badge(stringResource(R.string.models_by_hand))
                     if (language == null && status == ModelStatus.Ready) Badge(stringResource(R.string.model_ready))
                     if (model.npu) Badge(stringResource(R.string.models_npu_long))
                     when (npu) {
@@ -521,7 +539,10 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (status == ModelStatus.Ready && !model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.model_delete)) }, onClick = { menu = false; actions.delete(model) })
+                    if (voice && status == ModelStatus.Ready && !speaks) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.models_use_for_speakers)) }, onClick = { menu = false; actions.useVoicePrints(model) })
+                    }
+                    if (status == ModelStatus.Ready && !model.fromHub && !model.manual) DropdownMenuItem(text = { Text(stringResource(R.string.model_delete)) }, onClick = { menu = false; actions.delete(model) })
                     if (model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.models_remove)) }, onClick = { menu = false; actions.remove(model) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.models_page)) }, onClick = { menu = false; uri.openUri(model.source) })
                 }

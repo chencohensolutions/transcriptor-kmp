@@ -27,12 +27,18 @@ fun interface AudioSource {
  * [CHUNK_SAMPLES] pieces so memory stays small; each piece is diarized, and its speakers are matched to the others' and
  * to the voices the notebook knows by voice print (a [SpeakerTracker]), so a named voice keeps its name.
  */
-class SpeakerPass(private val diarizer: Diarizer, private val embedder: VoiceEmbedder) {
+class SpeakerPass(
+    private val diarizer: Diarizer,
+    private val embedder: VoiceEmbedder,
+    /** [embedder]'s model (its id) and the cosine at which its prints count as one speaker ([VoicePrintThresholds]). */
+    private val model: String = "",
+    private val threshold: Float = SpeakerTracker.THRESHOLD,
+) {
 
     class Result(val turns: List<Turn>, val speakers: List<Speaker>, val tracker: SpeakerTracker)
 
     fun run(audio: AudioSource, known: List<Voice>, progress: (millis: Long) -> Unit = {}): Result {
-        val tracker = SpeakerTracker(known)
+        val tracker = SpeakerTracker(known, threshold, model)
         val turns = mutableListOf<Turn>()
         var offset = 0L
         while (true) {

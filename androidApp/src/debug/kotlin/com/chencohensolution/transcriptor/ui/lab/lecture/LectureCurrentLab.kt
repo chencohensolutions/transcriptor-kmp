@@ -52,6 +52,10 @@ private fun rememberLiveLectureLab(): Pair<LiveLectureState, LiveLectureActions>
         paused = paused,
         liveModelName = "ivrit.ai turbo",
         lagMillis = 1_800,
+        voicePrints = com.chencohensolution.transcriptor.recording.ModelInUse(
+            "WeSpeaker SimAM-ResNet100", com.chencohensolution.transcriptor.recording.ModelInUse.Runs.Npu,
+        ),
+        speakerPassOnStop = true,
     )
     val actions = LiveLectureActions(
         pauseOrResume = { paused = !paused },
