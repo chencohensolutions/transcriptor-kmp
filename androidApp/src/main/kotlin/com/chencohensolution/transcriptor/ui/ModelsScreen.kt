@@ -821,13 +821,26 @@ private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, 
             if (hub.searching) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp)) }
             hub.error?.let { item { Text(stringResource(R.string.models_search_failed, it), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(20.dp)) } }
             items(hub.results, key = { it.repo }) { m -> HubRow(m, state) { open = m } }
-            if (!hub.searching && hub.error == null) {
+            // Every other match, greyed, with why the app can't use it: a search shows what Hugging Face found.
+            if (!hub.searching && hub.error == null && hub.others.isNotEmpty()) {
                 item {
                     Text(
-                        if (hub.results.isEmpty()) stringResource(R.string.models_none, hub.unusable)
-                        else stringResource(R.string.models_unusable, hub.unusable),
-                        style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                        stringResource(R.string.models_others, hub.others.size), style = MaterialTheme.typography.labelMedium,
+                        color = LocalTranscriptorColors.current.time, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 4.dp),
+                    )
+                }
+                items(hub.others, key = { "other:" + it.repo }) { o ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)) {
+                        Text(isolated(o.repo), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        Text(o.reason, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+                    }
+                }
+            }
+            if (!hub.searching && hub.error == null && hub.results.isEmpty() && hub.others.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.models_none, hub.unusable), style = MaterialTheme.typography.bodySmall,
+                        color = LocalTranscriptorColors.current.time, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     )
                 }
             }

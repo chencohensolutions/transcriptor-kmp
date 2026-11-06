@@ -114,7 +114,15 @@ data class HubSearch(
     /** Repos that matched but have no files the app's engines read (PyTorch, safetensors, ncnn…). */
     val unusable: Int = 0,
     val error: String? = null,
+    /** Every other repo that matched, with why the app can't use it here: listed, not hidden. */
+    val others: List<HubOther> = emptyList(),
 )
+
+/** A search result the app can't run (or that the filters leave out), and why ([HubClient.whyNot]). */
+data class HubOther(val repo: String, val reason: String, val downloads: Int)
+
+/** A search's results: what the app can run ([models]), and every other repo that matched ([others]). */
+data class HubResults(val models: List<HubModel>, val unusable: Int, val others: List<HubOther>)
 
 /** Added from Hugging Face (its id says so). */
 val SpeechModel.fromHub get() = id.startsWith("hf:")
@@ -129,20 +137,47 @@ class HubClient(private val fetch: suspend (url: String) -> String) {
      * [chip]'s NPU when [npuOnly]; with how many matched but can't be read. A blank query looks for whisper.cpp
      * files, sherpa-onnx models and NPU builds.
      */
-    suspend fun search(query: String, language: String?, kind: HubKind?, npuOnly: Boolean, chip: String?): Pair<List<HubModel>, Int> = coroutineScope {
+    suspend fun search(query: String, language: String?, kind: HubKind?, npuOnly: Boolean, chip: String?): HubResults = coroutineScope {
         val terms = query.trim().ifBlank { null }?.let { listOf(it) } ?: defaultTerms(kind)
-        val found = terms.flatMap { parseSearch(fetch("$API/models?search=${encode(it)}&limit=50&full=true")) }.distinctBy { it.id }
+        val found = terms.flatMap { parseSearch(fetch("$API/models?search=${encode(it)}&limit=$LIMIT&full=true")) }.distinctBy { it.id }
         val readable = found.filter { classify(it.id, it.files, it.tags) != null }
-        val details = readable.take(MAX_READ).map { s -> async { runCatching { hubModel(s, parseRepo(fetch("$API/models/${s.id}/revision/main?blobs=true"))) }.getOrNull() } }
-        val models = details.mapNotNull { it.await() }.filter { m ->
+        val details = readable.take(MAX_READ).map { s -> async { s to runCatching { hubModel(s, parseRepo(fetch("$API/models/${s.id}/revision/main?blobs=true"))) }.getOrNull() } }
+            .map { it.await() }
+        val read = details.mapNotNull { it.second }
+        val (models, filtered) = read.partition { m ->
             (kind == null || m.kind == kind) && (language == null || m.knows(language)) && (!npuOnly || (m.npu != null && m.fits(chip)))
-        }.sortedByDescending { it.likes }
-        models to (found.size - readable.size)
+        }
+        val others = found.filter { classify(it.id, it.files, it.tags) == null }.map { HubOther(it.id, whyNot(it.id, it.files, it.tags), it.downloads) } +
+            filtered.map { HubOther(it.repo, FILTERED, it.downloads) } +
+            readable.drop(MAX_READ).map { HubOther(it.id, NOT_READ, it.downloads) } +
+            details.filter { it.second == null }.map { HubOther(it.first.id, NOT_READ, it.first.downloads) }
+        HubResults(models.sortedByDescending { it.likes }, found.size - readable.size, others.sortedByDescending { it.downloads })
     }
 
     companion object {
         const val API = "https://huggingface.co/api"
-        private const val MAX_READ = 20
+        private const val MAX_READ = 30
+
+        /** How many repos a search asks for: enough that a short word ("wespeak") still finds the less popular ones. */
+        private const val LIMIT = 200
+
+        const val FILTERED = "Another kind, language or chip than the filters"
+        const val NOT_READ = "Not read: refine the search"
+
+        /** Why the app can't run a repo, from its files, name and tags. */
+        fun whyNot(id: String, files: List<String>, tags: List<String>): String {
+            val top = files.filter { '/' !in it }.map { it.lowercase() }
+            val text = (id + " " + tags.joinToString(" ")).lowercase()
+            return when {
+                "mlx" in text -> "MLX (Apple) format"
+                "coreml" in text || top.any { it.endsWith(".mlpackage") || it.endsWith(".mlmodelc") } -> "Core ML (Apple) format"
+                top.any { it.endsWith(".gguf") } -> "GGUF format"
+                top.any { it.endsWith(".onnx") } -> "ONNX without sherpa-onnx's model information"
+                top.any { it.endsWith(".safetensors") || it.endsWith(".bin") || it.endsWith(".pt") || it.endsWith(".ckpt") } -> "PyTorch / safetensors only"
+                top.isEmpty() || top.all { it.startsWith(".") || it.endsWith(".md") || it.endsWith(".json") || it.endsWith(".txt") } -> "No model files"
+                else -> "A format the app doesn't run"
+            }
+        }
 
         /** What a blank query looks for: a speaker kind's repos by their names, else speech models' files and NPU builds. */
         internal fun defaultTerms(kind: HubKind?) = when (kind) {

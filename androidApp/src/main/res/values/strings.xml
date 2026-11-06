@@ -269,4 +269,5 @@
     <string name="review_power">Power: %1$.1f W avg, %2$.0f mWh/min, %3$s °C</string>
     <string name="review_power_charging">Power: not measured (on the charger)</string>
     <string name="models_npu_retry">Try again</string>
+    <string name="models_others">Also found, not usable here (%1$d)</string>
 </resources>

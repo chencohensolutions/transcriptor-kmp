@@ -173,10 +173,10 @@ class HubTest {
         assertEquals(2, unusable)
         assertTrue(asked.first().contains("search=whisper%20hebrew"))
 
-        assertEquals(listOf("ggerganov/whisper.cpp", npuId), hub.search("x", "he", null, false, "SM8750").first.map { it.repo })
-        assertEquals(listOf(zipId), hub.search("x", null, HubKind.Streaming, false, "SM8750").first.map { it.repo })
-        assertEquals(listOf(npuId), hub.search("x", null, null, npuOnly = true, chip = "SM8750").first.map { it.repo })
-        assertEquals(emptyList(), hub.search("x", null, null, npuOnly = true, chip = "SM8650").first)
+        assertEquals(listOf("ggerganov/whisper.cpp", npuId), hub.search("x", "he", null, false, "SM8750").models.map { it.repo })
+        assertEquals(listOf(zipId), hub.search("x", null, HubKind.Streaming, false, "SM8750").models.map { it.repo })
+        assertEquals(listOf(npuId), hub.search("x", null, null, npuOnly = true, chip = "SM8750").models.map { it.repo })
+        assertEquals(emptyList(), hub.search("x", null, null, npuOnly = true, chip = "SM8650").models)
     }
 
     @Test
@@ -292,5 +292,13 @@ class HubTest {
         assertNull(classify("someone/diarizen-wavlm-base-s80", listOf("model.onnx"), listOf("speaker-diarization")))
         // An ONNX speaker model without an NPU build brings no .bin.
         assertEquals(emptyList(), speakerNpuFiles("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", listOf("model.onnx", "x.bin"), emptyList()))
+    }
+
+    @Test
+    fun aSearchListsWhatItCantRunWithWhy() {
+        assertEquals("MLX (Apple) format", HubClient.whyNot("mlx-community/wespeaker-voxceleb-resnet34-LM", listOf("model.safetensors"), emptyList()))
+        assertEquals("ONNX without sherpa-onnx's model information", HubClient.whyNot("Wespeaker/wespeaker-voxceleb-resnet34", listOf("voxceleb_resnet34.onnx", "README.md"), emptyList()))
+        assertEquals("PyTorch / safetensors only", HubClient.whyNot("x/y", listOf("pytorch_model.bin", "config.json"), emptyList()))
+        assertEquals("No model files", HubClient.whyNot("x/z", listOf("README.md", ".gitattributes"), emptyList()))
     }
 }

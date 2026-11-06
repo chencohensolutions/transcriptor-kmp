@@ -117,7 +117,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
                 hub = HubSearch(query, language, kind, npuOnly, searching = true, results = hub.results)
                 scope.launch {
                     hub = runCatching { Recording.hub.search(query, language, kind, npuOnly, chip) }.fold(
-                        { (found, unusable) -> hub.copy(searching = false, results = found, unusable = unusable, error = null) },
+                        { r -> hub.copy(searching = false, results = r.models, unusable = r.unusable, others = r.others, error = null) },
                         { hub.copy(searching = false, error = it.message ?: it.toString()) },
                     )
                 }
