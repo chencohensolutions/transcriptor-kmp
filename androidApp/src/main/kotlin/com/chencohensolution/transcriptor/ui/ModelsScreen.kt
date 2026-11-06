@@ -141,7 +141,7 @@ data class ModelsState(
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
 
     /** The models for [language] on this chip: the ones made for it first, then the multilingual ones. */
-    fun forLanguage(language: String) = models.filter { it.runsOn(chip) }.let { all ->
+    fun forLanguage(language: String) = models.filter { it.kind.transcribes && it.runsOn(chip) }.let { all ->
         all.filter { language in it.languages } + all.filter { SpeechModel.MULTILINGUAL in it.languages && language !in it.languages }
     }
 
@@ -162,11 +162,20 @@ data class ModelsState(
 
     val added get() = models.filter { it.fromHub }
 
-    /**
-     * The speakers page: the voice-print models (the catalog's, and those copied to the phone by hand once there),
-     * then the speaker pass's segmentation.
-     */
-    val speakerPage get() = (ModelCatalog.voicePrintModels + ModelCatalog.segmentationModels).filter { !it.manual || status(it) == ModelStatus.Ready }
+    /** The voice-print models: the catalog's (those copied by hand once they are here), then those added from Hugging Face. */
+    val voiceModels get() = ModelCatalog.voicePrintModels.filter { !it.manual || status(it) == ModelStatus.Ready } + added.filter { it.kind == ModelKind.SpeakerEmbedding }
+
+    /** The segmentation models for speaker turns, as [voiceModels]. */
+    val turnModels get() = ModelCatalog.segmentationModels.filter { !it.manual || status(it) == ModelStatus.Ready } + added.filter { it.kind == ModelKind.SpeakerSegmentation }
+
+    /** Manage models' Speakers: both. */
+    val speakerPage get() = voiceModels + turnModels
+
+    /** The voice-print model in use, when it is here. */
+    val voice get() = voiceModels.firstOrNull { it.id == voiceModel && ready(it) }
+
+    /** The segmentation model in use, when it is here. */
+    val turns get() = turnModels.firstOrNull { it.id == segmentationModel && ready(it) }
 }
 
 /** The models for speaker labels (live) and the speaker pass (after), every one the speakers page may list. */
@@ -202,8 +211,10 @@ class ModelsActions(
 
 /**
  * Settings: the languages in use, each with the model that writes it live and the one that improves its lectures;
- * a language's page picks both (the models to get under them). Then the switches after a lecture (find the speakers
- * when it stops, improve automatically), Manage models, the lectures folder and the audio. **Manage models** is the
+ * a language's page picks both (the models to get under them). Then Speaker recognition (a Voice model row, and how
+ * readily it starts a new speaker) and Speaker turns (a Turn model row): each row opens the same speaker page, its
+ * models to pick and Find more on Hugging Face. Then the switches after a lecture (find the speakers again after
+ * Stop, improve automatically), Manage models, the lectures folder and the audio. **Manage models** is the
  * catalog: per language (Add a language for any other), each model a card with its facts, badges (Live, Improve, NPU,
  * Many languages, From Hugging Face, the NPU check), its download and a menu. **Find on Hugging Face** searches for
  * models the app's engines read, filtered by language, kind and NPU builds for this phone; licenses are marked for
@@ -215,6 +226,9 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
     var page by rememberSaveable { mutableStateOf(0) }
     var shown by rememberSaveable { mutableStateOf(state.languages.first()) }
     var language by rememberSaveable { mutableStateOf<String?>(null) }
+    /** The speaker page open ([HubKind.VoicePrints] or [HubKind.SpeakerTurns]), and its Hugging Face search. */
+    var speakerJob by rememberSaveable { mutableStateOf<HubKind?>(null) }
+    var speakerHub by rememberSaveable { mutableStateOf(false) }
     val openCatalog = { l: String? -> if (l != null) shown = l; page = 1 }
     when {
         page == 2 -> {
@@ -229,7 +243,15 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
             BackHandler { language = null }
             LanguagePage(state, actions, language!!, openCatalog) { language = null }
         }
-        else -> SettingsPage(state, actions, openLanguage = { language = it }, openCatalog = { openCatalog(null) })
+        speakerJob != null && speakerHub -> {
+            BackHandler { speakerHub = false }
+            HubPage(state, hub, actions, startLanguage = null, speakerKind = speakerJob) { speakerHub = false }
+        }
+        speakerJob != null -> {
+            BackHandler { speakerJob = null }
+            SpeakerPage(state, actions, speakerJob!!, onFindMore = { speakerHub = true }) { speakerJob = null }
+        }
+        else -> SettingsPage(state, actions, openLanguage = { language = it }, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) })
     }
 }
 
@@ -240,7 +262,7 @@ const val APP_QNN = "2.40"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openCatalog: () -> Unit) {
+private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit) {
     var picking by remember { mutableStateOf(false) }
     if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); picking = false; openLanguage(it) }
     Scaffold(
@@ -278,6 +300,16 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
                 Text(stringResource(R.string.models_add_language), Modifier.padding(start = 8.dp))
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_recognition))
+            PageNote(stringResource(R.string.settings_recognition_note))
+            val voice = state.voice
+            SummaryRow(stringResource(R.string.settings_voice_model), speakerLine(voice, state)) { openSpeakers(HubKind.VoicePrints) }
+            if (voice != null) Box(Modifier.padding(horizontal = 20.dp)) { SpeakerTuning(state.speakerTuning[voice.id] ?: 0f) { actions.setSpeakerTuning(voice, it) } }
+            HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_turns))
+            PageNote(stringResource(R.string.settings_turns_note))
+            SummaryRow(stringResource(R.string.settings_turn_model), speakerLine(state.turns, state)) { openSpeakers(HubKind.SpeakerTurns) }
+            HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_after))
             SwitchRow(stringResource(R.string.settings_find_speakers), stringResource(R.string.settings_find_speakers_note), state.findSpeakersOnStop, actions.setFindSpeakersOnStop)
             SwitchRow(
@@ -313,6 +345,80 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
     }
 }
 
+/**
+ * A speaker job's page, the same for voice prints ([HubKind.VoicePrints]) and speaker turns ([HubKind.SpeakerTurns]):
+ * its note, its models to pick (the ready ones with a radio; picking marks one and stays here), the others with their
+ * download, then Find more on Hugging Face, searching that job's models.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SpeakerPage(state: ModelsState, actions: ModelsActions, job: HubKind, onFindMore: () -> Unit, onBack: () -> Unit) {
+    val voices = job == HubKind.VoicePrints
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
+                title = { Text(stringResource(if (voices) R.string.settings_recognition else R.string.settings_turns)) },
+            )
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            PageNote(stringResource(if (voices) R.string.settings_recognition_note else R.string.settings_turns_note))
+            Choices(
+                state, actions, if (voices) state.voiceModels else state.turnModels, if (voices) state.voice else state.turns,
+                text = { model, modifier -> SpeakerChoiceText(model, state, modifier) },
+                pick = if (voices) actions.useVoicePrints else actions.useSegmentation,
+            )
+            TextButton(onClick = onFindMore, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Icon(Icons.Filled.Search, null, Modifier.size(18.dp))
+                Text(stringResource(R.string.models_find_more), Modifier.padding(start = 8.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** A speaker model's line on Settings: its name and facts ("3D-Speaker CAM++ · 7M"), or a red "No model downloaded". */
+@Composable
+private fun speakerLine(model: SpeechModel?, state: ModelsState): Pair<String, Boolean> =
+    if (model == null) stringResource(R.string.settings_no_model) to true
+    else (listOf(isolated(model.name)) + speakerFacts(model, state)).joinToString(" · ") to false
+
+/** A speaker model's facts: parameters, its NPU build here, copied by hand, from Hugging Face. */
+@Composable
+private fun speakerFacts(model: SpeechModel, state: ModelsState) = listOfNotNull(
+    isolated(model.parameters).takeIf { model.parameters != "?" },
+    stringResource(R.string.models_npu_long).takeIf { model.id in state.npuVoiceModels },
+    stringResource(R.string.models_by_hand).takeIf { model.manual },
+    stringResource(R.string.models_from_hub).takeIf { model.fromHub },
+)
+
+/** A speaker model in a list to pick: its name, its facts, a non-commercial license marked. */
+@Composable
+private fun SpeakerChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(isolated(model.name.replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
+        val facts = speakerFacts(model, state)
+        if (facts.isNotEmpty()) Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if ("-NC" in model.license.uppercase()) Text(
+            stringResource(R.string.models_license_nc, model.license), style = MaterialTheme.typography.bodySmall,
+            color = LocalTranscriptorColors.current.speakers[3],
+        )
+    }
+}
+
+/** A row with a title, a summary line (red when the flag is set) and an arrow. */
+@Composable
+private fun SummaryRow(title: String, line: Pair<String, Boolean>, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(line.first, style = MaterialTheme.typography.bodySmall, color = if (line.second) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+    }
+}
+
 /** A language's page: the model that writes it live and the one that improves its lectures, each a list to pick. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -344,7 +450,11 @@ private fun LanguagePage(state: ModelsState, actions: ModelsActions, language: S
 
 /** The ready models to pick from, then the others with their download (or why one can't be picked). */
 @Composable
-private fun Choices(state: ModelsState, actions: ModelsActions, all: List<SpeechModel>, chosen: SpeechModel?, pick: (SpeechModel) -> Unit) {
+private fun Choices(
+    state: ModelsState, actions: ModelsActions, all: List<SpeechModel>, chosen: SpeechModel?,
+    text: @Composable (SpeechModel, Modifier) -> Unit = { model, modifier -> ChoiceText(model, state, modifier) },
+    pick: (SpeechModel) -> Unit,
+) {
     Column(Modifier.selectableGroup()) {
         all.filter { state.ready(it) }.forEach { model ->
             Row(
@@ -352,14 +462,14 @@ private fun Choices(state: ModelsState, actions: ModelsActions, all: List<Speech
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = chosen == model, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
-                ChoiceText(model, state)
+                text(model, Modifier)
             }
         }
         all.filter { !state.ready(it) }.forEach { model ->
             val status = state.status(model)
             Row(Modifier.fillMaxWidth().padding(start = 56.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    ChoiceText(model, state)
+                    text(model, Modifier)
                     // Downloaded but not loading on this NPU: why, under its name; it can't be picked.
                     if (status == ModelStatus.Ready) Text(
                         stringResource(if (state.npu[model.id] == NpuCheck.Checking) R.string.models_npu_checking else R.string.models_npu_fails),
@@ -579,19 +689,12 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                 }
                 model.credit?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time) }
                 if (npu is NpuCheck.Fails) Text(npu.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                if (speaks) SpeakerTuning(state.speakerTuning[model.id] ?: 0f) { actions.setSpeakerTuning(model, it) }
                 Progress(status)
             }
             DownloadControl(model, status, actions)
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (segments && status == ModelStatus.Ready && !turns) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.models_use_for_turns)) }, onClick = { menu = false; actions.useSegmentation(model) })
-                    }
-                    if (voice && status == ModelStatus.Ready && !speaks) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.models_use_for_speakers)) }, onClick = { menu = false; actions.useVoicePrints(model) })
-                    }
                     if (status == ModelStatus.Ready && !model.fromHub && !model.manual) DropdownMenuItem(text = { Text(stringResource(R.string.model_delete)) }, onClick = { menu = false; actions.delete(model) })
                     if (model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.models_remove)) }, onClick = { menu = false; actions.remove(model) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.models_page)) }, onClick = { menu = false; uri.openUri(model.source) })
@@ -636,10 +739,11 @@ private fun LanguagePicker(exclude: List<String>, onDismiss: () -> Unit, onPick:
 /** Hugging Face, searched for speech models, filtered by language, kind and this phone's NPU; a result opens its sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, startLanguage: String?, onBack: () -> Unit) {
-    var query by rememberSaveable { mutableStateOf(hub.query) }
+private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, startLanguage: String?, speakerKind: HubKind? = null, onBack: () -> Unit) {
+    // A speaker page's search: that job's models only, no language or NPU filter.
+    var query by rememberSaveable { mutableStateOf(if (speakerKind != null) "" else hub.query) }
     var language by rememberSaveable { mutableStateOf(startLanguage) }
-    var kind by rememberSaveable { mutableStateOf<HubKind?>(null) }
+    var kind by rememberSaveable { mutableStateOf(speakerKind) }
     var npuOnly by rememberSaveable { mutableStateOf(false) }
     var pickingLanguage by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<HubModel?>(null) }
@@ -650,7 +754,7 @@ private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, 
         topBar = {
             TopAppBar(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
-                title = { Text(stringResource(R.string.models_find)) },
+                title = { Text(speakerKind?.let { kindLabel(it) } ?: stringResource(R.string.models_find)) },
             )
         },
     ) { padding ->
@@ -664,7 +768,7 @@ private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, 
                     keyboardActions = KeyboardActions(onSearch = { actions.search(query, language, kind, npuOnly) }),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (speakerKind == null) LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         FilterChip(
                             selected = language != null, onClick = { pickingLanguage = true },
@@ -683,12 +787,12 @@ private fun HubPage(state: ModelsState, hub: HubSearch, actions: ModelsActions, 
                         )
                     }
                     item { FilterChip(selected = kind == null, onClick = { kind = null }, label = { Text(stringResource(R.string.models_all_kinds)) }) }
-                    items(HubKind.entries.toList()) { k ->
+                    items(HubKind.speech) { k ->
                         FilterChip(selected = kind == k, onClick = { kind = if (kind == k) null else k }, label = { Text(kindLabel(k)) })
                     }
                 }
                 Text(
-                    stringResource(R.string.models_search_note), style = MaterialTheme.typography.bodySmall,
+                    stringResource(if (speakerKind != null) R.string.models_speaker_search_note else R.string.models_search_note), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
@@ -718,6 +822,8 @@ private fun kindLabel(kind: HubKind) = stringResource(
         HubKind.SenseVoice -> R.string.models_kind_sensevoice
         HubKind.Moonshine -> R.string.models_kind_moonshine
         HubKind.Paraformer -> R.string.models_kind_paraformer
+        HubKind.VoicePrints -> R.string.models_kind_voice_prints
+        HubKind.SpeakerTurns -> R.string.models_kind_speaker_turns
     },
 )
 

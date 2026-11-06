@@ -44,9 +44,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var checking by remember { mutableStateOf(emptySet<String>()) }
     val chip = SherpaNpuWhisperEngine.chip
     val models = remember(changed) { Recording.modelLibrary.all }
+    // The catalog's speaker models and those added from Hugging Face.
+    val speakerList = remember(models) { (speakerModels + models.filter { !it.kind.transcribes }).distinctBy { it.id } }
     val statuses by produceState(emptyMap<String, ModelStatus>(), models) {
         while (true) {
-            value = withContext(Dispatchers.IO) { (models + speakerModels).associate { it.id to Recording.models.status(it) } }
+            value = withContext(Dispatchers.IO) { (models + speakerList).distinctBy { it.id }.associate { it.id to Recording.models.status(it) } }
             delay(1_000)
         }
     }
@@ -78,9 +80,9 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         npu = npu, audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
-        speakerTuning = remember(changed) { speakerModels.associate { it.id to Recording.settings.speakerTuning(it.id) } },
+        speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
         npuVoiceModels = remember(statuses) {
-            speakerModels.filter { it.kind == ModelKind.SpeakerEmbedding && statuses[it.id] == ModelStatus.Ready && Recording.voicePrintFiles(it).npu.isNotEmpty() }
+            speakerList.filter { it.kind == ModelKind.SpeakerEmbedding && statuses[it.id] == ModelStatus.Ready && Recording.voicePrintFiles(it).npu.isNotEmpty() }
                 .map { it.id }.toSet()
         },
     )

@@ -144,10 +144,8 @@
     <string name="models_any_language">Any language</string>
     <string name="models_badge_live">Live ✓</string>
     <string name="models_badge_speakers">Speakers ✓</string>
-    <string name="models_use_for_speakers">Use for speaker labels</string>
     <string name="models_by_hand">Copied by hand</string>
     <string name="models_badge_turns">Turns ✓</string>
-    <string name="models_use_for_turns">Use for live speaker turns</string>
     <string name="models_speaker_tuning">How readily it starts a new speaker</string>
     <string name="models_speaker_tuning_fewer">Fewer speakers</string>
     <string name="models_speaker_tuning_more">More speakers</string>
@@ -218,7 +216,7 @@
     <string name="settings_improve_is">Improve: %1$s</string>
     <string name="settings_improve_none">Improve: no model downloaded</string>
     <string name="settings_after">After a lecture</string>
-    <string name="settings_find_speakers">Find the speakers when it stops</string>
+    <string name="settings_find_speakers">Find the speakers again after Stop</string>
     <string name="settings_find_speakers_note">Off: speakers are found live while recording. On: the speaker pass also regroups them after Stop, in a minute or two.</string>
     <string name="settings_auto_improve">Improve automatically</string>
     <string name="settings_auto_improve_on">Each lecture is transcribed again with its improve model after it stops, while the phone charges. If it isn\'t charging, the lecture waits until the app is open on the charger.</string>
@@ -226,6 +224,17 @@
     <string name="settings_storage">Models and storage</string>
     <string name="settings_manage">Manage models</string>
     <string name="settings_manage_note">Download, delete, find on Hugging Face</string>
+    <string name="settings_recognition">Speaker recognition</string>
+    <string name="settings_recognition_note">Tells the voices apart: each line gets the speaker whose voice is closest. Name a speaker once and the notebook\'s next lectures know them.</string>
+    <string name="settings_voice_model">Voice model</string>
+    <string name="settings_turns">Speaker turns</string>
+    <string name="settings_turns_note">Finds where one speaker stops and the next starts, as you record.</string>
+    <string name="settings_turn_model">Turn model</string>
+    <string name="settings_no_model">No model downloaded</string>
+    <string name="models_find_more">Find more on Hugging Face</string>
+    <string name="models_kind_voice_prints">Voice prints</string>
+    <string name="models_kind_speaker_turns">Speaker turns</string>
+    <string name="models_speaker_search_note">Speaker models exported for sherpa-onnx; each file is one model.</string>
     <string name="settings_live_title">Live transcription</string>
     <string name="settings_live_note">Writes the lines during the lecture.</string>
     <string name="settings_improve_title">Improve transcription</string>

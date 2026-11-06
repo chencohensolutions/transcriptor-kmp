@@ -144,10 +144,8 @@
     <string name="models_any_language">כל שפה</string>
     <string name="models_badge_live">חי ✓</string>
     <string name="models_badge_speakers">דוברים ✓</string>
-    <string name="models_use_for_speakers">להשתמש לזיהוי דוברים</string>
     <string name="models_by_hand">הועתק ידנית</string>
     <string name="models_badge_turns">תורות ✓</string>
-    <string name="models_use_for_turns">להשתמש לזיהוי תורות בזמן אמת</string>
     <string name="models_speaker_tuning">כמה בקלות הוא מזהה דובר חדש</string>
     <string name="models_speaker_tuning_fewer">פחות דוברים</string>
     <string name="models_speaker_tuning_more">יותר דוברים</string>
@@ -218,7 +216,7 @@
     <string name="settings_improve_is">שיפור: %1$s</string>
     <string name="settings_improve_none">שיפור: לא הורד מודל</string>
     <string name="settings_after">אחרי הרצאה</string>
-    <string name="settings_find_speakers">זיהוי הדוברים כשהיא נעצרת</string>
+    <string name="settings_find_speakers">זיהוי הדוברים שוב אחרי העצירה</string>
     <string name="settings_find_speakers_note">כבוי: הדוברים מזוהים בזמן ההקלטה. מופעל: זיהוי הדוברים גם מקבץ אותם מחדש אחרי העצירה, תוך דקה או שתיים.</string>
     <string name="settings_auto_improve">שיפור אוטומטי</string>
     <string name="settings_auto_improve_on">כל הרצאה מתומללת שוב עם מודל השיפור שלה אחרי שהיא נעצרת, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, ההרצאה מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
@@ -226,6 +224,17 @@
     <string name="settings_storage">מודלים ואחסון</string>
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
+    <string name="settings_recognition">זיהוי דוברים</string>
+    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, וההרצאות הבאות במחברת יכירו אותו.</string>
+    <string name="settings_voice_model">מודל הקולות</string>
+    <string name="settings_turns">חילופי דוברים</string>
+    <string name="settings_turns_note">מוצא איפה דובר אחד מסיים והבא מתחיל, תוך כדי הקלטה.</string>
+    <string name="settings_turn_model">מודל החילופים</string>
+    <string name="settings_no_model">לא הורד מודל</string>
+    <string name="models_find_more">חיפוש מודלים נוספים ב-Hugging Face</string>
+    <string name="models_kind_voice_prints">טביעות קול</string>
+    <string name="models_kind_speaker_turns">חילופי דוברים</string>
+    <string name="models_speaker_search_note">מודלי דוברים שיוצאו ל-sherpa-onnx; כל קובץ הוא מודל אחד.</string>
     <string name="settings_live_title">תמלול בזמן אמת</string>
     <string name="settings_live_note">כותב את השורות במהלך ההרצאה.</string>
     <string name="settings_improve_title">שיפור התמלול</string>

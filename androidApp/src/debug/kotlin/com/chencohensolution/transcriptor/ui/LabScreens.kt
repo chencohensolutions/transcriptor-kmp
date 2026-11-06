@@ -12,7 +12,6 @@ internal val labScreens: List<LabScreen> = listOf(
     LabScreen("models", "Settings", listOf(
         modelsCurrent,
         modelsCurrentSm8750,
-        modelsOptionD2,
     )),
     LabScreen("lecture", "Lecture, while recording", listOf(
         lectureCurrent,

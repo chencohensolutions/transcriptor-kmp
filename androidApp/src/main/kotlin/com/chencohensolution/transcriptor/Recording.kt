@@ -247,7 +247,7 @@ object Recording {
      * catalog's (CAM++) if downloaded; null without one. Read when a lecture or a speaker pass starts.
      */
     val voiceModel: SpeechModel?
-        get() = ModelCatalog.voicePrintModels.let { all ->
+        get() = (ModelCatalog.voicePrintModels + addedSpeakerModels(ModelKind.SpeakerEmbedding)).let { all ->
             all.firstOrNull { it.id == settings.voiceModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
         }
 
@@ -256,9 +256,12 @@ object Recording {
      * pyannote's if downloaded; null without one (speakers are then labeled by each line's print).
      */
     val segmentationModel: SpeechModel?
-        get() = ModelCatalog.segmentationModels.let { all ->
+        get() = (ModelCatalog.segmentationModels + addedSpeakerModels(ModelKind.SpeakerSegmentation)).let { all ->
             all.firstOrNull { it.id == settings.segmentationModel && models.isReady(it) } ?: all.first().takeIf { models.isReady(it) }
         }
+
+    /** The speaker models of [kind] added from Hugging Face (Settings › Speaker recognition or turns › Find more). */
+    private fun addedSpeakerModels(kind: ModelKind) = installedModels.all().map { it.model }.filter { it.kind == kind }
 
     /** [model]'s files: its ONNX, and its NPU build on the phone it was compiled for. */
     fun voicePrintFiles(model: SpeechModel) = VoicePrintFiles.of(models.dir(model), SherpaNpuWhisperEngine.chip)
