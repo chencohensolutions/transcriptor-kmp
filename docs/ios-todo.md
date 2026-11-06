@@ -42,12 +42,12 @@ anything left to decide. Remove an entry once it is built.
 - Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and
   `MainActivity.kt` (keeping it recording, and the temporary start screen); `docs/screens/lecture.md`.
 - Shared, to call from SwiftUI: `LectureSession` (`state`, `start(notebook, title)`, `pauseOrResume()`,
-  `addNote(atMillis, text)`, `stop()`), `timelineOf(lecture)`, `SettingsStore.audioFormat`, `FlacCompression`
-  (`pending()`, `compress(lecture, progress)`).
+  `addNote(atMillis, text)`, `stop()`), `timelineOf(lecture)`, `SettingsStore.audioFormat`, `SettingsStore.flacLevel` (0–8,
+  passed to `AudioRecorder.start` and to `FlacEncode`), `FlacCompression` (`pending()`, `compress(lecture, progress)`).
 - To write in `sharedLogic/src/iosMain`: an `AudioRecorder` on `AVAudioEngine` at 48 kHz stereo 16 bit, writing with
   `AVAudioFile` (`kAudioFormatLinearPCM` for WAV, `kAudioFormatFLAC` for FLAC live), and a `FlacEncode` that converts
   the WAV with `AVAudioFile`. The app needs the background audio mode and the microphone usage description.
-- Strings: `lecture_*`, `recording_*`, `compressing_flac`, `start_*`, `format_*` in `androidApp/src/main/res/values/strings.xml`
+- Strings: `lecture_*`, `recording_*`, `compressing_flac`, `start_*`, `format_*`, `flac_effort*` in `androidApp/src/main/res/values/strings.xml`
   (Hebrew in `values-iw/`).
 - Speakers: `LiveLectureActions.renameSpeaker` → `LectureSession.renameSpeaker(id, name)`; the chip and the rename
   dialog in `LectureScreen.kt` (`SpeakerChip`, `RenameSpeakerDialog`), colors in `TranscriptorColors.speakers`,

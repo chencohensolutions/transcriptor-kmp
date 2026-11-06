@@ -36,6 +36,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val folder by Recording.folder.collectAsStateWithLifecycle()
     var changed by remember { mutableStateOf(0) }
     var format by remember { mutableStateOf(Recording.settings.audioFormat) }
+    var flacLevel by remember { mutableStateOf(Recording.settings.flacLevel) }
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
@@ -74,7 +75,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
+        npu = npu, audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
     )
     val io = { work: () -> Unit -> scope.launch(Dispatchers.IO) { work(); changed++ }; Unit }
     ModelsScreen(
@@ -87,6 +88,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             useLive = { l, m -> io { Recording.settings.setLiveModel(l, m.id) } },
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
+            setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             chooseFolder = chooseFolder,

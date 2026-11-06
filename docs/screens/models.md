@@ -9,7 +9,10 @@ Settings.
   added) with the model that writes it live and the one that improves its lectures ("Live: … / Improve: …", red when
   none is downloaded), and Add a language. **After a lecture**: Find the speakers when it stops
   (`SettingsStore.findSpeakersOnStop`), Improve automatically (`autoImprove`, off by default). **Models and storage**:
-  Manage models, the lectures folder (Choose a folder / Change), the audio format.
+  Manage models, the lectures folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
+  slider for the FLAC compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`;
+  hidden for WAV). Its note says the sound is the same at every level, and what a higher level costs: time after the
+  lecture, or the phone while recording.
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
   to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
