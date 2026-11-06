@@ -187,8 +187,8 @@ object ModelCatalog {
 
     // ivritZipformer's own checkpoint (model.pt, commit ee769a2a; not its int8 files) exported by icefall's
     // export-onnx-streaming.py (fixed shapes, chunk 64 = 1.28 s, left context 256) and compiled with QAIRT 2.40.0.251030
-    // for the Snapdragon 8 Elite's NPU, 16-bit. Not published yet (Nov 4, 2026): copied to the phone by hand until then.
-    private const val ZIPFORMER_NPU_SM8750 = "https://huggingface.co/HF_USER/zipformer2-66m-streaming-he-qnn-sm8750/resolve/COMMIT"
+    // for the Snapdragon 8 Elite's NPU, 16-bit. Published on the owner's Hugging Face (Nov 6, 2026).
+    private const val ZIPFORMER_NPU_SM8750 = "https://huggingface.co/hencohen83/zipformer2-66m-streaming-he-qnn-sm8750/resolve/284f0a333ca456ef9c4cac0c889c0b757355e13f"
     val ivritZipformerNpu = SpeechModel(
         id = "ivrit-zipformer2-66m-streaming-npu-sm8750",
         name = "ivrit.ai Zipformer streaming · NPU",

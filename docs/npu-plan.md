@@ -108,7 +108,8 @@ model library is over 2 GB: "relocation truncated to fit"). encoder.bin 1.53 GB,
 `build/qnn/out-large-SM8750/binary/`, on the phone in `…/models/ivrit-whisper-large-v3-npu-sm8750/`. Not timed or
 checked against the acceptance bar (step 4) yet.
 
-**Not published yet** (owner's decision: on the owner's Hugging Face): the three model files (encoder.bin,
+**Not published yet** (owner's decision: on the owner's Hugging Face; the Zipformer's NPU build is published, see
+below): the three model files (encoder.bin,
 decoder.bin, tokens.txt; `ModelCatalog` has their sha256) and the sherpa-onnx AAR. Until then both are built here
 and put in place by hand (the procedure: [npu-build.md](npu-build.md)):
 - **Model:** sherpa-onnx's `scripts/whisper/qnn/` export of ivrit.ai turbo (commit f33172a8) through QAIRT
@@ -146,3 +147,6 @@ often the better). **Speed: slower than the CPU** for this small model: 2.2 s ag
 stream), both far faster than real time. Likely the decoder and joiner, called for every 40 ms of audio, each paying
 the NPU's round trip; to try: the encoder on the NPU and the decoder and joiner on the CPU, and measure the battery
 before choosing it over the CPU.
+
+**Published** (Nov 6, 2026): [hencohen83/zipformer2-66m-streaming-he-qnn-sm8750](https://huggingface.co/hencohen83/zipformer2-66m-streaming-he-qnn-sm8750)
+(commit 284f0a33, public, CC-BY-4.0 with credit to Yakov Kolani and ivrit.ai). `ivritZipformerNpu` downloads from it.
