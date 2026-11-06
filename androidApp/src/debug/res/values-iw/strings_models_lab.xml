@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_lab_voices_title">מי מדבר</string>
+    <string name="models_lab_voices_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, וההרצאות הבאות במחברת יכירו אותו.</string>
+    <string name="models_lab_turns_title">חילופי דוברים בזמן ההקלטה</string>
+    <string name="models_lab_turns_note">מוצא איפה דובר אחד מסיים והבא מתחיל, תוך כדי הקלטה.</string>
+    <string name="models_lab_pass_again">זיהוי הדוברים שוב אחרי העצירה</string>
+    <string name="models_lab_npu">NPU</string>
+    <string name="models_lab_voices_is">קולות: %1$s</string>
+    <string name="models_lab_voices_none">קולות: לא הורד מודל</string>
+    <string name="models_lab_turns_is">חילופים: %1$s</string>
+    <string name="models_lab_turns_none">חילופים: לא הורד מודל</string>
+    <string name="models_lab_voice_model">מודל הקולות</string>
+    <string name="models_lab_none">לא הורד מודל</string>
+    <string name="models_lab_recognition">זיהוי דוברים</string>
+    <string name="models_lab_turns">חילופי דוברים</string>
+    <string name="models_lab_storage_row">הקלטה ואחסון</string>
+    <string name="models_lab_storage_note">שיפור אוטומטי, מודלים, תיקיית ההרצאות, שמע</string>
+</resources>

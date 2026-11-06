@@ -24,7 +24,7 @@ import kotlinx.coroutines.delay
 // those added), the Hugging Face search (no network: a second's wait, then a fixed list filtered as the app filters;
 // the repos are real but their likes, commits and sha256 are made up, lab-example/ repos are made up whole), and the NPU
 // check (three seconds, then a made-up outcome; the catalog's NPU models pass at once). To start with: Hebrew's turbo
-// and the speaker models are ready, Whisper turbo waits for Wi-Fi and Whisper large-v3 failed. `current` uses this
+// the speaker models and ResNet293 (copied by hand) are ready, Whisper turbo waits for Wi-Fi and Whisper large-v3 failed. `current` uses this
 // device's chip (none on the emulator); `current-sm8750` pretends it is a Snapdragon 8 Elite.
 internal val modelsCurrent = LabOption("current", "A page per language + the catalog (the app's)", "ModelsScreen with faked downloads, search and NPU checks") {
     ModelsLab(chip = SherpaNpuWhisperEngine.chip)
@@ -34,14 +34,19 @@ internal val modelsCurrentSm8750 = LabOption("current-sm8750", "The app's, on a 
     ModelsLab(chip = "SM8750")
 }
 
+/** The fake behind every `models` option: [screen] is drawn with its state and actions (the app's screen by default). */
 @Composable
-private fun ModelsLab(chip: String?) {
+internal fun ModelsLab(
+    chip: String?,
+    screen: @Composable (ModelsState, ModelsActions, HubSearch) -> Unit = { s, a, h -> ModelsScreen(s, a, h) },
+) {
     var statuses by remember {
         mutableStateOf(
             mapOf(
                 ModelCatalog.ivritTurbo.id to ModelStatus.Ready,
                 ModelCatalog.voicePrints.id to ModelStatus.Ready,
                 ModelCatalog.speakerSegmentation.id to ModelStatus.Ready,
+                ModelCatalog.voicePrintsResNet293.id to ModelStatus.Ready,
                 ModelCatalog.whisperTurbo.id to ModelStatus.WaitingForWifi,
                 ModelCatalog.whisperLargeV3.id to ModelStatus.Failed("download error 1008"),
             ),
@@ -53,11 +58,14 @@ private fun ModelsLab(chip: String?) {
     var refine by remember { mutableStateOf(emptyMap<String, String>()) }
     var format by remember { mutableStateOf(AudioFormat.WavThenFlac) }
     var flacLevel by remember { mutableStateOf(5) }
-    var speakers by remember { mutableStateOf(true) }
+    var speakers by remember { mutableStateOf(false) }
     var auto by remember { mutableStateOf(false) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var asked by remember { mutableStateOf<HubSearch?>(null) }
     var npu by remember { mutableStateOf(emptyMap<String, NpuCheck>()) }
+    var voiceModel by remember { mutableStateOf<String?>(ModelCatalog.voicePrints.id) }
+    var segmentation by remember { mutableStateOf<String?>(ModelCatalog.speakerSegmentation.id) }
+    var tuning by remember { mutableStateOf(emptyMap<String, Float>()) }
     val models = ModelCatalog.all + added
     val known = models + speakerModels
     LaunchedEffect(statuses.values.any { it is ModelStatus.Downloading || it == ModelStatus.Checking }) {
@@ -95,10 +103,12 @@ private fun ModelsLab(chip: String?) {
         asked = null
     }
     val download = { m: SpeechModel -> statuses = statuses + (m.id to ModelStatus.Downloading(0f)) }
-    ModelsScreen(
+    screen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
             audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto,
+            voiceModel = voiceModel, npuVoiceModels = if (chip == "SM8750") setOf(ModelCatalog.voicePrintsResNet293.id) else emptySet(),
+            speakerTuning = tuning, segmentationModel = segmentation,
         ),
         ModelsActions(
             download = download,
@@ -109,6 +119,9 @@ private fun ModelsLab(chip: String?) {
             setAudioFormat = { format = it },
             setFlacLevel = { flacLevel = it },
             setFindSpeakersOnStop = { speakers = it },
+            useVoicePrints = { voiceModel = it.id },
+            setSpeakerTuning = { m, v -> tuning = tuning + (m.id to v) },
+            useSegmentation = { segmentation = it.id },
             setAutoImprove = { auto = it },
             addLanguage = { if (it !in languages) languages = languages + it },
             search = { query, language, kind, npuOnly -> asked = HubSearch(query.trim(), language, kind, npuOnly) },
