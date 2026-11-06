@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab, lecture review option a: Improve transcription… always in the menu. -->
+<resources>
+    <string name="review_a_improve">Improve transcription…</string>
+    <string name="review_a_improving">Improving the transcription · %1$d%%</string>
+    <string name="review_a_improve_title">Improve transcription</string>
+    <string name="review_a_improve_about">%1$d min · %2$s · now: %3$s</string>
+    <string name="review_a_no_model">No model for %1$s is downloaded yet.</string>
+    <string name="review_a_get_model">Get %1$s · %2$s</string>
+    <string name="review_a_default">Default</string>
+    <string name="review_a_minutes">about %1$d min</string>
+    <string name="review_a_npu">NPU</string>
+    <string name="review_a_cpu">CPU</string>
+    <string name="review_a_speakers_first">Find the speakers first</string>
+    <string name="review_a_speakers_first_note">Improving drops the word times the speaker pass needs.</string>
+    <string name="review_a_kept">Lines you edited stay. The transcript now is kept, under Versions.</string>
+    <string name="review_a_improve_button">Improve</string>
+</resources>
