@@ -142,7 +142,7 @@ fun ReviewScreenA(state: ReviewState, improve: ImproveOptionsA, actions: ReviewA
                     }) {
                         Icon(if (editing) Icons.Filled.Check else Icons.Filled.Edit, stringResource(if (editing) R.string.review_done else R.string.review_edit_text))
                     }
-                    run {
+                    Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
@@ -409,8 +409,11 @@ private fun ImproveSheetA(state: ReviewState, improve: ImproveOptionsA, actions:
             if (improve.choices.isEmpty()) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.review_a_no_model, languageName(lecture.language)), style = MaterialTheme.typography.bodyMedium)
-                    improve.suggested?.let { (name, size) ->
-                        FilledTonalButton(onClick = { actions.getModel(); onDismiss() }) { Text(stringResource(R.string.review_a_get_model, isolated(name), size)) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_cancel)) }
+                        improve.suggested?.let { (name, size) ->
+                            Button(onClick = { actions.getModel(); onDismiss() }) { Text(stringResource(R.string.review_a_get_model, isolated(name), size)) }
+                        }
                     }
                 }
                 return@Column

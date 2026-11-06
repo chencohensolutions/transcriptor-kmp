@@ -15,8 +15,9 @@ import kotlinx.coroutines.delay
 
 // Fakes: "Improve automatically" is off (in the app today that hides Refine with…); the estimates (made up, as the
 // app would measure each model's speed on this phone); playback (a clock, no audio); the improve pass (six seconds,
-// then the large model's lines, edited lines kept); the speaker pass (four seconds). The lecture is the sample's first
-// three minutes, so the estimates are short: large-v3 takes about 0.4× the lecture's length on the NPU, 1.4× on the CPU.
+// then the large model's lines, edited lines kept); the models downloaded are those of `models a` and `b`; the speaker pass (four seconds). The lecture is the sample's first
+// three minutes, so the estimates are short: large-v3 takes about 0.4× the lecture's length on the NPU,
+// 1.4× on the CPU.
 internal val reviewA = LabOption("a", "Improve transcription… always in the menu", "A sheet: models with estimates, the Settings default picked, speakers first") {
     ReviewLabA(modelsDownloaded = true)
 }
@@ -64,12 +65,12 @@ private fun ReviewLabA(modelsDownloaded: Boolean) {
     val options = ImproveOptionsA(
         choices = if (!modelsDownloaded) emptyList() else listOf(
             ImproveChoiceA(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes(0.4), npu = true),
-            ImproveChoiceA(ModelCatalog.ivritLargeV3.id, ModelCatalog.ivritLargeV3.name, minutes(1.4), npu = false),
+            ImproveChoiceA(ModelCatalog.ivritTurboNpu.id, ModelCatalog.ivritTurboNpu.name, minutes(0.1), npu = true),
             ImproveChoiceA(ModelCatalog.ivritTurbo.id, ModelCatalog.ivritTurbo.name, minutes(0.25), npu = false),
-            ImproveChoiceA(ModelCatalog.whisperLargeV3.id, ModelCatalog.whisperLargeV3.name, null, npu = false),
+            ImproveChoiceA(ModelCatalog.whisperLargeV3.id, ModelCatalog.whisperLargeV3.name, minutes(1.4), npu = false),
         ),
         defaultId = ModelCatalog.ivritLargeV3Npu.id.takeIf { modelsDownloaded },
-        suggested = ModelCatalog.ivritLargeV3.name to modelsSize(1_660_000_000),
+        suggested = ModelCatalog.ivritLargeV3.name to modelsSize(ModelCatalog.ivritLargeV3.sizeBytes),
         offerSpeakersFirst = speakers == PassState.NotRun,
     )
     ReviewScreenA(

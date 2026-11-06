@@ -120,7 +120,8 @@ fun ModelsScreenA(state: ModelsStateA, actions: ModelsActionsA) {
 
 private fun ModelsState.candidates(language: String, job: Job) = when (job) {
     Job.Live -> liveModels(language)
-    Job.Improve -> refineModels(language)
+    // Improving transcribes again a line at a time: Whisper only, not the streaming models.
+    Job.Improve -> refineModels(language).filter { it.kind == ModelKind.Whisper || it.kind == ModelKind.WhisperNpu }
 }.let { all -> all.filter { ready(it) } + all.filter { !ready(it) } }
 
 private fun ModelsState.chosen(language: String, job: Job) = when (job) {
@@ -143,7 +144,7 @@ private fun JobRow(m: ModelsState, actions: ModelsActionsA, language: String, jo
             }
             when {
                 chosen != null -> Text(
-                    listOfNotNull(isolated(chosen.name), stringResource(R.string.models_a_on_npu).takeIf { chosen.onNpu }).joinToString(" · "),
+                    isolated(chosen.name),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 else -> Text(stringResource(R.string.models_a_none), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -192,6 +193,9 @@ private fun PickerSheet(m: ModelsState, actions: ModelsActionsA, language: Strin
                     }
                 }
             }
+            TextButton(onClick = { onDismiss(); actions.openLibrary(language) }, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                Text(stringResource(R.string.models_a_more))
+            }
             val failing = all.filter { m.status(it) == ModelStatus.Ready && !m.ready(it) }
             val rest = all.filter { m.status(it) != ModelStatus.Ready }
             if (failing.isNotEmpty() || rest.isNotEmpty()) {
@@ -217,9 +221,6 @@ private fun PickerSheet(m: ModelsState, actions: ModelsActionsA, language: Strin
                     }
                 }
             }
-            TextButton(onClick = { onDismiss(); actions.openLibrary(language) }, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Text(stringResource(R.string.models_a_more))
-            }
         }
     }
 }
@@ -227,12 +228,13 @@ private fun PickerSheet(m: ModelsState, actions: ModelsActionsA, language: Strin
 @Composable
 private fun ModelText(model: SpeechModel, m: ModelsState, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(isolated(model.name), style = MaterialTheme.typography.bodyLarge)
+        // The name's own "· NPU" stays on the line with the rest of the name.
+        Text(isolated(model.name.replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
         val facts = listOfNotNull(
-            stringResource(R.string.models_a_on_npu).takeIf { model.onNpu && m.npu[model.id] == NpuCheck.Runs },
             stringResource(R.string.models_a_streaming).takeIf { model.kind == ModelKind.StreamingTransducer || model.kind == ModelKind.StreamingTransducerNpu },
             stringResource(R.string.models_a_many).takeIf { SpeechModel.MULTILINGUAL in model.languages },
-            modelsSize(model.sizeBytes),
+            // A model to get has its size on its button.
+            modelsSize(model.sizeBytes).takeIf { m.status(model) == ModelStatus.Ready },
         )
         Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

@@ -154,7 +154,13 @@ private fun LanguagePage(m: ModelsState, actions: ModelsActionsB, language: Stri
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.models_b_improve_title))
             Note(stringResource(R.string.models_b_improve_note))
-            Choices(m, actions, m.refineModels(language), m.refineFor(language)) { actions.models.useRefine(language, it) }
+            // Improving transcribes again a line at a time: Whisper only. Models to get are listed once, under Live, when
+            // they do both.
+            val live = m.liveModels(language)
+            Choices(
+                m, actions, m.refineModels(language).filter { (it.kind == ModelKind.Whisper || it.kind == ModelKind.WhisperNpu) && (m.ready(it) || it !in live) },
+                m.refineFor(language),
+            ) { actions.models.useRefine(language, it) }
             TextButton(onClick = { actions.openLibrary(language) }, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text(stringResource(R.string.models_b_more, languageName(language)))
             }
@@ -199,12 +205,13 @@ private val SpeechModel.onNpu get() = kind == ModelKind.WhisperNpu || kind == Mo
 @Composable
 private fun ModelText(model: SpeechModel, m: ModelsState, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(isolated(model.name), style = MaterialTheme.typography.bodyLarge)
+        // The name's own "· NPU" stays on the line with the rest of the name.
+        Text(isolated(model.name.replace(" · ", "\u00A0·\u00A0")), style = MaterialTheme.typography.bodyLarge)
         val facts = listOfNotNull(
-            stringResource(R.string.models_b_on_npu).takeIf { model.onNpu && m.npu[model.id] == NpuCheck.Runs },
             stringResource(R.string.models_b_streaming).takeIf { model.kind == ModelKind.StreamingTransducer || model.kind == ModelKind.StreamingTransducerNpu },
             stringResource(R.string.models_b_many).takeIf { SpeechModel.MULTILINGUAL in model.languages },
-            modelsSize(model.sizeBytes),
+            // A model to get has its size on its button.
+            modelsSize(model.sizeBytes).takeIf { m.status(model) == ModelStatus.Ready },
         )
         Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
