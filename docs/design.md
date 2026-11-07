@@ -130,7 +130,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   `Recording.voiceModel`). CAM++ stays the default.
   - **The choices** (`ModelCatalog.voicePrintModels`):
     - CAM++, CPU.
-    - 3D-Speaker ERes2NetV2 (Apache-2.0, downloadable), CPU.
+    - 3D-Speaker ERes2NetV2 (Apache-2.0, downloadable), with its NPU build for the Snapdragon 8 Elite
+      (`hencohen83/3dspeaker-eres2netv2-qnn-sm8750`; prints match the CPU at cosine 0.99996 or more). CAM++'s NPU
+      build was dropped: its 1.5 s and 3 s graphs drift (cosine 0.94-0.98, the same on QNN's fp32 CPU backend).
     - WeSpeaker ResNet293-LM (CC-BY-4.0).
     - WeSpeaker SimAM-ResNet100, VoxBlink2 + VoxCeleb2 (CC-BY-NC-SA-4.0, non-commercial).
 
