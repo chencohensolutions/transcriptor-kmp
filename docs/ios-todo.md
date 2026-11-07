@@ -95,3 +95,12 @@ anything left to decide. Remove an entry once it is built.
   `ProcessInfo`/`task_info` CPU time; iOS gives no battery current, so the power figures are null there or
   estimated), `PowerReport` in `power.json` (`LectureStore.savePower`), `power-log.csv`
   (`LectureStore.appendPowerLog`), `ReviewState.power` and strings `review_power*`.
+- Deleting lectures (Nov 7, 2026): `NotebooksController.delete(ids, busy)` and `LectureStore.delete`; the Notebooks
+  screen's hold-to-select, the selection bar and the Undo snackbar (the files go when it closes); strings
+  `notebooks_deleted_*`, `notebooks_undo`, `notebooks_delete`, `notebooks_clear_selection`, `notebooks_selected`.
+- Fixing a line while recording: `LectureSession.editLine` (the fixes laid over live lines); the lecture screen's field
+  in place, kept above the keyboard, the list laid out from the bottom with lines gliding up and words fading in;
+  strings `lecture_edit_*`.
+- Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
+  iOS shares with `UIActivityViewController` from a temporary file. Delete lecture… on the lecture; strings
+  `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.

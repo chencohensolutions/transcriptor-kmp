@@ -270,4 +270,21 @@
     <string name="review_power_charging">צריכה: לא נמדדה (בטעינה)</string>
     <string name="models_npu_retry">לנסות שוב</string>
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
+    <string name="notebooks_deleted_one">ההרצאה נמחקה</string>
+    <string name="notebooks_deleted_many">%1$d הרצאות נמחקו</string>
+    <string name="notebooks_undo">ביטול</string>
+    <string name="notebooks_delete">מחיקה</string>
+    <string name="notebooks_clear_selection">ניקוי הבחירה</string>
+    <string name="notebooks_selected">%1$d נבחרו</string>
+    <string name="lecture_edit_still_live">ההקלטה ממשיכה: שורות חדשות נוספות למטה</string>
+    <string name="lecture_edit_cancel">ביטול</string>
+    <string name="lecture_edit_save">שמירה</string>
+    <string name="review_share_word">שיתוף כקובץ Word</string>
+    <string name="review_save_word">שמירה כקובץ Word</string>
+    <string name="review_word_saved">%1$s נשמר ליד ההקלטה</string>
+    <string name="review_delete_lecture">מחיקת ההרצאה…</string>
+    <string name="review_delete_title">למחוק את %1$s?</string>
+    <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית ההרצאות. אי אפשר לבטל את זה.</string>
+    <string name="review_delete_lecture_confirm">מחיקה</string>
+    <string name="review_delete_cancel">ביטול</string>
 </resources>

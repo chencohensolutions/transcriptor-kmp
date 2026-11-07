@@ -92,6 +92,17 @@ class NotebooksController(
         return lectures.move(lecture, notebookId).also { reload() }
     }
 
+    /**
+     * Deletes lectures for good (by id, in whichever notebook they are, or none), skipping those [busy] says are being
+     * recorded or worked on; returns the ids deleted.
+     */
+    fun delete(lectureIds: Collection<String>, busy: (String) -> Boolean = { false }): List<String> {
+        val where = _library.value.let { l -> l.notebooks.flatMap { n -> n.lectures.map { it.id to n.id } } + l.unfiled.map { it.id to UNFILED } }.toMap()
+        val deleted = lectureIds.filter { id -> !busy(id) && where[id]?.let { lectures.delete(it, id) } == true }
+        reload()
+        return deleted
+    }
+
     /** Makes a notebook and files an unfiled lecture into it. */
     fun assignToNew(lectureId: String, title: String, language: String): Lecture? = assign(lectureId, create(title, language).id)
 }

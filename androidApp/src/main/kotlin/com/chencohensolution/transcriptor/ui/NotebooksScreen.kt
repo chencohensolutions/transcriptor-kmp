@@ -1,5 +1,17 @@
 package com.chencohensolution.transcriptor.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +107,8 @@ class NotebooksActions(
     val chooseFolder: () -> Unit = {},
     /** "Not now" on the question where lectures are kept. */
     val keepInApp: () -> Unit = {},
+    /** Deletes lectures for good (their folders: recording, transcript, notes), once their Undo is gone. */
+    val delete: (lectureIds: List<String>) -> Unit = {},
 )
 
 /** What the Notebooks screen says about the lectures folder, on top of the list. */
@@ -113,10 +127,40 @@ sealed interface FolderNotice {
  * move them. At the bottom, the Record bar: it records in no notebook unless the lecture history guesses one for this
  * hour ("Usually on Monday at 10:00") or the list is narrowed to a notebook; its chip picks another, none, or a new
  * one, and the language of a lecture in no notebook. A lecture recording now replaces the bar with a way back to it.
+ *
+ * Holding a lecture selects it (round 2's b): the top bar becomes "2 selected" with ✕ and a trash can, and a tap adds
+ * or removes lectures. Delete takes them off the list at once with "2 lectures deleted · Undo"; their files go when
+ * the snackbar closes. A lecture a pass is working on can't be selected.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null) {
+fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null) {
+    // Deleted lectures leave the list at once; the files go when the snackbar closes, unless Undo brings them back.
+    var hidden by remember { mutableStateOf(emptySet<String>()) }
+    val state = all.copy(
+        notebooks = all.notebooks.map { n -> n.copy(lectures = n.lectures.filter { it.id !in hidden }) },
+        unfiled = all.unfiled.filter { it.id !in hidden },
+    )
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deletedOne = stringResource(R.string.notebooks_deleted_one)
+    val deletedMany = stringResource(R.string.notebooks_deleted_many)
+    val undo = stringResource(R.string.notebooks_undo)
+    fun deleteWithUndo(ids: List<String>) {
+        hidden = hidden + ids
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val r = snackbar.showSnackbar(if (ids.size == 1) deletedOne else deletedMany.format(ids.size), actionLabel = undo, duration = SnackbarDuration.Long)
+            if (r == SnackbarResult.ActionPerformed) hidden = hidden - ids.toSet() else actions.delete(ids)
+        }
+    }
+    var selected by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    fun toggle(id: String) {
+        if (id in state.working) return
+        selected = if (id in selected) selected - id else selected + id
+    }
+    BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
+
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
     var choosing by remember { mutableStateOf(false) }
@@ -155,11 +199,25 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
         }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = { IconButton(onClick = actions.settings) { Icon(Icons.Filled.Settings, stringResource(R.string.notebooks_settings)) } },
-            )
+            if (selected.isEmpty()) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.app_name)) },
+                    actions = { IconButton(onClick = actions.settings) { Icon(Icons.Filled.Settings, stringResource(R.string.notebooks_settings)) } },
+                )
+            } else {
+                TopAppBar(
+                    navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, stringResource(R.string.notebooks_clear_selection)) } },
+                    title = { Text(stringResource(R.string.notebooks_selected, selected.size)) },
+                    actions = {
+                        IconButton(onClick = { deleteWithUndo(selected.toList()); selected = emptySet() }) {
+                            Icon(Icons.Filled.Delete, stringResource(R.string.notebooks_delete))
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                )
+            }
         },
         bottomBar = {
             Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
@@ -278,7 +336,8 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
                     val suggestion = state.suggested[lecture.id]?.let { g -> state.notebooks.firstOrNull { it.id == g.notebookId } }
                     UnfiledRow(
                         lecture, state, suggestion,
-                        onOpen = { actions.openLecture(UNFILED, lecture.id) },
+                        onOpen = { if (selected.isEmpty()) actions.openLecture(UNFILED, lecture.id) else toggle(lecture.id) },
+                        selected = lecture.id in selected, onLongPress = { toggle(lecture.id) },
                         onMove = { suggestion?.let { actions.assign(lecture.id, it.id) } },
                         onAssign = { assigning = lecture },
                     )
@@ -290,7 +349,11 @@ fun NotebooksScreen(state: NotebooksState, actions: NotebooksActions, folder: Fo
             lectures.forEach { (group, rows) ->
                 item(key = group) { GroupTitle(stringResource(group)) }
                 items(rows, key = { (n, l) -> n.id + "/" + l.id }) { (notebook, lecture) ->
-                    LectureRow(lecture, notebook, state, onOpen = { actions.openLecture(notebook.id, lecture.id) }, showNotebook = filter == null)
+                    LectureRow(
+                        lecture, notebook, state, showNotebook = filter == null,
+                        onOpen = { if (selected.isEmpty()) actions.openLecture(notebook.id, lecture.id) else toggle(lecture.id) },
+                        selected = lecture.id in selected, onLongPress = { toggle(lecture.id) },
+                    )
                 }
             }
         }
@@ -365,10 +428,11 @@ private fun Working(progress: Float?) {
 }
 
 /** A lecture in a list: its notebook (when the list mixes them), its title in the notebook's direction, its facts. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LectureRow(lecture: LectureSummary, notebook: Notebook, state: NotebooksState, onOpen: () -> Unit, showNotebook: Boolean) {
+private fun LectureRow(lecture: LectureSummary, notebook: Notebook, state: NotebooksState, onOpen: () -> Unit, showNotebook: Boolean, selected: Boolean, onLongPress: () -> Unit) {
     val color = notebookColor(notebook.color)
-    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(Modifier.fillMaxWidth().background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).combinedClickable(onClick = onOpen, onLongClick = onLongPress).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         if (showNotebook) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.padding(end = 6.dp).size(8.dp).background(color, CircleShape))
@@ -395,9 +459,10 @@ private fun LectureRow(lecture: LectureSummary, notebook: Notebook, state: Noteb
 }
 
 /** A lecture not in a notebook: its weekday and time, and Move to the suggested notebook (or Put in a notebook). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UnfiledRow(lecture: LectureSummary, state: NotebooksState, suggestion: Notebook?, onOpen: () -> Unit, onMove: () -> Unit, onAssign: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun UnfiledRow(lecture: LectureSummary, state: NotebooksState, suggestion: Notebook?, onOpen: () -> Unit, onMove: () -> Unit, onAssign: () -> Unit, selected: Boolean, onLongPress: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).combinedClickable(onClick = onOpen, onLongClick = onLongPress).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(lecture.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Its title is its date: the weekday and time say more, and are what the suggestion goes by.
         Text(

@@ -294,4 +294,35 @@ class LiveRecordingTest {
         assertEquals(listOf("line 1", "line 2"), store.load("psych", lecture.id)?.segments?.map { it.text })
         assertTrue(engine.closed)
     }
+
+    @Test
+    fun aLineFixedWhileRecordingStaysFixedAsLiveLinesComeAndIsSaved() = runTest {
+        val engine = FakeEngine()
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 1L }) { language, scope, _ ->
+            com.chencohensolution.transcriptor.recording.LiveModel(
+                "fake",
+                com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
+            )
+        }
+        val lecture = session.start(notebook, "t")
+        recorder.advance(500, silence(500))
+        recorder.advance(3_500, tone(3_500))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        val first = assertNotNull(session.state.value).lecture.segments.single()
+        session.editLine(first.id, "  the first line, fixed  ")
+        session.editLine(first.id, " ")
+        session.editLine("no such line", "x")
+        runCurrent()
+        assertEquals(listOf("the first line, fixed"), session.state.value?.lecture?.segments?.map { it.text })
+        assertEquals(listOf(true), store.load("psych", lecture.id)?.segments?.map { it.edited })
+
+        recorder.advance(3_000, tone(3_000))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        assertEquals(listOf("the first line, fixed", "line 2"), session.state.value?.lecture?.segments?.map { it.text })
+        val stopped = assertNotNull(session.stop())
+        assertEquals(listOf("the first line, fixed", "line 2"), stopped.segments.map { it.text })
+        assertEquals(listOf(true, false), store.load("psych", lecture.id)?.segments?.map { it.edited })
+    }
 }

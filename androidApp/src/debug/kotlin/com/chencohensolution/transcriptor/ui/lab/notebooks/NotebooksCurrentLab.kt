@@ -25,7 +25,7 @@ import java.util.TimeZone
 // without a notebook: Saturday 10:05 (statistics' time, so suggested there) and Thursday 18:30 (no suggestion).
 // Recording is a clock (the banner stops it and lists the lecture, unfiled when recorded in none), filing and new
 // notebooks are in memory, a speaker pass runs on a lecture just stopped. The guess is the app's notebooksState on that
-// data, in the phone's time zone. Opening a lecture and Settings only say so.
+// data, in the phone's time zone. Opening a lecture and Settings only say so; deleting takes lectures out of memory.
 internal val notebooksCurrent = LabOption("current", "Lectures first, record now, file later (the app's)", "NotebooksScreen with lab notebooks, two unfiled lectures, Monday before class") {
     val (state, actions) = rememberNotebooksLab(now = MONDAY_BEFORE_CLASS)
     NotebooksScreen(state, actions)
@@ -99,6 +99,11 @@ private fun rememberNotebooksLab(now: Long): Pair<NotebooksState, NotebooksActio
         assign = { lectureId, notebookId -> take(lectureId)?.let { file(it, notebookId) } },
         assignToNew = { lectureId, t, l -> val n = create(t, l); take(lectureId)?.let { file(it, n.id) } },
         settings = { toast("Lab: Settings would open") },
+        delete = { ids ->
+            notebooks = notebooks.map { n -> n.copy(lectures = n.lectures.filter { it.id !in ids }) }
+            unfiled = unfiled.filter { it.id !in ids }
+            toast("Lab: deleted (the app deletes the lecture's folder)")
+        },
     )
     return state to actions
 }

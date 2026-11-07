@@ -40,6 +40,12 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 - ⋮ → Versions (n): the transcript now and every earlier one (live or refined, its model, when it was kept, its lines
   and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
   is lost. Notes belong to the lecture, not to a version.
+- Share, beside the pencil (round 3's b): one tap makes the lecture's Word file (`transcriptDocx`: the title, the
+  notebook, date and length, a paragraph per speaker turn with the name and time above it, the notes as shaded italic
+  paragraphs after their turn; right-to-left for Hebrew) and opens Android's share sheet (through the app's
+  FileProvider, from its cache). Holding it, or ⋮ → Save as Word, saves `<title>.docx` in the lecture's folder,
+  beside the recording (`LectureStore.saveWord`).
+- ⋮ → Delete lecture…, in red at the end, asks first, then closes the lecture and deletes its folder for good.
 - Every change is saved to `lecture.json` at once.
 
 ## Code
@@ -58,6 +64,7 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 
 - [Round 1 (Nov 2, 2026)](../ux-history/review/2026-11-02-after-the-lecture.md): c2 — document with the player at the bottom (picked); a — player + timeline, b — tabs, c — document + overview.
 - [Round 2 (Nov 6, 2026)](../ux-history/review/2026-11-06-improve-by-hand.md): a — Improve transcription… always in the menu, with a sheet (picked).
+- [Round 3 (Nov 6, 2026)](../ux-history/review/2026-11-06-word-export.md): b — Share as Word in the top bar, Delete lecture… in the menu (picked); a — Export as Word… sheet.
 
 - **Tune speakers on this lecture (N corrections)**, in the menu, for a lecture recorded with live speaker turns
   (owner's request, Nov 6, 2026). N is the number of lines the user gave another speaker than live did, and the item

@@ -88,6 +88,9 @@ class LectureSession(
     private var saving: Job? = null
     private var following: Job? = null
 
+    /** The lines the user fixed while recording, by line id: laid over live transcription's lines ([shown]). */
+    private var edits: Map<String, String> = emptyMap()
+
     val state: StateFlow<LiveLectureState?> =
         combine(recording, recorder.positionMillis, recorder.level, liveOutput) { r, position, level, out ->
             r?.let {
@@ -117,6 +120,7 @@ class LectureSession(
         )
         store.save(lecture)
         names = emptyMap()
+        edits = emptyMap()
         liveModel = live(notebook.language, scope, voices?.load(notebook.id).orEmpty())?.also { model ->
             val live = model.liveSpeakers
             recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
@@ -125,7 +129,7 @@ class LectureSession(
                 combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
                     liveOutput.value = out
                     val r = recording.value ?: return@collect
-                    val (lines, who) = labeled(model, out, found)
+                    val (lines, who) = shown(model, out, found)
                     if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
                         recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
                         if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
@@ -202,6 +206,34 @@ class LectureSession(
         return liveLines(out.segments, found.turns, found.settledMillis) to (model.speakers?.speakers ?: emptyList())
     }
 
+    /**
+     * The lines as the user sees them: [labeled], with the lines the user fixed ([editLine]) in their words. Live lines
+     * are made again from the model's output as it goes, so the fixes are kept apart and laid over them every time:
+     * before the lines are split by speaker (an edited line keeps its speaker split as it was, by time, not by words),
+     * and after (a fix to a piece of a split line).
+     */
+    private fun shown(model: LiveModel, out: LiveOutput, found: LiveSpeakers.State): Pair<List<Segment>, List<Speaker>> {
+        val (lines, who) = labeled(model, out.copy(segments = withEdits(out.segments)), found)
+        return withEdits(lines) to who
+    }
+
+    private fun withEdits(lines: List<Segment>): List<Segment> =
+        if (edits.isEmpty()) lines
+        else lines.map { line -> edits[line.id]?.let { text -> line.copy(text = text, edited = true, words = emptyList()) } ?: line }
+
+    /**
+     * The user's words for a finished line while recording: kept over what live transcription makes of it from now on,
+     * saved, and marked edited (the improve pass leaves it alone). Blank text changes nothing.
+     */
+    fun editLine(id: String, text: String) {
+        val clean = text.trim()
+        val r = recording.value ?: return
+        if (clean.isEmpty() || r.lecture.segments.none { it.id == id }) return
+        edits = edits + (id to clean)
+        recording.update { it?.copy(lecture = it.lecture.copy(segments = withEdits(it.lecture.segments))) }
+        saveNow()
+    }
+
     /** A note pinned to [atMillis]: the position in the audio when the user started typing it. */
     fun addNote(atMillis: Long, text: String) {
         if (text.isBlank() || recording.value == null) return
@@ -230,7 +262,7 @@ class LectureSession(
             model.transcriber.finish()
             model.liveSpeakers?.finish()
             following?.cancel()
-            val (lines, who) = labeled(model, model.transcriber.output.value, model.liveSpeakers?.state?.value ?: LiveSpeakers.State())
+            val (lines, who) = shown(model, model.transcriber.output.value, model.liveSpeakers?.state?.value ?: LiveSpeakers.State())
             recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
             // The named speakers' voices, as this whole lecture heard them, for the notebook's next lectures.
             val tracker = liveModel?.speakers

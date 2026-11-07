@@ -314,6 +314,12 @@ object Recording {
      * Files an unfiled lecture into a notebook (files: not on the main thread), and gives the notebook the voices of
      * the speakers named in it, so its next lectures label them by name.
      */
+    /** Deletes lectures for good (files: not on the main thread), except those recording, open or worked on now. */
+    fun delete(lectureIds: List<String>) {
+        val busy = busy()
+        library.delete(lectureIds) { it in busy }
+    }
+
     fun file(lectureId: String, notebookId: String) {
         val lecture = library.assign(lectureId, notebookId) ?: return
         for (speaker in lecture.speakers.filter { it.name.isNotBlank() }) {

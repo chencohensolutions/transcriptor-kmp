@@ -270,4 +270,21 @@
     <string name="review_power_charging">Power: not measured (on the charger)</string>
     <string name="models_npu_retry">Try again</string>
     <string name="models_others">Also found, not usable here (%1$d)</string>
+    <string name="notebooks_deleted_one">Lecture deleted</string>
+    <string name="notebooks_deleted_many">%1$d lectures deleted</string>
+    <string name="notebooks_undo">Undo</string>
+    <string name="notebooks_delete">Delete</string>
+    <string name="notebooks_clear_selection">Clear selection</string>
+    <string name="notebooks_selected">%1$d selected</string>
+    <string name="lecture_edit_still_live">Still recording: new lines keep coming below</string>
+    <string name="lecture_edit_cancel">Cancel</string>
+    <string name="lecture_edit_save">Save</string>
+    <string name="review_share_word">Share as Word</string>
+    <string name="review_save_word">Save as Word</string>
+    <string name="review_word_saved">Saved %1$s beside the recording</string>
+    <string name="review_delete_lecture">Delete lecture…</string>
+    <string name="review_delete_title">Delete %1$s?</string>
+    <string name="review_delete_text">Its recording, transcript and notes are deleted from the lectures folder. This can\'t be undone.</string>
+    <string name="review_delete_lecture_confirm">Delete</string>
+    <string name="review_delete_cancel">Cancel</string>
 </resources>
