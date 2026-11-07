@@ -76,6 +76,9 @@ data class SpeechModel(
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
 
+    /** It loads Qualcomm's runtime with its NPU build, so [NpuLoadGuard] watches its loads. */
+    val loadsOnNpu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
+
     /** Its NPU context binaries' size (`.bin` files other than a ggml model): what Qualcomm's runtime loads. */
     val npuBinaryBytes get() = files.filter { it.name.endsWith(".bin") && kind != ModelKind.Whisper }.sumOf { it.sizeBytes }
 

@@ -35,6 +35,7 @@
     <string name="lecture_model_first_line">with the first line</string>
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
+    <string name="lecture_model_skipped_memory">Not enough free memory now for %1$s; using %2$s. Close other apps and try again.</string>
     <string name="lecture_model_npu_failed">CPU (its NPU build failed)</string>
     <string name="lecture_speaker_pass_on_stop">After Stop: speaker pass, pyannote + %1$s</string>
     <string name="lecture_live_failed">Live transcription stopped (%1$s). Recording and notes go on.</string>

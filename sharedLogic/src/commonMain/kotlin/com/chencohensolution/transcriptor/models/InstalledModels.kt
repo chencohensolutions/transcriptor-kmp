@@ -115,6 +115,8 @@ private data class InstalledV1(
  * Loads NPU models so that one too big for the phone can't crash the app twice: a model whose load doesn't fit in
  * [freeBytes] ([needs]) is refused up front, and each load is marked in `models.json` while it runs.
  *
+ * - **Not enough free memory now:** refused for this load only ([Refused.now]); [pick] falls back to the next ready
+ *   model that fits, and the model is tried again next time (other apps may have freed memory).
  * - **A load the app didn't survive:** Android ends the app with no error to catch (the low-memory killer). The mark
  *   is then still there at the next start, and [recover] disables that model for this phone.
  * - **Disabled:** an NPU result that failed ([NpuResult]), so the model is left out of what can run
@@ -122,7 +124,25 @@ private data class InstalledV1(
  *   own; [reenable] does, when the user asks.
  */
 class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes: () -> Long) {
-    class Refused(message: String) : Exception(message)
+    /** A load refused: [now] when only for want of free memory at the moment (not disabled), else the model is disabled. */
+    class Refused(message: String, val now: Boolean = false) : Exception(message)
+
+    /** [model]'s load fits in the free memory now (any model that doesn't load on the NPU does). */
+    fun fitsNow(model: SpeechModel) = !model.loadsOnNpu || needs(model) <= freeBytes()
+
+    /** The model to load: [preferred] if it fits now, else the first of [ready] that does ([skipped]: the one passed over). */
+    data class Pick(val model: SpeechModel?, val skipped: SpeechModel? = null)
+
+    /**
+     * Picks [preferred] (or the first of [ready]) unless its NPU load doesn't fit in the free memory now; then the
+     * next of [ready] that fits, the preferred one [Pick.skipped] for this load only (not disabled: it is tried again
+     * next time).
+     */
+    fun pick(preferred: SpeechModel?, ready: List<SpeechModel>): Pick {
+        val first = preferred ?: ready.firstOrNull() ?: return Pick(null)
+        if (fitsNow(first)) return Pick(first)
+        return Pick(ready.firstOrNull { it.id != first.id && fitsNow(it) }, skipped = first)
+    }
 
     /** At start: disables the model whose load was running when the app was last killed; its id, or null. */
     fun recover(): String? {
@@ -137,11 +157,8 @@ class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes
         installed.npu(model.id)?.takeIf { !it.runs }?.let { throw Refused(it.reason ?: "Disabled on this phone") }
         val need = needs(model)
         val free = freeBytes()
-        if (need > free) {
-            val reason = "Not enough memory on this phone: needs about ${gb(need)} GB, ${gb(free)} GB free"
-            installed.setNpu(model.id, NpuResult(runs = false, reason = reason))
-            throw Refused(reason)
-        }
+        // Not enough free memory right now: refused this time only. Closing other apps may be enough.
+        if (need > free) throw Refused("Not enough free memory now: needs about ${gb(need)} GB, ${gb(free)} GB free. Close other apps and try again.", now = true)
         installed.setLoading(model.id)
         try {
             return load()

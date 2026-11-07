@@ -20,17 +20,43 @@ class NpuGuardTest {
     private val turbo = ModelCatalog.ivritTurboNpu
 
     @Test
-    fun aModelTooBigForFreeMemoryIsRefusedAndDisabled() {
-        val guard = NpuLoadGuard(installed) { 6_100_000_000 } // the S25 with about 6.1 GB free
+    fun aModelTooBigForTheFreeMemoryNowIsRefusedThisTimeOnly() {
+        var free = 6_100_000_000L // the S25 with about 6.1 GB free
+        val guard = NpuLoadGuard(installed) { free }
         var loaded = false
         // Large-v3 16-bit: 3.3 GB of context binaries, about 8.7 GB to load.
-        assertFailsWith<NpuLoadGuard.Refused> { guard.load(large) { loaded = true } }
+        val refused = assertFailsWith<NpuLoadGuard.Refused> { guard.load(large) { loaded = true } }
         assertFalse(loaded)
-        assertEquals(false, installed.npu(large.id)?.runs)
-        assertTrue(installed.npu(large.id)!!.reason!!.startsWith("Not enough memory"))
+        assertTrue(refused.now)
+        assertTrue(refused.message!!.startsWith("Not enough free memory now"))
+        // Not disabled: still offered, and tried again next time.
+        assertNull(installed.npu(large.id))
+        assertTrue(ModelLibrary(installed).forLanguage("he", "SM8750").any { it.id == large.id })
         // Turbo (1.8 GB of binaries, about 5 GB to load) fits.
         assertEquals("ok", guard.load(turbo) { "ok" })
         assertNull(installed.loading())
+        // With more memory free, the same model loads.
+        free = 9_500_000_000L
+        assertEquals("ok", guard.load(large) { "ok" })
+    }
+
+    @Test
+    fun thePickFallsBackToTheNextReadyModelThatFitsNow() {
+        val zipformer = ModelCatalog.ivritZipformerNpu
+        val cpu = ModelCatalog.all.first { it.kind == com.chencohensolution.transcriptor.models.ModelKind.Whisper }
+        val guard = NpuLoadGuard(installed) { 4_400_000_000 } // other apps open: about 4.4 GB free
+        // Turbo (about 5 GB) doesn't fit now: the next ready one that does, turbo named as skipped.
+        val pick = guard.pick(turbo, listOf(turbo, large, zipformer, cpu))
+        assertEquals(zipformer, pick.model)
+        assertEquals(turbo, pick.skipped)
+        assertNull(installed.npu(turbo.id))
+        // It fits: no fallback. A CPU model always fits.
+        assertEquals(NpuLoadGuard.Pick(zipformer), guard.pick(zipformer, listOf(turbo, zipformer)))
+        assertEquals(NpuLoadGuard.Pick(cpu), guard.pick(cpu, listOf(cpu)))
+        // Nothing else fits: no model, and the one passed over is named.
+        assertEquals(NpuLoadGuard.Pick(null, turbo), guard.pick(turbo, listOf(turbo, large)))
+        // No preference: the first ready.
+        assertEquals(zipformer, guard.pick(null, listOf(zipformer, turbo)).model)
     }
 
     @Test

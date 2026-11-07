@@ -47,6 +47,8 @@ class LiveModel(
     val liveSpeakers: LiveSpeakers? = null,
     /** [liveSpeakers]' segmentation model (its id); null: pyannote's. */
     val turns: String? = null,
+    /** The live model picked that didn't fit in the free memory now (its name), passed over for this one this time. */
+    val skipped: String? = null,
 )
 
 /**
@@ -103,6 +105,7 @@ class LectureSession(
                     voicePrints = liveModel?.voicePrints?.value,
                     speakerPassOnStop = liveModel?.voicePrints != null && settings.findSpeakersOnStop && speakerPassReady(),
                     speakersLive = liveModel?.liveSpeakers != null,
+                    skippedForMemory = liveModel?.skipped,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
