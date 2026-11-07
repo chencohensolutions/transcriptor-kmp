@@ -83,24 +83,28 @@ data class HubModel(
     fun fits(chip: String?) = npu == null || npu.chip.equals(chip, ignoreCase = true)
 
     /** The model a [variant] of it installs as. */
-    fun toSpeechModel(variant: HubVariant) = SpeechModel(
-        id = "hf:$repo:${variant.label}",
-        name = "$name · ${variant.label}",
-        languages = variant.languages ?: languages.ifEmpty { listOf(SpeechModel.MULTILINGUAL) },
-        parameters = variant.parameters,
-        license = license ?: "?",
-        fitsLive = variant.fitsLive,
-        source = "https://huggingface.co/$repo/tree/$commit",
-        kind = when (kind) {
+    fun toSpeechModel(variant: HubVariant) = run {
+        val k = when (kind) {
             HubKind.VoicePrints -> ModelKind.SpeakerEmbedding
             HubKind.SpeakerTurns -> ModelKind.SpeakerSegmentation
             HubKind.Streaming -> if (npu != null) ModelKind.StreamingTransducerNpu else ModelKind.StreamingTransducer
             else -> if (npu != null) ModelKind.WhisperNpu else ModelKind.Whisper
-        },
-        files = variant.files,
-        quantizeTo = variant.quantizeTo,
-        chips = npu?.let { listOf(it.chip.uppercase()) } ?: emptyList(),
-    )
+        }
+        SpeechModel(
+            id = "hf:$repo:${variant.label}",
+            name = "$name · ${variant.label}",
+            languages = variant.languages ?: languages.ifEmpty { listOf(SpeechModel.MULTILINGUAL) },
+            parameters = variant.parameters,
+            license = license ?: "?",
+            fitsLive = variant.fitsLive,
+            source = "https://huggingface.co/$repo/tree/$commit",
+            kind = k,
+            liveWindowSeconds = SpeechModel.liveWindowFor(k, variant.fitsLive),
+            files = variant.files,
+            quantizeTo = variant.quantizeTo,
+            chips = npu?.let { listOf(it.chip.uppercase()) } ?: emptyList(),
+        )
+    }
 }
 
 /** The Hugging Face search, with its filters: a language (null: any), a kind (null: all), NPU builds for this phone. */

@@ -86,6 +86,12 @@ data class SpeechModel(
 
     companion object {
         const val MULTILINGUAL = "*"
+
+        /**
+         * The live window for a model added from Hugging Face: a whisper.cpp model too slow for lines (a large one)
+         * runs live in 30 s windows, as the catalog's large-v3 does.
+         */
+        fun liveWindowFor(kind: ModelKind, fitsLive: Boolean): Int? = if (kind == ModelKind.Whisper && !fitsLive) 30 else null
     }
 }
 
