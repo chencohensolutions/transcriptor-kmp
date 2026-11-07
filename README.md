@@ -26,3 +26,8 @@ Settings › Models: one for live transcription, one for refining after class.
 
 Kotlin Multiplatform: shared logic in `sharedLogic/`, Jetpack Compose on Android, SwiftUI on iOS. See
 [CLAUDE.md](CLAUDE.md) for the commands and [docs/design.md](docs/design.md) for the design.
+
+## License
+
+Free for noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). For commercial use, ask for a
+separate license. Third-party code and the speech models keep their own licenses.
