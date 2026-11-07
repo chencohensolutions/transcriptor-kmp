@@ -16,13 +16,12 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * A live lecture that keeps growing, for the round's options on the lecture screen (lab only, deleted when the round
- * closes). It starts with LabData's first four lines, then "says" the rest of LabData's lines a word at a time, at
+ * A live lecture that keeps growing, for the lecture screen's lab. It starts with LabData's first four lines, then "says" the rest of LabData's lines a word at a time, at
  * a speaker's uneven pace, each becoming a finished line when its last word is in; after the last line it says them
  * again (new ids, later times), so lines keep being created. Notes, pause, renaming and editing a line work in memory.
  */
 @Composable
-internal fun rememberGrowingLectureLab(): Triple<LiveLectureState, LiveLectureActions, (id: String, text: String) -> Unit> {
+internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActions> {
     val source = LabData.liveLectureWithSpeakers
     val toSay = source.segments.drop(4)
     val start = source.segments[3].endMillis + 500
@@ -79,9 +78,9 @@ internal fun rememberGrowingLectureLab(): Triple<LiveLectureState, LiveLectureAc
         pauseOrResume = { paused = !paused },
         addNote = { at, text -> lecture = lecture.copy(notes = lecture.notes + Note("mine${lecture.notes.size + 1}", at, text)) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name) else it }) },
+        editLine = { id, text ->
+            lecture = lecture.copy(segments = lecture.segments.map { if (it.id == id && it.text != text.trim()) it.copy(text = text.trim(), edited = true) else it })
+        },
     )
-    val editLine: (String, String) -> Unit = { id, text ->
-        lecture = lecture.copy(segments = lecture.segments.map { if (it.id == id && it.text != text.trim()) it.copy(text = text.trim(), edited = true) else it })
-    }
-    return Triple(state, actions, editLine)
+    return state to actions
 }

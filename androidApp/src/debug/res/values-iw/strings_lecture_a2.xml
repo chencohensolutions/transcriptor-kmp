@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- UI lab: the lecture screen's option a2. -->
-<resources>
-    <string name="lecture_a2_still_live">ההקלטה ממשיכה: שורות חדשות נוספות למטה</string>
-    <string name="lecture_a2_cancel">ביטול</string>
-    <string name="lecture_a2_save">שמירה</string>
-</resources>

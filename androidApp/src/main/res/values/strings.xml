@@ -276,4 +276,7 @@
     <string name="notebooks_delete">Delete</string>
     <string name="notebooks_clear_selection">Clear selection</string>
     <string name="notebooks_selected">%1$d selected</string>
+    <string name="lecture_edit_still_live">Still recording: new lines keep coming below</string>
+    <string name="lecture_edit_cancel">Cancel</string>
+    <string name="lecture_edit_save">Save</string>
 </resources>

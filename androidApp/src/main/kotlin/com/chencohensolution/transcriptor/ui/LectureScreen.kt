@@ -26,6 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -73,6 +78,24 @@ import com.chencohensolution.transcriptor.notebook.timelineOf
 import com.chencohensolution.transcriptor.recording.LiveLectureState
 import com.chencohensolution.transcriptor.recording.ModelInUse
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.animation.Animatable
+import androidx.compose.animation.core.Animatable as FloatAnimatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.key
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+
 
 class LiveLectureActions(
     val back: () -> Unit = {},
@@ -80,7 +103,8 @@ class LiveLectureActions(
     val stop: () -> Unit = {},
     /** A note pinned to [atMillis], when the user started typing it. */
     val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
-    val openSegment: (Segment) -> Unit = {},
+    /** The user's words for a finished line: kept over live transcription's, saved, marked edited. */
+    val editLine: (id: String, text: String) -> Unit = { _, _ -> },
     /** Names a speaker ("Lecturer"); the notebook remembers the voice. */
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
 )
@@ -88,9 +112,18 @@ class LiveLectureActions(
 /**
  * The lecture while recording, as one timeline: lines and notes in the order they happened, notes as amber cards
  * among the lines. The note bar is always open at the bottom; the note's time is taken when typing starts.
+ *
+ * Tapping a finished line turns it into a field where it is, with Cancel and Save (round 2's a2): it glides up to stay
+ * above the keyboard as it opens and as the text grows; recording and live lines go on below, the note bar steps
+ * aside, and a saved line is marked ✎ (edited: the improve pass keeps it). The line being spoken now can't be edited.
+ *
+ * The list is laid out from the bottom, so the live line stays in view by itself and the lines above glide up as it
+ * grows and as new lines come, with no scrolling; each new word fades in quickly, and a finished line settles from
+ * grey into the text's color.
  */
 @Composable
 fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
+    var editingId by remember { mutableStateOf<String?>(null) }
     val colors = LocalTranscriptorColors.current
     val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
     // A line shows its speaker where the speaker changes: line id to speaker id.
@@ -104,6 +137,8 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
         }
     }
     var renaming by remember { mutableStateOf<Speaker?>(null) }
+    // The lines already there when the screen opened don't animate; every line after them is new.
+    val shownAtOpen = remember { state.lecture.segments.map { it.id }.toSet() }
     renaming?.let { speaker ->
         RenameSpeakerDialog(speaker, onDismiss = { renaming = null }) { name ->
             actions.renameSpeaker(speaker.id, name)
@@ -112,11 +147,10 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     }
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val atLive by remember { derivedStateOf { !list.canScrollForward } }
-    var following by remember { mutableStateOf(true) }
-    LaunchedEffect(atLive) { if (atLive) following = true }
-    LaunchedEffect(list.isScrollInProgress) { if (list.isScrollInProgress && !atLive) following = false }
-    LaunchedEffect(entries.size, state.partial, following) { if (following) list.scrollToItem(entries.size + 1) }
+    // The list is laid out from the bottom (reversed): the live line is its first item and stays at the bottom by
+    // itself, so following it needs no scrolling (a scroll running all the time would swallow taps). Lines above it
+    // glide up as it grows and as new lines come in. Scrolled back, the lines in view stay put.
+    val following by remember { derivedStateOf { !list.canScrollBackward } }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
@@ -157,9 +191,33 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
         Box(Modifier.weight(1f)) {
             val appDirection = LocalLayoutDirection.current
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-                LazyColumn(state = list, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = list, reverseLayout = true, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize()) {
+                    item(key = "live") {
+                        // Grows with a glide as words come in, and shrinks as its line becomes a finished one.
+                        Box(Modifier.fillMaxWidth().animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))) { if (state.partial != null) {
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
+                                key(state.lecture.segments.size) { FadingWords(state.partial.orEmpty(), colors.partial) }
+                            }
+                        } }
+                    }
+                    items(entries.asReversed(), key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
+                        when (entry) {
+                            is TimelineEntry.Speech -> SpeechRow(
+                                entry, fresh = entry.segment.id !in shownAtOpen,
+                                modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                speaker = speakerChanges[entry.segment.id]?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } },
+                                onSpeaker = { renaming = it },
+                                editing = entry.segment.id == editingId,
+                                onClick = { editingId = entry.segment.id },
+                                onCancel = { editingId = null },
+                                onSave = { actions.editLine(entry.segment.id, it); editingId = null },
+                            )
+                            is TimelineEntry.Written -> Box(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = spring(stiffness = Spring.StiffnessMediumLow))) { NoteCard(entry) }
+                        }
+                    }
                     // The app's text, in the app's direction, among the notebook's content.
-                    item {
+                    item(key = "status") {
                         val model = state.liveModelName
                         val error = state.liveError
                         val status = when {
@@ -179,30 +237,11 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                             if (!state.finishing) ModelsInUse(state)
                         } }
                     }
-                    items(entries, key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
-                        when (entry) {
-                            is TimelineEntry.Speech -> SpeechRow(
-                                entry,
-                                speaker = speakerChanges[entry.segment.id]?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } },
-                                onSpeaker = { renaming = it },
-                                onClick = { actions.openSegment(entry.segment) },
-                            )
-                            is TimelineEntry.Written -> NoteCard(entry)
-                        }
-                    }
-                    item {
-                        if (state.partial != null) {
-                            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                                Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
-                                Text(state.partial + " …", style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), color = colors.partial, fontStyle = FontStyle.Italic)
-                            }
-                        }
-                    }
                 }
             }
             if (!following) {
                 Surface(
-                    onClick = { following = true; scope.launch { list.animateScrollToItem(entries.size + 1) } },
+                    onClick = { scope.launch { list.animateScrollToItem(0) } },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                     shadowElevation = 4.dp,
@@ -217,7 +256,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
             }
         }
 
-        NoteBar(state, actions)
+        if (editingId == null) NoteBar(state, actions)
     }
 }
 
@@ -230,21 +269,60 @@ private fun TextStyle.inNotebookDirection() =
     copy(textDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextDirection.Rtl else TextDirection.Ltr)
 
 @Composable
-private fun SpeechRow(entry: TimelineEntry.Speech, speaker: Speaker?, onSpeaker: (Speaker) -> Unit, onClick: () -> Unit) {
+private fun SpeechRow(
+    entry: TimelineEntry.Speech, fresh: Boolean, modifier: Modifier, speaker: Speaker?, onSpeaker: (Speaker) -> Unit,
+    editing: Boolean, onClick: () -> Unit, onCancel: () -> Unit, onSave: (String) -> Unit,
+) {
     val colors = LocalTranscriptorColors.current
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 6.dp)) {
+    // A new line settles quickly from the live line's grey into the text's color, where the live line was.
+    val ink = MaterialTheme.colorScheme.onSurface
+    val color = remember { Animatable(if (fresh) colors.partial else ink) }
+    LaunchedEffect(ink) { color.animateTo(ink, tween(350)) }
+    // While fixed, the line glides up to stay above the keyboard, as it opens and as the text grows.
+    val inView = remember { BringIntoViewRequester() }
+    val keyboard = WindowInsets.ime.getBottom(LocalDensity.current)
+    Column(
+        modifier.fillMaxWidth().bringIntoViewRequester(inView)
+            .background(if (editing) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
+            .clickable(enabled = !editing, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
         if (speaker != null) SpeakerChip(speaker, Modifier.padding(start = 44.dp, bottom = 4.dp)) { onSpeaker(speaker) }
         Row {
-            Text(
-                formatClock(entry.segment.startMillis),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.time,
-                modifier = Modifier.width(44.dp).padding(top = 3.dp),
-            )
-            Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp)
+            Column(Modifier.width(44.dp).padding(top = 3.dp)) {
+                Text(formatClock(entry.segment.startMillis), style = MaterialTheme.typography.labelSmall, color = colors.time)
+                if (entry.segment.edited) Text("✎", style = MaterialTheme.typography.labelSmall, color = colors.time)
+            }
+            if (!editing) {
+                Text(entry.segment.text, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp, color = color.value)
+            } else {
+                var text by remember { mutableStateOf(TextFieldValue(entry.segment.text, TextRange(entry.segment.text.length))) }
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                LaunchedEffect(keyboard, text.text.length / 20) { delay(60); inView.bringIntoView() }
+                Column(Modifier.weight(1f)) {
+                    TextField(
+                        value = text, onValueChange = { text = it },
+                        textStyle = MaterialTheme.typography.bodyLarge.inNotebookDirection().copy(lineHeight = 26.sp),
+                        colors = TextFieldDefaults.colors(focusedIndicatorColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                    )
+                    val appDirection = LocalLayoutDirection.current
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.FiberManualRecord, null, tint = colors.recording, modifier = Modifier.size(10.dp))
+                        Text(
+                            stringResource(R.string.lecture_edit_still_live), style = MaterialTheme.typography.labelSmall, color = colors.time,
+                            modifier = Modifier.weight(1f).padding(start = 6.dp),
+                        )
+                        TextButton(onClick = onCancel) { Text(stringResource(R.string.lecture_edit_cancel)) }
+                        TextButton(onClick = { onSave(text.text) }, enabled = text.text.isNotBlank()) { Text(stringResource(R.string.lecture_edit_save)) }
+                    }
+                }
+            }
         }
     }
 }
+
 
 /** "Speaker 2", or the name the user gave; its number is its order of speaking. */
 @Composable
@@ -265,6 +343,7 @@ private fun SpeakerChip(speaker: Speaker, modifier: Modifier = Modifier, onClick
             .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }
+
 
 @Composable
 internal fun RenameSpeakerDialog(speaker: Speaker, onDismiss: () -> Unit, onSave: (String) -> Unit) {
@@ -373,4 +452,22 @@ private fun ModelsInUse(state: LiveLectureState) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
     }
+}
+
+/** The line being spoken, written in a word at a time, each word fading in over 200 ms; keyed by the caller per line. */
+@Composable
+private fun FadingWords(text: String, color: Color) {
+    val words = text.split(" ")
+    val alphas = remember { HashMap<Int, FloatAnimatable<Float, AnimationVector1D>>() }
+    for (i in words.indices) alphas.getOrPut(i) { FloatAnimatable(0f) }
+    LaunchedEffect(words.size) {
+        for (i in words.indices) { val a = alphas.getValue(i); if (a.targetValue < 1f) launch { a.animateTo(1f, tween(200)) } }
+    }
+    val shown = buildAnnotatedString {
+        words.forEachIndexed { i, w ->
+            if (i > 0) append(" ")
+            withStyle(SpanStyle(color = color.copy(alpha = color.alpha * (alphas[i]?.value ?: 1f)))) { append(w) }
+        }
+    }
+    Text(shown, style = MaterialTheme.typography.bodyLarge.inNotebookDirection(), lineHeight = 26.sp, fontStyle = FontStyle.Italic)
 }

@@ -134,6 +134,7 @@ class MainActivity : ComponentActivity() {
                                 stop = { openAfterStop = true; RecordingService.stop(this) },
                                 addNote = Recording.session::addNote,
                                 renameSpeaker = Recording.session::renameSpeaker,
+                                editLine = Recording.session::editLine,
                             ),
                         )
                     }

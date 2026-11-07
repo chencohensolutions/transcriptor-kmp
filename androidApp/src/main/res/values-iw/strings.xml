@@ -276,4 +276,7 @@
     <string name="notebooks_delete">מחיקה</string>
     <string name="notebooks_clear_selection">ניקוי הבחירה</string>
     <string name="notebooks_selected">%1$d נבחרו</string>
+    <string name="lecture_edit_still_live">ההקלטה ממשיכה: שורות חדשות נוספות למטה</string>
+    <string name="lecture_edit_cancel">ביטול</string>
+    <string name="lecture_edit_save">שמירה</string>
 </resources>
