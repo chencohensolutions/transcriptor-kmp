@@ -7,7 +7,7 @@
     <application>
         <activity
             android:exported="false"
-            android:label="Transcriptor UI lab"
+            android:label="Audio Logs UI lab"
             android:name=".ui.UiLabActivity" />
     </application>
 

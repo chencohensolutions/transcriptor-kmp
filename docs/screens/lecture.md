@@ -1,4 +1,4 @@
-# Lecture, while recording
+# Moment, while recording
 
 Android, in the app: recording, live lines and notes. iOS after Android is finished.
 
@@ -9,7 +9,7 @@ recording or the transcription.
 
 ## What it shows
 
-- The lecture's title and its notebook, the elapsed time, a red dot that breathes while recording, the microphone's
+- The moment's title and its notebook, the elapsed time, a red dot that breathes while recording, the microphone's
   level, Pause/Resume and Stop.
 - The transcript: one line per piece of speech (split at pauses), each with its start time, in the notebook's
   language direction. The line being spoken now is grey and italic until it ends.
@@ -36,7 +36,7 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
 
 ## Behavior
 
-- Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the lecture and
+- Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the moment and
   opens it after ([lecture-review.md](lecture-review.md)).
 - Tapping a finished line fixes it in place (round 2's a2): it becomes a field where it is, with Cancel and Save, and
   glides up to stay above the keyboard as it opens and as the text grows; recording and live lines go on below and the

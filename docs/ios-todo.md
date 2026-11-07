@@ -4,10 +4,18 @@ iOS (SwiftUI, in `iosApp/`) is built after the Android app is finished. Each ent
 shared state and controller methods the SwiftUI side should call, the Android files to mirror, new strings, and
 anything left to decide. Remove an entry once it is built.
 
+## App name and moments (Nov 7, 2026)
+
+- The app is **Audio Logs** (two words); each recording is a **moment** (Hebrew רגע, plural רגעים). Use these in every
+  SwiftUI string: the app's display name (`CFBundleDisplayName`), and the words Android has in `app_name`,
+  `start_lecture`, `start_lectures`, `folder_*`, `settings_after`, `settings_*_note`, `review_tune_*`,
+  `review_delete_*`, `notebooks_deleted_*`, `notebooks_empty_*`. The Hebrew app name is not decided yet. The code and
+  files keep the name `Lecture` (`lecture.json`).
+
 ## Notebooks
 
 - Android: `NotebooksScreen.kt` (mirror it in SwiftUI), `MainActivity.kt` (the screen as the root, Record with the
-  microphone permission, the banner back to the lecture), `Recording.kt` (`library`, `file`, `working`, `utcOffset`);
+  microphone permission, the banner back to the moment), `Recording.kt` (`library`, `file`, `working`, `utcOffset`);
   `docs/screens/notebooks.md`.
 - Shared, to call from SwiftUI: `NotebooksController` (`library`, `reload()` off the main thread, `create`, `assign`,
   `assignToNew`), `notebooksState(library, now, utcOffset, recording, working)`, `RecordingNow`, `UNFILED`,
@@ -34,9 +42,9 @@ anything left to decide. Remove an entry once it is built.
 - iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
 - Strings: `models_*`.
 
-## The lectures folder
+## The moments folder
 
-- Android: finished lectures move from the app to a folder the user picks (`Documents/Transcriptor`), through
+- Android: finished moments move from the app to a folder the user picks (`Documents/Transcriptor`), through
   `storage/SafFileSystem.kt` (an okio `FileSystem` on the documents provider) and `Recording.chooseFolder`/`archive`/
   `openAudio`; a `.nomedia` in it.
 - Shared: `LectureStore.library` (a `Place`), `adoptLibrary`, `archiveFinished`, `SettingsStore.lectureFolder`.
@@ -44,7 +52,7 @@ anything left to decide. Remove an entry once it is built.
   `SettingsStore.lectureFolder`), an okio `FileSystem` over it (`startAccessingSecurityScopedResource`), no `.nomedia`.
 - Strings: `folder_*`.
 
-## Lecture, while recording
+## Moment, while recording
 
 - Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and
   `MainActivity.kt` (keeping it recording, and the temporary start screen); `docs/screens/lecture.md`.
@@ -68,15 +76,15 @@ anything left to decide. Remove an entry once it is built.
 - The recording screen's models in use: `LiveLectureState.voicePrints` (`ModelInUse`, its `runs` set when the
   voice-print model loads, from `LiveModel.voicePrints`) and `speakerPassOnStop`; strings `lecture_speakers_model`,
   `lecture_model_*`, `lecture_speaker_pass_on_stop`; Android's `ModelsInUse` in `LectureScreen.kt`.
-- Lecture, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
+- Moment, after: `ReviewScreen.kt` (mirror it in SwiftUI), `LectureReview` (`state`, `open`, `close`, `reload`,
   `playPause`, `seek`, `playLine`, `cycleSpeed`, `editLine`, `setLineSpeaker`, `renameSpeaker`, `addNote`, `editNote`,
   `deleteNote`, `switchTo` (versions), `passes`); an `AudioPlayer` in iosMain on `AVAudioPlayer` (`enableRate` for the speed); strings
   `review_*`.
-- After a lecture: `SettingsStore.findSpeakersOnStop` (the speaker pass when it stops, on by default; files from before
+- After a moment: `SettingsStore.findSpeakersOnStop` (the speaker pass when it stops, on by default; files from before
   read the old `afterLecture`) and `autoImprove` (off by default): after Stop and the speaker pass, improve with the
   language's model if charging, else `addImprovePending` until the app is open on the charger (Android:
   `RecordingService` ACTION_STOP and `improveNextPending`, `MainActivity.improvePendingIfCharging`).
-- Improve transcription… on the lecture, always offered: `ReviewState.refineModels` (`ModelChoice` with `minutes`
+- Improve transcription… on the moment, always offered: `ReviewState.refineModels` (`ModelChoice` with `minutes`
   and `npu`), `improveDefault`, `improveToGet`; the sheet in `ReviewScreen.kt` (`ImproveSheet`); speakers first then
   improve (`RecordingService.refine(…, speakersFirst)`); `SettingsStore.recordImproveSpeed`/`improveSpeed` and
   `ModelChoices.estimateMinutes` for the estimates. Strings `review_improve*`, `review_speakers_first*`, `review_kept`,
@@ -91,16 +99,16 @@ anything left to decide. Remove an entry once it is built.
 - Tuning: `SettingsStore.speakerTuning`/`setSpeakerTuning` (a slider on the speakers page) and the review's
   `LectureReview.tuneSpeakers()`/`applySpeakerTuning` with `ReviewState.speakerCorrections` (strings `review_tune_*`);
   `SettingsStore.segmentationModel` and `ModelCatalog.segmentationModels` (DiariZen).
-- Power per lecture: `PowerMeter` with a `PowerProbe` (iOS: `UIDevice` battery level and state, thermal state,
+- Power per moment: `PowerMeter` with a `PowerProbe` (iOS: `UIDevice` battery level and state, thermal state,
   `ProcessInfo`/`task_info` CPU time; iOS gives no battery current, so the power figures are null there or
   estimated), `PowerReport` in `power.json` (`LectureStore.savePower`), `power-log.csv`
   (`LectureStore.appendPowerLog`), `ReviewState.power` and strings `review_power*`.
-- Deleting lectures (Nov 7, 2026): `NotebooksController.delete(ids, busy)` and `LectureStore.delete`; the Notebooks
+- Deleting moments (Nov 7, 2026): `NotebooksController.delete(ids, busy)` and `LectureStore.delete`; the Notebooks
   screen's hold-to-select, the selection bar and the Undo snackbar (the files go when it closes); strings
   `notebooks_deleted_*`, `notebooks_undo`, `notebooks_delete`, `notebooks_clear_selection`, `notebooks_selected`.
-- Fixing a line while recording: `LectureSession.editLine` (the fixes laid over live lines); the lecture screen's field
+- Fixing a line while recording: `LectureSession.editLine` (the fixes laid over live lines); the moment screen's field
   in place, kept above the keyboard, the list laid out from the bottom with lines gliding up and words fading in;
   strings `lecture_edit_*`.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
-  iOS shares with `UIActivityViewController` from a temporary file. Delete lecture… on the lecture; strings
+  iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.

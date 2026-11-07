@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Transcriptor</string>
+    <string name="app_name">Audio Logs</string>
     <string name="main_coming_soon">המחברות יחליפו את המסך הזה אחרי שהעיצוב שלהן ייבחר במעבדת הממשק.</string>
     <string name="lecture_back">חזרה</string>
     <string name="lecture_pause">השהיה</string>
@@ -17,17 +17,17 @@
     <string name="compressing_flac">דוחס ל־FLAC…</string>
     <string name="start_format">שמע</string>
     <string name="format_wav">WAV (הכי גדול, כ־690MB לשעה)</string>
-    <string name="format_wav_then_flac">WAV, ודחיסה ל־FLAC אחרי ההרצאה</string>
+    <string name="format_wav_then_flac">WAV, ודחיסה ל־FLAC אחרי הרגע</string>
     <string name="format_flac_live">FLAC בזמן ההקלטה</string>
     <string name="flac_effort">מאמץ הדחיסה ל־FLAC</string>
     <string name="flac_effort_value">%1$d מתוך %2$d</string>
     <string name="flac_effort_fast">מהיר יותר</string>
     <string name="flac_effort_small">קובץ קטן יותר</string>
-    <string name="flac_effort_note_after">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, והדחיסה אחרי ההרצאה לוקחת יותר זמן.</string>
+    <string name="flac_effort_note_after">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, והדחיסה אחרי הרגע לוקחת יותר זמן.</string>
     <string name="flac_effort_note_live">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, ומעמיסה יותר על הטלפון בזמן ההקלטה (וגם על הסוללה).</string>
-    <string name="start_lecture">התחלת הרצאה</string>
+    <string name="start_lecture">התחלת רגע</string>
     <string name="start_default_notebook">המחברת שלי</string>
-    <string name="start_last">ההרצאה האחרונה: %1$s · %2$s · %3$d הערות · %4$s</string>
+    <string name="start_last">הרגע האחרון: %1$s · %2$s · %3$d הערות · %4$s</string>
     <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
     <string name="lecture_speakers_model">דוברים: %1$s · %2$s</string>
@@ -50,11 +50,11 @@
     <string name="model_delete">מחיקה</string>
     <string name="model_in_use">משמש לתמלול חי</string>
     <string name="start_speakers">זיהוי דוברים</string>
-    <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך ההרצאה; אחריה, מעבר נוסף מוצא מי דיבר מתי, גם כשמדברים יחד, ומתקן את השורות. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו בהרצאות הבאות.</string>
+    <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך הרגע; אחריו, מעבר נוסף מוצא מי דיבר מתי, גם כשמדברים יחד, ומתקן את השורות. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו ברגעים הבאים.</string>
     <string name="speaker_n">דובר %1$d</string>
     <string name="speaker_rename_title">שם עבור %1$s</string>
-    <string name="speaker_rename_note">המחברת תזהה את הקול הזה בהרצאות הבאות שלה.</string>
-    <string name="speaker_rename_hint">המרצה</string>
+    <string name="speaker_rename_note">המחברת תזהה את הקול הזה ברגעים הבאים שלה.</string>
+    <string name="speaker_rename_hint">דנה</string>
     <string name="speaker_rename_save">שמירה</string>
     <string name="speaker_rename_cancel">ביטול</string>
     <string name="finding_speakers">מזהה את הדוברים…</string>
@@ -75,7 +75,7 @@
     <string name="review_edit_text">עריכת הטקסט</string>
     <string name="review_done">סיום</string>
     <string name="review_move_line">מי אמר את השורה ב־%1$s?</string>
-    <string name="start_lectures">הרצאות</string>
+    <string name="start_lectures">רגעים</string>
     <string name="start_speakers_count">%1$d דוברים</string>
     <string name="refining">משפר את התמלול…</string>
     <string name="review_versions">גרסאות (%1$d)</string>
@@ -91,7 +91,7 @@
     <string name="notebooks_no_notebook_in">בלי מחברת · %1$s</string>
     <string name="notebooks_no_notebook_assign">בלי מחברת, לשייך אחר כך</string>
     <string name="notebooks_no_notebook_language">שפה בלי מחברת: %1$s</string>
-    <string name="notebooks_language_title">שפת הרצאה בלי מחברת</string>
+    <string name="notebooks_language_title">שפת רגע בלי מחברת</string>
     <string name="notebooks_suggested">מוצעת</string>
     <string name="notebooks_usually">בדרך כלל ב%1$s</string>
     <string name="notebooks_slot">%1$s ב־%2$s</string>
@@ -115,26 +115,26 @@
     <string name="notebooks_refined">משופר</string>
     <string name="notebooks_improving">משפר את התמלול · %1$d%%</string>
     <string name="notebooks_recording">מקליט · %1$s</string>
-    <string name="notebooks_back_to_lecture">חזרה להרצאה</string>
-    <string name="notebooks_empty_title">מחברת לכל קורס</string>
-    <string name="notebooks_empty_note">אפשר להקליט עכשיו ולשייך אחר כך, או ליצור מחברת לקורס: ההרצאות שלה מתומללות בטלפון, בשפה שלה, עם ההערות שלך עליהן.</string>
+    <string name="notebooks_back_to_lecture">חזרה לרגע</string>
+    <string name="notebooks_empty_title">מחברת לכל קבוצה</string>
+    <string name="notebooks_empty_note">אפשר להקליט עכשיו ולשייך אחר כך, או ליצור מחברת לקבוצה: הרגעים שלה מתומללים בטלפון, בשפה שלה, עם ההערות שלך עליהם.</string>
     <string name="notebooks_new_notebook">מחברת חדשה</string>
     <string name="notebooks_new_name">שם</string>
     <string name="notebooks_new_name_hint">מבוא לפסיכולוגיה</string>
-    <string name="notebooks_new_language">שפת ההרצאות</string>
+    <string name="notebooks_new_language">שפת הרגעים</string>
     <string name="notebooks_new_language_note">קובעת את מודלי הדיבור ואת כיוון הכתיבה של השורות.</string>
     <string name="notebooks_create">יצירה</string>
     <!-- Lectures folder -->
-    <string name="folder_title">תיקיית ההרצאות</string>
+    <string name="folder_title">תיקיית הרגעים</string>
     <string name="folder_in_app">נשמרות רק בתוך האפליקציה: הסרת האפליקציה מוחקת אותן. אפשר לבחור תיקייה מחוץ לאפליקציה.</string>
-    <string name="folder_ready">בתיקייה „%1$s”, מחוץ לאפליקציה. כל הרצאה היא תיקייה שם: השמע שלה, transcript.md ו־lecture.json.</string>
+    <string name="folder_ready">בתיקייה „%1$s”, מחוץ לאפליקציה. כל רגע הוא תיקייה שם: השמע שלו, transcript.md ו־lecture.json.</string>
     <string name="folder_choose">בחירת תיקייה</string>
     <string name="folder_change">שינוי</string>
-    <string name="folder_moving">מעביר הרצאות אל „%1$s” · %2$d%%</string>
-    <string name="folder_lost">אין גישה לתיקייה „%1$s”: הרצאות חדשות יישארו באפליקציה עד שתיבחר שוב.</string>
+    <string name="folder_moving">מעביר רגעים אל „%1$s” · %2$d%%</string>
+    <string name="folder_lost">אין גישה לתיקייה „%1$s”: רגעים חדשים יישארו באפליקציה עד שתיבחר שוב.</string>
     <string name="folder_choose_again">בחירה מחדש</string>
-    <string name="folder_ask_title">איפה לשמור את ההרצאות?</string>
-    <string name="folder_ask_note">בתיקייה מחוץ לאפליקציה (מוצע: Documents/Transcriptor) הן נשארות גם אם האפליקציה מוסרת, והתמלולים שמורים ליד השמע.</string>
+    <string name="folder_ask_title">איפה לשמור את הרגעים?</string>
+    <string name="folder_ask_note">בתיקייה מחוץ לאפליקציה (מוצע: Documents/Transcriptor) הם נשארים גם אם האפליקציה מוסרת, והתמלולים שמורים ליד השמע.</string>
     <string name="folder_not_now">לא עכשיו</string>
     <string name="folder_failed">אי אפשר להשתמש בתיקייה הזו: %1$s</string>
     <!-- Settings › Models -->
@@ -215,17 +215,17 @@
     <string name="settings_live_none">בזמן אמת: לא הורד מודל</string>
     <string name="settings_improve_is">שיפור: %1$s</string>
     <string name="settings_improve_none">שיפור: לא הורד מודל</string>
-    <string name="settings_after">אחרי הרצאה</string>
+    <string name="settings_after">אחרי רגע</string>
     <string name="settings_find_speakers">זיהוי הדוברים שוב אחרי העצירה</string>
     <string name="settings_find_speakers_note">כבוי: הדוברים מזוהים בזמן ההקלטה. מופעל: זיהוי הדוברים גם מקבץ אותם מחדש אחרי העצירה, תוך דקה או שתיים.</string>
     <string name="settings_auto_improve">שיפור אוטומטי</string>
-    <string name="settings_auto_improve_on">כל הרצאה מתומללת שוב עם מודל השיפור שלה אחרי שהיא נעצרת, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, ההרצאה מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
-    <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל הרצאה מהתפריט שלה, מתי שרוצים.</string>
+    <string name="settings_auto_improve_on">כל רגע מתומלל שוב עם מודל השיפור שלו אחרי שהוא נעצר, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, הרגע מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
+    <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל רגע מהתפריט שלו, מתי שרוצים.</string>
     <string name="settings_storage">מודלים ואחסון</string>
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
     <string name="settings_recognition">זיהוי דוברים</string>
-    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, וההרצאות הבאות במחברת יכירו אותו.</string>
+    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, והרגעים הבאים במחברת יכירו אותו.</string>
     <string name="settings_voice_model">מודל הקולות</string>
     <string name="settings_turns">חילופי דוברים</string>
     <string name="settings_turns_note">מוצא איפה דובר אחד מסיים והבא מתחיל, תוך כדי הקלטה.</string>
@@ -236,9 +236,9 @@
     <string name="models_kind_speaker_turns">חילופי דוברים</string>
     <string name="models_speaker_search_note">מודלי דוברים שיוצאו ל-sherpa-onnx; כל קובץ הוא מודל אחד.</string>
     <string name="settings_live_title">תמלול בזמן אמת</string>
-    <string name="settings_live_note">כותב את השורות במהלך ההרצאה.</string>
+    <string name="settings_live_note">כותב את השורות במהלך הרגע.</string>
     <string name="settings_improve_title">שיפור התמלול</string>
-    <string name="settings_improve_note">מתמלל הרצאה שוב אחריה, ידנית מהתפריט שלה או אוטומטית. אפשר לבחור מודל אחר להרצאה אחת.</string>
+    <string name="settings_improve_note">מתמלל רגע שוב אחריו, ידנית מהתפריט שלו או אוטומטית. אפשר לבחור מודל אחר לרגע אחד.</string>
     <string name="settings_more">חיפוש מודלים נוספים ל%1$s</string>
     <string name="settings_streaming">מילים תוך כדי דיבור</string>
     <!-- The lecture: improving its transcription. -->
@@ -257,21 +257,21 @@
     <string name="review_kept">שורות שערכת נשארות. התמלול הנוכחי נשמר, תחת גרסאות.</string>
     <string name="review_improve_button">שיפור</string>
 
-    <string name="review_tune_speakers">כיוונון הדוברים לפי ההרצאה הזו (%1$d תיקונים)</string>
-    <string name="review_tune_title">כיוונון לפי ההרצאה הזו</string>
+    <string name="review_tune_speakers">כיוונון הדוברים לפי הרגע הזה (%1$d תיקונים)</string>
+    <string name="review_tune_title">כיוונון לפי הרגע הזה</string>
     <string name="review_tune_fewer">פחות דוברים מעכשיו</string>
     <string name="review_tune_more">יותר דוברים מעכשיו</string>
     <string name="review_tune_same">ההגדרה הנוכחית כבר הכי טובה</string>
-    <string name="review_tune_result">%1$s: %2$d מתוך %3$d שורות יתאימו לדוברים שלך (עכשיו %4$d), עם %5$d דוברים (עכשיו %6$d). חל מההרצאה הבאה.</string>
+    <string name="review_tune_result">%1$s: %2$d מתוך %3$d שורות יתאימו לדוברים שלך (עכשיו %4$d), עם %5$d דוברים (עכשיו %6$d). חל מהרגע הבא.</string>
     <string name="review_tune_apply">החלה</string>
     <string name="review_tune_ok">אישור</string>
-    <string name="review_tune_none">אין לפי מה לכוונן: בהרצאה הזו אין טביעות קול מזיהוי דוברים בזמן אמת, או שורות עם דוברים.</string>
+    <string name="review_tune_none">אין לפי מה לכוונן: ברגע הזה אין טביעות קול מזיהוי דוברים בזמן אמת, או שורות עם דוברים.</string>
     <string name="review_power">צריכה: %1$.1f וואט בממוצע, %2$.0f mWh לדקה, %3$s°C</string>
     <string name="review_power_charging">צריכה: לא נמדדה (בטעינה)</string>
     <string name="models_npu_retry">לנסות שוב</string>
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
-    <string name="notebooks_deleted_one">ההרצאה נמחקה</string>
-    <string name="notebooks_deleted_many">%1$d הרצאות נמחקו</string>
+    <string name="notebooks_deleted_one">הרגע נמחק</string>
+    <string name="notebooks_deleted_many">%1$d רגעים נמחקו</string>
     <string name="notebooks_undo">ביטול</string>
     <string name="notebooks_delete">מחיקה</string>
     <string name="notebooks_clear_selection">ניקוי הבחירה</string>
@@ -282,9 +282,9 @@
     <string name="review_share_word">שיתוף כקובץ Word</string>
     <string name="review_save_word">שמירה כקובץ Word</string>
     <string name="review_word_saved">%1$s נשמר ליד ההקלטה</string>
-    <string name="review_delete_lecture">מחיקת ההרצאה…</string>
+    <string name="review_delete_lecture">מחיקת הרגע…</string>
     <string name="review_delete_title">למחוק את %1$s?</string>
-    <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית ההרצאות. אי אפשר לבטל את זה.</string>
+    <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית הרגעים. אי אפשר לבטל את זה.</string>
     <string name="review_delete_lecture_confirm">מחיקה</string>
     <string name="review_delete_cancel">ביטול</string>
 </resources>

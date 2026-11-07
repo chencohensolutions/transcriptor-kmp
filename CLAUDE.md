@@ -1,4 +1,7 @@
-# Transcriptor (Kotlin Multiplatform)
+# Audio Logs (Kotlin Multiplatform; the code is still named Transcriptor)
+
+The app is **Audio Logs**; a recording is a **moment** (Hebrew רגע) in everything the user sees. The code keeps
+`Lecture` for it (classes, files, `lecture.json`, string keys).
 
 A notebook for classes on Android and iOS: it records the lecture, transcribes it on the phone with a local speech
 model (Hebrew first, other languages by model), and lets the user write notes while it keeps transcribing. Every line

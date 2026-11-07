@@ -1,8 +1,9 @@
-# Transcriptor
+# Audio Logs
 
-A notebook for your classes, for Android and iOS. It records the lecture and transcribes it **on the phone** with a
+A log of your conversations, for Android and iOS (the code and repository are still named Transcriptor).
+Each recording is a **moment**: it records it and transcribes it **on the phone** with a
 local speech recognition model, Hebrew first. Write notes while it keeps transcribing; every line of speech and every
-note is stamped with its time in the recording. The audio is kept (FLAC, 48 kHz stereo, 16 bit), so after class a
+note is stamped with its time in the recording. The audio is kept (FLAC, 48 kHz stereo, 16 bit), so afterwards a
 larger model can refine the whole transcript, tell the speakers apart, and any line can be played back and corrected.
 
 **Status:** early. The Android screens are being designed in the UI lab; the iOS app (SwiftUI) follows once Android

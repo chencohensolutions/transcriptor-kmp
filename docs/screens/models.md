@@ -6,18 +6,18 @@ Settings.
 
 ## What it shows
 
-- **Settings**: **Languages**, one row per language in use (the notebooks', a lecture in none, the phone's, those
-  added) with the model that writes it live and the one that improves its lectures ("Live: … / Improve: …", red when
+- **Settings**: **Languages**, one row per language in use (the notebooks', a moment in none, the phone's, those
+  added) with the model that writes it live and the one that improves its moments ("Live: … / Improve: …", red when
   none is downloaded), and Add a language. **Speaker recognition**: its note, a **Voice model** row with the model in
   use and its facts ("3D-Speaker CAM++ · 7M", red "No model downloaded" without one), and under it the slider "How
   readily it starts a new speaker", Fewer ↔ More speakers, with Reset (one value per model,
-  `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a lecture**: Find the
+  `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a moment**: Find the
   speakers again after Stop
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
-  Manage models, the lectures folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
+  Manage models, the moments folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
   slider for the FLAC compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`;
   hidden for WAV). Its note says the sound is the same at every level, and what a higher level costs: time after the
-  lecture, or the phone while recording.
+  moment, or the phone while recording.
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
   to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
@@ -26,7 +26,7 @@ Settings.
 - **A speaker page** (the Voice model or Turn model row): the same page for both jobs, titled Speaker recognition or
   Speaker turns, with the job's note, its models (the downloaded ones to pick with a radio, the others with their
   download), then **Find more on Hugging Face**. Picking marks the model and stays on the page; it applies from the
-  next lecture or speaker pass (`ModelsActions.useVoicePrints` / `useSegmentation`, `SettingsStore.voiceModel` /
+  next moment or speaker pass (`ModelsActions.useVoicePrints` / `useSegmentation`, `SettingsStore.voiceModel` /
   `segmentationModel`). Each model shows its parameters, "NPU" when its NPU build is on this phone, "Copied by hand",
   "From Hugging Face", and a non-commercial license in amber.
   - **Which models:** voice prints: the catalog's (CAM++, ERes2NetV2), those copied by hand (WeSpeaker ResNet293-LM,
