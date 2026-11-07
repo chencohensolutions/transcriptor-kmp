@@ -68,8 +68,16 @@ data class SpeechModel(
      * (a non-commercial license) or that has no public home yet. Its files' urls are empty; it is listed once there.
      */
     val manual: Boolean = false,
+    /**
+     * How much free memory loading its NPU build took at the peak, measured on a phone (bytes); null: estimated from
+     * its context binaries ([NpuLoadGuard.needs]).
+     */
+    val npuPeakBytes: Long? = null,
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
+
+    /** Its NPU context binaries' size (`.bin` files other than a ggml model): what Qualcomm's runtime loads. */
+    val npuBinaryBytes get() = files.filter { it.name.endsWith(".bin") && kind != ModelKind.Whisper }.sumOf { it.sizeBytes }
 
     fun runsOn(chip: String?) = chips.isEmpty() || chip in chips
 

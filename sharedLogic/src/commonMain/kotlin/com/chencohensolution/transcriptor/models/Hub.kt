@@ -72,6 +72,8 @@ data class HubModel(
     val commit: String,
     val variants: List<HubVariant>,
     val npu: NpuBuild? = null,
+    /** The peak memory its NPU build's load took, as its card states (`npu_peak_memory_mb`); null when it doesn't. */
+    val npuPeakBytes: Long? = null,
 ) {
     val author get() = repo.substringBefore('/')
     val name get() = repo.substringAfter('/')
@@ -100,6 +102,7 @@ data class HubModel(
         files = variant.files,
         quantizeTo = variant.quantizeTo,
         chips = npu?.let { listOf(it.chip.uppercase()) } ?: emptyList(),
+        npuPeakBytes = npuPeakBytes?.takeIf { npu != null },
     )
 }
 
@@ -192,7 +195,11 @@ class HubClient(private val fetch: suspend (url: String) -> String) {
 internal data class HubSummary(val id: String, val sha: String, val downloads: Int, val likes: Int, val tags: List<String>, val files: List<String>)
 
 /** A repo read whole: its commit, its files with their sizes and checksums, its card's license and languages. */
-internal data class HubDetail(val sha: String, val files: List<HubFile>, val license: String?, val languages: List<String>, val tags: List<String>)
+internal data class HubDetail(
+    val sha: String, val files: List<HubFile>, val license: String?, val languages: List<String>, val tags: List<String>,
+    /** The card's `npu_peak_memory_mb`, in bytes. */
+    val npuPeakBytes: Long? = null,
+)
 
 internal data class HubFile(val name: String, val size: Long, val sha256: String?, val gitSha1: String?)
 
@@ -234,6 +241,8 @@ internal fun parseRepo(body: String): HubDetail {
         license = card?.str("license"),
         languages = cardLanguages,
         tags = o.strings("tags"),
+        npuPeakBytes = (card?.get("npu_peak_memory_mb") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+            ?.takeIf { it > 0 }?.let { (it * 1024 * 1024).toLong() },
     )
 }
 
@@ -299,7 +308,7 @@ internal fun hubModel(s: HubSummary, d: HubDetail): HubModel? {
     return HubModel(
         repo = s.id, kind = kind, license = license, use = licenseUse(license),
         languages = languagesOf(s.id, kind, d.languages + tags), downloads = s.downloads, likes = s.likes,
-        commit = commit, variants = variants, npu = npu,
+        commit = commit, variants = variants, npu = npu, npuPeakBytes = d.npuPeakBytes,
     )
 }
 

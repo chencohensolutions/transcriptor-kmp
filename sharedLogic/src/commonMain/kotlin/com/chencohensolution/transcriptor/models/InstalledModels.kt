@@ -89,12 +89,13 @@ private data class FileV1(val name: String, val url: String, val sha256: String,
 private data class InstalledV1(
     val id: String, val name: String, val languages: List<String>, val parameters: String, val license: String,
     val fitsLive: Boolean, val source: String, val kind: ModelKind, val files: List<FileV1>, val quantizeTo: String? = null,
-    val chips: List<String> = emptyList(), val repo: String, val use: LicenseUse,
+    val chips: List<String> = emptyList(), val repo: String, val use: LicenseUse, val npuPeakBytes: Long? = null,
 ) {
     fun toInstalled() = InstalledModel(
         SpeechModel(
             id, name, languages, parameters, license, fitsLive, source, kind,
             files.map { ModelFile(it.name, it.url, it.sha256, it.size, it.gitSha1) }, quantizeTo = quantizeTo, chips = chips,
+            npuPeakBytes = npuPeakBytes,
         ),
         repo, use,
     )
@@ -104,14 +105,15 @@ private data class InstalledV1(
             InstalledV1(
                 id, name, languages, parameters, license, fitsLive, source, kind,
                 files.map { FileV1(it.name, it.url, it.sha256, it.sizeBytes, it.gitSha1) }, quantizeTo, chips, i.repo, i.use,
+                npuPeakBytes,
             )
         }
     }
 }
 
 /**
- * Loads NPU models so that one too big for the phone can't crash the app twice: a model whose files and working
- * memory don't fit in [freeBytes] is refused up front, and each load is marked in `models.json` while it runs.
+ * Loads NPU models so that one too big for the phone can't crash the app twice: a model whose load doesn't fit in
+ * [freeBytes] ([needs]) is refused up front, and each load is marked in `models.json` while it runs.
  *
  * - **A load the app didn't survive:** Android ends the app with no error to catch (the low-memory killer). The mark
  *   is then still there at the next start, and [recover] disables that model for this phone.
@@ -133,7 +135,7 @@ class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes
     /** Runs [load] (the model's NPU engine, made and loaded) for [model], or refuses it: see the class. */
     fun <T> load(model: SpeechModel, load: () -> T): T {
         installed.npu(model.id)?.takeIf { !it.runs }?.let { throw Refused(it.reason ?: "Disabled on this phone") }
-        val need = needs(model.sizeBytes)
+        val need = needs(model)
         val free = freeBytes()
         if (need > free) {
             val reason = "Not enough memory on this phone: needs about ${gb(need)} GB, ${gb(free)} GB free"
@@ -154,8 +156,15 @@ class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes
     companion object {
         const val KILLED = "Not enough memory on this phone: the app was closed while loading it"
 
-        /** What loading [sizeBytes] of NPU files takes: the files, a quarter more while the runtime prepares them, and 512 MB. */
-        fun needs(sizeBytes: Long) = sizeBytes + sizeBytes / 4 + 512L * 1024 * 1024
+        /** Room kept free besides the load itself. */
+        const val HEADROOM = 512L * 1024 * 1024
+
+        /**
+         * The free memory loading [model]'s NPU build needs: its measured peak ([SpeechModel.npuPeakBytes]) when known,
+         * else 2.5 times its context binaries (Whisper large-v3 8-bit's 1.95 GB took free memory on the S25 from 6.1
+         * to 1.1 GB: about 2.5 times), and [HEADROOM] either way.
+         */
+        fun needs(model: SpeechModel) = (model.npuPeakBytes ?: (model.npuBinaryBytes * 5 / 2)) + HEADROOM
 
         private fun gb(bytes: Long) = ((bytes / 1e8).toLong() / 10.0).toString()
     }
