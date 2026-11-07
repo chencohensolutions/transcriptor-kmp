@@ -52,3 +52,4 @@ skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`
 - [Round 1 (Nov 4, 2026)](../ux-history/notebooks/2026-11-04-first-round.md): c2 — moments first, record now, file
   later (picked); a — notebooks with their moments, b — shelf, then the notebook, c — moments first.
 - [Round 2 (Nov 6, 2026)](../ux-history/notebooks/2026-11-06-delete.md): deleting a moment: b — hold to select, Undo (picked); a — a menu on each moment, c — swipe to delete.
+- [Round 3 (Nov 7, 2026)](../ux-history/notebooks/2026-11-07-labels.md): labels instead of notebooks: a — chips on top, labels on the Record bar (picked); b — labels after, one list; c — a side drawer.
