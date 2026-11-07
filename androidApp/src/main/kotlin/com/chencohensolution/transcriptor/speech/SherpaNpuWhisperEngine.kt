@@ -25,7 +25,7 @@ class SherpaNpuWhisperEngine(private val dir: File, private val libDir: String) 
         val stream = recognizer.createStream()
         try {
             stream.acceptWaveform(samples, 16_000)
-            recognizer.decode(stream)
+            npuBusy.time { recognizer.decode(stream) }
             val text = recognizer.getResult(stream).text.trim()
             return if (text.isEmpty()) emptyList() else listOf(Piece(0, samples.size / 16L, text))
         } finally {

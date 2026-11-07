@@ -18,6 +18,17 @@ anything left to decide. Remove an entry once it is built.
   `UtteranceTranscriber` with `limits = UtteranceLimits.window(seconds)` (Android: `Recording.kt`, where the live
   transcriber is made). `ModelChoices` already lists it for live only once downloaded. No new strings.
 
+## Processor meters while recording (Nov 7, 2026)
+
+- Settings › Advanced: `SettingsStore.processorMeters` (`ProcessorMeterStyle`: Off, Bars, Chip, Graphs; off by
+  default). The moment screen shows `LiveLectureState.meterStyle`, `meters`, `meterHistory`; Android fills them in
+  `MainActivity.kt` from `rememberProcessorMeters` (`ProcessorMetersSampling.kt`), once a second while the screen
+  shows. Views to mirror: `ui/ProcessorMetersView.kt`. Strings `meters_*`, `settings_meters*`, `settings_advanced`.
+- iOS needs its own `ProcessorProbe` in `sharedLogic/src/iosMain` feeding `ProcessorMeterSampler`: the app's CPU time
+  from `task_info`/`thread_info` (`cpuSeconds`), `ProcessInfo.activeProcessorCount` (`cpuCores`). iOS exposes no GPU
+  busy %, clocks or temperatures to apps: leave them null (those meters hide). NPU: time the Core ML calls with an
+  `NpuBusyClock` if the Neural Engine is used, else null.
+
 ## Notebooks
 
 - Android: `NotebooksScreen.kt` (mirror it in SwiftUI), `MainActivity.kt` (the screen as the root, Record with the

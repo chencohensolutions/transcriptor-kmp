@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import androidx.compose.material3.AlertDialog
@@ -120,6 +121,9 @@ class LiveLectureActions(
  * The list is laid out from the bottom, so the live line stays in view by itself and the lines above glide up as it
  * grows and as new lines come, with no scrolling; each new word fades in quickly, and a finished line settles from
  * grey into the text's color.
+ *
+ * With processor meters on (Settings › Advanced, [LiveLectureState.meterStyle]): three bars or the last minute's graphs
+ * under the top bar, or a chip at the transcript's top end that opens a sheet (`ProcessorMetersView.kt`).
  */
 @Composable
 fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
@@ -137,6 +141,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
         }
     }
     var renaming by remember { mutableStateOf<Speaker?>(null) }
+    var metersOpen by remember { mutableStateOf(false) }
     // The lines already there when the screen opened don't animate; every line after them is new.
     val shownAtOpen = remember { state.lecture.segments.map { it.id }.toSet() }
     renaming?.let { speaker ->
@@ -185,6 +190,12 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     ) { Icon(Icons.Filled.Stop, stringResource(R.string.lecture_stop)) }
                 }
                 HorizontalDivider()
+                val meters = state.meters
+                if (meters != null) when (state.meterStyle) {
+                    ProcessorMeterStyle.Bars -> MetersBars(meters)
+                    ProcessorMeterStyle.Graphs -> MetersGraphs(meters, state.meterHistory)
+                    else -> {}
+                }
             }
         }
 
@@ -238,6 +249,11 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         } }
                     }
                 }
+            }
+            val meters = state.meters
+            if (state.meterStyle == ProcessorMeterStyle.Chip && meters != null) {
+                MetersChip(meters, Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 12.dp)) { metersOpen = true }
+                if (metersOpen) MetersSheet(meters) { metersOpen = false }
             }
             if (!following) {
                 Surface(
