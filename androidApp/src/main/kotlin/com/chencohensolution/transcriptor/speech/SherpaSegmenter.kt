@@ -39,7 +39,7 @@ class SherpaSegmenter(model: File, npu: File? = null, libDir: String? = null, th
 
     override fun segment(window: FloatArray) = Segmentation(
         segmentation.frameShift, segmentation.frameSize,
-        powersetToActive(segmentation.forward(window), segmentation.numClasses, segmentation.numSpeakers, segmentation.powersetMaxClasses),
+        powersetToActive(if (onNpu) npuBusy.time { segmentation.forward(window) } else segmentation.forward(window), segmentation.numClasses, segmentation.numSpeakers, segmentation.powersetMaxClasses),
     )
 
     override fun close() = segmentation.release()

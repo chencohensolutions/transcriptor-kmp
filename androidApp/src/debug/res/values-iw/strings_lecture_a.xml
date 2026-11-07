@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="lecture_a_cpu">CPU · אפליקציה</string>
-    <string name="lecture_a_gpu">GPU · טלפון</string>
-    <string name="lecture_a_npu_ours">NPU · השימוש שלנו</string>
-</resources>

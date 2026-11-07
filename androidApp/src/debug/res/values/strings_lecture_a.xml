@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="lecture_a_cpu">CPU · app</string>
-    <string name="lecture_a_gpu">GPU · phone</string>
-    <string name="lecture_a_npu_ours">NPU · our use</string>
-</resources>

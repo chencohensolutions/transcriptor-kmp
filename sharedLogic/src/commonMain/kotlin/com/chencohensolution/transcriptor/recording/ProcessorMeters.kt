@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.recording
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlin.math.roundToInt
 
 /**
@@ -37,11 +39,12 @@ data class CoreClock(val first: Int, val last: Int, val clock: Clock)
 
 /**
  * One reading of the counters the meters are worked out from. [cpuSeconds] is the app's CPU time so far (user +
- * system, all threads); [npuBusyMillis] the time our models have spent running on the NPU so far.
+ * system, all threads); [npuBusyMillis] the time our models have spent running on the NPU so far ([NpuBusyClock]).
+ * Anything that couldn't be read is null, and its meter is hidden.
  */
 data class ProcessorSample(
     val atMillis: Long,
-    val cpuSeconds: Double,
+    val cpuSeconds: Double?,
     val cpuCores: Int,
     val npuBusyMillis: Long? = null,
     val gpuBusyPercent: Int? = null,
@@ -56,7 +59,11 @@ data class ProcessorSample(
  */
 fun processorMeters(previous: ProcessorSample?, now: ProcessorSample): ProcessorMeters {
     val wallMillis = previous?.let { now.atMillis - it.atMillis }?.takeIf { it > 0 }
-    val coresBusy = wallMillis?.let { ((now.cpuSeconds - previous.cpuSeconds) * 1000 / it).toFloat().coerceIn(0f, now.cpuCores.toFloat()) }
+    val coresBusy = wallMillis?.let { wall ->
+        val before = previous.cpuSeconds ?: return@let null
+        val after = now.cpuSeconds ?: return@let null
+        ((after - before) * 1000 / wall).toFloat().coerceIn(0f, now.cpuCores.toFloat())
+    }
     val npuBusy = wallMillis?.let { wall ->
         val before = previous.npuBusyMillis ?: return@let null
         val after = now.npuBusyMillis ?: return@let null
@@ -72,4 +79,71 @@ fun processorMeters(previous: ProcessorSample?, now: ProcessorSample): Processor
         gpuClock = now.gpuClock,
         npuTemperatureC = now.npuTemperatureMilliC?.let { it / 1000f },
     )
+}
+
+/** Reads a [ProcessorSample] now (the platform's files); a field it can't read is null. */
+fun interface ProcessorProbe {
+    fun sample(): ProcessorSample
+}
+
+/**
+ * Samples [probe] (about once a second, while the lecture screen shows meters) and keeps the last [keep] meters for
+ * the graphs. [reset] when sampling stops, so a gap isn't counted as one long interval.
+ */
+class ProcessorMeterSampler(private val probe: ProcessorProbe, private val keep: Int = 60) {
+    private var previous: ProcessorSample? = null
+
+    /** The meters so far, oldest first; the first reading (no interval yet) isn't in it. */
+    var history: List<ProcessorMeters> = emptyList()
+        private set
+
+    fun sample(): ProcessorMeters {
+        val now = probe.sample()
+        val meters = processorMeters(previous, now)
+        if (previous != null) history = (history + meters).takeLast(keep)
+        previous = now
+        return meters
+    }
+
+    fun reset() {
+        previous = null
+        history = emptyList()
+    }
+}
+
+/**
+ * The time our models have kept the NPU busy: each NPU call between [begin] and [end]. Calls that overlap (Whisper
+ * and voice prints at once) count once, as wall time with at least one call running. [busyMillis] is null until the
+ * first call, so a recording with no NPU model shows no NPU meter.
+ */
+class NpuBusyClock(private val clock: () -> Long) {
+    private val lock = SynchronizedObject()
+    private var running = 0
+    private var since = 0L
+    private var done = 0L
+    private var used = false
+
+    fun begin() = synchronized(lock) {
+        if (running++ == 0) since = clock()
+        used = true
+    }
+
+    fun end() = synchronized(lock) {
+        if (running == 0) return@synchronized
+        if (--running == 0) done += clock() - since
+    }
+
+    inline fun <T> time(block: () -> T): T {
+        begin()
+        try {
+            return block()
+        } finally {
+            end()
+        }
+    }
+
+    val busyMillis: Long?
+        get() = synchronized(lock) {
+            if (!used) null else done + if (running > 0) clock() - since else 0
+        }
 }

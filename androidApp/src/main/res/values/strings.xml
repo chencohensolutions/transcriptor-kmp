@@ -287,4 +287,34 @@
     <string name="review_delete_text">Its recording, transcript and notes are deleted from the moments folder. This can\'t be undone.</string>
     <string name="review_delete_lecture_confirm">Delete</string>
     <string name="review_delete_cancel">Cancel</string>
+
+    <!-- Processor meters while recording (Settings › Advanced) -->
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_meters">Processor meters while recording</string>
+    <string name="settings_meters_note">How hard the phone works while it records and transcribes. CPU counts this app only, GPU the whole phone, NPU only this app\'s models (the phone doesn\'t show its total).</string>
+    <string name="settings_meters_off">Off</string>
+    <string name="settings_meters_bars">Three bars under the top bar</string>
+    <string name="settings_meters_chip">A small chip, tap for details</string>
+    <string name="settings_meters_graphs">The last minute as graphs</string>
+    <string name="meters_cpu">CPU · app</string>
+    <string name="meters_gpu">GPU · phone</string>
+    <string name="meters_npu_ours">NPU · our use</string>
+    <string name="meters_short_cpu">CPU</string>
+    <string name="meters_short_gpu">GPU</string>
+    <string name="meters_short_npu">NPU</string>
+    <string name="meters_last_minute">Last minute · tap to fold</string>
+    <string name="meters_title">Processors</string>
+    <string name="meters_cpu_long">CPU · this app</string>
+    <string name="meters_cpu_note">%1$.1f of %2$d cores busy with this app. Other apps aren\'t counted.</string>
+    <string name="meters_gpu_long">GPU · whole phone</string>
+    <string name="meters_gpu_note">Every app, including the screen.</string>
+    <string name="meters_npu_long">NPU · our use</string>
+    <string name="meters_npu_note">Time this app\'s models keep the NPU busy. The phone doesn\'t show its total NPU load.</string>
+    <string name="meters_clocks">Clocks</string>
+    <string name="meters_cores">Cores %1$d–%2$d</string>
+    <string name="meters_gpu_clock">GPU</string>
+    <string name="meters_ghz">%1$.2f of %2$.2f GHz</string>
+    <string name="meters_mhz">%1$d of %2$d MHz</string>
+    <string name="meters_npu_temperature">NPU temperature</string>
+    <string name="meters_celsius">%1$.1f °C</string>
 </resources>

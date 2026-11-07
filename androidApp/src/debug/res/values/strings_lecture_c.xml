@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="lecture_c_cpu">CPU · app</string>
-    <string name="lecture_c_gpu">GPU · phone</string>
-    <string name="lecture_c_npu_ours">NPU · our use</string>
-    <string name="lecture_c_last_minute">Last minute · tap to fold</string>
-    <string name="lecture_c_folded">CPU %1$s · GPU %2$s · NPU (our use) %3$s</string>
-</resources>

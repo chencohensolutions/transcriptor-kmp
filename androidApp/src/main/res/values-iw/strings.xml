@@ -287,4 +287,34 @@
     <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית הרגעים. אי אפשר לבטל את זה.</string>
     <string name="review_delete_lecture_confirm">מחיקה</string>
     <string name="review_delete_cancel">ביטול</string>
+
+    <!-- מדי מעבדים בזמן הקלטה (הגדרות › מתקדם) -->
+    <string name="settings_advanced">מתקדם</string>
+    <string name="settings_meters">מדי מעבדים בזמן הקלטה</string>
+    <string name="settings_meters_note">כמה הטלפון עובד בזמן שהוא מקליט ומתמלל. CPU סופר רק את האפליקציה, GPU את כל הטלפון, NPU רק את המודלים של האפליקציה (הטלפון לא מראה את הסך הכול).</string>
+    <string name="settings_meters_off">כבוי</string>
+    <string name="settings_meters_bars">שלושה פסים מתחת לסרגל העליון</string>
+    <string name="settings_meters_chip">תווית קטנה, הקשה לפרטים</string>
+    <string name="settings_meters_graphs">הדקה האחרונה כגרפים</string>
+    <string name="meters_cpu">CPU · אפליקציה</string>
+    <string name="meters_gpu">GPU · טלפון</string>
+    <string name="meters_npu_ours">NPU · השימוש שלנו</string>
+    <string name="meters_short_cpu">CPU</string>
+    <string name="meters_short_gpu">GPU</string>
+    <string name="meters_short_npu">NPU</string>
+    <string name="meters_last_minute">הדקה האחרונה · הקשה לקיפול</string>
+    <string name="meters_title">מעבדים</string>
+    <string name="meters_cpu_long">CPU · האפליקציה</string>
+    <string name="meters_cpu_note">%1$.1f מתוך %2$d ליבות עסוקות באפליקציה. אפליקציות אחרות לא נספרות.</string>
+    <string name="meters_gpu_long">GPU · כל הטלפון</string>
+    <string name="meters_gpu_note">כל האפליקציות, כולל המסך.</string>
+    <string name="meters_npu_long">NPU · השימוש שלנו</string>
+    <string name="meters_npu_note">הזמן שהמודלים של האפליקציה מעסיקים את ה־NPU. הטלפון לא מראה את העומס הכולל על ה־NPU.</string>
+    <string name="meters_clocks">שעונים</string>
+    <string name="meters_cores">ליבות %1$d–%2$d</string>
+    <string name="meters_gpu_clock">GPU</string>
+    <string name="meters_ghz">%1$.2f מתוך %2$.2f GHz</string>
+    <string name="meters_mhz">%1$d מתוך %2$d MHz</string>
+    <string name="meters_npu_temperature">טמפרטורת ה־NPU</string>
+    <string name="meters_celsius">%1$.1f°C</string>
 </resources>
