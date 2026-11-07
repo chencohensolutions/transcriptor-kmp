@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- UI lab: the lecture screen's option a. -->
-<resources>
-    <string name="lecture_a_still_live">Still recording: new lines keep coming below</string>
-    <string name="lecture_a_cancel">Cancel</string>
-    <string name="lecture_a_save">Save</string>
-</resources>

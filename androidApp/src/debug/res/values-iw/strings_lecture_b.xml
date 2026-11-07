@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- UI lab: the lecture screen's option b. -->
-<resources>
-    <string name="lecture_b_line_at">השורה ב־%1$s</string>
-    <string name="lecture_b_previous">השורה הקודמת</string>
-    <string name="lecture_b_next">השורה הבאה</string>
-    <string name="lecture_b_done">סיום</string>
-</resources>

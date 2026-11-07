@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- UI lab: the notebooks screen's option c. -->
-<resources>
-    <string name="notebooks_c_deleted_one">Lecture deleted</string>
-    <string name="notebooks_c_deleted_many">%1$d lectures deleted</string>
-    <string name="notebooks_c_undo">Undo</string>
-    <string name="notebooks_c_delete">Delete</string>
-</resources>

@@ -45,3 +45,4 @@ Empty (no notebooks, no lectures): a line on what a notebook is; Record still wo
 
 - [Round 1 (Nov 4, 2026)](../ux-history/notebooks/2026-11-04-first-round.md): c2 — lectures first, record now, file
   later (picked); a — notebooks with their lectures, b — shelf, then the notebook, c — lectures first.
+- [Round 2 (Nov 6, 2026)](../ux-history/notebooks/2026-11-06-delete.md): deleting a lecture: b — hold to select, Undo (picked); a — a menu on each lecture, c — swipe to delete.
