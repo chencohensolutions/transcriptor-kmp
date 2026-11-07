@@ -465,6 +465,26 @@ class LibraryFolderTest {
     }
 
     @Test
+    fun lecturesStillInTheAppWhenTheLibraryHasTheLabelsKeepTheirs() {
+        adoptLibrary(lectures, labels, library)
+        // Before labels: notebooks.json was in the library; a lecture not yet archived was here in its notebook.
+        val l = recorded("here")
+        phone.createDirectories("/files/notebooks/psych".toPath())
+        phone.atomicMove(lectures.local.folder("here"), "/files/notebooks/psych/here".toPath())
+        VoiceStore(phone, "/files/notebooks/psych".toPath()).save(Voice("Dana", listOf(1f)))
+        folder.write("/library/notebooks.json".toPath()) { writeUtf8("""{"v": 1, "notebooks": [{"id": "psych", "title": "Psych", "language": "he", "color": 1, "createdAt": 1}]}""") }
+
+        migrateToLabels(lectures.local, 1, into = library)
+        migrateToLabels(library, 1)
+
+        assertEquals(listOf(l.id), lectures.all().map { it.id })
+        assertEquals(listOf("psych"), lectures.load("here")?.labels)
+        assertEquals(listOf("Psych"), labels.all().map { it.name })
+        assertEquals(listOf("Dana"), voices.load().map { it.name })
+        assertFalse(phone.exists("/files/labels.json".toPath()))
+    }
+
+    @Test
     fun aLibraryFromBeforeLabelsIsMovedToLabelsWhenPicked() {
         val inLibrary = LectureStore(folder, "/library".toPath())
         folder.createDirectories("/library".toPath())

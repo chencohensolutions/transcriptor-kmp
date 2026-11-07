@@ -29,16 +29,19 @@ anything left to decide. Remove an entry once it is built.
   busy %, clocks or temperatures to apps: leave them null (those meters hide). NPU: time the Core ML calls with an
   `NpuBusyClock` if the Neural Engine is used, else null.
 
-## Notebooks
+## Notebooks (moments and labels)
 
-- Android: `NotebooksScreen.kt` (mirror it in SwiftUI), `MainActivity.kt` (the screen as the root, Record with the
-  microphone permission, the banner back to the moment), `Recording.kt` (`library`, `file`, `working`, `utcOffset`);
+- Android: `NotebooksScreen.kt` (mirror it in SwiftUI: chips by label, the Record bar's labels and language, the
+  labels sheet), `MainActivity.kt` (the screen as the root, Record with the microphone permission, the banner back to
+  the moment), `Recording.kt` (`library`, `setLabels`, `deleteLabel`, `working`, `utcOffset`, `migrateLibrary`);
   `docs/screens/notebooks.md`.
-- Shared, to call from SwiftUI: `NotebooksController` (`library`, `reload()` off the main thread, `create`, `assign`,
-  `assignToNew`), `notebooksState(library, now, utcOffset, recording, working)`, `RecordingNow`, `UNFILED`,
-  `NotebookStore.migrate` at launch. `utcOffset` on iOS: `NSTimeZone.localTimeZone.secondsFromGMTForDate` × 1000.
-- Recording in no notebook: `LectureSession.start(Notebook(UNFILED, <"Not in a notebook">, language, []), title)`.
-- Filing gives the notebook the named speakers' voices (Android's `Recording.file`, with `printOf`).
+- Shared, to call from SwiftUI: `NotebooksController` (`library`, `reload()` off the main thread, `newLabel`,
+  `setLabels(ids, add, remove, busy)`, `renameLabel`, `deleteLabel(id, busy)`, `delete`),
+  `notebooksState(library, now, utcOffset, recording, working)`, `RecordingNow`, `labelNames`, `LabelStore`.
+  `utcOffset` on iOS: `NSTimeZone.localTimeZone.secondsFromGMTForDate` × 1000.
+- At launch: `migrateToLabels(local, now, utcOffset, into = library ?: local)`, then for the moments folder before the
+  first list (an iOS app has had no notebooks, so this only matters for a folder shared with Android).
+- Recording: `LectureSession.start(labels, labelNames, language, title)`.
 - Strings: `notebooks_*`.
 
 ## Settings and Manage models
@@ -73,7 +76,7 @@ anything left to decide. Remove an entry once it is built.
 
 - Android: `LectureScreen.kt` and `RecordingIndicators.kt` (the screen); `RecordingService.kt`, `Recording.kt` and
   `MainActivity.kt` (keeping it recording, and the temporary start screen); `docs/screens/lecture.md`.
-- Shared, to call from SwiftUI: `LectureSession` (`state`, `start(notebook, title)`, `pauseOrResume()`,
+- Shared, to call from SwiftUI: `LectureSession` (`state`, `start(labels, labelNames, language, title)`, `pauseOrResume()`,
   `addNote(atMillis, text)`, `stop()`), `timelineOf(lecture)`, `SettingsStore.audioFormat`, `SettingsStore.flacLevel` (0–8,
   passed to `AudioRecorder.start` and to `FlacEncode`), `FlacCompression` (`pending()`, `compress(lecture, progress)`).
 - To write in `sharedLogic/src/iosMain`: an `AudioRecorder` on `AVAudioEngine` at 48 kHz stereo 16 bit, writing with

@@ -9,9 +9,9 @@ recording or the transcription.
 
 ## What it shows
 
-- The moment's title and its notebook, the elapsed time, a red dot that breathes while recording, the microphone's
+- The moment's title and its labels, the elapsed time, a red dot that breathes while recording, the microphone's
   level, Pause/Resume and Stop.
-- The transcript: one line per piece of speech (split at pauses), each with its start time, in the notebook's
+- The transcript: one line per piece of speech (split at pauses), each with its start time, in the moment's
   language direction. The line being spoken now is grey and italic until it ends. With a model that runs live in
   ~30 s windows (large-v3 on the CPU, when chosen for live) a line is a window, shown when it is transcribed, and there
   is no grey line; "behind" grows by up to a window.
@@ -37,7 +37,7 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
   appears 2.5–5 s after its text, and a line may then split where the speaker changed.
 
 - Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
-  it names the speaker, and the notebook remembers the voice for its next lectures.
+  it names the speaker, and the app remembers the voice for the next moments.
 
 ## Processor meters
 

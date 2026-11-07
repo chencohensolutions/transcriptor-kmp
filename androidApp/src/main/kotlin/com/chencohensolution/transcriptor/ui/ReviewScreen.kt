@@ -196,7 +196,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                     IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) }
                     Column(Modifier.weight(1f)) {
                         Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(state.notebookTitle, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1)
+                        if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Box(
                         Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
