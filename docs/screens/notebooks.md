@@ -30,6 +30,12 @@ The app's first screen, lectures first (round 1's c2). In the app.
 
 Empty (no notebooks, no lectures): a line on what a notebook is; Record still works.
 
+**Deleting** (round 2's b): holding a lecture selects it; the top bar becomes "2 selected" with ✕ and a trash can, a
+tap adds or removes lectures, Back clears the selection. Delete takes them off the list at once with "2 lectures
+deleted · Undo"; when the snackbar closes, their folders (recording, transcript, notes, versions) are deleted for good,
+here or in the lectures folder. A lecture a pass is working on can't be selected, and the one recording or open is
+skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`).
+
 ## Code
 
 - Screen: `androidApp/.../ui/NotebooksScreen.kt` (`NotebooksScreen`, `NotebooksActions`); wired in `MainActivity`.

@@ -11,7 +11,7 @@ Same round as [deleting a lecture](../notebooks/2026-11-06-delete.md) and
   asks first. *Turned down*.
 - **b — Share in the top bar**: a share button beside the pencil; one tap makes the Word file with everything
   (speakers' names, times, notes) and opens Android's share sheet; holding it, or ⋮ → Save as Word, saves it in the
-  lecture's folder. ⋮ → Delete lecture… asks first, then back to the list. *Picked*.
+  lecture's folder. ⋮ → Delete lecture… asks first, then back to the list. *Picked*, promoted in 7dde9ff.
 
 ## What they faked
 - Playback and passes (as `review current`).

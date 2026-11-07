@@ -38,21 +38,29 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
 
 - Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the lecture and
   opens it after ([lecture-review.md](lecture-review.md)).
-- Tapping a line opens it (to come: play that part, correct the text).
-- The transcript follows the live line; scrolling back stops following until "Back to live".
+- Tapping a finished line fixes it in place (round 2's a2): it becomes a field where it is, with Cancel and Save, and
+  glides up to stay above the keyboard as it opens and as the text grows; recording and live lines go on below and the
+  note bar steps aside. A saved line is marked ✎ (edited: the improve pass keeps it). The session keeps the fixes apart
+  and lays them over live transcription's lines every time they are made again (`LectureSession.editLine`, `shown`),
+  before and after they are split by speaker. The line being spoken now can't be edited.
+- The transcript is laid out from the bottom, so the live line stays in view by itself: the lines above glide up as it
+  grows and as new lines come, with no scrolling (a scroll running all the time would swallow taps). Each new word
+  fades in quickly (200 ms); a finished line settles from grey into the text's color. Scrolling back stops following
+  until "Back to live".
 
 ## Code
 
 - Screen: `androidApp/src/main/kotlin/com/chencohensolution/transcriptor/ui/LectureScreen.kt` (`LectureScreen`,
   `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`).
 - State and controller (shared): `recording/LiveLectureState.kt`, `recording/LectureSession.kt` (`start`,
-  `pauseOrResume`, `addNote`, `stop`), `notebook/Timeline.kt` (`timelineOf`), `notebook/LectureStore.kt`,
+  `pauseOrResume`, `addNote`, `editLine`, `stop`), `notebook/Timeline.kt` (`timelineOf`), `notebook/LectureStore.kt`,
   `recording/WavWriter.kt`, `recording/FlacCompression.kt`, `settings/Settings.kt` (`AudioFormat`).
 - Android: `recording/AndroidRecorder.kt` and `FlacEncoder.kt` (sharedLogic's androidMain); `RecordingService.kt`
   (foreground service: microphone while recording, media processing while compressing); `Recording.kt` (the app's
   one session); `MainActivity.kt` (the temporary start screen, then this screen).
 - Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
-  screen with a faked recording and live transcription (`./scripts/ui-lab.sh lecture current`).
+  screen with a faked recording and live transcription that keeps making lines (`LectureGrowingLab.kt`;
+  `./scripts/ui-lab.sh lecture current`).
 
 ## Design history
 

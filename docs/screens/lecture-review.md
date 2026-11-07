@@ -40,6 +40,12 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 - ⋮ → Versions (n): the transcript now and every earlier one (live or refined, its model, when it was kept, its lines
   and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
   is lost. Notes belong to the lecture, not to a version.
+- Share, beside the pencil (round 3's b): one tap makes the lecture's Word file (`transcriptDocx`: the title, the
+  notebook, date and length, a paragraph per speaker turn with the name and time above it, the notes as shaded italic
+  paragraphs after their turn; right-to-left for Hebrew) and opens Android's share sheet (through the app's
+  FileProvider, from its cache). Holding it, or ⋮ → Save as Word, saves `<title>.docx` in the lecture's folder,
+  beside the recording (`LectureStore.saveWord`).
+- ⋮ → Delete lecture…, in red at the end, asks first, then closes the lecture and deletes its folder for good.
 - Every change is saved to `lecture.json` at once.
 
 ## Code

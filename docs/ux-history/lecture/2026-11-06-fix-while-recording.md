@@ -12,7 +12,7 @@ Same round as [deleting a lecture](../notebooks/2026-11-06-delete.md) and
 - **a2 — a, with motion**: the line being fixed glides up to stay above the keyboard as it opens and as the text
   grows; the transcript is laid out from the bottom (reversed list), so lines glide up as the live line grows and as
   new lines come, with no scrolling (a scroll running all the time swallowed taps in a); each new word fades in over
-  200 ms; a finished line settles from grey into the text's color. *Picked*.
+  200 ms; a finished line settles from grey into the text's color. *Picked*, promoted in 417df41.
 - **b — Fix lines in a sheet**: a sheet with the line, ‹ › to the lines around it, and what is said now on top.
   *Turned down*.
 - **c — Words fade in**: each word fades in (450 ms), lines glide up, no "…". *Turned down* (its fade went into a2).

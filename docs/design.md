@@ -165,8 +165,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
 `transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the lecture to read beside its
 audio (owner's request, Nov 4, 2026): its title, date and length, then each speaker's turn with its time and the notes
-after the turn they were written in, rewritten on every save (`transcriptMarkdown`). Other exports (Word, PDF,
-subtitles) come later from `lecture.json`.
+after the turn they were written in, rewritten on every save (`transcriptMarkdown`). A Word file of the same reading
+(`transcriptDocx`, Nov 7, 2026) is made on demand: shared from the lecture, or saved beside the audio as
+`<title>.docx`. Other exports (PDF, subtitles) come later from `lecture.json`.
 
 **Where the files are** (owner's decision, Nov 4, 2026): a lecture records in the app's own storage, and once it is
 finished (stopped, its passes done, compressed to FLAC if that is the setting, not open) it moves to the **lectures
@@ -251,6 +252,8 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
 - Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.
+- Fixing a line while recording (the session keeps the user's words over live lines), deleting lectures (hold to
+  select, Undo), and the Word export (Nov 7, 2026).
 
 ## Open questions
 
