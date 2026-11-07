@@ -279,4 +279,12 @@
     <string name="lecture_edit_still_live">ההקלטה ממשיכה: שורות חדשות נוספות למטה</string>
     <string name="lecture_edit_cancel">ביטול</string>
     <string name="lecture_edit_save">שמירה</string>
+    <string name="review_share_word">שיתוף כקובץ Word</string>
+    <string name="review_save_word">שמירה כקובץ Word</string>
+    <string name="review_word_saved">%1$s נשמר ליד ההקלטה</string>
+    <string name="review_delete_lecture">מחיקת ההרצאה…</string>
+    <string name="review_delete_title">למחוק את %1$s?</string>
+    <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית ההרצאות. אי אפשר לבטל את זה.</string>
+    <string name="review_delete_lecture_confirm">מחיקה</string>
+    <string name="review_delete_cancel">ביטול</string>
 </resources>

@@ -1,5 +1,9 @@
 package com.chencohensolution.transcriptor.ui
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.chencohensolution.transcriptor.notebook.docxName
+import com.chencohensolution.transcriptor.notebook.transcriptDocx
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,7 +23,8 @@ import kotlinx.coroutines.delay
 // Fakes: playback (a clock; no audio), the improve pass and the speaker pass (progress, then made-up results), the
 // lecture's speakers and lines, the models to improve with and their estimates (as if each had run once on this
 // phone; the sample is three minutes long). Seeking, playing a sentence, editing, moving a line, renaming, notes and
-// the speed work in memory.
+// the speed work in memory. The Word file is the app's; Share opens the share sheet with it and Save as Word saves it
+// in Downloads/Transcriptor (the lab has no lecture folders). Delete lecture only says so.
 internal val reviewCurrent = LabOption("current", "Document + player below (the app's)", "ReviewScreen with faked playback and passes") {
     val (state, actions) = rememberReviewLab(modelsDownloaded = true)
     ReviewScreen(state, actions)
@@ -38,6 +43,7 @@ internal val reviewCurrentNoModel = LabOption("current-none", "The app's, nothin
  */
 @Composable
 private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, ReviewActions> {
+    val context = LocalContext.current
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
     var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)) }
     var position by remember { mutableStateOf(65_000L) }
@@ -95,6 +101,12 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         addNote = { at, text -> lecture = lecture.copy(notes = (lecture.notes + Note("n${lecture.notes.size + 1}", at, text.trim())).sortedBy { it.atMillis }) },
         editNote = { id, text -> lecture = lecture.copy(notes = lecture.notes.map { if (it.id == id) it.copy(text = text.trim()) else it }) },
         deleteNote = { id -> lecture = lecture.copy(notes = lecture.notes.filter { it.id != id }) },
+        shareWord = { val name = docxName(lecture); LabWord.share(context, LabWord.save(context, name, transcriptDocx(lecture, LabData.notebooks.first().title)), name) },
+        saveWord = {
+            LabWord.save(context, docxName(lecture), transcriptDocx(lecture, LabData.notebooks.first().title))
+            Toast.makeText(context, "Lab: saved in Downloads/Transcriptor (the app: beside the recording)", Toast.LENGTH_LONG).show()
+        },
+        deleteLecture = { Toast.makeText(context, "Lab: deleted; the list would open with it gone", Toast.LENGTH_LONG).show() },
     )
     return state to actions
 }

@@ -38,7 +38,7 @@ fun transcriptMarkdown(lecture: Lecture, utcOffsetMillis: Long = 0): String {
 }
 
 /** "Speaker" in the languages most lectures are in; English for the rest. */
-private val SPEAKER = mapOf(
+internal val SPEAKER = mapOf(
     "he" to "דובר", "ar" to "متحدث", "en" to "Speaker", "de" to "Sprecher", "fr" to "Intervenant", "es" to "Hablante",
     "it" to "Relatore", "pt" to "Orador", "ru" to "Говорящий", "uk" to "Мовець", "pl" to "Mówca", "nl" to "Spreker",
     "tr" to "Konuşmacı", "fa" to "گوینده", "hi" to "वक्ता", "zh" to "发言人", "ja" to "話者", "ko" to "화자",
@@ -48,7 +48,7 @@ private val SPEAKER = mapOf(
 private fun escape(text: String) = text.replace(Regex("""([\\`*_\[\]#<>|])"""), """\\$1""")
 
 /** 12:03, or 1:02:03 past an hour. */
-private fun clock(millis: Long): String {
+internal fun clock(millis: Long): String {
     val total = millis / 1000
     val h = total / 3600
     val m = (total % 3600) / 60
@@ -59,7 +59,7 @@ private fun clock(millis: Long): String {
 private fun two(n: Long) = n.toString().padStart(2, '0')
 
 /** "2026-11-02 10:00" from local milliseconds (UTC plus the offset). */
-private fun dateOf(localMillis: Long): String {
+internal fun dateOf(localMillis: Long): String {
     val days = localMillis.floorDiv(DAY)
     val minutes = localMillis.mod(DAY) / 60_000
     val (y, m, d) = civil(days)

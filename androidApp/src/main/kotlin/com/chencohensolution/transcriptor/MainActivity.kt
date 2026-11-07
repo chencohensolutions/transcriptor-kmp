@@ -1,5 +1,8 @@
 package com.chencohensolution.transcriptor
 
+import java.io.File
+import androidx.core.content.FileProvider
+import android.content.Intent
 import android.Manifest
 import android.os.Bundle
 import android.provider.DocumentsContract
@@ -155,6 +158,18 @@ class MainActivity : ComponentActivity() {
                                 },
                                 switchVersion = r::switchTo,
                                 addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
+                                shareWord = { lifecycleScope.launch(Dispatchers.IO) { r.word()?.let { (name, bytes) -> shareWord(name, bytes) } } },
+                                saveWord = {
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val name = runCatching { r.saveWord() }.getOrNull() ?: return@launch
+                                        withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, getString(R.string.review_word_saved, name), Toast.LENGTH_LONG).show() }
+                                    }
+                                },
+                                deleteLecture = {
+                                    val id = review.lecture.id
+                                    r.close()
+                                    lifecycleScope.launch(Dispatchers.IO) { Recording.delete(listOf(id)) }
+                                },
                             ),
                         )
                     }
@@ -223,6 +238,20 @@ class MainActivity : ComponentActivity() {
             ),
             notice,
         )
+    }
+
+    /** Android's share sheet with a lecture's Word file, written to the app's cache for the FileProvider. */
+    private fun shareWord(name: String, bytes: ByteArray) {
+        val dir = File(cacheDir, "shared").apply { deleteRecursively(); mkdirs() }
+        val file = File(dir, name).apply { writeBytes(bytes) }
+        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TITLE, name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(send, name))
     }
 
     /** Opens a recorded lecture, under its notebook's title ("Not in a notebook" for an unfiled one). */

@@ -1,5 +1,9 @@
 package com.chencohensolution.transcriptor.ui
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Share
 import com.chencohensolution.transcriptor.review.LectureReview
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -123,6 +127,12 @@ class ReviewActions(
     val addNote: (atMillis: Long, text: String) -> Unit = { _, _ -> },
     val editNote: (id: String, text: String) -> Unit = { _, _ -> },
     val deleteNote: (id: String) -> Unit = {},
+    /** Makes the lecture's Word file and opens Android's share sheet with it. */
+    val shareWord: () -> Unit = {},
+    /** Saves the lecture's Word file in its folder, beside its recording. */
+    val saveWord: () -> Unit = {},
+    /** Deletes the lecture for good (asked first) and goes back to the list. */
+    val deleteLecture: () -> Unit = {},
 )
 
 /**
@@ -132,9 +142,28 @@ class ReviewActions(
  * or delete). At the bottom, the overview of the whole lecture (a lane per speaker, the notes, the playhead; tap to
  * jump) and the player. The passes over the recording are in the menu, with a progress banner while one runs:
  * Improve transcription… is always there, whether or not lectures are improved on their own.
+ *
+ * Beside the pencil, Share (round 3's b): one tap makes the Word file with everything in it (the speakers' names, the
+ * times, the notes) and opens Android's share sheet; holding it, or ⋮ → Save as Word, saves it in the lecture's folder.
+ * Delete lecture…, in red at the end of ⋮, asks first, then goes back to the list.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
+    var confirmingDelete by remember { mutableStateOf(false) }
+    if (confirmingDelete) AlertDialog(
+        onDismissRequest = { confirmingDelete = false },
+        icon = { Icon(Icons.Filled.Delete, null) },
+        title = { Text(stringResource(R.string.review_delete_title, isolated(state.lecture.title))) },
+        text = { Text(stringResource(R.string.review_delete_text)) },
+        confirmButton = {
+            TextButton(onClick = { confirmingDelete = false; actions.deleteLecture() }) {
+                Text(stringResource(R.string.review_delete_lecture_confirm), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = { confirmingDelete = false }) { Text(stringResource(R.string.review_delete_cancel)) } },
+    )
+
     var editing by remember { mutableStateOf(false) }
     val edits = remember { mutableStateMapOf<String, String>() }
     var menu by remember { mutableStateOf(false) }
@@ -169,6 +198,10 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(state.notebookTitle, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1)
                     }
+                    Box(
+                        Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Filled.Share, stringResource(R.string.review_share_word)) }
                     IconButton(onClick = {
                         if (editing) {
                             edits.forEach { (id, text) -> actions.editLine(id, text) }
@@ -199,6 +232,17 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                             if (state.speakerPass != null) DropdownMenuItem(
                                 text = { Text(stringResource(R.string.review_find_speakers)) }, enabled = state.speakerPass !is PassState.Running,
                                 onClick = { actions.findSpeakers(); menu = false },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.review_save_word)) },
+                                leadingIcon = { Icon(Icons.Filled.Description, null) },
+                                onClick = { menu = false; actions.saveWord() },
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.review_delete_lecture), color = MaterialTheme.colorScheme.error) },
+                                leadingIcon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                onClick = { menu = false; confirmingDelete = true },
                             )
                         }
                     }

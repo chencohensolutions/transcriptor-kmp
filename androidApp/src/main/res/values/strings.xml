@@ -279,4 +279,12 @@
     <string name="lecture_edit_still_live">Still recording: new lines keep coming below</string>
     <string name="lecture_edit_cancel">Cancel</string>
     <string name="lecture_edit_save">Save</string>
+    <string name="review_share_word">Share as Word</string>
+    <string name="review_save_word">Save as Word</string>
+    <string name="review_word_saved">Saved %1$s beside the recording</string>
+    <string name="review_delete_lecture">Delete lecture…</string>
+    <string name="review_delete_title">Delete %1$s?</string>
+    <string name="review_delete_text">Its recording, transcript and notes are deleted from the lectures folder. This can\'t be undone.</string>
+    <string name="review_delete_lecture_confirm">Delete</string>
+    <string name="review_delete_cancel">Cancel</string>
 </resources>

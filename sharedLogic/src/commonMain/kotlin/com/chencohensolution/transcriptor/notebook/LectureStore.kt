@@ -98,6 +98,20 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         return true
     }
 
+    /** The lecture as a Word file ([transcriptDocx]), under [notebookTitle]. */
+    fun word(lecture: Lecture, notebookTitle: String?): ByteArray = transcriptDocx(lecture, notebookTitle, utcOffset(lecture.startedAtMillis))
+
+    /** Saves the lecture's Word file in its folder, beside its recording (replacing an earlier one); returns its name. */
+    fun saveWord(lecture: Lecture, notebookTitle: String?): String {
+        val place = placeOf(lecture.notebookId, lecture.id)
+        val folder = place.folder(lecture.notebookId, lecture.id)
+        val name = docxName(lecture)
+        val temp = folder / "$name.tmp"
+        place.fileSystem.write(temp) { write(word(lecture, notebookTitle)) }
+        place.fileSystem.atomicMove(temp, folder / name)
+        return name
+    }
+
     /** The lecture; null when there is none. */
     fun load(notebookId: String, lectureId: String): Lecture? = read(placeOf(notebookId, lectureId), notebookId, lectureId)
 

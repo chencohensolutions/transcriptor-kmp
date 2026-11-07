@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.review
 
+import com.chencohensolution.transcriptor.notebook.docxName
 import com.chencohensolution.transcriptor.speech.LiveStretch
 import com.chencohensolution.transcriptor.speech.SpeakerTuning
 import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
@@ -116,6 +117,18 @@ class LectureReview(
         player.pause()
         player.release()
         open.value = null
+    }
+
+    /** The open lecture as a Word file, with its file name: to share. Files: not on the main thread. */
+    fun word(): Pair<String, ByteArray>? {
+        val o = open.value ?: return null
+        return docxName(o.lecture) to store.word(o.lecture, o.notebookTitle)
+    }
+
+    /** Saves the open lecture's Word file in its folder; returns its name. Files: not on the main thread. */
+    fun saveWord(): String? {
+        val o = open.value ?: return null
+        return store.saveWord(o.lecture, o.notebookTitle)
     }
 
     /** Reads the open lecture again from disk (after a pass changed it), keeping the playback. */
