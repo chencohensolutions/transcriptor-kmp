@@ -2,26 +2,29 @@ package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
+import com.chencohensolution.transcriptor.notebook.Label
+import com.chencohensolution.transcriptor.notebook.LabelStore
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.LectureSummary
+import com.chencohensolution.transcriptor.notebook.NOTEBOOKS_FILE
 import com.chencohensolution.transcriptor.notebook.Note
-import com.chencohensolution.transcriptor.notebook.Place
-import com.chencohensolution.transcriptor.notebook.VoiceStore
-import com.chencohensolution.transcriptor.notebook.adoptLibrary
-import com.chencohensolution.transcriptor.notebook.archiveFinished
-import com.chencohensolution.transcriptor.speech.Voice
-import com.chencohensolution.transcriptor.notebook.Notebook
-import com.chencohensolution.transcriptor.notebook.RecordingNow
-import com.chencohensolution.transcriptor.notebook.NotebookStore
 import com.chencohensolution.transcriptor.notebook.NotebooksController
+import com.chencohensolution.transcriptor.notebook.Place
+import com.chencohensolution.transcriptor.notebook.RecordingNow
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.notebook.TRANSCRIPT
-import com.chencohensolution.transcriptor.notebook.UNFILED
-import com.chencohensolution.transcriptor.notebook.guessNotebook
+import com.chencohensolution.transcriptor.notebook.VoiceStore
+import com.chencohensolution.transcriptor.notebook.adoptLibrary
+import com.chencohensolution.transcriptor.notebook.archiveFinished
+import com.chencohensolution.transcriptor.notebook.guessLabels
+import com.chencohensolution.transcriptor.notebook.labelNames
+import com.chencohensolution.transcriptor.notebook.migrateToLabels
 import com.chencohensolution.transcriptor.notebook.notebooksState
 import com.chencohensolution.transcriptor.notebook.transcriptMarkdown
+import com.chencohensolution.transcriptor.settings.SettingsStore
+import com.chencohensolution.transcriptor.speech.Voice
 import okio.Buffer
 import okio.FileSystem
 import okio.ForwardingFileSystem
@@ -41,76 +44,125 @@ class NotebooksTest {
     private val root = "/files".toPath()
     private val israel = { _: Long -> 2 * HOUR }
     private val lectures = LectureStore(fs, root, israel)
-    private val notebooks = NotebookStore(fs, root)
+    private val labels = LabelStore(fs, root)
 
-    private fun lecture(id: String, notebook: String, at: Long, language: String = "he") =
-        Lecture(id, notebook, "Lecture $id", language, at, 47 * MIN, emptyList(), emptyList())
+    private fun lecture(id: String, at: Long, language: String = "he", labels: List<String> = emptyList()) =
+        Lecture(id, "Lecture $id", language, at, 47 * MIN, emptyList(), emptyList(), labels = labels)
 
-    private fun summary(id: String, at: Long) = LectureSummary(id, id, at, 90 * MIN, 0, false)
+    private fun summary(id: String, at: Long, vararg labels: String) = LectureSummary(id, id, at, 90 * MIN, 0, false, "he", labels.toList())
 
-    @Test
-    fun notebooksAreKeptInAVersionedFileEachWithItsOwnColor() {
-        val psych = notebooks.create(" מבוא לפסיכולוגיה ", "he", 1)
-        val stats = notebooks.create("סטטיסטיקה", "he", 2)
-        assertEquals(listOf(psych, stats), notebooks.all())
-        assertEquals("מבוא לפסיכולוגיה", psych.title)
-        assertEquals(listOf(0, 1), notebooks.all().map { it.color })
-        assertTrue(fs.read(root / "notebooks.json") { readUtf8() }.contains("\"v\": 1"))
-        assertFalse(fs.exists(root / "notebooks.json.tmp"))
-    }
-
-    @Test
-    fun theOldDefaultNotebooksLecturesBecomeUnfiledOnce() {
-        val old = lecture("lecture-1", "default", MONDAY_10)
-        lectures.save(old)
-        fs.write(lectures.audioPath(old)) { writeUtf8("audio") }
-        fs.write(root / "notebooks" / "default" / "voices.json") { writeUtf8("[]") }
-
-        notebooks.migrate(lectures)
-
-        assertFalse(fs.exists(root / "notebooks" / "default"))
-        val moved = assertNotNull(lectures.load(UNFILED, "lecture-1"))
-        assertEquals(UNFILED, moved.notebookId)
-        assertEquals("audio", fs.read(lectures.audioPath(moved)) { readUtf8() })
-        assertEquals(emptyList(), notebooks.all())
-
-        // Not again: a later "default" folder is left alone.
-        lectures.save(lecture("lecture-2", "default", MONDAY_10))
-        notebooks.migrate(lectures)
-        assertNotNull(lectures.load("default", "lecture-2"))
-    }
-
-    @Test
-    fun aLectureMovesWithItsAudioTranscriptAndVersions() {
-        val l = lecture("lecture-1", UNFILED, MONDAY_10)
+    /** A lecture as the app kept it before labels: `notebooks/<notebook>/<id>/`, with its audio. */
+    private fun before(notebook: String, l: Lecture) {
         lectures.save(l)
-        fs.write(lectures.audioPath(l)) { writeUtf8("audio") }
-        fs.createDirectories(lectures.folder(UNFILED, l.id) / "versions")
-        fs.write(lectures.folder(UNFILED, l.id) / "versions" / "v1.json") { writeUtf8("{}") }
+        fs.write(lectures.audioPath(l)) { writeUtf8("audio of ${l.id}") }
+        fs.createDirectories(root / "notebooks" / notebook)
+        fs.atomicMove(root / "moments" / l.id, root / "notebooks" / notebook / l.id)
+    }
 
-        val moved = lectures.move(l, "psych")
+    @Test
+    fun labelsAreKeptInAVersionedFileEachWithItsOwnColor() {
+        val psych = labels.create(" פסיכולוגיה ", 1)
+        val exam = labels.create("Exam", 2)
+        assertEquals(listOf(psych, exam), labels.all())
+        assertEquals("פסיכולוגיה", psych.name)
+        assertEquals(listOf(0, 1), labels.all().map { it.color })
+        // The same name (any case) is the same label.
+        assertEquals(exam, labels.create("exam", 3))
+        assertTrue(fs.read(root / "labels.json") { readUtf8() }.contains("\"v\": 1"))
+        assertFalse(fs.exists(root / "labels.json.tmp"))
+        labels.rename(exam.id, "מבחן")
+        assertEquals(listOf("פסיכולוגיה", "מבחן"), labels.all().map { it.name })
+        labels.delete(psych.id)
+        assertEquals(listOf(exam.id), labels.all().map { it.id })
+        // A new label takes the first free color.
+        assertEquals(0, labels.create("Stats", 4).color)
+    }
 
-        assertEquals("psych", moved.notebookId)
-        assertFalse(fs.exists(lectures.folder(UNFILED, l.id)))
-        assertEquals(moved, lectures.load("psych", l.id))
-        assertEquals("audio", fs.read(lectures.audioPath(moved)) { readUtf8() })
-        assertTrue(fs.exists(lectures.folder("psych", l.id) / TRANSCRIPT))
-        assertTrue(fs.exists(lectures.folder("psych", l.id) / "versions" / "v1.json"))
+    @Test
+    fun aMomentIsItsOwnFolderWithItsLabelsInItsFile() {
+        val l = lecture("lecture-1", MONDAY_10, labels = listOf("psych", "exam"))
+        lectures.save(l)
+        assertEquals(root / "moments" / "lecture-1", lectures.folder(l.id))
+        assertEquals(l, lectures.load("lecture-1"))
+        assertTrue(fs.read(lectures.folder(l.id) / "lecture.json") { readUtf8() }.contains("\"labels\""))
+        val relabeled = lectures.setLabels(l, listOf("exam"))
+        assertEquals(listOf("exam"), lectures.load(l.id)?.labels)
+        assertEquals(relabeled, lectures.load(l.id))
+    }
+
+    @Test
+    fun notebooksBecomeLabelsAndEveryLectureKeepsItsFilesAndVoices() {
+        fs.createDirectories(root)
+        fs.write(root / NOTEBOOKS_FILE) {
+            writeUtf8("""{"v": 1, "notebooks": [{"id": "psych", "title": "פסיכולוגיה", "language": "he", "color": 0, "createdAt": 1},
+                {"id": "stats", "title": "Stats", "language": "he", "color": 4, "createdAt": 2}]}""")
+        }
+        before("psych", lecture("p1", MONDAY_10).copy(notes = listOf(Note("n", 1_000, "הערה"))))
+        before("stats", lecture("s1", MONDAY_10 + DAY))
+        before("unfiled", lecture("u1", MONDAY_10 + 2 * DAY))
+        before("default", lecture("d1", MONDAY_10 - WEEK))
+        fs.createDirectories(root / "notebooks" / "psych" / "p1" / "versions")
+        fs.write(root / "notebooks" / "psych" / "p1" / "versions" / "v1.json") { writeUtf8("{}") }
+        VoiceStore(fs, root / "notebooks" / "psych").save(Voice("Lecturer", listOf(1f), "cam"))
+        VoiceStore(fs, root / "notebooks" / "psych").save(Voice("Dana", listOf(2f), "cam"))
+        VoiceStore(fs, root / "notebooks" / "stats").save(Voice("Lecturer", listOf(3f), "cam"))
+
+        migrateToLabels(Place(fs, root), now = 10, utcOffset = israel)
+
+        assertEquals(listOf(Label("psych", "פסיכולוגיה", 0), Label("stats", "Stats", 4)), labels.all())
+        assertEquals(listOf("psych"), lectures.load("p1")?.labels)
+        assertEquals(listOf("הערה"), lectures.load("p1")?.notes?.map { it.text })
+        assertEquals(listOf("stats"), lectures.load("s1")?.labels)
+        assertEquals(emptyList(), lectures.load("u1")?.labels)
+        assertEquals(emptyList(), lectures.load("d1")?.labels)
+        assertEquals("audio of p1", fs.read(root / "moments" / "p1" / AUDIO_WAV) { readUtf8() })
+        assertTrue(fs.exists(root / "moments" / "p1" / "versions" / "v1.json"))
+        assertTrue(fs.read(root / "moments" / "p1" / TRANSCRIPT) { readUtf8() }.contains("2026-11-02 10:00"))
+        assertEquals(
+            setOf("Lecturer · פסיכולוגיה", "Dana", "Lecturer · Stats"),
+            VoiceStore(fs, root) { "cam" }.load().map { it.name }.toSet(),
+        )
+        assertFalse(fs.exists(root / "notebooks"))
+        assertFalse(fs.exists(root / NOTEBOOKS_FILE))
+
+        // Once: nothing changes the next time.
+        labels.rename("psych", "Psych")
+        migrateToLabels(Place(fs, root), now = 20)
+        assertEquals("Psych", labels.all().first().name)
+    }
+
+    @Test
+    fun aMigrationCutOffGoesOnAndNeverOverwritesAMoment() {
+        fs.createDirectories(root)
+        fs.createDirectories(root)
+        fs.write(root / NOTEBOOKS_FILE) { writeUtf8("""{"v": 1, "notebooks": [{"id": "psych", "title": "P", "language": "he", "color": 0, "createdAt": 1}]}""") }
+        before("psych", lecture("a", MONDAY_10))
+        before("psych", lecture("b", MONDAY_10))
+        // "b" is in moments/ already (as if moved before a crash) and a copy is still in the notebook.
+        lectures.save(lecture("b", MONDAY_10).copy(title = "moved"))
+
+        migrateToLabels(Place(fs, root), now = 1)
+
+        assertEquals(listOf("psych"), lectures.load("a")?.labels)
+        assertEquals("moved", lectures.load("b")?.title)
+        // What couldn't move stays, with the notebooks' file, for the next start.
+        assertTrue(fs.exists(root / "notebooks" / "psych" / "b" / "lecture.json"))
+        assertTrue(fs.exists(root / NOTEBOOKS_FILE))
     }
 
     @Test
     fun theTranscriptIsWrittenBesideTheAudioOnEverySave() {
-        val l = lecture("lecture-1", "psych", MONDAY_10)
+        val l = lecture("lecture-1", MONDAY_10)
         lectures.save(l)
-        assertTrue(fs.read(lectures.folder("psych", l.id) / TRANSCRIPT) { readUtf8() }.startsWith("# Lecture lecture-1"))
+        assertTrue(fs.read(lectures.folder(l.id) / TRANSCRIPT) { readUtf8() }.startsWith("# Lecture lecture-1"))
         lectures.save(l.copy(title = "זיכרון עבודה"))
-        assertTrue(fs.read(lectures.folder("psych", l.id) / TRANSCRIPT) { readUtf8() }.startsWith("# זיכרון עבודה"))
+        assertTrue(fs.read(lectures.folder(l.id) / TRANSCRIPT) { readUtf8() }.startsWith("# זיכרון עבודה"))
         assertEquals(AUDIO_WAV, l.audioFile)
     }
 
     @Test
     fun theTranscriptReadsAsTurnsWithTheNotesInPlace() {
-        val l = lecture("lecture-7", "psych", MONDAY_10).copy(
+        val l = lecture("lecture-7", MONDAY_10).copy(
             title = "זיכרון עבודה",
             durationMillis = 3 * MIN + 15_000,
             speakers = listOf(Speaker("s1", "המרצה"), Speaker("s2", "")),
@@ -144,88 +196,110 @@ class NotebooksTest {
     }
 
     @Test
-    fun theNotebookOfTheUsualHourIsGuessed() {
-        val psych = Notebook("psych", "Psych", "he", (1..3).map { summary("p$it", MONDAY_10 - it * WEEK) })
-        val stats = Notebook("stats", "Stats", "he", listOf(summary("s1", MONDAY_10 - WEEK - 2 * DAY)))
-        val guess = assertNotNull(guessNotebook(listOf(psych, stats), MONDAY_10 - 10 * MIN, israel))
-        assertEquals("psych", guess.notebookId)
-        assertEquals(3, guess.times)
+    fun theLabelsOfTheUsualHourAreGuessed() {
+        val moments = (1..3).map { summary("p$it", MONDAY_10 - it * WEEK, "psych") } + summary("s1", MONDAY_10 - WEEK - 2 * DAY, "stats")
+        val guess = assertNotNull(guessLabels(moments, MONDAY_10 - 10 * MIN, israel))
+        assertEquals(listOf("psych"), guess.labels)
         assertEquals(MONDAY_10 - WEEK, guess.usualStartMillis)
         // 45 minutes late still counts; two hours late doesn't; nor another weekday.
-        assertEquals("psych", guessNotebook(listOf(psych), MONDAY_10 + 45 * MIN, israel)?.notebookId)
-        assertNull(guessNotebook(listOf(psych), MONDAY_10 + 2 * HOUR, israel))
-        assertNull(guessNotebook(listOf(psych), MONDAY_10 + DAY, israel))
+        assertEquals(listOf("psych"), guessLabels(moments, MONDAY_10 + 45 * MIN, israel)?.labels)
+        assertNull(guessLabels(moments, MONDAY_10 + 2 * HOUR, israel))
+        assertNull(guessLabels(moments, MONDAY_10 + DAY, israel))
     }
 
     @Test
-    fun aOneOffIsNotAHabitAndTodaysOwnLectureDoesNotCount() {
-        val once = Notebook("once", "Once", "he", listOf(summary("o1", MONDAY_10 - WEEK)))
-        assertNull(guessNotebook(listOf(once), MONDAY_10, israel))
-        val today = Notebook("t", "T", "he", listOf(summary("t1", MONDAY_10 - HOUR), summary("t2", MONDAY_10 - WEEK)))
-        assertNull(guessNotebook(listOf(today), MONDAY_10, israel))
+    fun aClassWithTwoLabelsGuessesBothButAnOccasionalLabelIsNotItsHabit() {
+        val both = (1..3).map { summary("p$it", MONDAY_10 - it * WEEK, "psych", "dana") }
+        assertEquals(listOf("psych", "dana"), guessLabels(both, MONDAY_10, israel)?.labels?.sorted()?.reversed())
+        // An exam on two of five Monday classes.
+        val exams = (1..5).map { i -> summary("p$i", MONDAY_10 - i * WEEK, *(if (i <= 2) arrayOf("psych", "exam") else arrayOf("psych"))) }
+        assertEquals(listOf("psych"), guessLabels(exams, MONDAY_10, israel)?.labels)
+        // Moments without labels are no habit.
+        assertNull(guessLabels((1..3).map { summary("u$it", MONDAY_10 - it * WEEK) }, MONDAY_10, israel))
     }
 
     @Test
-    fun aTieGoesToTheNotebookUsedLast() {
-        val a = Notebook("a", "A", "he", listOf(summary("a1", MONDAY_10 - 3 * WEEK), summary("a2", MONDAY_10 - 2 * WEEK)))
-        val b = Notebook("b", "B", "he", listOf(summary("b1", MONDAY_10 - 2 * WEEK), summary("b2", MONDAY_10 - WEEK)))
-        assertEquals("b", guessNotebook(listOf(a, b), MONDAY_10, israel)?.notebookId)
+    fun aOneOffIsNotAHabitAndTodaysOwnMomentDoesNotCount() {
+        assertNull(guessLabels(listOf(summary("o1", MONDAY_10 - WEEK, "once")), MONDAY_10, israel))
+        assertNull(guessLabels(listOf(summary("t1", MONDAY_10 - HOUR, "t"), summary("t2", MONDAY_10 - WEEK, "t")), MONDAY_10, israel))
+    }
+
+    @Test
+    fun aTieGoesToTheLabelUsedLast() {
+        val moments = listOf(
+            summary("a1", MONDAY_10 - 3 * WEEK, "a"), summary("a2", MONDAY_10 - 2 * WEEK, "a"),
+            summary("b1", MONDAY_10 - 2 * WEEK - 10 * MIN, "b"), summary("b2", MONDAY_10 - WEEK, "b"),
+        )
+        assertEquals("b", guessLabels(moments, MONDAY_10, israel)?.labels?.first())
     }
 
     @Test
     fun theHourIsThePhonesAtEachDate() {
-        // Summer lectures at 10:00 local (UTC+3, 7:00 UTC); now winter, 10:50 local (UTC+2, 8:50 UTC). The phone's
+        // Summer moments at 10:00 local (UTC+3, 7:00 UTC); now winter, 10:50 local (UTC+2, 8:50 UTC). The phone's
         // offset at each date makes it the same class; one offset for all would put them 110 minutes apart.
         val winter = MONDAY_10 + 50 * MIN
         val summerOffset = { at: Long -> if (at < winter - 4 * WEEK) 3 * HOUR else 2 * HOUR }
-        val summer = (5..6).map { winter - 50 * MIN - it * WEEK - HOUR }
-        val n = Notebook("n", "N", "he", summer.mapIndexed { i, at -> summary("s$i", at) })
-        assertEquals("n", guessNotebook(listOf(n), winter, summerOffset)?.notebookId)
-        assertNull(guessNotebook(listOf(n), winter, { 0 }))
+        val summer = (5..6).map { summary("s$it", winter - 50 * MIN - it * WEEK - HOUR, "n") }
+        assertEquals(listOf("n"), guessLabels(summer, winter, summerOffset)?.labels)
+        assertNull(guessLabels(summer, winter, { 0 }))
     }
 
     @Test
-    fun theControllerListsNotebooksUnfiledLecturesAndFilesThem() {
-        val psych = notebooks.create("Psych", "he", 1)
-        lectures.save(lecture("p1", psych.id, MONDAY_10 - 2 * WEEK))
-        lectures.save(lecture("p2", psych.id, MONDAY_10 - WEEK))
-        lectures.save(lecture("u1", UNFILED, MONDAY_10 + 5 * MIN, language = "en"))
-        lectures.save(lecture("u0", UNFILED, MONDAY_10 - 3 * DAY))
-        val controller = NotebooksController(notebooks, lectures, { 100 })
+    fun theControllerListsMomentsSuggestsLabelsAndSetsThem() {
+        val psych = labels.create("Psych", 1)
+        val exam = labels.create("Exam", 2)
+        lectures.save(lecture("p1", MONDAY_10 - 2 * WEEK, labels = listOf(psych.id)))
+        lectures.save(lecture("p2", MONDAY_10 - WEEK, labels = listOf(psych.id, "gone")))
+        lectures.save(lecture("u1", MONDAY_10 + 5 * MIN, language = "en"))
+        lectures.save(lecture("u0", MONDAY_10 - 3 * DAY, language = "en"))
+        val controller = NotebooksController(labels, lectures, { 100 })
         controller.reload()
 
         val library = controller.library.value
-        assertEquals(listOf("p2", "p1"), library.notebooks.single().lectures.map { it.id })
-        assertEquals(listOf("u1", "u0"), library.unfiled.map { it.id })
-        assertEquals("en", library.unfiledLanguage)
+        assertEquals(listOf("u1", "u0", "p2", "p1"), library.moments.map { it.id })
+        // A label that no longer exists isn't shown.
+        assertEquals(listOf(psych.id), library.moments.first { it.id == "p2" }.labels)
+        assertEquals("en", library.lastLanguage)
 
         val state = notebooksState(library, MONDAY_10 + WEEK - 10 * MIN, israel)
-        assertEquals(psych.id, state.guess?.notebookId)
-        assertEquals(psych.id, state.suggested["u1"]?.notebookId)
+        assertEquals(listOf(psych.id), state.guess?.labels)
+        // The guessed label's moments are in Hebrew: the next one is too, though the last was in English.
+        assertEquals("he", state.language)
+        assertEquals("en", notebooksState(library, MONDAY_10 + WEEK + DAY, israel).language)
+        assertEquals(psych.id, state.suggested["u1"])
         assertNull(state.suggested["u0"])
 
-        // The lecture recording now is the banner, not in the lists.
-        val recording = RecordingNow(null, "Lecture u1", 5_000, lectureId = "u1")
-        assertEquals(listOf("u0"), notebooksState(library, MONDAY_10, israel, recording).unfiled.map { it.id })
+        // The moment recording now is the banner, not in the list.
+        val recording = RecordingNow(emptyList(), "Lecture u1", 5_000, lectureId = "u1")
+        assertEquals(listOf("u0", "p2", "p1"), notebooksState(library, MONDAY_10, israel, recording).moments.map { it.id })
 
-        controller.assign("u1", psych.id)
-        assertEquals(listOf("u1", "p2", "p1"), controller.library.value.notebooks.single().lectures.map { it.id })
-        assertNull(controller.assign("u1", psych.id))
+        assertEquals(listOf("u1", "u0"), controller.setLabels(listOf("u1", "u0", "p1"), add = setOf(psych.id, exam.id), remove = emptySet(), busy = { it == "p1" }))
+        assertEquals(listOf(psych.id, exam.id), lectures.load("u1")?.labels)
+        assertEquals(listOf(psych.id), lectures.load("p1")?.labels)
+        controller.setLabels(listOf("u1"), add = emptySet(), remove = setOf(psych.id))
+        assertEquals(listOf(exam.id), controller.library.value.moments.first { it.id == "u1" }.labels)
+        assertEquals("Psych, Exam", labelNames(listOf(psych.id, exam.id, "gone"), controller.library.value.labels))
 
-        val english = assertNotNull(controller.assignToNew("u0", "English", "en"))
-        assertEquals(listOf("Psych", "English"), controller.library.value.notebooks.map { it.title })
-        assertEquals(english.notebookId, controller.library.value.notebooks.last().id)
-        assertEquals(emptyList(), controller.library.value.unfiled)
+        val stats = controller.newLabel("Stats")
+        assertEquals(listOf("Psych", "Exam", "Stats"), controller.library.value.labels.map { it.name })
+        controller.renameLabel(stats.id, "Statistics")
+        assertEquals("Statistics", controller.library.value.labels.last().name)
+
+        // Deleting a label keeps its moments, without it; a busy one keeps the id (and shows nothing for it).
+        controller.deleteLabel(exam.id, busy = { it == "u0" })
+        assertEquals(emptyList(), lectures.load("u1")?.labels)
+        assertEquals(listOf(psych.id, exam.id), lectures.load("u0")?.labels)
+        assertEquals(listOf(psych.id), controller.library.value.moments.first { it.id == "u0" }.labels)
     }
 
     @Test
-    fun withNoLecturesTheUnfiledLanguageIsThePhones() {
-        val controller = NotebooksController(notebooks, lectures, { 0 }, { Languages.default(listOf("iw")) })
+    fun withNoMomentsTheLanguageIsThePhones() {
+        val controller = NotebooksController(labels, lectures, { 0 }, { Languages.default(listOf("iw")) })
         controller.reload()
-        assertEquals("he", controller.library.value.unfiledLanguage)
-        val english = NotebooksController(notebooks, lectures, { 0 })
+        assertEquals("he", controller.library.value.lastLanguage)
+        val english = NotebooksController(labels, lectures, { 0 })
         english.reload()
-        assertEquals("en", english.library.value.unfiledLanguage)
+        assertEquals("en", english.library.value.lastLanguage)
     }
 
     @Test
@@ -244,7 +318,7 @@ class NotebooksTest {
 
     @Test
     fun anUnnamedSpeakerIsNamedInTheLecturesLanguage() {
-        val l = lecture("x", "n", MONDAY_10, language = "de").copy(
+        val l = lecture("x", MONDAY_10, language = "de").copy(
             speakers = listOf(Speaker("s1", "")),
             segments = listOf(Segment("a", 0, 1_000, "Guten Morgen.", "m", speakerId = "s1")),
         )
@@ -253,24 +327,32 @@ class NotebooksTest {
     }
 
     @Test
-    fun deletingLecturesRemovesTheirFoldersWhereverTheyAreAndSkipsBusyOnes() {
-        val psych = notebooks.create("Psych", "he", 1)
-        lectures.save(lecture("a", psych.id, 10 * DAY))
-        lectures.save(lecture("b", UNFILED, 11 * DAY))
-        lectures.save(lecture("c", psych.id, 12 * DAY))
+    fun deletingMomentsRemovesTheirFoldersWhereverTheyAreAndSkipsBusyOnes() {
+        lectures.save(lecture("a", 10 * DAY))
+        lectures.save(lecture("b", 11 * DAY))
+        lectures.save(lecture("c", 12 * DAY))
         val library = Place(fs, "/library".toPath())
         lectures.library = library
-        lectures.archive(lectures.load(psych.id, "c")!!)
-        val controller = NotebooksController(notebooks, lectures, { 20 * DAY })
+        lectures.archive(lectures.load("c")!!)
+        val controller = NotebooksController(labels, lectures, { 20 * DAY })
         controller.reload()
 
         assertEquals(listOf("b", "c"), controller.delete(listOf("a", "b", "c", "nope"), busy = { it == "a" }))
-        assertTrue(fs.exists(root / "notebooks" / psych.id / "a" / "lecture.json"))
-        assertNull(lectures.load(UNFILED, "b"))
-        assertFalse(fs.exists(library.folder(psych.id, "c")))
-        assertEquals(listOf("a"), controller.library.value.notebooks.single().lectures.map { it.id })
-        assertTrue(controller.library.value.unfiled.isEmpty())
-        assertFalse(lectures.delete(psych.id, "c"))
+        assertTrue(fs.exists(root / "moments" / "a" / "lecture.json"))
+        assertNull(lectures.load("b"))
+        assertFalse(fs.exists(library.folder("c")))
+        assertEquals(listOf("a"), controller.library.value.moments.map { it.id })
+        assertFalse(lectures.delete("c"))
+    }
+
+    @Test
+    fun movesWaitingToBeImprovedKeptBeforeLabelsAreReadByLectureId() {
+        fs.createDirectories(root)
+        fs.write(root / "settings.json") { writeUtf8("""{"v": 1, "improvePending": ["psych/l1", "l2"]}""") }
+        val settings = SettingsStore(fs, root)
+        assertEquals(listOf("l1", "l2"), settings.improvePending)
+        settings.removeImprovePending("l1")
+        assertEquals(listOf("l2"), settings.improvePending)
     }
 
     private companion object {
@@ -299,123 +381,141 @@ class LibraryFolderTest {
     private val phone = FakeFileSystem()
     private val folder = Lossy(FakeFileSystem())
     private val lectures = LectureStore(phone, "/files".toPath())
-    private val notebooks = NotebookStore { lectures.library ?: lectures.local }
+    private val labels = LabelStore { lectures.library ?: lectures.local }
     private val voices = VoiceStore { lectures.library ?: lectures.local }
     private val library = Place(folder, "/library".toPath())
 
-    private fun recorded(id: String, notebook: String): Lecture {
-        val l = Lecture(id, notebook, "Lecture $id", "he", 1_000, 60_000, emptyList(), emptyList())
+    private fun recorded(id: String, vararg labels: String): Lecture {
+        val l = Lecture(id, "Lecture $id", "he", 1_000, 60_000, emptyList(), emptyList(), labels = labels.toList())
         lectures.save(l)
         phone.write(lectures.audioPath(l)) { writeUtf8("audio of $id") }
         return l
     }
 
     @Test
-    fun choosingTheFolderMovesNotebooksVoicesAndFinishedLecturesThere() {
-        val psych = notebooks.create("Psych", "he", 1)
-        voices.save(psych.id, Voice("המרצה", listOf(0.1f, 0.2f)))
+    fun choosingTheFolderMovesLabelsVoicesAndFinishedMomentsThere() {
+        val psych = labels.create("Psych", 1)
+        voices.save(Voice("המרצה", listOf(0.1f, 0.2f)))
         recorded("a", psych.id)
-        recorded("b", UNFILED)
+        recorded("b")
         recorded("open", psych.id)
 
-        adoptLibrary(lectures, notebooks, library, busy = setOf("open"))
+        adoptLibrary(lectures, labels, library, busy = setOf("open"))
 
         assertEquals(library, lectures.library)
-        assertEquals(listOf("Psych"), notebooks.all().map { it.title })
-        assertTrue(folder.exists("/library/notebooks.json".toPath()))
-        assertFalse(phone.exists("/files/notebooks.json".toPath()))
-        assertEquals("המרצה", voices.load(psych.id).single().name)
-        assertEquals("audio of a", folder.read("/library/notebooks/${psych.id}/a/audio.wav".toPath()) { readUtf8() })
-        assertTrue(folder.exists("/library/notebooks/${psych.id}/a/$TRANSCRIPT".toPath()))
-        assertFalse(phone.exists(lectures.local.folder(psych.id, "a")))
-        assertFalse(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "b"))))
-        // The open lecture stays here, and is still found.
-        assertTrue(lectures.isLocal(assertNotNull(lectures.load(psych.id, "open"))))
+        assertEquals(listOf("Psych"), labels.all().map { it.name })
+        assertTrue(folder.exists("/library/labels.json".toPath()))
+        assertFalse(phone.exists("/files/labels.json".toPath()))
+        assertEquals("המרצה", voices.load().single().name)
+        assertFalse(phone.exists("/files/voices.json".toPath()))
+        assertEquals("audio of a", folder.read("/library/moments/a/audio.wav".toPath()) { readUtf8() })
+        assertTrue(folder.exists("/library/moments/a/$TRANSCRIPT".toPath()))
+        assertEquals(listOf(psych.id), lectures.load("a")?.labels)
+        assertFalse(phone.exists(lectures.local.folder("a")))
+        assertFalse(lectures.isLocal(assertNotNull(lectures.load("b"))))
+        // The open moment stays here, and is still found.
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load("open"))))
         assertEquals(setOf("a", "b", "open"), lectures.all().map { it.id }.toSet())
 
         assertEquals(1, archiveFinished(lectures, busy = emptySet()))
-        assertFalse(phone.exists(lectures.local.folder(psych.id, "open")))
+        assertFalse(phone.exists(lectures.local.folder("open")))
     }
 
     @Test
-    fun newLecturesRecordHereAndMoveWhenFinishedNotWhileBusyOrWaitingForFlac() {
-        adoptLibrary(lectures, notebooks, library)
-        val recording = recorded("now", UNFILED)
+    fun newMomentsRecordHereAndMoveWhenFinishedNotWhileBusyOrWaitingForFlac() {
+        adoptLibrary(lectures, labels, library)
+        val recording = recorded("now")
         assertTrue(lectures.isLocal(recording))
-        lectures.save(recorded("wav", UNFILED).copy(pendingFlac = true))
+        lectures.save(recorded("wav").copy(pendingFlac = true))
         assertEquals(0, archiveFinished(lectures, busy = setOf("now")))
         assertEquals(1, archiveFinished(lectures, busy = emptySet()))
-        assertFalse(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "now"))))
-        assertTrue(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "wav"))))
+        assertFalse(lectures.isLocal(assertNotNull(lectures.load("now"))))
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load("wav"))))
     }
 
     @Test
-    fun aLectureInTheLibraryIsEditedAndFiledThere() {
-        val psych = notebooks.create("Psych", "he", 1)
-        adoptLibrary(lectures, notebooks, library)
-        recorded("a", UNFILED)
+    fun aMomentInTheLibraryIsEditedAndLabeledThere() {
+        val psych = labels.create("Psych", 1)
+        adoptLibrary(lectures, labels, library)
+        recorded("a")
         archiveFinished(lectures, emptySet())
-        val a = assertNotNull(lectures.load(UNFILED, "a"))
+        val a = assertNotNull(lectures.load("a"))
         lectures.save(a.copy(title = "זיכרון"))
-        val moved = lectures.move(assertNotNull(lectures.load(UNFILED, "a")), psych.id)
-        assertEquals("זיכרון", lectures.load(psych.id, "a")?.title)
-        assertEquals("/library/notebooks/${psych.id}/a/audio.wav".toPath(), lectures.audioPath(moved))
-        assertFalse(phone.exists(lectures.local.folder(psych.id, "a")))
+        val labeled = lectures.setLabels(assertNotNull(lectures.load("a")), listOf(psych.id))
+        assertEquals("זיכרון", lectures.load("a")?.title)
+        assertEquals(listOf(psych.id), lectures.load("a")?.labels)
+        assertEquals("/library/moments/a/audio.wav".toPath(), lectures.audioPath(labeled))
+        assertFalse(phone.exists(lectures.local.folder("a")))
     }
 
     @Test
-    fun afterAReinstallTheLibrarysNotebooksAndLecturesComeBack() {
+    fun afterAReinstallTheLibrarysLabelsAndMomentsComeBack() {
         val old = LectureStore(folder, "/old".toPath())
         // What the library held before: written as a previous install left it.
-        val before = NotebookStore(folder, "/library".toPath())
-        val psych = before.create("Psych", "he", 1)
-        LectureStore(folder, "/library".toPath()).save(Lecture("kept", psych.id, "Kept", "he", 1, 1, emptyList(), emptyList()))
-        // A new install: a notebook made before the folder was picked again.
-        notebooks.create("Stats", "he", 2)
+        LabelStore(folder, "/library".toPath()).create("Psych", 1)
+        LectureStore(folder, "/library".toPath()).save(Lecture("kept", "Kept", "he", 1, 1, emptyList(), emptyList()))
+        // A new install: a label made before the folder was picked again.
+        labels.create("Stats", 2)
 
-        adoptLibrary(lectures, notebooks, library)
+        adoptLibrary(lectures, labels, library)
 
-        assertEquals(listOf("Psych", "Stats"), notebooks.all().map { it.title })
+        assertEquals(listOf("Psych", "Stats"), labels.all().map { it.name })
         assertEquals(listOf("kept"), lectures.all().map { it.id })
         assertEquals(emptyList(), old.all())
     }
 
     @Test
-    fun changingTheFolderMovesEverythingIncludingTheOpenLecture() {
-        val psych = notebooks.create("Psych", "he", 1)
-        voices.save(psych.id, Voice("המרצה", listOf(0.5f)))
-        recorded("a", psych.id)
-        adoptLibrary(lectures, notebooks, library)
-        val next = Place(folder, "/next".toPath())
+    fun aLibraryFromBeforeLabelsIsMovedToLabelsWhenPicked() {
+        val inLibrary = LectureStore(folder, "/library".toPath())
+        folder.createDirectories("/library".toPath())
+        folder.write("/library/notebooks.json".toPath()) { writeUtf8("""{"v": 1, "notebooks": [{"id": "psych", "title": "Psych", "language": "he", "color": 2, "createdAt": 1}]}""") }
+        inLibrary.save(Lecture("kept", "Kept", "he", 1, 1, emptyList(), emptyList()))
+        folder.createDirectories("/library/notebooks/psych".toPath())
+        folder.atomicMove("/library/moments/kept".toPath(), "/library/notebooks/psych/kept".toPath())
 
-        adoptLibrary(lectures, notebooks, next, busy = setOf("a"))
+        adoptLibrary(lectures, labels, library)
 
-        assertEquals(next, lectures.library)
-        assertEquals(listOf("Psych"), notebooks.all().map { it.title })
-        assertEquals("המרצה", voices.load(psych.id).single().name)
-        assertEquals("/next/notebooks/${psych.id}/a/audio.wav".toPath(), lectures.audioPath(assertNotNull(lectures.load(psych.id, "a"))))
-        assertFalse(folder.exists(library.folder(psych.id, "a")))
+        assertEquals(listOf(Label("psych", "Psych", 2)), labels.all())
+        assertEquals(listOf("psych"), lectures.load("kept")?.labels)
         assertFalse(folder.exists("/library/notebooks.json".toPath()))
     }
 
     @Test
-    fun aFailedCopyLeavesTheLectureHere() {
-        adoptLibrary(lectures, notebooks, library)
-        val a = recorded("a", UNFILED)
+    fun changingTheFolderMovesEverythingIncludingTheOpenMoment() {
+        val psych = labels.create("Psych", 1)
+        voices.save(Voice("המרצה", listOf(0.5f)))
+        recorded("a", psych.id)
+        adoptLibrary(lectures, labels, library)
+        val next = Place(folder, "/next".toPath())
+
+        adoptLibrary(lectures, labels, next, busy = setOf("a"))
+
+        assertEquals(next, lectures.library)
+        assertEquals(listOf("Psych"), labels.all().map { it.name })
+        assertEquals("המרצה", voices.load().single().name)
+        assertEquals("/next/moments/a/audio.wav".toPath(), lectures.audioPath(assertNotNull(lectures.load("a"))))
+        assertFalse(folder.exists(library.folder("a")))
+        assertFalse(folder.exists("/library/labels.json".toPath()))
+    }
+
+    @Test
+    fun aFailedCopyLeavesTheMomentHere() {
+        adoptLibrary(lectures, labels, library)
+        val a = recorded("a")
         folder.dropping = true
         assertEquals(0, archiveFinished(lectures, emptySet()))
         folder.dropping = false
-        assertFalse(folder.exists(library.folder(UNFILED, "a")))
-        assertTrue(lectures.isLocal(assertNotNull(lectures.load(UNFILED, "a"))))
+        assertFalse(folder.exists(library.folder("a")))
+        assertTrue(lectures.isLocal(assertNotNull(lectures.load("a"))))
         assertEquals("audio of a", phone.read(lectures.audioPath(a)) { readUtf8() })
     }
 
     @Test
-    fun anUnreachableLibraryListsOnlyTheLecturesHere() {
-        adoptLibrary(lectures, notebooks, library)
-        recorded("a", UNFILED)
+    fun anUnreachableLibraryListsOnlyTheMomentsHere() {
+        adoptLibrary(lectures, labels, library)
+        recorded("a")
         archiveFinished(lectures, emptySet())
-        recorded("b", UNFILED)
+        recorded("b")
         lectures.library = Place(folder, "/gone".toPath())
         assertEquals(listOf("b"), lectures.all().map { it.id })
     }

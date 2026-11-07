@@ -21,7 +21,7 @@ class RefineTest {
     @Test
     fun linesAreTranscribedAgainKeepingTimesSpeakersAndEdits() {
         val lecture = Lecture(
-            "l", "nb", "t", "he", 0, 40_000,
+            "l", "t", "he", 0, 40_000,
             segments = listOf(
                 Segment("s1", 1_000, 5_000, "חי", "turbo", speakerId = "speaker-1", words = listOf(Word(1_000, "חי"))),
                 Segment("s2", 6_000, 9_000, "תוקן ביד", "turbo", edited = true),
@@ -71,9 +71,9 @@ class VersionTest {
         }
         var clock = 200L
         val review = com.chencohensolution.transcriptor.review.LectureReview(store, null, player, backgroundScope, now = { clock })
-        review.open(live.notebookId, live.id, "")
+        review.open(live.id, "")
         review.switchTo("v100")
-        val back = store.load(live.notebookId, live.id)!!
+        val back = store.load(live.id)!!
         assertEquals(live.segments, back.segments)
         assertEquals(null, back.refinedWith)
         assertEquals(listOf("v200"), back.versions.map { it.id })
@@ -83,7 +83,7 @@ class VersionTest {
 
         clock = 300
         review.switchTo("v200")
-        val again = store.load(live.notebookId, live.id)!!
+        val again = store.load(live.id)!!
         assertEquals(refined.segments, again.segments)
         assertEquals("large", again.refinedWith)
         assertEquals(listOf("v300"), again.versions.map { it.id })

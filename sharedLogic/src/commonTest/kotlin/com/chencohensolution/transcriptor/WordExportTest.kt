@@ -58,8 +58,8 @@ class WordExportTest {
         val store = com.chencohensolution.transcriptor.notebook.LectureStore(fs, okio.Path.Companion.run { "/files".toPath() })
         store.save(lecture)
         assertEquals("זיכרון עבודה.docx", store.saveWord(lecture, "Psych"))
-        val file = store.folder(lecture.notebookId, lecture.id) / "זיכרון עבודה.docx"
+        val file = store.folder(lecture.id) / "זיכרון עבודה.docx"
         assertTrue(transcriptDocx(lecture, "Psych").contentEquals(fs.read(file) { readByteArray() }))
-        assertFalse(fs.exists(store.folder(lecture.notebookId, lecture.id) / "זיכרון עבודה.docx.tmp"))
+        assertFalse(fs.exists(store.folder(lecture.id) / "זיכרון עבודה.docx.tmp"))
     }
 }

@@ -5,7 +5,8 @@ import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 
 /** The lecture screen while recording, as [LectureSession] produces it. */
 data class LiveLectureState(
-    val notebookTitle: String,
+    /** The moment's labels' names ("Psychology, Exam"); empty for none. */
+    val labelNames: String,
     val lecture: Lecture,
     /** The line live transcription is writing now, before its end; null in a pause between lines, or without it. */
     val partial: String?,

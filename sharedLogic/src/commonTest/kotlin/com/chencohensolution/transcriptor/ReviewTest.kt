@@ -44,7 +44,7 @@ class ReviewTest {
     private fun TestScope.review(): LectureReview {
         store.save(lecture)
         return LectureReview(store, voices, player, backgroundScope, printOf = { _, id -> if (id == "speaker-2") listOf(0.1f, 1f) else null })
-            .also { assertTrue(it.open(lecture.notebookId, lecture.id, "פסיכולוגיה")) }
+            .also { assertTrue(it.open(lecture.id, "פסיכולוגיה")) }
     }
 
     @Test
@@ -58,7 +58,7 @@ class ReviewTest {
         runCurrent()
         assertTrue(player.released)
         assertNull(review.state.value)
-        assertFalse(LectureReview(store, voices, player, backgroundScope).open("nb", "nothing", ""))
+        assertFalse(LectureReview(store, voices, player, backgroundScope).open("nothing", ""))
     }
 
     @Test
@@ -95,25 +95,25 @@ class ReviewTest {
         review.addNote(80_000, "לחזור לזה")
         review.editNote("n1", "תוקן")
         review.deleteNote("n2")
-        val saved = store.load(lecture.notebookId, lecture.id)!!
+        val saved = store.load(lecture.id)!!
         val s3 = saved.segments.first { it.id == "s3" }
         assertEquals("הבעיה המרכזית: מחסן פסיבי." to true, s3.text to s3.edited)
         assertEquals("speaker-2", saved.segments.first { it.id == "s5" }.speakerId)
         assertEquals(listOf("n1" to "תוקן", "n4" to "לחזור לזה", "n3" to lecture.notes[2].text), saved.notes.map { it.id to it.text })
         // The same text again isn't an edit.
         review.editLine("s4", lecture.segments[3].text)
-        assertFalse(store.load(lecture.notebookId, lecture.id)!!.segments.first { it.id == "s4" }.edited)
+        assertFalse(store.load(lecture.id)!!.segments.first { it.id == "s4" }.edited)
     }
 
     @Test
     fun aRenamedSpeakerIsRememberedByTheNotebook() = runTest {
         val review = review()
         review.renameSpeaker("speaker-2", "יעל")
-        assertEquals("יעל", store.load(lecture.notebookId, lecture.id)!!.speakers.first { it.id == "speaker-2" }.name)
-        assertEquals(listOf("יעל"), voices.load(lecture.notebookId).map { it.name })
+        assertEquals("יעל", store.load(lecture.id)!!.speakers.first { it.id == "speaker-2" }.name)
+        assertEquals(listOf("יעל"), voices.load().map { it.name })
         // Renamed again: the notebook's voice follows.
         review.renameSpeaker("speaker-2", "יעל כהן")
-        assertEquals(listOf("יעל כהן"), voices.load(lecture.notebookId).map { it.name })
+        assertEquals(listOf("יעל כהן"), voices.load().map { it.name })
     }
 
     @Test

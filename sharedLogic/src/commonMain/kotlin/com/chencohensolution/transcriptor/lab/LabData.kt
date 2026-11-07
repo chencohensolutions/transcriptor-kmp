@@ -3,11 +3,11 @@ package com.chencohensolution.transcriptor.lab
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.Note
-import com.chencohensolution.transcriptor.notebook.Notebook
+import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 
-/** Made-up notebooks and a lecture for the UI labs (Android's src/debug, and iOS later). */
+/** Made-up labels, moments and a lecture for the UI labs (Android's src/debug, and iOS later). */
 object LabData {
     private const val MIN = 60_000L
     private const val TURBO = "ivrit-whisper-large-v3-turbo"
@@ -22,7 +22,7 @@ object LabData {
     /** A psychology class, 47 minutes in, as live transcription writes it. */
     val lecture = Lecture(
         id = "lecture-7",
-        notebookId = "psych",
+        labels = listOf("psych"),
         title = "זיכרון עבודה",
         language = "he",
         startedAtMillis = LECTURE_START,
@@ -69,29 +69,24 @@ object LabData {
         speakers = listOf(Speaker("speaker-1", "המרצה"), Speaker("speaker-2", "דובר 2")),
     )
 
-    private fun summary(id: String, title: String, daysAgo: Int, minutes: Int, notes: Int, refined: Boolean = true) =
-        LectureSummary(id, title, LECTURE_START - daysAgo * 24 * 60 * MIN, minutes * MIN, notes, refined)
+    private fun summary(id: String, title: String, daysAgo: Int, minutes: Int, notes: Int, labels: List<String>, language: String = "he", refined: Boolean = true) =
+        LectureSummary(id, title, LECTURE_START - daysAgo * 24 * 60 * MIN, minutes * MIN, notes, refined, language, labels)
 
-    val notebooks = listOf(
-        Notebook(
-            "psych", "מבוא לפסיכולוגיה", "he",
-            listOf(
-                summary("lecture-7", "זיכרון עבודה", 0, 47, 3, refined = false),
-                summary("lecture-6", "המודל המולטי־מחסני", 7, 88, 11),
-                summary("lecture-5", "קשב סלקטיבי", 14, 91, 6),
-                summary("lecture-4", "תפיסה חזותית", 21, 85, 9),
-            ),
-        ),
-        Notebook(
-            "stats", "סטטיסטיקה א׳", "he",
-            listOf(
-                summary("stats-3", "התפלגות נורמלית", 2, 90, 14),
-                summary("stats-2", "מדדי פיזור", 9, 90, 8),
-            ),
-        ),
-        Notebook(
-            "english", "Academic English", "en",
-            listOf(summary("en-1", "Reading abstracts", 4, 60, 2)),
-        ),
-    ).mapIndexed { i, notebook -> notebook.copy(color = i) }
+    val labels = listOf(
+        Label("psych", "פסיכולוגיה", 0),
+        Label("stats", "סטטיסטיקה", 1),
+        Label("english", "Academic English", 2),
+        Label("exam", "מבחן", 3),
+    )
+
+    /** Moments with labels, newest first: Monday psychology classes (one before an exam), statistics, English. */
+    val moments = listOf(
+        summary("lecture-7", "זיכרון עבודה", 0, 47, 3, listOf("psych"), refined = false),
+        summary("stats-3", "התפלגות נורמלית", 2, 90, 14, listOf("stats", "exam")),
+        summary("en-1", "Reading abstracts", 4, 60, 2, listOf("english"), language = "en"),
+        summary("lecture-6", "המודל המולטי־מחסני", 7, 88, 11, listOf("psych", "exam")),
+        summary("stats-2", "מדדי פיזור", 9, 90, 8, listOf("stats")),
+        summary("lecture-5", "קשב סלקטיבי", 14, 91, 6, listOf("psych")),
+        summary("lecture-4", "תפיסה חזותית", 21, 85, 9, listOf("psych")),
+    )
 }

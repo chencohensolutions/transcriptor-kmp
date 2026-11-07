@@ -1,7 +1,6 @@
 package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.notebook.LectureStore
-import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.recording.LectureSession
@@ -66,7 +65,6 @@ class SpeakerTest {
     private val root = "/data".toPath()
     private val store = LectureStore(fs, root)
     private val voices = VoiceStore(fs, root)
-    private val notebook = Notebook("psych", "פסיכולוגיה", "he", emptyList())
 
     private fun TestScope.session(recorder: FakeRecorder) =
         LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { testScheduler.currentTime + 1 }, voices = voices) { language, scope, known ->
@@ -87,7 +85,7 @@ class SpeakerTest {
     fun linesGetSpeakersAndANameCarriesToTheNextLecture() = runTest {
         val recorder = FakeRecorder(fs)
         val first = session(recorder)
-        first.start(notebook, "1")
+        first.start(listOf("psych"), "פסיכולוגיה", "he", "1")
         recorder.say(3_000, 300)
         recorder.say(3_000, 800)
         recorder.say(3_000, 300)
@@ -99,13 +97,13 @@ class SpeakerTest {
         assertEquals("המרצה", first.state.value!!.lecture.speakers.first { it.id == "speaker-1" }.name)
         val stopped = assertNotNull(first.stop())
         assertEquals(listOf(Speaker("speaker-1", "המרצה"), Speaker("speaker-2", "")), stopped.speakers)
-        assertEquals(listOf("המרצה"), voices.load("psych").map { it.name })
+        assertEquals(listOf("המרצה"), voices.load().map { it.name })
 
         // The next lecture: the student speaks first, then the lecturer, who is named from the start.
         val recorder2 = FakeRecorder(fs)
         val second = session(recorder2)
         testScheduler.advanceTimeBy(1_000)
-        second.start(notebook, "2")
+        second.start(listOf("psych"), "פסיכולוגיה", "he", "2")
         recorder2.say(3_000, 800)
         recorder2.say(3_000, 300)
         runCurrent()
@@ -119,28 +117,28 @@ class SpeakerTest {
         val fs = FakeFileSystem()
         var model = "cam"
         val store = VoiceStore(fs, "/v".toPath()) { model }
-        store.save("nb", Voice("המרצה", listOf(1f, 0f)))
+        store.save(Voice("המרצה", listOf(1f, 0f)))
         model = "resnet"
-        assertEquals(emptyList(), store.load("nb"))
-        store.save("nb", Voice("המרצה", listOf(0f, 1f, 0f)))
-        assertEquals(listOf(listOf(0f, 1f, 0f)), store.load("nb").map { it.print })
-        store.rename("nb", "המרצה", "Dana")
-        assertEquals(listOf("Dana"), store.load("nb").map { it.name })
+        assertEquals(emptyList(), store.load())
+        store.save(Voice("המרצה", listOf(0f, 1f, 0f)))
+        assertEquals(listOf(listOf(0f, 1f, 0f)), store.load().map { it.print })
+        store.rename("המרצה", "Dana")
+        assertEquals(listOf("Dana"), store.load().map { it.name })
         model = "cam"
-        assertEquals(listOf(Voice("Dana", listOf(1f, 0f), "cam")), store.load("nb"))
+        assertEquals(listOf(Voice("Dana", listOf(1f, 0f), "cam")), store.load())
         // A print made by a lecture's tracker keeps its model, whichever model is picked meanwhile.
-        store.save("nb", Voice("Noa", listOf(0f, 0f, 1f), "resnet"))
-        assertEquals(listOf("Dana"), store.load("nb").map { it.name })
+        store.save(Voice("Noa", listOf(0f, 0f, 1f), "resnet"))
+        assertEquals(listOf("Dana"), store.load().map { it.name })
     }
 
     @Test
     fun voicesSavedBeforeModelsHadIdsAreCamPlusPlus() {
         val fs = FakeFileSystem()
-        val file = "/v/notebooks/nb/voices.json".toPath()
+        val file = "/v/voices.json".toPath()
         fs.createDirectories(file.parent!!)
         fs.write(file) { writeUtf8("""{"v":1,"voices":[{"name":"המרצה","print":[1.0,0.0]}]}""") }
-        assertEquals(listOf(ModelCatalog.voicePrints.id), VoiceStore(fs, "/v".toPath()).load("nb").map { it.model })
-        assertEquals(emptyList(), VoiceStore(fs, "/v".toPath()) { "other" }.load("nb"))
+        assertEquals(listOf(ModelCatalog.voicePrints.id), VoiceStore(fs, "/v".toPath()).load().map { it.model })
+        assertEquals(emptyList(), VoiceStore(fs, "/v".toPath()) { "other" }.load())
     }
 
     @Test
@@ -173,7 +171,7 @@ class SpeakerTest {
             }
             LiveModel("fake", UtteranceTranscriber(language, "m", scope, StandardTestDispatcher(testScheduler), labeler) { FakeEngine() }, tracker, inUse)
         }
-        session.start(notebook, "1")
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "1")
         runCurrent()
         assertEquals(com.chencohensolution.transcriptor.recording.ModelInUse.Runs.NotYet, session.state.value!!.voicePrints!!.runs)
         assertTrue(session.state.value!!.speakerPassOnStop)

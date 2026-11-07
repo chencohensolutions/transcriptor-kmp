@@ -145,7 +145,7 @@ class SpeakerTuningTest {
         val fs = okio.fakefilesystem.FakeFileSystem()
         val store = com.chencohensolution.transcriptor.notebook.LectureStore(fs, okio.Path.Companion.run { "/d".toPath() })
         val lecture = com.chencohensolution.transcriptor.notebook.Lecture(
-            id = "l1", notebookId = "nb", title = "t", language = "he", startedAtMillis = 0, durationMillis = 7_000,
+            id = "l1", title = "t", language = "he", startedAtMillis = 0, durationMillis = 7_000,
             segments = emptyList(), notes = emptyList(),
         )
         store.save(lecture)

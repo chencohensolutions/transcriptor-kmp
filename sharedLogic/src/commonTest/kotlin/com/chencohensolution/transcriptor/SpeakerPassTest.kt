@@ -66,7 +66,7 @@ class SpeakerPassTest {
     @Test
     fun aLineIsSplitWhereTheTurnChanges() {
         val lecture = Lecture(
-            "l", "nb", "t", "he", 0, 20_000,
+            "l", "t", "he", 0, 20_000,
             segments = listOf(
                 Segment("s1", 1_000, 9_000, "אחת שתיים שלוש ארבע חמש", "z", speakerId = "speaker-1",
                     words = words(1_000L to "אחת", 2_000L to "שתיים", 4_500L to "שלוש", 6_000L to "ארבע", 7_000L to "חמש")),
@@ -86,7 +86,7 @@ class SpeakerPassTest {
     @Test
     fun oneWordOfAnotherSpeakerStaysInTheLine() {
         val lecture = Lecture(
-            "l", "nb", "t", "he", 0, 10_000,
+            "l", "t", "he", 0, 10_000,
             segments = listOf(Segment("s1", 0, 6_000, "א ב ג ד", "z", words = words(500L to "א", 1_500L to "ב", 3_000L to "ג", 4_500L to "ד"))),
             notes = emptyList(),
         )
@@ -100,7 +100,7 @@ class SpeakerPassTest {
     @Test
     fun anEditedLineKeepsItsTextAndGetsTheMainSpeaker() {
         val lecture = Lecture(
-            "l", "nb", "t", "he", 0, 10_000,
+            "l", "t", "he", 0, 10_000,
             segments = listOf(Segment("s1", 0, 6_000, "תוקן ביד", "z", edited = true, words = words(500L to "א", 4_000L to "ב"))),
             notes = emptyList(),
         )

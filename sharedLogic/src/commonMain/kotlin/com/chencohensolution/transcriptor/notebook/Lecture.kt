@@ -1,19 +1,17 @@
 package com.chencohensolution.transcriptor.notebook
 
 /**
- * A course: its lectures share a language, which picks the speech models (Settings › Models).
- * [language] is a BCP-47 tag ("he", "en").
+ * A label a moment can have: moments have any number of them (none included), so a label is a way to find moments
+ * (a course, a person, a project), not a place they are in. [color] is an index into the app's palette, picked when it
+ * was made.
  */
-data class Notebook(
+data class Label(
     val id: String,
-    val title: String,
-    val language: String,
-    val lectures: List<LectureSummary>,
-    /** Its color: an index into the app's palette, picked when it was made. */
+    val name: String,
     val color: Int = 0,
 )
 
-/** A lecture as the notebook lists it. */
+/** A moment as a list shows it, with its language (it lays out its title) and its labels' ids. */
 data class LectureSummary(
     val id: String,
     val title: String,
@@ -21,6 +19,8 @@ data class LectureSummary(
     val durationMillis: Long,
     val noteCount: Int,
     val refined: Boolean,
+    val language: String = "en",
+    val labels: List<String> = emptyList(),
 )
 
 /**
@@ -29,8 +29,8 @@ data class LectureSummary(
  */
 data class Lecture(
     val id: String,
-    val notebookId: String,
     val title: String,
+    /** A BCP-47 tag ("he", "en"): it picked the speech models and lays out the lines. */
     val language: String,
     val startedAtMillis: Long,
     val durationMillis: Long,
@@ -47,6 +47,8 @@ data class Lecture(
     val refinedWith: String? = null,
     /** Earlier transcripts of the recording, kept when a refine pass or a switch replaced them (`versions/<id>.json`). */
     val versions: List<VersionInfo> = emptyList(),
+    /** Its labels' ids ([Label]), in the order they were given. */
+    val labels: List<String> = emptyList(),
 )
 
 /**
