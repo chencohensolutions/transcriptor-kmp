@@ -2,10 +2,15 @@
 
 ## What it is
 
-A notebook for classes. A **notebook** is a course; a **lecture** is one recorded class in it. During the lecture
-the app records, transcribes on the phone, and the user writes **notes** without stopping either. After the lecture
-a larger model **refines** the transcript from the saved audio and tells the **speakers** apart. Everything stays on
-the phone.
+**Audio Logs** (owner's decision, Nov 7, 2026; two words, since "Audiolog" reads as אודיולוג, audiologist, in
+Hebrew). It records a conversation, transcribes it on the phone, and lets the user write **notes** without stopping
+either. Each recording is a **moment** (Hebrew רגע, רגעים). After the moment a larger model **refines** the transcript
+from the saved audio and tells the **speakers** apart. Everything stays on the phone. A **notebook** groups moments
+for now (labels on moments may replace notebooks: to be mocked in the UI lab first).
+
+The code still says `Lecture` (`Lecture`, `LectureStore`, `LectureSession`, `lecture.json`, `lecture_*` string keys):
+only the words the user sees were renamed, so files on disk and other tools keep working. The Hebrew app name is not
+decided yet (רשמקול is the idea), so Hebrew shows "Audio Logs" too.
 
 Android is built first, then iOS (SwiftUI) on the same shared logic (owner's decision, Nov 2, 2026).
 
@@ -23,9 +28,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 - Measured on a Galaxy S25 (6 threads, ivrit.ai turbo q8_0): 6.5 s of Hebrew in about 2.3 s, with the encoder's
   window fitted to the line (`audio_ctx`) instead of whisper's fixed 30 s, which alone is 5× faster. Loading the
   model takes about 2 s, once per lecture.
-- Two passes per lecture, each with its own model, chosen **per language** in Settings › Models:
-  - **Live**, during the lecture: the turbo model (809M parameters, about 570–870 MB), fast enough on recent phones.
-  - **Refine**, after the lecture: large-v3 (1.55B, about 1.1–1.7 GB) over the whole recording, slower than real time; it
+- Two passes per moment, each with its own model, chosen **per language** in Settings › Models:
+  - **Live**, during the moment: the turbo model (809M parameters, about 570–870 MB), fast enough on recent phones.
+  - **Refine**, after the moment: large-v3 (1.55B, about 1.1–1.7 GB) over the whole recording, slower than real time; it
     replaces the live lines, except lines the user edited.
 - Hebrew: ivrit.ai's fine-tunes of Whisper (Apache-2.0), the strongest open Hebrew models known as of Nov 2026. Other
   languages: OpenAI's Whisper large-v3 and turbo (MIT). Every model offered must be free for commercial use. Models
@@ -67,7 +72,7 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Speakers
 
-- **During the lecture** (owner's request, Nov 2, 2026): when a line ends, a voice print of its audio (3D-Speaker
+- **During the moment** (owner's request, Nov 2, 2026): when a line ends, a voice print of its audio (3D-Speaker
   CAM++, Apache-2.0, 28 MB, on sherpa-onnx; `SpeakerLabeler`) joins the speaker whose average print is closest, if
   at least 0.5 alike (cosine), else starts a new "Speaker N" (`SpeakerTracker`). Lines under 1.5 s get no label.
   A line where the voice changes without a pause (a TV debate, an interruption) is split: prints of 1.5 s windows
@@ -75,8 +80,8 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
   two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
 - Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
-  `voices.json` (`VoiceStore`), and its next lectures start with those voices, labeled by name from their first line.
-- **After the lecture, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
+  `voices.json` (`VoiceStore`), and its next moments start with those voices, labeled by name from their first line.
+- **After the moment, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
   runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
   when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python
   pipeline can't run on a phone, and on a test recording it was 10× slower and merged every voice (its settings
@@ -87,11 +92,11 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
   start screen. Overlapping speech still gives one speaker's words: separating voices is a later step.
 - **Live speaker turns** (owner's request, Nov 6, 2026; diart's method): when pyannote's segmentation is on the phone,
-  speakers are found during the lecture instead of by each line's print (`LiveSpeakers`).
+  speakers are found during the moment instead of by each line's print (`LiveSpeakers`).
   - **Each step:** every 2.5 s, segmentation reads the last 10 s (pyannote's window) and settles the part that is
     2.5 s old or older and wasn't settled before: who speaks there, overlaps included.
   - **Prints:** each of the window's voices there gets one print of its single-voice audio in that part (when it has
-    1 s or more) from the picked voice-print model. It joins the closest of the lecture's speakers (`SpeakerTracker`,
+    1 s or more) from the picked voice-print model. It joins the closest of the moment's speakers (`SpeakerTracker`,
     known voices first), or starts a new one, at the model's `VoicePrintThresholds.live` (short prints are noisier,
     so it is lower than for whole lines). A voice with too little audio keeps the speaker it had in the previous
     window, where the windows overlap.
@@ -99,11 +104,11 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     times gets the speaker who spoke most of it.
   - **Delay:** labels follow the text by 2.5–5 s; each moment is decided once.
   - **The pass after Stop is off by default:** `SettingsStore.findSpeakersOnStop`, now `speakerPassOnStop`; the old
-    switch is ignored. It can still be run from the lecture's menu.
+    switch is ignored. It can still be run from the moment's menu.
   - **Without segmentation:** each line's print, as below.
-  - **What live decided is kept** with the lecture (`speakers-live.json`: the model, and each voice's stretch per
+  - **What live decided is kept** with the moment (`speakers-live.json`: the model, and each voice's stretch per
     settled part with its print, or the stretch it continues; `LectureStore.saveLiveSpeakers`).
-  - **"Tune speakers on this lecture"** (the lecture's menu, with the number of lines the user gave another speaker
+  - **"Tune speakers on this moment"** (the moment's menu, with the number of lines the user gave another speaker
     than live did) replays those prints across the model's "fewer ↔ more speakers" range (`SpeakerTuning`). It shows
     the setting whose speakers match the user's labels best, and Apply sets it. It isn't offered after a speaker pass,
     which regroups every line.
@@ -115,18 +120,18 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
     They are exported with a fixed window and pyannote's metadata, so the same sherpa-onnx class runs them
     (`build/diarizen/`, not in git).
-  - **Replay A/B** of the three lectures through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
+  - **Replay A/B** of the three moments through this path (`build/speaker-ab/live_ab*.log`): pyannote costs 0.03 s
     per second of audio on one Mac CPU core, CAM++'s prints 0.02.
   - **A live threshold per pair** of voice-print model and segmentation model (`VoicePrintThresholds.live`; Nov 7,
     2026). With DiariZen large, ResNet293 at its pyannote threshold (0.15) put both voices of a 4.7 min recording in
-    one speaker. All 16 pairs were replayed on the Mac over the three labeled lectures and the owner's two latest
+    one speaker. All 16 pairs were replayed on the Mac over the three labeled moments and the owner's two latest
     (`build/speaker-ab/live_ab3.py`, `live_ab3_table.md`). Each pair takes the highest threshold whose lines are at
     most 2 points more often wrong than at its best: merging voices is what users notice. CAM++ is the most accurate
     live with every segmentation model (11–14% of lines wrong; DiariZen base + CAM++ 11.4%); the WeSpeaker models
     17–20% with DiariZen large. The "fewer ↔ more speakers" slider moves the pair's threshold, the recording screen's
     model line shows the one in use, and `speakers-live.json` keeps the segmentation model (`turns`) for tuning.
 - **The voice-print model is picked** in Settings › Models › Speakers (owner's request, Nov 6, 2026), for both the live
-  labels and the speaker pass; a change applies from the next lecture or speaker pass (`SettingsStore.voiceModel`,
+  labels and the speaker pass; a change applies from the next moment or speaker pass (`SettingsStore.voiceModel`,
   `Recording.voiceModel`). CAM++ stays the default.
   - **The choices** (`ModelCatalog.voicePrintModels`):
     - CAM++, CPU.
@@ -138,16 +143,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
     The two WeSpeaker models are copied to the phone by hand (`SpeechModel.manual`, listed once their folder has `.ok`),
     with `feature_normalize_type=global-mean` added to their ONNX. sherpa-onnx's release lacks it, and without the mean
-    normalization WeSpeaker trains with, ResNet293's EER on the owner's lectures was 31.8% instead of 18.2%.
+    normalization WeSpeaker trains with, ResNet293's EER on the owner's moments was 31.8% instead of 18.2%.
   - **On the NPU:** on the Snapdragon 8 Elite they run on the NPU when their folder has the NPU build (`t150.bin`,
     `t300.bin`, `t600.bin`; [npu-build.md](npu-build.md)). sherpa-onnx's extractor windows any length over those
     graphs; if the NPU fails, the same model runs on the CPU (`SherpaVoiceEmbedder`, `SherpaDiarizer`). On the NPU a
     1.5 s print takes 16 ms with ResNet100 and 6 ms with ResNet293.
   - **Thresholds:** each model has its own (`VoicePrintThresholds`): the tracker's cosine and the speaker pass's
-    clustering distance, set from an A/B on the owner's lectures (`build/speaker-ab/results.md`, not in git).
+    clustering distance, set from an A/B on the owner's moments (`build/speaker-ab/results.md`, not in git).
   - **Saved voices:** `voices.json` keeps a print per model (`"model"`; prints saved before are CAM++'s). Only the
     picked model's prints are compared; a voice without one is learned again the next time it is named.
-  - **The A/B (Nov 6):** lines of three lectures, same-vs-different-speaker EER.
+  - **The A/B (Nov 6):** lines of three moments, same-vs-different-speaker EER.
     - ResNet100 + mean normalization 17.9%, ResNet293 + mean normalization 18.2%, CAM++ 21.0%, ERes2NetV2 23.1%.
     - The labels were CAM++'s own (no line was edited), so this favors CAM++.
 - Expect it to work well for lecturer vs. students and less well for students far from the phone. Overlapping
@@ -155,7 +160,7 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
 
 ### Data
 
-- **Power per lecture** (owner's request, Nov 6, 2026): while a lecture records, `PowerMeter` samples the battery every
+- **Power per moment** (owner's request, Nov 6, 2026): while a moment records, `PowerMeter` samples the battery every
   10 s (`AndroidPowerProbe`):
   - BatteryManager's CURRENT_NOW, whose size is used: the S25 reports discharge as negative;
   - the voltage, the temperature, whether it is plugged in, and the level, all from ACTION_BATTERY_CHANGED;
@@ -172,29 +177,29 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
   time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.
 
-One folder per lecture: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
-`transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the lecture to read beside its
+One folder per moment: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
+`transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the moment to read beside its
 audio (owner's request, Nov 4, 2026): its title, date and length, then each speaker's turn with its time and the notes
 after the turn they were written in, rewritten on every save (`transcriptMarkdown`). A Word file of the same reading
-(`transcriptDocx`, Nov 7, 2026) is made on demand: shared from the lecture, or saved beside the audio as
+(`transcriptDocx`, Nov 7, 2026) is made on demand: shared from the moment, or saved beside the audio as
 `<title>.docx`. Other exports (PDF, subtitles) come later from `lecture.json`.
 
-**Where the files are** (owner's decision, Nov 4, 2026): a lecture records in the app's own storage, and once it is
-finished (stopped, its passes done, compressed to FLAC if that is the setting, not open) it moves to the **lectures
+**Where the files are** (owner's decision, Nov 4, 2026): a moment records in the app's own storage, and once it is
+finished (stopped, its passes done, compressed to FLAC if that is the setting, not open) it moves to the **moments
 folder** outside the app, when the user picked one: `Documents/Transcriptor` is suggested (the system's folder picker
 opens on Documents, and the app makes `Transcriptor` in the folder picked unless it is one). The folder is reached
 through Android's documents provider (`SafFileSystem`, a persisted tree permission), so it outlives the app: after a
 reinstall, picking it again brings back every notebook and lecture. An empty `.nomedia` at its root keeps music and
-gallery apps from listing the recordings. Moving a lecture copies its folder, checks every file's size and that
+gallery apps from listing the recordings. Moving a moment copies its folder, checks every file's size and that
 `lecture.json` reads back, then deletes it from the app (`LectureStore.archive`); a failed copy leaves it in the app
 for next time. `notebooks.json` and the voices live in the folder too; settings and models stay in the app. Playback
-and the passes read a lecture's audio from either place (`Recording.openAudio`). If the folder can't be reached, new
-lectures stay in the app and Notebooks asks to pick it again.
+and the passes read a moment's audio from either place (`Recording.openAudio`). If the folder can't be reached, new
+moments stay in the app and Notebooks asks to pick it again.
 
-The notebooks are in `notebooks.json` (`NotebookStore`, v1: id, title, language, color, createdAt). Lectures recorded
-without a notebook are in `notebooks/unfiled/` until they are filed (`LectureStore.move`); the notebook a lecture's
-weekday and time suggest is `guessNotebook`'s (same weekday, within an hour, at least two earlier lectures). Before
-notebooks, every lecture was in `notebooks/default/`: those became unfiled on the first launch with notebooks.
+The notebooks are in `notebooks.json` (`NotebookStore`, v1: id, title, language, color, createdAt). Moments recorded
+without a notebook are in `notebooks/unfiled/` until they are filed (`LectureStore.move`); the notebook a moment's
+weekday and time suggest is `guessNotebook`'s (same weekday, within an hour, at least two earlier moments). Before
+notebooks, every moment was in `notebooks/default/`: those became unfiled on the first launch with notebooks.
 
 ```json
 {
@@ -236,20 +241,20 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 ## Built so far
 
 - The project, the shared data types and the model catalog, the Android UI lab.
-- Lecture (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
+- Moment (while recording): option a of round 1 (one timeline), in the app. It records to WAV or FLAC, with the
   screen off too, transcribes live with the first downloaded live model for the language, and saves lines, notes and
   `lecture.json`. Stop waits for the last lines.
 - Settings › Models (round 1's b4), in the app: the models per language in use, models added from Hugging Face
   (`HubClient`: only files the app's engines read; pinned to the repo's commit, checked by sha256 or git blob id;
   licenses marked for commercial use, not, or unknown, and asked for), and each NPU model tried on the NPU once
   downloaded. Since Nov 6 (round 2's b) Settings has a page per language, the one place its live and improve models
-  are chosen, and two switches after a lecture: find the speakers when it stops, improve automatically (while
+  are chosen, and two switches after a moment: find the speakers when it stops, improve automatically (while
   charging). Added models are kept in `models.json` in the app's storage.
-- Notebooks (round 1's c2), in the app: the first screen, lectures first, recording with or without a notebook, filing
-  unfiled lectures, the notebook guessed from when its lectures are. The gear opens a temporary Settings page (the old
+- Notebooks (round 1's c2), in the app: the first screen, moments first, recording with or without a notebook, filing
+  unfiled moments, the notebook guessed from when its moments are. The gear opens a temporary Settings page (the old
   start screen's audio format and model downloads) until Settings › Models was promoted.
-- Lecture, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
-  naming speakers, notes after the lecture, and the speaker pass and the refine pass ("Improve transcription…", always
+- Moment, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
+  naming speakers, notes after the moment, and the speaker pass and the refine pass ("Improve transcription…", always
   offered, with an estimate per model from its last run) from its menu. Stop opens it.
 - **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
   model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
@@ -257,12 +262,12 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. The UI calls it Improve.
   Any downloaded Whisper model for the language can improve (`ModelChoices`; the Zipformer could, a line at a time with
   `transcribeLineStreaming`, but is no longer offered since Nov 6: it writes the live text again). Before a pass, the current transcript is kept as a **version**
-  (`versions/<id>.json` in the lecture's folder: its lines, speakers and edits; `lecture.json` lists them under
+  (`versions/<id>.json` in the moment's folder: its lines, speakers and edits; `lecture.json` lists them under
   `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
-- Speaker labels during the lecture, with names the notebook remembers (above). The voice-print model downloads on
+- Speaker labels during the moment, with names the notebook remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.
-- Fixing a line while recording (the session keeps the user's words over live lines), deleting lectures (hold to
+- Fixing a line while recording (the session keeps the user's words over live lines), deleting moments (hold to
   select, Undo), and the Word export (Nov 7, 2026).
 
 ## Open questions
