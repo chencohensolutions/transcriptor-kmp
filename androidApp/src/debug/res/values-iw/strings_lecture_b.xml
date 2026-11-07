@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lecture_b_chip_cpu">CPU</string>
+    <string name="lecture_b_chip_gpu">GPU</string>
+    <string name="lecture_b_chip_npu">NPU</string>
+    <string name="lecture_b_title">מעבדים</string>
+    <string name="lecture_b_cpu">CPU · האפליקציה</string>
+    <string name="lecture_b_cpu_note">%1$.1f מתוך %2$d ליבות עסוקות באפליקציה. אפליקציות אחרות לא נספרות.</string>
+    <string name="lecture_b_gpu">GPU · כל הטלפון</string>
+    <string name="lecture_b_gpu_note">כל האפליקציות, כולל המסך.</string>
+    <string name="lecture_b_npu">NPU · השימוש שלנו</string>
+    <string name="lecture_b_npu_note">הזמן שהמודלים שלנו מעסיקים את ה־NPU. הטלפון לא מראה את העומס הכולל על ה־NPU.</string>
+    <string name="lecture_b_clocks">שעונים</string>
+    <string name="lecture_b_cores">ליבות %1$d–%2$d</string>
+    <string name="lecture_b_gpu_clock">GPU</string>
+    <string name="lecture_b_ghz">%1$.2f מתוך %2$.2f GHz</string>
+    <string name="lecture_b_mhz">%1$d מתוך %2$d MHz</string>
+    <string name="lecture_b_npu_temp">טמפרטורת ה־NPU</string>
+    <string name="lecture_b_celsius">%1$.1f°C</string>
+</resources>

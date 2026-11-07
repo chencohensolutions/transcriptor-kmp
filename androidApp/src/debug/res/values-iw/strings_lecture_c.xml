@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lecture_c_cpu">CPU · אפליקציה</string>
+    <string name="lecture_c_gpu">GPU · טלפון</string>
+    <string name="lecture_c_npu_ours">NPU · השימוש שלנו</string>
+    <string name="lecture_c_last_minute">הדקה האחרונה · הקשה לקיפול</string>
+    <string name="lecture_c_folded">CPU %1$s · GPU %2$s · NPU (השימוש שלנו) %3$s</string>
+</resources>

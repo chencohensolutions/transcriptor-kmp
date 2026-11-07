@@ -28,6 +28,8 @@ data class LiveLectureState(
     val speakerPassOnStop: Boolean = false,
     /** Speakers are found live with segmentation ([com.chencohensolution.transcriptor.speech.LiveSpeakers]). */
     val speakersLive: Boolean = false,
+    /** How hard the processors are working (refreshed about every second); null when not measured. */
+    val meters: ProcessorMeters? = null,
 )
 
 /** A model a recording uses ([name], for the screen) and where it runs: unknown until it loads. */
