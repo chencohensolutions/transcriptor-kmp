@@ -187,6 +187,21 @@ class HubTest {
     }
 
     @Test
+    fun anAddedLargeWhisperRunsLiveInWindowsAndKeepsItWhenReadBack() {
+        val fs = FakeFileSystem()
+        val installed = InstalledModels(fs, "/files".toPath())
+        val m = assertNotNull(hubModel(parseSearch("[$cppSearch]").single(), parseRepo(cppRepo)))
+        val large = m.toSpeechModel(m.variants.first { it.label == "large-v3" })
+        val turbo = m.toSpeechModel(m.variants.first { it.label == "large-v3-turbo-q5_0" })
+        assertEquals(30, large.liveWindowSeconds)
+        assertTrue(large.runsLive && !large.fitsLive)
+        assertNull(turbo.liveWindowSeconds)
+        // models.json keeps no window: it comes back from the kind and fitsLive (models added before it existed too).
+        installed.add(InstalledModel(large, m.repo, m.use))
+        assertEquals(30, InstalledModels(fs, "/files".toPath()).all().single().model.liveWindowSeconds)
+    }
+
+    @Test
     fun addedModelsJoinTheLibraryAndAFailedNpuCheckTakesOneOut() {
         val fs = FakeFileSystem()
         val installed = InstalledModels(fs, "/files".toPath())
