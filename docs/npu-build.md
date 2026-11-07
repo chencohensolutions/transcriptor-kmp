@@ -9,7 +9,7 @@ What gets built, per chip (SM8750 = Snapdragon 8 Elite, Hexagon v79, the only ch
 | Model | Graphs | Source checkpoint | App catalog |
 |---|---|---|---|
 | ivrit.ai Whisper large-v3 turbo | encoder, decoder | `ivrit-ai/whisper-large-v3-turbo` safetensors, commit f33172a8 | `ivritTurboNpu` |
-| ivrit.ai Whisper large-v3 (refine only) | encoder, decoder | `ivrit-ai/whisper-large-v3` safetensors (sharded), commit 766847c9; converted with `--no_simplification --float_bitwidth 16` | `ivritLargeV3Npu` |
+| ivrit.ai Whisper large-v3 (refine only) | encoder, decoder | `ivrit-ai/whisper-large-v3` safetensors (sharded), commit 766847c9; converted with `--no_simplification --float_bitwidth 16` (too large for the S25's memory in the app; a w8a16 build is in progress, section 3) | `ivritLargeV3Npu` |
 | ivrit.ai Zipformer2 66M streaming | encoder, decoder, joiner | `ivrit-ai/zipformer2-66m-streaming-he` `model.pt`, commit ee769a2a | `ivritZipformerNpu` |
 | WeSpeaker SimAM-ResNet100 (VoxBlink2 + VoxCeleb2; non-commercial) | t150, t300, t600 | WeSpeaker's runtime ONNX `voxblink2_samresnet100_ft` `avg_model.onnx`, sha256 0d92ee34 | none: copied by hand (`voicePrintsSimAmResNet100`) |
 | WeSpeaker ResNet293-LM (VoxCeleb) | t150, t300, t600 | sherpa-onnx's `wespeaker_en_voxceleb_resnet293_LM.onnx` | none: copied by hand (`voicePrintsResNet293`) |
@@ -154,6 +154,56 @@ CONV_ARGS= run SM8750 out-zipformer-SM8750 zipformer-export/encoder.onnx zipform
 
 Results for SM8750: Whisper encoder.bin 1.35 GB, decoder.bin 453 MB. Zipformer encoder 155 MB, decoder 2.2 MB,
 joiner 1.6 MB.
+
+### w8a16: 8-bit weights, 16-bit activations (Whisper large-v3)
+
+Without calibration data the converter can't quantize, so the builds above stay float (16-bit with
+`--float_bitwidth 16`). For a model too large for the phone's memory as float, `CALIB=<folder>` quantizes it: 8-bit
+per-channel weights, every activation 16-bit, attention's run-time MatMul inputs too (`--use_dynamic_16_bit_weights`, a
+hidden flag; without it the K and V caches go 8-bit). The float inputs and outputs stay float16, as the float builds have
+them, so sherpa-onnx's runtime reads both alike (its in-place self-attention cache needs float16).
+`compile-for-phone.sh --calib <folder>` does the same.
+
+1. **Calibration data:** public speech only, not the owner's recordings (owner's rule, Nov 7, 2026). For Hebrew:
+   Google's [FLEURS](https://huggingface.co/datasets/google/fleurs) `he_il` dev and test (commit 70bb2e84, CC-BY-4.0, not
+   gated), its sentences joined into one long recording per split with 0.3 s gaps (they are float WAVs: decode with
+   ffmpeg). ivrit.ai's datasets are gated and their license allows only training models or research.
+2. **Calibration inputs:** [`whisper_calib.py`](../scripts/npu/whisper_calib.py) cuts the audio into 100 windows of
+   30 s (log-mel, 128 bins), runs the ONNX encoder and decoder on the CPU (greedy, Hebrew, transcribe) over 25 of them
+   and keeps the decoder's real inputs at 8 steps each: 200 samples. The raw files are in the converted graph's layout
+   (mel `(3000, 128)`, caches `(1280, ctx)`), int32 inputs as int32, and the lists are named after the graphs.
+3. **The decoder graph, rewritten first:** [`whisper_decoder_w8a16.py`](../scripts/npu/whisper_decoder_w8a16.py). The
+   export's masked-score fill, -60000, becomes -100 (quantized, the scores shared a range with -60000, a step of 0.92,
+   and the text came out empty), and each layer's current-token score MatMul becomes Mul and ReduceSum (QAIRT 2.40
+   cuts a MatMul's run-time second input to 8 bits when its calibrated range is exactly symmetric, and the HTP then
+   can't build it). The float model's text is unchanged.
+4. **Compile:**
+   ```bash
+   cd build/qnn
+   mkdir -p export-large-w8 && ln -sf ../export-large/large-v3-decoder.weights export-large-w8/
+   venv-export/bin/python ../../scripts/npu/whisper_decoder_w8a16.py export-large/large-v3-decoder.onnx \
+     export-large-w8/large-v3-decoder.onnx && ln -sf large-v3-decoder.onnx export-large-w8/decoder.onnx
+   venv-export/bin/python ../../scripts/npu/whisper_calib.py --export export-large --prefix large-v3 \
+     --out calib-large-fleurs calib-large-fleurs/fleurs-he-dev.wav calib-large-fleurs/fleurs-he-test.wav
+   runq() { docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -e HOME=/tmp -e CALIB=/workspace/calib-large-fleurs \
+     -e CONV_ARGS="$CONV_ARGS" -v $PWD:/workspace -v $PWD/../../scripts/npu:/scripts qairt-build:2.40 bash /scripts/compile.sh "$@"; }
+   CONV_ARGS="--no_simplification --float_bitwidth 16" runq SM8750 out-large-w8a16-fleurs-SM8750 export-large/encoder.onnx
+   CONV_ARGS="--float_bitwidth 16" runq SM8750 out-large-w8a16-fleurs-SM8750 export-large-w8/decoder.onnx
+   ```
+   `compile.sh` stops right after the converter if any activation came out 8-bit.
+5. **Check on the Mac before the phone:** `qnn-net-run` with the x86 `libQnnHtp.so` and `--retrieve_context` runs a
+   context binary in Qualcomm's simulator (about 1.5 min per decoder step). Give int32 inputs as float32 files (with
+   `--native_input_tensor_names` it fails with "Unable to find composed graph"), name every input (`name:=path`; the
+   compiled graph orders them differently from the ONNX), and compare the logits with onnxruntime's.
+
+Time and memory, under Rosetta: the encoder's calibration about 2 min per window (3.5 h), its context binary 45 min
+but over 22 GB (the VM's out-of-memory killer stopped it twice; a 24 GB swap file inside the VM got it through); the
+decoder 25 min, then 10.
+
+**Status (Nov 7, 2026): not working on the phone yet.** Both graphs match the float model in the simulator, and the
+w8a16 encoder with the 16-bit decoder gives good text on the phone, but the w8a16 decoder's text on the phone is empty
+or looping. Loading the pair (1.95 GB of files) took about 5 GB of the phone's memory at its peak. Details and what to
+try next: [npu-plan.md](npu-plan.md).
 
 ## 4. The sherpa-onnx AAR
 

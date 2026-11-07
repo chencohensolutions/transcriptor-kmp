@@ -138,6 +138,28 @@ and put in place by hand (the procedure: [npu-build.md](npu-build.md)):
 2500/2600 have ExecuTorch NPU backends; Tensor only LiteRT, in beta), the GPU (Vulkan) for phones with no public NPU
 access, the CPU last.
 
+### Large-v3 w8a16 (Nov 6–7, 2026): not working on the phone yet
+
+The 16-bit large-v3 (3.28 GB) got the app killed for memory on the S25. 8-bit weights with 16-bit activations (w8a16;
+how: [npu-build.md](npu-build.md), section 3) make it 1.95 GB: encoder.bin 932.5 MB, decoder.bin 1,018.5 MB. Calibrated
+on public Hebrew only (FLEURS he_il, the owner's rule: not the owner's recordings).
+- **On the Mac (Qualcomm's x86 simulator):** the decoder's logits match the float model on 3 steps (2 from audio it
+  wasn't calibrated on): same top-1, cosine 0.9993 or better. The encoder's outputs: cosine 0.974–0.994, and the float
+  decoder gives the same text from them as from the float encoder.
+- **On the phone:** with the 16-bit decoder, the w8a16 encoder's text is good (close to the 16-bit build and CPU
+  q8_0). With the w8a16 decoder, the text is empty, a word or two, or a loop (3 of 12 held-out clips before the test
+  was stopped). Encoder 3.3–7.5 s a window, decoder 0.34–0.62 s a step: even correct, about 30–60 s per 30 s window,
+  slower than large-v3 q8_0 on the CPU (about 23 s, 12 s of it the encoder).
+- **Memory:** loading the pair took the phone's free memory from 6.1 GB to 1.1 GB: about 5 GB at the peak, 2.5 times
+  the files. `NpuLoadGuard`'s bar (files + 25% + 512 MB) is too low for QNN models.
+- **Fixed on the way:** the export's -60000 mask fill (a quantized range [-60000, 30]); a QAIRT converter bug that cut
+  a symmetric-range MatMul input to 8 bits (rewritten as Mul + ReduceSum); the encoder's context binary needing over
+  22 GB (swap in the VM). All in `scripts/npu/`.
+- **To try next:** the decoder with the runtime's in-place self cache and cross-cache-once off
+  (`SHERPA_ONNX_QNN_SELF_INPLACE=0 SHERPA_ONNX_QNN_CROSS_ONCE=0`: the simulator runs one step from fresh inputs, the
+  phone keeps buffers between steps); or the w8a16 encoder on the NPU with the decoder on the CPU (about 5 + 11 s
+  a window). Nothing is published or in the catalog.
+
 ### In the app: the crash and its fix (Nov 4, 2026)
 
 The NPU didn't open inside the app (`deviceCreate` 14001) although it did from `adb shell`: Qualcomm's stub library

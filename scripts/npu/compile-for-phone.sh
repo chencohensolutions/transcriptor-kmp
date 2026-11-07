@@ -1,11 +1,14 @@
 #!/bin/bash
 # Compiles ONNX graphs for the NPU of the phone connected over adb (Qualcomm Snapdragon): reads its chip, then
-# converts each graph to 16-bit and builds its context binary for that chip (docs/npu-build.md).
+# converts each graph to 16-bit (float, or w8a16 with --calib) and builds its context binary for that chip
+# (docs/npu-build.md).
 #
 #   scripts/npu/compile-for-phone.sh [options] <graph.onnx>...
 #     --name <name>    output folder name (default: the first graph's folder name)
 #     --soc <SM....>   compile for this chip instead of the phone's (no phone needed)
 #     --conv "<args>"  extra converter flags, e.g. "--float_bitwidth 16" for 16-bit inputs and outputs
+#     --calib <dir>    quantize w8a16 (8-bit weights, 16-bit activations), calibrated on <dir>/<graph>.txt for each
+#                      graph (see compile.sh; e.g. made by whisper_calib.py)
 #
 # Output: build/qnn/out-<name>-<soc>/binary/<graph>.bin, one per graph, named after its file.
 #
@@ -15,18 +18,19 @@
 set -e
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 q=$repo/build/qnn
-name= soc= conv=
+name= soc= conv= calib=
 while [ $# -gt 0 ]; do
   case $1 in
     --name) name=$2; shift 2 ;;
     --soc) soc=$2; shift 2 ;;
     --conv) conv=$2; shift 2 ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    --calib) calib=$(cd "$2" && pwd); shift 2 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     -*) echo "unknown option $1" >&2; exit 2 ;;
     *) break ;;
   esac
 done
-[ $# -gt 0 ] || { sed -n '2,16p' "$0"; exit 2; }
+[ $# -gt 0 ] || { sed -n '2,17p' "$0"; exit 2; }
 fail() { echo "error: $*" >&2; exit 1; }
 
 # The graphs: one folder, full precision.
@@ -41,6 +45,9 @@ for f in "$@"; do
   graphs+=("/model/$(basename "$f")")
 done
 name=${name:-$(basename "$dir")}
+for g in "${graphs[@]}"; do
+  [ -z "$calib" ] || [ -f "$calib/$(basename $g .onnx).txt" ] || fail "no calibration list $calib/$(basename $g .onnx).txt"
+done
 
 # The chip: from the phone unless given.
 if [ -z "$soc" ]; then
@@ -67,6 +74,7 @@ if ! docker image inspect qairt-build:2.40 > /dev/null 2>&1; then
 fi
 run() {
   docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -e HOME=/tmp -e CONV_ARGS="$conv" \
+    ${calib:+-e CALIB=/calib -v "$calib":/calib} \
     -v $q:/workspace -v $repo/scripts/npu:/scripts -v "$dir":/model qairt-build:2.40 "$@"
 }
 [ -f $q/nopi.so ] || run clang -O2 -shared -fPIC -o /workspace/nopi.so /scripts/nopi.c
@@ -88,7 +96,7 @@ if bad:
     print("error: the NPU needs fixed shapes; export again with them fixed:\n  " + "\n  ".join(bad)); sys.exit(1)
 PY
 
-echo "== compiling ${#graphs[@]} graph(s) for $soc (Hexagon $arch) into build/qnn/out-$name-$soc"
+echo "== compiling ${#graphs[@]} graph(s)${calib:+ w8a16} for $soc (Hexagon $arch) into build/qnn/out-$name-$soc"
 run bash /scripts/compile.sh "$soc" "out-$name-$soc" "${graphs[@]}"
 A=$(echo $arch | tr v V)
 cat <<MSG
