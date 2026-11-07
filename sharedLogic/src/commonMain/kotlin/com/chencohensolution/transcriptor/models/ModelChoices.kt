@@ -14,14 +14,21 @@ object ModelChoices {
      * transcribes a line at a time with punctuation; the streaming models would only write the live text again.
      */
     fun fits(model: SpeechModel, job: ModelJob) = when (job) {
-        ModelJob.Live -> model.kind.transcribes && model.fitsLive
+        ModelJob.Live -> model.kind.transcribes && model.runsLive
         ModelJob.Improve -> model.kind == ModelKind.Whisper || model.kind == ModelKind.WhisperNpu
     }
 
-    /** The models for [job]: the ready ones first, then those to get; for improving, the large ones before the fast. */
+    /**
+     * The models for [job]: the ready ones first, then those to get; for improving, the large ones before the fast.
+     * Live, a model that runs in windows ([SpeechModel.liveWindowSeconds]: a large one, slower) is offered only once it
+     * is ready (it is got for improving), after the ones that write lines, so it runs live only when chosen.
+     */
     fun candidates(forLanguage: List<SpeechModel>, job: ModelJob, ready: (SpeechModel) -> Boolean): List<SpeechModel> {
-        val fit = forLanguage.filter { fits(it, job) }.let { if (job == ModelJob.Improve) it.sortedBy { m -> m.fitsLive } else it }
-        return fit.filter(ready) + fit.filterNot(ready)
+        val fit = forLanguage.filter { fits(it, job) }
+        return when (job) {
+            ModelJob.Improve -> fit.sortedBy { it.fitsLive }.let { it.filter(ready) + it.filterNot(ready) }
+            ModelJob.Live -> fit.filter(ready).sortedBy { !it.fitsLive } + fit.filterNot(ready).filter { it.fitsLive }
+        }
     }
 
     /** The model that runs: the one chosen if it is ready, else the first ready one; null when none is. */

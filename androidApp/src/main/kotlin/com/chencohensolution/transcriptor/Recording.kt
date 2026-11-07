@@ -58,6 +58,7 @@ import com.chencohensolution.transcriptor.speech.SpeakerTracker
 import com.chencohensolution.transcriptor.speech.Voice
 import com.chencohensolution.transcriptor.speech.StreamingTranscriber
 import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
+import com.chencohensolution.transcriptor.speech.UtteranceLimits
 import com.chencohensolution.transcriptor.speech.ModelFiles
 import com.chencohensolution.transcriptor.speech.WhisperEngine
 import kotlinx.coroutines.CoroutineScope
@@ -456,7 +457,7 @@ object Recording {
 
 /** The live models for [language] that are downloaded, the language's own first (ivrit.ai's for Hebrew). */
 fun readyLiveModels(language: String) =
-    Recording.modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.fitsLive && Recording.models.isReady(it) }
+    Recording.modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip).filter { it.runsLive && Recording.models.isReady(it) }
 
 /** The live model that runs for [language]: the one chosen on the start screen if it is ready, else the first ready. */
 fun liveModelFor(language: String): SpeechModel? {
@@ -510,14 +511,16 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     val labeler = if (live != null) null else tracker?.let { t ->
         SpeakerLabeler(t) { Recording.voiceEmbedder(prints).also { e -> inUse?.value = ModelInUse(prints.name + at, e.runs) } }
     }
+    // Lines at pauses, or ~30 s windows for a model too slow for lines.
+    val limits = model.liveWindowSeconds?.let(UtteranceLimits::window) ?: UtteranceLimits.lines
     val transcriber = when (model.kind) {
         ModelKind.Whisper -> {
             val path = Recording.models.file(model).path
-            UtteranceTranscriber(language, model.id, scope, worker, labeler) { WhisperEngine(path) }
+            UtteranceTranscriber(language, model.id, scope, worker, labeler, limits) { WhisperEngine(path) }
         }
         ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)
-            UtteranceTranscriber(language, model.id, scope, worker, labeler) {
+            UtteranceTranscriber(language, model.id, scope, worker, labeler, limits) {
                 SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).also { e -> Recording.npuGuard.load(model) { e.load(language) } }
             }
         }

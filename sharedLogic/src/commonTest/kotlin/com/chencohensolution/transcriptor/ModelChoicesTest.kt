@@ -33,6 +33,17 @@ class ModelChoicesTest {
     }
 
     @Test
+    fun aLargeModelIsOfferedLiveOnlyOnceReadyAndAfterTheLineModels() {
+        val ready = ready(ModelCatalog.ivritTurbo, ModelCatalog.ivritLargeV3)
+        val live = ModelChoices.candidates(hebrew, ModelJob.Live, ready)
+        assertEquals(listOf(ModelCatalog.ivritTurbo.id, ModelCatalog.ivritLargeV3.id), live.take(2).map { it.id })
+        // It runs only when chosen; not got for live (it is got for improving).
+        assertEquals(ModelCatalog.ivritTurbo, ModelChoices.running(live, null, ready))
+        assertEquals(ModelCatalog.ivritLargeV3, ModelChoices.running(live, ModelCatalog.ivritLargeV3.id, ready))
+        assertEquals(false, ModelCatalog.whisperLargeV3.id in ModelChoices.candidates(hebrew, ModelJob.Live, ready()).map { it.id })
+    }
+
+    @Test
     fun theChosenModelRunsWhenReadyElseTheFirstReady() {
         val ready = ready(ModelCatalog.ivritTurbo, ModelCatalog.ivritTurboNpu)
         val live = ModelChoices.candidates(hebrew, ModelJob.Live, ready)

@@ -21,7 +21,9 @@ Settings.
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
   to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
-  once, under Live. One that fails the NPU check says so and can't be picked. "Find more models for …" opens the
+  once, under Live. A large model that runs live in ~30 s windows (large-v3 on the CPU, `liveWindowSeconds`) is got
+  under Improve and, once downloaded, can also be picked under Live, after the line models. One that fails the NPU
+  check says so and can't be picked. "Find more models for …" opens the
   catalog on the language. The lists come from `ModelChoices` (shared).
 - **A speaker page** (the Voice model or Turn model row): the same page for both jobs, titled Speaker recognition or
   Speaker turns, with the job's note, its models (the downloaded ones to pick with a radio, the others with their
