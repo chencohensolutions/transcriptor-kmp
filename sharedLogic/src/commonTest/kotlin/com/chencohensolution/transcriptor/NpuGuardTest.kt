@@ -20,16 +20,85 @@ class NpuGuardTest {
     private val turbo = ModelCatalog.ivritTurboNpu
 
     @Test
-    fun aModelTooBigForFreeMemoryIsRefusedAndDisabled() {
-        val guard = NpuLoadGuard(installed) { 4_400_000_000 } // the S25 with about 4.4 GB free
+    fun aModelTooBigForTheFreeMemoryNowIsRefusedThisTimeOnly() {
+        var free = 6_100_000_000L // the S25 with about 6.1 GB free
+        val guard = NpuLoadGuard(installed) { free }
         var loaded = false
-        assertFailsWith<NpuLoadGuard.Refused> { guard.load(large) { loaded = true } }
+        // Large-v3 16-bit: 3.3 GB of context binaries, about 8.7 GB to load.
+        val refused = assertFailsWith<NpuLoadGuard.Refused> { guard.load(large) { loaded = true } }
         assertFalse(loaded)
-        assertEquals(false, installed.npu(large.id)?.runs)
-        assertTrue(installed.npu(large.id)!!.reason!!.startsWith("Not enough memory"))
-        // Turbo (1.8 GB) fits.
+        assertTrue(refused.now)
+        assertTrue(refused.message!!.startsWith("Not enough free memory now"))
+        // Not disabled: still offered, and tried again next time.
+        assertNull(installed.npu(large.id))
+        assertTrue(ModelLibrary(installed).forLanguage("he", "SM8750").any { it.id == large.id })
+        // Turbo (1.8 GB of binaries, about 5 GB to load) fits.
         assertEquals("ok", guard.load(turbo) { "ok" })
         assertNull(installed.loading())
+        // With more memory free, the same model loads.
+        free = 9_500_000_000L
+        assertEquals("ok", guard.load(large) { "ok" })
+    }
+
+    @Test
+    fun thePickFallsBackToTheNextReadyModelThatFitsNow() {
+        val zipformer = ModelCatalog.ivritZipformerNpu
+        val cpu = ModelCatalog.all.first { it.kind == com.chencohensolution.transcriptor.models.ModelKind.Whisper }
+        val guard = NpuLoadGuard(installed) { 4_400_000_000 } // other apps open: about 4.4 GB free
+        // Turbo (about 5 GB) doesn't fit now: the next ready one that does, turbo named as skipped.
+        val pick = guard.pick(turbo, listOf(turbo, large, zipformer, cpu))
+        assertEquals(zipformer, pick.model)
+        assertEquals(turbo, pick.skipped)
+        assertNull(installed.npu(turbo.id))
+        // It fits: no fallback. A CPU model always fits.
+        assertEquals(NpuLoadGuard.Pick(zipformer), guard.pick(zipformer, listOf(turbo, zipformer)))
+        assertEquals(NpuLoadGuard.Pick(cpu), guard.pick(cpu, listOf(cpu)))
+        // Nothing else fits: no model, and the one passed over is named.
+        assertEquals(NpuLoadGuard.Pick(null, turbo), guard.pick(turbo, listOf(turbo, large)))
+        // No preference: the first ready.
+        assertEquals(zipformer, guard.pick(null, listOf(zipformer, turbo)).model)
+    }
+
+    @Test
+    fun theEstimateIsTwoAndAHalfTimesTheContextBinariesAndAMeasuredPeakOverridesIt() {
+        val mb = 1024L * 1024
+        // What was measured: the 8-bit large-v3 pair, 1.95 GB, took the S25 from 6.1 to 1.1 GB free.
+        val pair = turbo.copy(id = "large-8bit", files = listOf(
+            turbo.files[0].copy(name = "encoder.bin", sizeBytes = 1_000_000_000),
+            turbo.files[1].copy(name = "decoder.bin", sizeBytes = 950_000_000),
+            turbo.files[2],
+        ))
+        assertEquals(1_950_000_000, pair.npuBinaryBytes) // tokens.txt not counted
+        assertEquals(4_875_000_000 + NpuLoadGuard.HEADROOM, NpuLoadGuard.needs(pair))
+        assertTrue(NpuLoadGuard.needs(pair) > 5_000_000_000, "covers the measured 5 GB peak")
+        // A measured peak, from the catalog or the model's card, replaces the estimate.
+        val measured = pair.copy(npuPeakBytes = 5_000 * mb)
+        assertEquals(5_000 * mb + NpuLoadGuard.HEADROOM, NpuLoadGuard.needs(measured))
+        assertFailsWith<NpuLoadGuard.Refused> { NpuLoadGuard(installed) { 5_000 * mb }.load(measured) { } }
+        // A ggml Whisper model's model.bin isn't an NPU binary.
+        assertEquals(0, ModelCatalog.all.first { it.kind == com.chencohensolution.transcriptor.models.ModelKind.Whisper }.npuBinaryBytes)
+    }
+
+    @Test
+    fun theSpeakerModelsNpuBuildsPassEasilyOnTheS25() {
+        val gb = 1_000_000_000L
+        for (m in listOf(ModelCatalog.voicePrintsResNet293, ModelCatalog.voicePrintsEres2NetV2, ModelCatalog.ivritZipformerNpu)) {
+            assertTrue(NpuLoadGuard.needs(m) < 1 * gb, "${m.id}: ${NpuLoadGuard.needs(m)}")
+        }
+        // ResNet100 (3 x 106 MB) and DiariZen large (about 300 MB window.bin), as added by hand or from Hugging Face.
+        val r100 = ModelCatalog.voicePrintsResNet293.copy(id = "r100", files = List(3) { ModelCatalog.voicePrintsResNet293.files[1].copy(name = "t${150 shl it}.bin", sizeBytes = 106_000_000) })
+        val dzLarge = ModelCatalog.voicePrintsResNet293.copy(id = "dz", files = listOf(ModelCatalog.voicePrintsResNet293.files[1].copy(name = "window.bin", sizeBytes = 300_000_000)))
+        assertTrue(NpuLoadGuard.needs(r100) < 2 * gb)
+        assertTrue(NpuLoadGuard.needs(dzLarge) < 2 * gb)
+        val guard = NpuLoadGuard(installed) { 4_400_000_000 }
+        for (m in listOf(ModelCatalog.voicePrintsResNet293, ModelCatalog.voicePrintsEres2NetV2, r100, dzLarge)) assertEquals("ok", guard.load(m) { "ok" })
+    }
+
+    @Test
+    fun aMeasuredPeakIsKeptWithAModelAddedFromHuggingFace() {
+        val model = turbo.copy(id = "hf:x/whisper-qnn-sm8750:model", npuPeakBytes = 4_000_000_000)
+        installed.add(com.chencohensolution.transcriptor.models.InstalledModel(model, "x/whisper-qnn-sm8750", com.chencohensolution.transcriptor.models.LicenseUse.Commercial))
+        assertEquals(4_000_000_000, InstalledModels(fs, "/m".toPath()).all().single { it.model.id == model.id }.model.npuPeakBytes)
     }
 
     @Test

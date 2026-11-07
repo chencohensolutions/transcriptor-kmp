@@ -29,6 +29,11 @@ data class LiveLectureState(
     val speakerPassOnStop: Boolean = false,
     /** Speakers are found live with segmentation ([com.chencohensolution.transcriptor.speech.LiveSpeakers]). */
     val speakersLive: Boolean = false,
+    /**
+     * The live model picked, passed over because its NPU load didn't fit in the free memory at the start (its name):
+     * [liveModelName] runs instead, this time only.
+     */
+    val skippedForMemory: String? = null,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
     val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     /** How hard the processors are working (refreshed about every second); null until the first reading. */

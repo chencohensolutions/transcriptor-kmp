@@ -187,9 +187,11 @@ object Recording {
                 }
                 else -> Unit
             }
-        }.fold({ NpuResult(runs = true) }, { NpuResult(runs = false, reason = it.message ?: it.toString()) })
-        installedModels.setNpu(model.id, result)
-        return result
+        }
+        val npu = result.fold({ NpuResult(runs = true) }, { NpuResult(runs = false, reason = it.message ?: it.toString()) })
+        // Refused for want of free memory now: not a verdict on the model, so not kept.
+        if ((result.exceptionOrNull() as? NpuLoadGuard.Refused)?.now != true) installedModels.setNpu(model.id, npu)
+        return npu
     }
 
     /**
@@ -465,12 +467,16 @@ fun liveModelFor(language: String): SpeechModel? {
     return ready.firstOrNull { it.id == Recording.settings.liveModel(language) } ?: ready.firstOrNull()
 }
 
+/** [liveModelFor]'s model, or the next ready one when its NPU load doesn't fit in the free memory now. */
+fun liveModelPick(language: String) = Recording.npuGuard.pick(liveModelFor(language), readyLiveModels(language))
+
 /**
  * Live transcription for [language] with [liveModelFor]'s model, and speaker labels when the voice-print model is
  * downloaded, starting from the voices the notebook [known]; null when no live model is downloaded.
  */
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
-    val model = liveModelFor(language) ?: return null
+    val pick = liveModelPick(language)
+    val model = pick.model ?: return null
     val prints = Recording.voiceModel
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
     val segmentation = Recording.segmentationModel
@@ -531,7 +537,9 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation })
+    return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation },
+        skipped = pick.skipped?.name,
+    )
 }
 
 class TranscriptorApp : Application() {

@@ -207,10 +207,18 @@ certificate expired in May 2026).
 
 The 16-bit Whisper large-v3 NPU build (3.3 GB) got the app killed by Android's low-memory killer on the S25 (12 GB,
 about 4.4 GB free): no error to catch, and the next try did the same. `NpuLoadGuard` prevents both.
-- **Before loading,** it refuses a model whose files plus a quarter, plus 512 MB, exceed the free memory
-  (`ActivityManager.MemoryInfo.availMem`).
+- **Before loading,** it refuses a model whose load wouldn't fit in the free memory
+  (`ActivityManager.MemoryInfo.availMem`): 2.5 times its context binaries plus 512 MB (`NpuLoadGuard.needs`; Nov 7,
+  2026). The first estimate, the files plus a quarter, was far too low: the 8-bit large-v3 pair (1.95 GB of binaries)
+  took the S25 from 6.1 to 1.1 GB free, a peak of about 5 GB. A measured peak replaces the estimate:
+  `SpeechModel.npuPeakBytes` in the catalog, or `npu_peak_memory_mb` on a Hugging Face model's card (kept with an
+  added model in `models.json`). The speaker models' NPU builds need under 1 GB (ResNet293, ERes2NetV2) to under
+  2 GB (ResNet100, DiariZen large).
 - **While loading,** it marks the model in `models.json` (`loading`) and clears the mark after. A mark still there at
   the next start means the load killed the app.
-- **Either way,** the model is disabled on this phone. A failed `NpuResult` with the reason leaves it out of what can
-  run, so the pick falls back to the next working model, and nothing retries it on its own.
+- **Not enough free memory now** (refused up front) skips the model for this load only (`NpuLoadGuard.Refused.now`):
+  the recording takes the next ready live model that fits (`NpuLoadGuard.pick`), and the recording screen says so
+  ("Not enough free memory now for X; using Y. Close other apps and try again."). The model is tried again next time.
+- **A load that got the app killed** disables the model on this phone. A failed `NpuResult` with the reason leaves it
+  out of what can run, so the pick falls back to the next working model, and nothing retries it on its own.
 - **Settings** shows the reason under the model, and "Try again" re-enables it.

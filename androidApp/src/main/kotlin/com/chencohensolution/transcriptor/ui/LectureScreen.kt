@@ -245,6 +245,13 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                                 color = if (state.liveError != null) MaterialTheme.colorScheme.error else colors.time,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                             )
+                            val skipped = state.skippedForMemory
+                            if (skipped != null && model != null && !state.finishing) Text(
+                                stringResource(R.string.lecture_model_skipped_memory, skipped, model),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                            )
                             if (!state.finishing) ModelsInUse(state)
                         } }
                     }

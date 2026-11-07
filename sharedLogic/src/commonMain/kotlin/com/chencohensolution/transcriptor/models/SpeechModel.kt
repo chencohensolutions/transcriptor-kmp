@@ -76,11 +76,22 @@ data class SpeechModel(
      * grey line. Null: lines (or not live at all).
      */
     val liveWindowSeconds: Int? = null,
+    /**
+     * How much free memory loading its NPU build took at the peak, measured on a phone (bytes); null: estimated from
+     * its context binaries ([NpuLoadGuard.needs]).
+     */
+    val npuPeakBytes: Long? = null,
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
 
     /** It can transcribe live: line by line ([fitsLive]) or in windows ([liveWindowSeconds]). */
     val runsLive get() = fitsLive || liveWindowSeconds != null
+
+    /** It loads Qualcomm's runtime with its NPU build, so [NpuLoadGuard] watches its loads. */
+    val loadsOnNpu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
+
+    /** Its NPU context binaries' size (`.bin` files other than a ggml model): what Qualcomm's runtime loads. */
+    val npuBinaryBytes get() = files.filter { it.name.endsWith(".bin") && kind != ModelKind.Whisper }.sumOf { it.sizeBytes }
 
     fun runsOn(chip: String?) = chips.isEmpty() || chip in chips
 

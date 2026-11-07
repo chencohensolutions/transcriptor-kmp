@@ -35,6 +35,7 @@
     <string name="lecture_model_first_line">נטען עם השורה הראשונה</string>
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
+    <string name="lecture_model_skipped_memory">אין מספיק זיכרון פנוי כרגע עבור %1$s; משתמש ב־%2$s. סגור אפליקציות אחרות ונסה שוב.</string>
     <string name="lecture_model_npu_failed">CPU (בניית ה־NPU נכשלה)</string>
     <string name="lecture_speaker_pass_on_stop">אחרי עצירה: זיהוי דוברים, pyannote + %1$s</string>
     <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
