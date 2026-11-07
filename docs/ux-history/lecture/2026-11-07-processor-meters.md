@@ -26,7 +26,10 @@ Promoted with real readers (`AndroidProcessorProbe`) and the NPU calls timed (`n
   CPU burst per window, then only the recording); clocks following the load; the NPU warming during windows.
 - The mocks were drawn over the app's `LectureScreen` just under its top bar (no copy of the screen).
 
-Screenshots: [2026-11-07-meters-shots/](2026-11-07-meters-shots/).
+Screenshots in [2026-11-07-meters-shots/](2026-11-07-meters-shots/): the mock of a on the phone (`mock-a-he-phone.png`),
+and the promoted screen on the emulator with fake readings (the lab's `lecture current-bars`, `current-chip`,
+`current-graphs`, `models current`), in English and Hebrew: `bars-*`, `chip-en`, `chip-sheet-*`, `graphs-*`,
+`settings-*`.
 
 ## Reviving an option
     git checkout ux/lecture/2026-11-07 -- androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/<b> androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureMetersLab.kt androidApp/src/debug/res/values/strings_lecture_<b>.xml androidApp/src/debug/res/values-iw/strings_lecture_<b>.xml

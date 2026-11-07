@@ -311,7 +311,7 @@
     <string name="meters_npu_long">NPU · our use</string>
     <string name="meters_npu_note">Time this app\'s models keep the NPU busy. The phone doesn\'t show its total NPU load.</string>
     <string name="meters_clocks">Clocks</string>
-    <string name="meters_cores">Cores %1$d–%2$d</string>
+    <string name="meters_cores">Cores %1$s</string>
     <string name="meters_gpu_clock">GPU</string>
     <string name="meters_ghz">%1$.2f of %2$.2f GHz</string>
     <string name="meters_mhz">%1$d of %2$d MHz</string>

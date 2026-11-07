@@ -100,7 +100,7 @@ internal fun MetersGraphs(m: ProcessorMeters, history: List<ProcessorMeters>) {
                 )
             } else {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    shown.forEach { (label, percent, line) -> Graph(stringResource(label), percent, line, Modifier.weight(1f)) }
+                    shown.forEach { (label, percent, line) -> Graph(stringResource(label), percent, line, Modifier.weight(if (label == R.string.meters_npu_ours) 1.3f else 1f)) }
                 }
                 Text(
                     stringResource(R.string.meters_last_minute),
@@ -158,7 +158,8 @@ internal fun MetersSheet(m: ProcessorMeters, onDismiss: () -> Unit) {
                 HorizontalDivider()
                 Text(stringResource(R.string.meters_clocks), style = MaterialTheme.typography.titleSmall)
             }
-            m.cpuClocks.forEach { group -> ClockRow(stringResource(R.string.meters_cores, group.first, group.last), group.clock, ghz = true) }
+            m.cpuClocks.forEach { group -> // The range left to right in Hebrew too ("0–5", not "5–0").
+            ClockRow(stringResource(R.string.meters_cores, "\u2066${group.first}–${group.last}\u2069"), group.clock, ghz = true) }
             m.gpuClock?.let { ClockRow(stringResource(R.string.meters_gpu_clock), it, ghz = false) }
             m.npuTemperatureC?.let { t ->
                 Row(verticalAlignment = Alignment.CenterVertically) {

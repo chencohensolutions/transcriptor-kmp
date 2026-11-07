@@ -311,7 +311,7 @@
     <string name="meters_npu_long">NPU · השימוש שלנו</string>
     <string name="meters_npu_note">הזמן שהמודלים של האפליקציה מעסיקים את ה־NPU. הטלפון לא מראה את העומס הכולל על ה־NPU.</string>
     <string name="meters_clocks">שעונים</string>
-    <string name="meters_cores">ליבות %1$d–%2$d</string>
+    <string name="meters_cores">ליבות %1$s</string>
     <string name="meters_gpu_clock">GPU</string>
     <string name="meters_ghz">%1$.2f מתוך %2$.2f GHz</string>
     <string name="meters_mhz">%1$d מתוך %2$d MHz</string>
