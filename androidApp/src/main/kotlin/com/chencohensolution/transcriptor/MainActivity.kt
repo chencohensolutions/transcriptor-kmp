@@ -218,6 +218,7 @@ class MainActivity : ComponentActivity() {
                 settings = onSettings,
                 chooseFolder = chooseFolder,
                 keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
+                delete = { ids -> io { Recording.delete(ids) } },
             ),
             notice,
         )

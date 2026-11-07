@@ -8,7 +8,6 @@ internal val labScreens: List<LabScreen> = listOf(
     LabScreen("notebooks", "Notebooks", listOf(
         notebooksCurrent,
         notebooksCurrentNoGuess,
-        notebooksOptionB,
     )),
     LabScreen("models", "Settings", listOf(
         modelsCurrent,

@@ -86,6 +86,18 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         return true
     }
 
+    /**
+     * Deletes a lecture's folder for good, wherever it is (here or in the library): its audio, `lecture.json`, the
+     * transcript and its versions. False when there was none. Not while it is being recorded or a pass runs on it.
+     */
+    fun delete(notebookId: String, lectureId: String): Boolean {
+        val place = placeOf(notebookId, lectureId)
+        val folder = place.folder(notebookId, lectureId)
+        if (!place.exists(folder)) return false
+        place.fileSystem.deleteRecursively(folder)
+        return true
+    }
+
     /** The lecture; null when there is none. */
     fun load(notebookId: String, lectureId: String): Lecture? = read(placeOf(notebookId, lectureId), notebookId, lectureId)
 

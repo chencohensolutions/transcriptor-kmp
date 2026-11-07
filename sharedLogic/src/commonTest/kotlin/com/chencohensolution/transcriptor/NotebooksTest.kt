@@ -252,6 +252,27 @@ class NotebooksTest {
         assertTrue(transcriptMarkdown(l.copy(language = "sw")).contains("**Speaker 1** · 0:00"))
     }
 
+    @Test
+    fun deletingLecturesRemovesTheirFoldersWhereverTheyAreAndSkipsBusyOnes() {
+        val psych = notebooks.create("Psych", "he", 1)
+        lectures.save(lecture("a", psych.id, 10 * DAY))
+        lectures.save(lecture("b", UNFILED, 11 * DAY))
+        lectures.save(lecture("c", psych.id, 12 * DAY))
+        val library = Place(fs, "/library".toPath())
+        lectures.library = library
+        lectures.archive(lectures.load(psych.id, "c")!!)
+        val controller = NotebooksController(notebooks, lectures, { 20 * DAY })
+        controller.reload()
+
+        assertEquals(listOf("b", "c"), controller.delete(listOf("a", "b", "c", "nope"), busy = { it == "a" }))
+        assertTrue(fs.exists(root / "notebooks" / psych.id / "a" / "lecture.json"))
+        assertNull(lectures.load(UNFILED, "b"))
+        assertFalse(fs.exists(library.folder(psych.id, "c")))
+        assertEquals(listOf("a"), controller.library.value.notebooks.single().lectures.map { it.id })
+        assertTrue(controller.library.value.unfiled.isEmpty())
+        assertFalse(lectures.delete(psych.id, "c"))
+    }
+
     private companion object {
         const val MIN = 60_000L
         const val HOUR = 60 * MIN
