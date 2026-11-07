@@ -95,6 +95,7 @@ import com.chencohensolution.transcriptor.models.ModelKind
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import com.chencohensolution.transcriptor.speech.ModelStatus
@@ -136,6 +137,8 @@ data class ModelsState(
     val speakerTuning: Map<String, Float> = emptyMap(),
     /** The segmentation model live speaker turns use (its id); null without one. */
     val segmentationModel: String? = null,
+    /** The processor meters on the lecture screen while recording (Advanced). */
+    val processorMeters: ProcessorMeterStyle = ProcessorMeterStyle.Off,
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
@@ -146,7 +149,7 @@ data class ModelsState(
     }
 
     /** The models for [language] in the catalog: every one, the live ones first. */
-    fun catalog(language: String) = forLanguage(language).sortedByDescending { it.fitsLive }
+    fun catalog(language: String) = forLanguage(language).sortedByDescending { it.runsLive }
 
     /** The models that can write [language] live: the ready ones first ([ModelChoices]). */
     fun liveModels(language: String) = ModelChoices.candidates(forLanguage(language), ModelJob.Live, ::ready)
@@ -200,6 +203,7 @@ class ModelsActions(
     val setFlacLevel: (Int) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
+    val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
     val chooseFolder: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
@@ -216,7 +220,8 @@ class ModelsActions(
  * a language's page picks both (the models to get under them). Then Speaker recognition (a Voice model row, and how
  * readily it starts a new speaker) and Speaker turns (a Turn model row): each row opens the same speaker page, its
  * models to pick and Find more on Hugging Face. Then the switches after a lecture (find the speakers again after
- * Stop, improve automatically), Manage models, the lectures folder and the audio. **Manage models** is the
+ * Stop, improve automatically), Manage models, the lectures folder and the audio, then Advanced (the processor meters
+ * while recording: off, bars, a chip or graphs). **Manage models** is the
  * catalog: per language (Add a language for any other), each model a card with its facts, badges (Live, Improve, NPU,
  * Many languages, From Hugging Face, the NPU check), its download and a menu. **Find on Hugging Face** searches for
  * models the app's engines read, filtered by language, kind and NPU builds for this phone; licenses are marked for
@@ -342,6 +347,27 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
                 }
             }
             if (state.audioFormat != AudioFormat.Wav) FlacEffort(state.flacLevel, state.audioFormat, actions.setFlacLevel)
+            HorizontalDivider(Modifier.padding(top = 16.dp))
+            SectionTitle(stringResource(R.string.settings_advanced))
+            Column(Modifier.selectableGroup()) {
+                Text(stringResource(R.string.settings_meters), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
+                PageNote(stringResource(R.string.settings_meters_note))
+                listOf(
+                    ProcessorMeterStyle.Off to R.string.settings_meters_off,
+                    ProcessorMeterStyle.Bars to R.string.settings_meters_bars,
+                    ProcessorMeterStyle.Chip to R.string.settings_meters_chip,
+                    ProcessorMeterStyle.Graphs to R.string.settings_meters_graphs,
+                ).forEach { (option, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = state.processorMeters == option, role = Role.RadioButton) { actions.setProcessorMeters(option) }
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = state.processorMeters == option, onClick = null)
+                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -705,7 +731,7 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                         is NpuCheck.Fails -> ColoredBadge(stringResource(R.string.models_npu_fails), ok = false)
                         null -> {}
                     }
-                    if (!model.fitsLive && language != null) Badge(stringResource(R.string.models_after_only))
+                    if (!model.runsLive && language != null) Badge(stringResource(R.string.models_after_only))
                     if (SpeechModel.MULTILINGUAL in model.languages && language != null) Badge(stringResource(R.string.models_multilingual))
                     if (model.fromHub) Badge(stringResource(R.string.models_from_hub))
                 }

@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.models
 
+import com.chencohensolution.transcriptor.speech.UtteranceLimits
+
 /** How a model runs. */
 @kotlinx.serialization.Serializable
 enum class ModelKind {
@@ -69,12 +71,21 @@ data class SpeechModel(
      */
     val manual: Boolean = false,
     /**
+     * For a Whisper model too slow for live lines ([fitsLive] false) but fast enough for whole windows: live, it
+     * transcribes windows of about this many seconds instead of lines at pauses ([UtteranceLimits.window]), with no
+     * grey line. Null: lines (or not live at all).
+     */
+    val liveWindowSeconds: Int? = null,
+    /**
      * How much free memory loading its NPU build took at the peak, measured on a phone (bytes); null: estimated from
      * its context binaries ([NpuLoadGuard.needs]).
      */
     val npuPeakBytes: Long? = null,
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
+
+    /** It can transcribe live: line by line ([fitsLive]) or in windows ([liveWindowSeconds]). */
+    val runsLive get() = fitsLive || liveWindowSeconds != null
 
     /** It loads Qualcomm's runtime with its NPU build, so [NpuLoadGuard] watches its loads. */
     val loadsOnNpu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
@@ -86,6 +97,12 @@ data class SpeechModel(
 
     companion object {
         const val MULTILINGUAL = "*"
+
+        /**
+         * The live window for a model added from Hugging Face: a whisper.cpp model too slow for lines (a large one)
+         * runs live in 30 s windows, as the catalog's large-v3 does.
+         */
+        fun liveWindowFor(kind: ModelKind, fitsLive: Boolean): Int? = if (kind == ModelKind.Whisper && !fitsLive) 30 else null
     }
 }
 
@@ -98,6 +115,8 @@ object ModelCatalog {
         parameters = "1.55B",
         license = "Apache-2.0",
         fitsLive = false,
+        // About 23 s for a 30 s window on the S25's CPU (whisper.cpp q8_0, 6 threads): live in windows, not lines.
+        liveWindowSeconds = 30,
         source = "https://huggingface.co/ivrit-ai/whisper-large-v3",
         kind = ModelKind.Whisper,
         // f16: ivrit.ai publishes no quantized file; q8_0 on the phone.
@@ -164,6 +183,8 @@ object ModelCatalog {
         parameters = "1.55B",
         license = "MIT",
         fitsLive = false,
+        // About 23 s for a 30 s window on the S25's CPU (whisper.cpp q8_0, 6 threads): live in windows, not lines.
+        liveWindowSeconds = 30,
         source = "https://huggingface.co/openai/whisper-large-v3",
         kind = ModelKind.Whisper,
         // q5_0

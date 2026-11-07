@@ -95,6 +95,7 @@ private data class InstalledV1(
         SpeechModel(
             id, name, languages, parameters, license, fitsLive, source, kind,
             files.map { ModelFile(it.name, it.url, it.sha256, it.size, it.gitSha1) }, quantizeTo = quantizeTo, chips = chips,
+            liveWindowSeconds = SpeechModel.liveWindowFor(kind, fitsLive),
             npuPeakBytes = npuPeakBytes,
         ),
         repo, use,

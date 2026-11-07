@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.recording
 
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 
 /** The lecture screen while recording, as [LectureSession] produces it. */
 data class LiveLectureState(
@@ -33,6 +34,12 @@ data class LiveLectureState(
      * [liveModelName] runs instead, this time only.
      */
     val skippedForMemory: String? = null,
+    /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
+    val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
+    /** How hard the processors are working (refreshed about every second); null until the first reading. */
+    val meters: ProcessorMeters? = null,
+    /** The last minute of [meters], oldest first, for [ProcessorMeterStyle.Graphs]. */
+    val meterHistory: List<ProcessorMeters> = emptyList(),
 )
 
 /** A model a recording uses ([name], for the screen) and where it runs: unknown until it loads. */

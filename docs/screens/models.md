@@ -17,11 +17,16 @@ Settings.
   Manage models, the moments folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
   slider for the FLAC compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`;
   hidden for WAV). Its note says the sound is the same at every level, and what a higher level costs: time after the
-  moment, or the phone while recording.
+  moment, or the phone while recording. **Advanced**: Processor meters while recording, one of Off (the default),
+  Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
+  (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
+  [lecture.md](lecture.md#processor-meters).
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
   to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
-  once, under Live. One that fails the NPU check says so and can't be picked. "Find more models for …" opens the
+  once, under Live. A large model that runs live in ~30 s windows (large-v3 on the CPU, `liveWindowSeconds`) is got
+  under Improve and, once downloaded, can also be picked under Live, after the line models. One that fails the NPU
+  check says so and can't be picked. "Find more models for …" opens the
   catalog on the language. The lists come from `ModelChoices` (shared).
 - **A speaker page** (the Voice model or Turn model row): the same page for both jobs, titled Speaker recognition or
   Speaker turns, with the job's note, its models (the downloaded ones to pick with a radio, the others with their
@@ -72,3 +77,5 @@ Settings.
   Transcription section with a row per language and job.
 - [Round 3 (Nov 6, 2026)](../ux-history/models/2026-11-06-speakers-in-view.md): d2 — a section per speaker job, picked on
   its own page with a Hugging Face search (picked); a, b, c, d, d3 — the speaker models in other places on Settings.
+- [Processor meters (Nov 7, 2026)](../ux-history/lecture/2026-11-07-processor-meters.md): the moment screen's round;
+  all three styles were promoted, picked under Advanced.

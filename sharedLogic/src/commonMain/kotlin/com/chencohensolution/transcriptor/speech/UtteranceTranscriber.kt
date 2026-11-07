@@ -19,6 +19,11 @@ import kotlinx.atomicfu.locks.synchronized
  * [PARTIAL_EVERY_MS] of new audio, for the grey line, until it is [MAX_PARTIAL_MS] long: each partial costs as much
  * as the line so far, so a long line waits for its end. The engine runs on [worker], one call at a time; closed
  * utterances go first. Pauses don't reach [feed], so sample counts are the position in the audio.
+ *
+ * With [UtteranceLimits.window] in [limits] (a model too slow for lines,
+ * [com.chencohensolution.transcriptor.models.SpeechModel.liveWindowSeconds]) the pieces
+ * are windows of about 30 s, each one line, and there is no grey line: a partial would cost a whole window. Windows the
+ * engine hasn't reached wait in the queue (none is dropped; the recording goes on), and each line shows when it's done.
  */
 class UtteranceTranscriber(
     private val language: String,
@@ -26,10 +31,12 @@ class UtteranceTranscriber(
     scope: CoroutineScope,
     worker: CoroutineDispatcher,
     private val speakers: SpeakerLabeler? = null,
+    private val limits: UtteranceLimits = UtteranceLimits.lines,
     private val loadEngine: () -> SpeechEngine,
 ) : LiveTranscriber {
     private val downsampler = Downsampler()
-    private val utterances = Utterances()
+    private val utterances = Utterances(limits)
+    private val partials = limits == UtteranceLimits.lines
     private val queue = ArrayDeque<Utterance>()
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private var fed = 0L
@@ -91,7 +98,7 @@ class UtteranceTranscriber(
                 }
                 if (synchronizedQueue { finishing }) break
                 val open = synchronizedQueue { utterances.openSnapshot() }
-                if (open != null && open.samples.size >= MIN_PARTIAL_SAMPLES &&
+                if (partials && open != null && open.samples.size >= MIN_PARTIAL_SAMPLES &&
                     open.samples.size <= MAX_PARTIAL_MS * 16 &&
                     open.samples.size - lastPartialSize >= PARTIAL_EVERY_MS * 16
                 ) {
