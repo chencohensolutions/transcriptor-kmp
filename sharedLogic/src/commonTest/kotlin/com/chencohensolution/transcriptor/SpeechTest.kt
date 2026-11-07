@@ -5,6 +5,8 @@ import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.Piece
 import com.chencohensolution.transcriptor.speech.SpeechEngine
 import com.chencohensolution.transcriptor.speech.Utterances
+import com.chencohensolution.transcriptor.speech.UtteranceLimits
+import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.speech.cleanLine
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -89,7 +91,71 @@ class SpeechTest {
         val u = Utterances()
         val closed = u.feed(mono(tone(30_000)))
         assertEquals(1, closed.size)
-        assertTrue(closed[0].samples.size / 16L in Utterances.SOFT_MAX_MS..Utterances.HARD_MAX_MS)
+        assertTrue(closed[0].samples.size / 16L in UtteranceLimits.lines.softMaxMs..UtteranceLimits.lines.hardMaxMs)
+    }
+
+    /** Speech in 4 s stretches with 0.8 s pauses, as a lecturer talks: [n] stretches. */
+    private fun talk(n: Int) = (1..n).map { tone(4_000) + silence(800) }.reduce { a, b -> a + b }
+
+    @Test
+    fun aWindowRunsOverPausesAndEndsAtThePauseNearItsEnd() {
+        val u = Utterances(UtteranceLimits.window(30))
+        val closed = u.feed(mono(talk(8)))
+        // Pauses at 4 s, 8.8 s, ... don't end it; the first one past 25 s (at 28 s) does.
+        assertEquals(1, closed.size)
+        assertTrue(closed[0].samples.size / 16 in 27_900..28_500, "window ${closed[0].samples.size / 16} ms")
+    }
+
+    @Test
+    fun aWindowEndsAtThirtySecondsWithoutAPause() {
+        val u = Utterances(UtteranceLimits.window(30))
+        // Speech without a pause: 60 ms gaps keep the noise floor down, as a voice's do, and are no pause.
+        val closed = u.feed(mono((1..17).map { tone(2_000) + silence(60) }.reduce { a, b -> a + b }))
+        assertEquals(1, closed.size)
+        assertEquals(30_000, closed[0].samples.size / 16)
+    }
+
+    @Test
+    fun aWindowEndsWhenTheSpeakerStops() {
+        val u = Utterances(UtteranceLimits.window(30))
+        // 2 s of quiet doesn't end it (a line would have ended); 5 s does.
+        assertTrue(u.feed(mono(tone(3_000) + silence(2_500))).isEmpty())
+        val closed = u.feed(mono(silence(3_000)))
+        assertEquals(1, closed.size)
+        assertTrue(closed[0].samples.size / 16 in 7_900..8_400, "window ${closed[0].samples.size / 16} ms")
+    }
+
+    @Test
+    fun windowsGetNoGreyLineAndNoneIsLostWhenTheModelFallsBehind() = runTest {
+        val engine = FakeEngine()
+        val live = UtteranceTranscriber(
+            "he", "m", backgroundScope, StandardTestDispatcher(testScheduler), limits = UtteranceLimits.window(30),
+        ) { engine }
+        // Half a window: nothing to show yet, and no partial (it would cost a whole window).
+        live.feed(talk(3), talk(3).size)
+        runCurrent()
+        assertNull(live.output.value.partial)
+        assertTrue(engine.calls.isEmpty())
+        // 82 s more arrive before the model runs: three windows wait their turn and come out in order.
+        val more = talk(17)
+        live.feed(more, more.size)
+        runCurrent()
+        val out = live.output.value
+        assertEquals(listOf("line 1", "line 2", "line 3"), out.segments.map { it.text })
+        assertTrue(out.segments.zipWithNext().all { (a, b) -> a.endMillis <= b.startMillis })
+        assertNull(out.partial)
+        // The rest is the last window.
+        live.finish()
+        assertEquals(listOf("line 1", "line 2", "line 3", "line 4"), live.output.value.segments.map { it.text })
+        assertEquals(4, engine.calls.size)
+    }
+
+    @Test
+    fun largeV3RunsLiveInWindowsAndTurboInLines() {
+        assertEquals(30, ModelCatalog.ivritLargeV3.liveWindowSeconds)
+        assertTrue(ModelCatalog.ivritLargeV3.runsLive && !ModelCatalog.ivritLargeV3.fitsLive)
+        assertNull(ModelCatalog.ivritTurbo.liveWindowSeconds)
+        assertTrue(ModelCatalog.ivritTurbo.runsLive)
     }
 
     private fun TestScope.transcriber(engine: FakeEngine) =

@@ -50,6 +50,12 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   **segment** with its start and end in the recording; the line being spoken is transcribed again every 1.5 s of new
   audio for the grey partial line. Lines waiting go first. Silero VAD (built into whisper.cpp) may replace the
   loudness test if classrooms need it.
+- Live in windows (Nov 7, 2026, an experiment): a Whisper model too slow for lines but fast enough for whole 30 s
+  windows (`SpeechModel.liveWindowSeconds`; large-v3 on the CPU, about 23 s a window on the S25) transcribes ~30 s
+  windows instead (`UtteranceLimits.window`): pauses inside don't end one; it ends at the first short pause past 25 s,
+  at 30 s, or after 5 s of quiet. No grey line (it would cost a window). Windows the model hasn't reached wait in the
+  queue, none dropped, and each shows as one line when done. Offered for live only once downloaded (it is got for
+  improving), after the line models, so it runs live only when chosen (`ModelChoices.candidates`).
 
 ### Audio
 

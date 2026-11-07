@@ -9,13 +9,44 @@ class Utterance(val startSample: Long, val samples: FloatArray) {
 }
 
 /**
- * Splits 16 kHz audio into utterances at pauses, by loudness against a noise floor that follows the room: a line
- * of at least [MIN_LINE_MS] ends after [PAUSE_MS] of quiet (a shorter one only after [LONG_PAUSE_MS]: the model
- * guesses badly from a second of audio), or, past [SOFT_MAX_MS], at the first short quiet, and never runs past
- * [HARD_MAX_MS]. Keeps [PRE_ROLL_MS] before the speech starts so its first word isn't cut. Pieces with less than
- * [MIN_SPEECH_MS] of speech are dropped (a cough, a door).
+ * Where [Utterances] ends a piece: after [pauseMs] of quiet once it holds [minLineMs] of speech, after [longPauseMs]
+ * of quiet in any case, past [softMaxMs] at the first [shortPauseMs] of quiet, and at [hardMaxMs] whatever comes.
  */
-class Utterances {
+data class UtteranceLimits(
+    val pauseMs: Int,
+    val longPauseMs: Int,
+    val minLineMs: Int,
+    val shortPauseMs: Int,
+    val softMaxMs: Int,
+    val hardMaxMs: Int,
+) {
+    companion object {
+        /**
+         * Lines: a line of at least 3 s ends after 0.6 s of quiet (a shorter one only after 2 s: the model guesses badly
+         * from a second of audio), past 15 s at the first short quiet, and never runs past 25 s.
+         */
+        val lines = UtteranceLimits(
+            pauseMs = 600, longPauseMs = 2_000, minLineMs = 3_000, shortPauseMs = 150, softMaxMs = 15_000, hardMaxMs = 25_000,
+        )
+
+        /**
+         * Windows of about [seconds] for a model too slow for lines but fast enough for whole windows (Whisper's encoder
+         * takes 30 s whatever it is given): pauses inside don't end it; it ends at the first short quiet in its last
+         * 5 s, at [seconds] whatever comes, or after 5 s of quiet (the speaker stopped: no window of silence).
+         */
+        fun window(seconds: Int) = UtteranceLimits(
+            pauseMs = Int.MAX_VALUE, longPauseMs = 5_000, minLineMs = 0, shortPauseMs = 150,
+            softMaxMs = (seconds - 5).coerceAtLeast(1) * 1_000, hardMaxMs = seconds * 1_000,
+        )
+    }
+}
+
+/**
+ * Splits 16 kHz audio into utterances at pauses, by loudness against a noise floor that follows the room, ending each
+ * where [limits] says (lines by default, or windows). Keeps [PRE_ROLL_MS] before the speech starts so its first word
+ * isn't cut. Pieces with less than [MIN_SPEECH_MS] of speech are dropped (a cough, a door).
+ */
+class Utterances(private val limits: UtteranceLimits = UtteranceLimits.lines) {
     private var position = 0L
     private val frame = FloatArray(FRAME)
     private var inFrame = 0
@@ -88,21 +119,16 @@ class Utterances {
         if (speech) { speechFrames++; quietFrames = 0 } else quietFrames++
         val lengthMs = u.size / 16
         val quietMs = quietFrames * FRAME_MS
-        val end = (quietMs >= PAUSE_MS && lengthMs - quietMs >= MIN_LINE_MS) || quietMs >= LONG_PAUSE_MS ||
-            (lengthMs >= SOFT_MAX_MS && quietMs >= SHORT_PAUSE_MS) ||
-            lengthMs >= HARD_MAX_MS
+        val l = limits
+        val end = (quietMs >= l.pauseMs && lengthMs - quietMs >= l.minLineMs) || quietMs >= l.longPauseMs ||
+            (lengthMs >= l.softMaxMs && quietMs >= l.shortPauseMs) ||
+            lengthMs >= l.hardMaxMs
         return if (end) close() else null
     }
 
     companion object {
         const val FRAME = 480 // 30 ms
         const val FRAME_MS = 30
-        const val PAUSE_MS = 600
-        const val LONG_PAUSE_MS = 2_000
-        const val MIN_LINE_MS = 3_000
-        const val SHORT_PAUSE_MS = 150
-        const val SOFT_MAX_MS = 15_000
-        const val HARD_MAX_MS = 25_000
         const val PRE_ROLL_MS = 240
         const val MIN_SPEECH_MS = 300
         const val MIN_LEVEL = 0.004f

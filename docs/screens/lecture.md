@@ -12,7 +12,9 @@ recording or the transcription.
 - The moment's title and its notebook, the elapsed time, a red dot that breathes while recording, the microphone's
   level, Pause/Resume and Stop.
 - The transcript: one line per piece of speech (split at pauses), each with its start time, in the notebook's
-  language direction. The line being spoken now is grey and italic until it ends.
+  language direction. The line being spoken now is grey and italic until it ends. With a model that runs live in
+  ~30 s windows (large-v3 on the CPU, when chosen for live) a line is a window, shown when it is transcribed, and there
+  is no grey line; "behind" grows by up to a window.
 - The live model and how far behind the audio it is ("Live: ivrit.ai turbo · 1.8s behind").
 - The notes, each with its time: the time the user **started** typing it.
 

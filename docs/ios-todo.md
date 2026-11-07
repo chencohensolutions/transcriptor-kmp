@@ -12,6 +12,12 @@ anything left to decide. Remove an entry once it is built.
   `review_delete_*`, `notebooks_deleted_*`, `notebooks_empty_*`. The Hebrew app name is not decided yet. The code and
   files keep the name `Lecture` (`lecture.json`).
 
+## Live in windows (Nov 7, 2026)
+
+- A model with `SpeechModel.liveWindowSeconds` (large-v3 on the CPU) runs live in ~30 s windows: build its
+  `UtteranceTranscriber` with `limits = UtteranceLimits.window(seconds)` (Android: `Recording.kt`, where the live
+  transcriber is made). `ModelChoices` already lists it for live only once downloaded. No new strings.
+
 ## Notebooks
 
 - Android: `NotebooksScreen.kt` (mirror it in SwiftUI), `MainActivity.kt` (the screen as the root, Record with the

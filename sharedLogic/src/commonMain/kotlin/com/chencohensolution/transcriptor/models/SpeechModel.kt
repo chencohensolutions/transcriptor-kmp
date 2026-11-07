@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.models
 
+import com.chencohensolution.transcriptor.speech.UtteranceLimits
+
 /** How a model runs. */
 @kotlinx.serialization.Serializable
 enum class ModelKind {
@@ -68,8 +70,17 @@ data class SpeechModel(
      * (a non-commercial license) or that has no public home yet. Its files' urls are empty; it is listed once there.
      */
     val manual: Boolean = false,
+    /**
+     * For a Whisper model too slow for live lines ([fitsLive] false) but fast enough for whole windows: live, it
+     * transcribes windows of about this many seconds instead of lines at pauses ([UtteranceLimits.window]), with no
+     * grey line. Null: lines (or not live at all).
+     */
+    val liveWindowSeconds: Int? = null,
 ) {
     val sizeBytes get() = files.sumOf { it.sizeBytes }
+
+    /** It can transcribe live: line by line ([fitsLive]) or in windows ([liveWindowSeconds]). */
+    val runsLive get() = fitsLive || liveWindowSeconds != null
 
     fun runsOn(chip: String?) = chips.isEmpty() || chip in chips
 
@@ -87,6 +98,8 @@ object ModelCatalog {
         parameters = "1.55B",
         license = "Apache-2.0",
         fitsLive = false,
+        // About 23 s for a 30 s window on the S25's CPU (whisper.cpp q8_0, 6 threads): live in windows, not lines.
+        liveWindowSeconds = 30,
         source = "https://huggingface.co/ivrit-ai/whisper-large-v3",
         kind = ModelKind.Whisper,
         // f16: ivrit.ai publishes no quantized file; q8_0 on the phone.
@@ -153,6 +166,8 @@ object ModelCatalog {
         parameters = "1.55B",
         license = "MIT",
         fitsLive = false,
+        // About 23 s for a 30 s window on the S25's CPU (whisper.cpp q8_0, 6 threads): live in windows, not lines.
+        liveWindowSeconds = 30,
         source = "https://huggingface.co/openai/whisper-large-v3",
         kind = ModelKind.Whisper,
         // q5_0

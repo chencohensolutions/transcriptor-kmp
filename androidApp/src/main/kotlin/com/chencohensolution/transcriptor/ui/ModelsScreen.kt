@@ -146,7 +146,7 @@ data class ModelsState(
     }
 
     /** The models for [language] in the catalog: every one, the live ones first. */
-    fun catalog(language: String) = forLanguage(language).sortedByDescending { it.fitsLive }
+    fun catalog(language: String) = forLanguage(language).sortedByDescending { it.runsLive }
 
     /** The models that can write [language] live: the ready ones first ([ModelChoices]). */
     fun liveModels(language: String) = ModelChoices.candidates(forLanguage(language), ModelJob.Live, ::ready)
@@ -705,7 +705,7 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
                         is NpuCheck.Fails -> ColoredBadge(stringResource(R.string.models_npu_fails), ok = false)
                         null -> {}
                     }
-                    if (!model.fitsLive && language != null) Badge(stringResource(R.string.models_after_only))
+                    if (!model.runsLive && language != null) Badge(stringResource(R.string.models_after_only))
                     if (SpeechModel.MULTILINGUAL in model.languages && language != null) Badge(stringResource(R.string.models_multilingual))
                     if (model.fromHub) Badge(stringResource(R.string.models_from_hub))
                 }
