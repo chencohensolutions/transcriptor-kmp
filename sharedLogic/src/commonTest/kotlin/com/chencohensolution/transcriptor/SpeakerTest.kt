@@ -184,6 +184,17 @@ class SpeakerTest {
     }
 
     @Test
+    fun eres2NetV2DownloadsItsNpuBuildPinnedWithItsCpuModel() {
+        val m = ModelCatalog.voicePrintsEres2NetV2
+        assertEquals(listOf("model.onnx", "t150.bin", "t300.bin", "t600.bin"), m.files.map { it.name })
+        for (f in m.files) {
+            assertTrue(f.url.startsWith("https://huggingface.co/hencohen83/3dspeaker-eres2netv2-qnn-sm8750/resolve/3a42653e5230c9d28b4ea5d701f855ea3eeff906/"), f.url)
+            assertEquals(64, f.sha256.length, f.name)
+        }
+        assertEquals("Apache-2.0", m.license)
+    }
+
+    @Test
     fun moreSpeakersRaisesTheCosinesAndLowersTheClustering() {
         val id = ModelCatalog.voicePrintsResNet293.id
         val tuned = VoicePrintThresholds.of(id)

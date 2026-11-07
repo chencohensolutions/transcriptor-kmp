@@ -165,11 +165,12 @@ class SpeakerTuningTest {
         assertEquals(Turns.DiariZenLarge, Turns.of("hf:hencohen83/diarizen-wavlm-large-s80-qnn-sm8750:model"))
         assertEquals(Turns.DiariZenBase, Turns.of("diarizen-wavlm-base-s80-md"))
         assertEquals(Turns.DiariZenMeeting, Turns.of("hf:hencohen83/diarizen-meeting-base-qnn-sm8750:model"))
-        // Pyannote's pair is the model's own live threshold.
-        assertEquals(t.of(r293).live, t.live(r293, null))
-        // ResNet293's prints of DiariZen large's pieces spread wider: a higher threshold (all one speaker at 0.15).
+        // A model without its own pairs: its live threshold, whatever the segmentation.
+        assertEquals(t.of("hf:someone/other-model").live, t.live("hf:someone/other-model", "diarizen-wavlm-large-s80-md"))
+        assertEquals(t.live(r293, null), t.live(r293, "pyannote-segmentation-3.0"))
+        // ResNet293 on DiariZen large's pieces: above 0.15, where a 2-voice lecture was all one speaker.
         val large = t.live(r293, "hf:hencohen83/diarizen-wavlm-large-s80-qnn-sm8750:model")
-        assertTrue(large >= 0.25f, "$large")
+        assertTrue(large > 0.15f, "$large")
         // The slider is an offset on the pair's threshold.
         assertEquals(large + t.COSINE_RANGE, t.live(r293, "diarizen-wavlm-large-s80-md", 1f), 1e-6f)
         assertEquals(large - t.COSINE_RANGE, t.live(r293, "diarizen-wavlm-large-s80-md", -1f), 1e-6f)

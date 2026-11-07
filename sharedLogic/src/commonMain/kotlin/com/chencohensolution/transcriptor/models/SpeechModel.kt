@@ -232,7 +232,12 @@ object ModelCatalog {
         ),
     )
 
-    /** 3D-Speaker ERes2NetV2 (Chinese training, 17.8M): another voice-print model to pick. Not in [all]. */
+    /**
+     * 3D-Speaker ERes2NetV2 (Chinese training, 17.8M; Apache-2.0), another voice-print model to pick, from the owner's Hugging Face: sherpa-onnx's release unchanged, and its NPU
+     * build for the Snapdragon 8 Elite (`t150.bin`, `t300.bin`, `t600.bin`, that chip only, the CPU otherwise or if it
+     * fails; prints match the CPU's at cosine 0.99996 or more; docs/npu-build.md). Not in [all].
+     */
+    private const val ERES2NETV2 = "https://huggingface.co/hencohen83/3dspeaker-eres2netv2-qnn-sm8750/resolve/3a42653e5230c9d28b4ea5d701f855ea3eeff906"
     val voicePrintsEres2NetV2 = SpeechModel(
         id = "3dspeaker-eres2netv2-zh-cn",
         name = "3D-Speaker ERes2NetV2",
@@ -243,11 +248,10 @@ object ModelCatalog {
         source = "https://github.com/modelscope/3D-Speaker",
         kind = ModelKind.SpeakerEmbedding,
         files = listOf(
-            ModelFile(
-                "model.onnx",
-                "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx",
-                "bf1a75b9930474cf3389ef415e6e5d38ca96fea4a3a00f7e301d080a58ee2239", 71_441_526,
-            ),
+            ModelFile("model.onnx", "$ERES2NETV2/model.onnx", "bf1a75b9930474cf3389ef415e6e5d38ca96fea4a3a00f7e301d080a58ee2239", 71_441_526),
+            ModelFile("t150.bin", "$ERES2NETV2/t150.bin", "dfcf6bf5232dad8a87d9476c0e0dbaaf187f4e4e5404a2cee5785e5d1edb5c68", 39_161_856),
+            ModelFile("t300.bin", "$ERES2NETV2/t300.bin", "6307b60a18251b06250a9b634e3891f62930efee5eb604bebbf82f3f34aec36c", 39_325_696),
+            ModelFile("t600.bin", "$ERES2NETV2/t600.bin", "042791797291120bb42f791d23b90c8c0f8cdd1a0ed3086768c18c153eeb15d7", 39_727_104),
         ),
     )
 
