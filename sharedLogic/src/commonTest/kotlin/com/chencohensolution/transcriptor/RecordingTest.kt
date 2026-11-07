@@ -3,7 +3,6 @@ package com.chencohensolution.transcriptor
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.LectureStore
-import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.recording.AudioFileFormat
 import com.chencohensolution.transcriptor.recording.AudioRecorder
 import com.chencohensolution.transcriptor.recording.FlacCompression
@@ -70,7 +69,6 @@ class RecordingTest {
     private val store = LectureStore(fs, root)
     private val settings = SettingsStore(fs, root)
     private val recorder = FakeRecorder(fs)
-    private val notebook = Notebook("psych", "פסיכולוגיה קוגניטיבית", "he", emptyList())
 
     private fun TestScope.session() = LectureSession(recorder, store, settings, backgroundScope, now = { 1_793_600_000_000 })
 
@@ -109,28 +107,28 @@ class RecordingTest {
         assertNull(settings.improveSpeed("ivrit-whisper-large-v3"))
         settings.recordImproveSpeed("ivrit-whisper-large-v3", workMillis = 1_200_000, audioMillis = 3_000_000)
         assertEquals(0.4, SettingsStore(fs, root).improveSpeed("ivrit-whisper-large-v3"))
-        settings.addImprovePending("psych", "l1")
-        settings.addImprovePending("psych", "l2")
-        settings.addImprovePending("psych", "l1")
-        assertEquals(listOf("psych" to "l1", "psych" to "l2"), SettingsStore(fs, root).improvePending)
-        settings.removeImprovePending("psych", "l1")
-        assertEquals(listOf("psych" to "l2"), SettingsStore(fs, root).improvePending)
+        settings.addImprovePending("l1")
+        settings.addImprovePending("l2")
+        settings.addImprovePending("l1")
+        assertEquals(listOf("l1", "l2"), SettingsStore(fs, root).improvePending)
+        settings.removeImprovePending("l1")
+        assertEquals(listOf("l2"), SettingsStore(fs, root).improvePending)
     }
 
     @Test
     fun startCreatesTheFolderTheJsonAndTheAudio() = runTest {
-        val lecture = session().start(notebook, "זיכרון עבודה")
-        val folder = store.folder("psych", lecture.id)
+        val lecture = session().start(listOf("psych"), "פסיכולוגיה", "he", "זיכרון עבודה")
+        val folder = store.folder(lecture.id)
         assertTrue(fs.exists(folder / "lecture.json"))
         assertEquals(folder / AUDIO_WAV, recorder.file)
         assertEquals(AudioFileFormat.Wav, recorder.format)
-        assertEquals("זיכרון עבודה", store.load("psych", lecture.id)?.title)
+        assertEquals("זיכרון עבודה", store.load(lecture.id)?.title)
     }
 
     @Test
     fun flacLiveRecordsToFlac() = runTest {
         settings.audioFormat = AudioFormat.FlacLive
-        val lecture = session().start(notebook, "t")
+        val lecture = session().start(listOf("psych"), "פסיכולוגיה", "he", "t")
         assertEquals(AUDIO_FLAC, lecture.audioFile)
         assertEquals(AudioFileFormat.Flac, recorder.format)
         assertEquals(FLAC_DEFAULT_LEVEL, recorder.flacLevel)
@@ -147,19 +145,19 @@ class RecordingTest {
         assertEquals(0, SettingsStore(fs, root).flacLevel)
         settings.flacLevel = 2
         settings.audioFormat = AudioFormat.FlacLive
-        session().start(notebook, "t")
+        session().start(listOf("psych"), "פסיכולוגיה", "he", "t")
         assertEquals(2, recorder.flacLevel)
     }
 
     @Test
     fun notesKeepTheirTimeAndAreSavedAtOnce() = runTest {
         val session = session()
-        val lecture = session.start(notebook, "t")
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(5_000)
         session.addNote(3_000, "  פסיבי ↔ אקטיבי ")
         session.addNote(4_000, "   ")
         runCurrent()
-        val notes = store.load("psych", lecture.id)!!.notes
+        val notes = store.load(lecture.id)!!.notes
         assertEquals(1, notes.size)
         assertEquals(3_000, notes[0].atMillis)
         assertEquals("פסיבי ↔ אקטיבי", notes[0].text)
@@ -169,7 +167,7 @@ class RecordingTest {
     @Test
     fun pauseAndResumeMoveTheState() = runTest {
         val session = session()
-        session.start(notebook, "t")
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         session.pauseOrResume()
         runCurrent()
         assertTrue(recorder.paused)
@@ -184,16 +182,16 @@ class RecordingTest {
     @Test
     fun theDurationIsSavedWhileRecordingAndOnStop() = runTest {
         val session = session()
-        val lecture = session.start(notebook, "t")
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(31_000)
         advanceTimeBy(LectureSession.SAVE_EVERY_MILLIS + 1)
-        assertEquals(31_000, store.load("psych", lecture.id)?.durationMillis)
+        assertEquals(31_000, store.load(lecture.id)?.durationMillis)
         assertEquals(1, recorder.checkpoints)
         recorder.advance(9_000)
         val stopped = assertNotNull(session.stop())
         runCurrent()
         assertEquals(40_000, stopped.durationMillis)
-        assertEquals(40_000, store.load("psych", lecture.id)?.durationMillis)
+        assertEquals(40_000, store.load(lecture.id)?.durationMillis)
         assertFalse(stopped.pendingFlac)
         assertNull(session.state.value)
         assertEquals(40_000 * 48, WavWriter.read(fs, store.audioPath(stopped)).frames)
@@ -202,9 +200,9 @@ class RecordingTest {
     @Test
     fun theJsonHasTheDocumentedFields() = runTest {
         val session = session()
-        val lecture = session.start(notebook, "t")
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         session.addNote(1_000, "n")
-        val text = fs.read(store.folder("psych", lecture.id) / "lecture.json") { readUtf8() }
+        val text = fs.read(store.folder(lecture.id) / "lecture.json") { readUtf8() }
         listOf("\"v\": 1", "\"startedAt\": \"2026-11-02T", "\"durationMs\"", "\"audio\": \"audio.wav\"", "\"atMs\": 1000")
             .forEach { assertTrue(it in text, "$it in $text") }
     }
@@ -230,7 +228,7 @@ class RecordingTest {
     fun wavThenFlacIsCompressedAfterStop() = runTest {
         settings.audioFormat = AudioFormat.WavThenFlac
         val session = session()
-        session.start(notebook, "t")
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(2_000)
         val stopped = assertNotNull(session.stop())
         assertTrue(stopped.pendingFlac)
@@ -246,7 +244,7 @@ class RecordingTest {
         val done = compression.compress(stopped)
         assertEquals(7, level)
         assertEquals(AUDIO_FLAC, done.audioFile)
-        assertEquals(AUDIO_FLAC, store.load("psych", stopped.id)?.audioFile)
+        assertEquals(AUDIO_FLAC, store.load(stopped.id)?.audioFile)
         assertFalse(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
         assertTrue(compression.pending().isEmpty())
     }
@@ -255,13 +253,13 @@ class RecordingTest {
     fun aFailedCompressionKeepsTheWav() = runTest {
         settings.audioFormat = AudioFormat.WavThenFlac
         val session = session()
-        session.start(notebook, "t")
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(1_000)
         val stopped = assertNotNull(session.stop())
         val compression = FlacCompression(fs, store, { _, flac, _, _ -> fs.write(flac) {}; 10 })
         assertFailsWith<IllegalStateException> { compression.compress(stopped) }
         assertTrue(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
-        assertEquals(true, store.load("psych", stopped.id)?.pendingFlac)
+        assertEquals(true, store.load(stopped.id)?.pendingFlac)
     }
 }
 
@@ -270,7 +268,6 @@ class LiveRecordingTest {
     private val root = "/data".toPath()
     private val store = LectureStore(fs, root)
     private val recorder = FakeRecorder(fs)
-    private val notebook = Notebook("psych", "פסיכולוגיה", "he", emptyList())
 
     @Test
     fun linesFromLiveTranscriptionAreSavedAndStopWaitsForTheLast() = runTest {
@@ -281,17 +278,17 @@ class LiveRecordingTest {
                 com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
             )
         }
-        val lecture = session.start(notebook, "t")
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(500, silence(500))
         recorder.advance(3_500, tone(3_500))
         recorder.advance(1_000, silence(1_000))
         runCurrent()
         assertEquals("fake", session.state.value?.liveModelName)
-        assertEquals(listOf("line 1"), store.load("psych", lecture.id)?.segments?.map { it.text })
+        assertEquals(listOf("line 1"), store.load(lecture.id)?.segments?.map { it.text })
         recorder.advance(900, tone(900))
         val stopped = assertNotNull(session.stop())
         assertEquals(listOf("line 1", "line 2"), stopped.segments.map { it.text })
-        assertEquals(listOf("line 1", "line 2"), store.load("psych", lecture.id)?.segments?.map { it.text })
+        assertEquals(listOf("line 1", "line 2"), store.load(lecture.id)?.segments?.map { it.text })
         assertTrue(engine.closed)
     }
 
@@ -304,7 +301,7 @@ class LiveRecordingTest {
                 com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
             )
         }
-        val lecture = session.start(notebook, "t")
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(500, silence(500))
         recorder.advance(3_500, tone(3_500))
         recorder.advance(1_000, silence(1_000))
@@ -315,7 +312,7 @@ class LiveRecordingTest {
         session.editLine("no such line", "x")
         runCurrent()
         assertEquals(listOf("the first line, fixed"), session.state.value?.lecture?.segments?.map { it.text })
-        assertEquals(listOf(true), store.load("psych", lecture.id)?.segments?.map { it.edited })
+        assertEquals(listOf(true), store.load(lecture.id)?.segments?.map { it.edited })
 
         recorder.advance(3_000, tone(3_000))
         recorder.advance(1_000, silence(1_000))
@@ -323,6 +320,6 @@ class LiveRecordingTest {
         assertEquals(listOf("the first line, fixed", "line 2"), session.state.value?.lecture?.segments?.map { it.text })
         val stopped = assertNotNull(session.stop())
         assertEquals(listOf("the first line, fixed", "line 2"), stopped.segments.map { it.text })
-        assertEquals(listOf(true, false), store.load("psych", lecture.id)?.segments?.map { it.edited })
+        assertEquals(listOf(true, false), store.load(lecture.id)?.segments?.map { it.edited })
     }
 }

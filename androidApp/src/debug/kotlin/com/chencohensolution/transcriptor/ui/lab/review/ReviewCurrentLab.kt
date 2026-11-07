@@ -74,7 +74,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
-        notebookTitle = LabData.notebooks.first().title, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = LabData.labels.first().name, lecture = lecture, positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
@@ -101,9 +101,9 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         addNote = { at, text -> lecture = lecture.copy(notes = (lecture.notes + Note("n${lecture.notes.size + 1}", at, text.trim())).sortedBy { it.atMillis }) },
         editNote = { id, text -> lecture = lecture.copy(notes = lecture.notes.map { if (it.id == id) it.copy(text = text.trim()) else it }) },
         deleteNote = { id -> lecture = lecture.copy(notes = lecture.notes.filter { it.id != id }) },
-        shareWord = { val name = docxName(lecture); LabWord.share(context, LabWord.save(context, name, transcriptDocx(lecture, LabData.notebooks.first().title)), name) },
+        shareWord = { val name = docxName(lecture); LabWord.share(context, LabWord.save(context, name, transcriptDocx(lecture, LabData.labels.first().name)), name) },
         saveWord = {
-            LabWord.save(context, docxName(lecture), transcriptDocx(lecture, LabData.notebooks.first().title))
+            LabWord.save(context, docxName(lecture), transcriptDocx(lecture, LabData.labels.first().name))
             Toast.makeText(context, "Lab: saved in Downloads/Transcriptor (the app: beside the recording)", Toast.LENGTH_LONG).show()
         },
         deleteLecture = { Toast.makeText(context, "Lab: deleted; the list would open with it gone", Toast.LENGTH_LONG).show() },

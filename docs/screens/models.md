@@ -6,7 +6,7 @@ Settings.
 
 ## What it shows
 
-- **Settings**: **Languages**, one row per language in use (the notebooks', a moment in none, the phone's, those
+- **Settings**: **Languages**, one row per language in use (the moments', the phone's, those
   added) with the model that writes it live and the one that improves its moments ("Live: … / Improve: …", red when
   none is downloaded), and Add a language. **Speaker recognition**: its note, a **Voice model** row with the model in
   use and its facts ("3D-Speaker CAM++ · 7M", red "No model downloaded" without one), and under it the slider "How

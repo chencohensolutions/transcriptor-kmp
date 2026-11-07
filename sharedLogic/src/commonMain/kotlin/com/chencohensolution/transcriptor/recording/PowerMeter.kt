@@ -131,8 +131,8 @@ class PowerMeter(private val probe: PowerProbe, private val intervalMillis: Long
 object PowerLogCsv {
     const val HEADER = "lecture,notebook,started,duration_s,avg_mw,mwh_total,mwh_per_min,j_per_min,battery_start,battery_end,temp_start,temp_end,cpu_s_per_min,screen_on,charging,models"
 
-    fun row(lectureId: String, notebookId: String, startedAtMillis: Long, r: PowerReport): String = listOf(
-        lectureId, notebookId, startedAtMillis.toString(), (r.durationMillis / 1000).toString(),
+    fun row(lectureId: String, labels: String, startedAtMillis: Long, r: PowerReport): String = listOf(
+        lectureId, labels, startedAtMillis.toString(), (r.durationMillis / 1000).toString(),
         r.averageMilliwatts.str(), r.totalMilliwattHours.str(), r.milliwattHoursPerMinute.str(), r.joulesPerMinute.str(),
         r.batteryPercentStart?.toString().orEmpty(), r.batteryPercentEnd?.toString().orEmpty(),
         r.temperatureStart.str(), r.temperatureEnd.str(), r.cpuSecondsPerMinute.str(), r.screenOnShare.str(),

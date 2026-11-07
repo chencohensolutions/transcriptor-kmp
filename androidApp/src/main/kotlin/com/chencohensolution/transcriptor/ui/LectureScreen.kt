@@ -166,7 +166,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                     }
                     Column(Modifier.weight(1f)) {
                         Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(state.notebookTitle, style = MaterialTheme.typography.bodySmall, color = colors.time, maxLines = 1)
+                        if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = colors.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     RecordingDot(state.paused)
                     Spacer(Modifier.width(6.dp))

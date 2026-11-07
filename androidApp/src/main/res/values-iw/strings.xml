@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Audio Logs</string>
-    <string name="main_coming_soon">המחברות יחליפו את המסך הזה אחרי שהעיצוב שלהן ייבחר במעבדת הממשק.</string>
     <string name="lecture_back">חזרה</string>
     <string name="lecture_pause">השהיה</string>
     <string name="lecture_resume">המשך</string>
@@ -26,7 +25,6 @@
     <string name="flac_effort_note_after">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, והדחיסה אחרי הרגע לוקחת יותר זמן.</string>
     <string name="flac_effort_note_live">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, ומעמיסה יותר על הטלפון בזמן ההקלטה (וגם על הסוללה).</string>
     <string name="start_lecture">התחלת רגע</string>
-    <string name="start_default_notebook">המחברת שלי</string>
     <string name="start_last">הרגע האחרון: %1$s · %2$s · %3$d הערות · %4$s</string>
     <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
@@ -87,24 +85,12 @@
     <string name="review_version_refined">שופר · %1$s</string>
     <!-- Notebooks -->
     <string name="notebooks_settings">הגדרות</string>
-    <string name="notebooks_records_in">מקליט ב:</string>
     <string name="notebooks_record">הקלטה</string>
-    <string name="notebooks_no_notebook_in">בלי מחברת · %1$s</string>
-    <string name="notebooks_no_notebook_assign">בלי מחברת, לשייך אחר כך</string>
-    <string name="notebooks_no_notebook_language">שפה בלי מחברת: %1$s</string>
-    <string name="notebooks_language_title">שפת רגע בלי מחברת</string>
+    <string name="notebooks_language_title">שפת הרגע</string>
     <string name="notebooks_suggested">מוצעת</string>
-    <string name="notebooks_usually">בדרך כלל ב%1$s</string>
+    <string name="notebooks_usually">בדרך כלל %1$s ב%2$s</string>
     <string name="notebooks_slot">%1$s ב־%2$s</string>
-    <string name="notebooks_assign_after">אפשר לבחור מחברת אחר כך</string>
     <string name="notebooks_all">הכול</string>
-    <string name="notebooks_unfiled_chip">לא שויכו (%1$d)</string>
-    <string name="notebooks_unfiled">עוד לא במחברת</string>
-    <string name="notebooks_unfiled_title">לא במחברת</string>
-    <string name="notebooks_move_to">העברה ל%1$s</string>
-    <string name="notebooks_other">אחרת…</string>
-    <string name="notebooks_assign">שיוך למחברת</string>
-    <string name="notebooks_assign_title">מחברת עבור %1$s</string>
     <string name="notebooks_today">היום</string>
     <string name="notebooks_yesterday">אתמול</string>
     <string name="notebooks_this_week">השבוע</string>
@@ -117,13 +103,10 @@
     <string name="notebooks_improving">משפר את התמלול · %1$d%%</string>
     <string name="notebooks_recording">מקליט · %1$s</string>
     <string name="notebooks_back_to_lecture">חזרה לרגע</string>
-    <string name="notebooks_empty_title">מחברת לכל קבוצה</string>
-    <string name="notebooks_empty_note">אפשר להקליט עכשיו ולשייך אחר כך, או ליצור מחברת לקבוצה: הרגעים שלה מתומללים בטלפון, בשפה שלה, עם ההערות שלך עליהם.</string>
-    <string name="notebooks_new_notebook">מחברת חדשה</string>
+    <string name="notebooks_empty_title">הקלטת רגע</string>
+    <string name="notebooks_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (קורס, אדם, פרויקט) כדי למצוא אותו אחר כך.</string>
     <string name="notebooks_new_name">שם</string>
     <string name="notebooks_new_name_hint">מבוא לפסיכולוגיה</string>
-    <string name="notebooks_new_language">שפת הרגעים</string>
-    <string name="notebooks_new_language_note">קובעת את מודלי הדיבור ואת כיוון הכתיבה של השורות.</string>
     <string name="notebooks_create">יצירה</string>
     <!-- Lectures folder -->
     <string name="folder_title">תיקיית הרגעים</string>
@@ -271,6 +254,21 @@
     <string name="review_power_charging">צריכה: לא נמדדה (בטעינה)</string>
     <string name="models_npu_retry">לנסות שוב</string>
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
+    <string name="notebooks_labels">תוויות</string>
+    <string name="notebooks_labels_more">תוויות…</string>
+    <string name="notebooks_add_labels">הוספת תוויות</string>
+    <string name="notebooks_add">הוספת %1$s</string>
+    <string name="notebooks_no_labels">בלי תוויות</string>
+    <string name="notebooks_no_label_chip">בלי תווית (%1$d)</string>
+    <string name="notebooks_no_label_title">עוד בלי תוויות</string>
+    <string name="notebooks_new_label">תווית חדשה</string>
+    <string name="notebooks_edit_label">עריכת תווית</string>
+    <string name="notebooks_delete_label">מחיקת התווית</string>
+    <string name="notebooks_delete_label_note">הרגעים שלה נשארים, בלי התווית הזו.</string>
+    <string name="notebooks_done">סיום</string>
+    <string name="notebooks_labels_of">התוויות של %1$s</string>
+    <string name="notebooks_labels_of_many">התוויות של %1$d רגעים</string>
+    <string name="notebooks_label_later">אפשר להוסיף תוויות אחר כך</string>
     <string name="notebooks_deleted_one">הרגע נמחק</string>
     <string name="notebooks_deleted_many">%1$d רגעים נמחקו</string>
     <string name="notebooks_undo">ביטול</string>

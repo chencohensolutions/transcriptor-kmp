@@ -19,7 +19,7 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.
-- Tap a speaker's chip: name them; the notebook remembers the voice (a print of up to 20 s of their lines) when the
+- Tap a speaker's chip: name them; the app remembers the voice (a print of up to 20 s of their lines) when the
   voice-print model is downloaded.
 - The pencil: every line becomes a field, with a dot in its speaker's color to move it to another speaker; Done
   saves the changed lines, marked edited (the refine pass will keep them).
@@ -41,7 +41,7 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
   and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
   is lost. Notes belong to the moment, not to a version.
 - Share, beside the pencil (round 3's b): one tap makes the moment's Word file (`transcriptDocx`: the title, the
-  notebook, date and length, a paragraph per speaker turn with the name and time above it, the notes as shaded italic
+  labels, date and length, a paragraph per speaker turn with the name and time above it, the notes as shaded italic
   paragraphs after their turn; right-to-left for Hebrew) and opens Android's share sheet (through the app's
   FileProvider, from its cache). Holding it, or ⋮ → Save as Word, saves `<title>.docx` in the moment's folder,
   beside the recording (`LectureStore.saveWord`).

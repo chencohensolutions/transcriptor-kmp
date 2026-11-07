@@ -63,7 +63,7 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
     }
     val partial = toSay[saying].text.split(" ").take(words).joinToString(" ").ifEmpty { null }
     val state = LiveLectureState(
-        notebookTitle = LabData.notebooks.first().title,
+        labelNames = LabData.labels.first().name,
         lecture = lecture,
         partial = if (paused) null else partial,
         elapsedMillis = elapsed,

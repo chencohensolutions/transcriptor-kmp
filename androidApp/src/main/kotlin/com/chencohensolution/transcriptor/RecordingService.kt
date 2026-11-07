@@ -10,7 +10,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.chencohensolution.transcriptor.notebook.Lecture
-import com.chencohensolution.transcriptor.notebook.Notebook
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,8 +48,8 @@ class RecordingService : Service() {
             ACTION_START -> if (!session.isRecording) {
                 startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 session.start(
-                    Notebook(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_NOTEBOOK_TITLE)!!, intent.getStringExtra(EXTRA_LANGUAGE)!!, emptyList()),
-                    intent.getStringExtra(EXTRA_TITLE)!!,
+                    intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
+                    intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()
@@ -59,7 +58,7 @@ class RecordingService : Service() {
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
                 val improve = lecture?.takeIf { it.segments.isNotEmpty() && Recording.settings.autoImprove }?.let { Recording.improveModelFor(it.language) }
                 // Improving on its own waits for the charger.
-                if (lecture != null && improve != null && !charging()) Recording.settings.addImprovePending(lecture.notebookId, lecture.id)
+                if (lecture != null && improve != null && !charging()) Recording.settings.addImprovePending(lecture.id)
                 val then = improve?.takeIf { charging() }?.let { model -> { done: Lecture -> refine(done, model.id) } }
                 when {
                     lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.findSpeakersOnStop -> findSpeakers(lecture, then)
@@ -68,7 +67,7 @@ class RecordingService : Service() {
                 }
             }
             ACTION_REFINE -> {
-                val lecture = Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, intent.getStringExtra(EXTRA_LECTURE)!!)
+                val lecture = Recording.store.load(intent.getStringExtra(EXTRA_LECTURE)!!)
                 val model = intent.getStringExtra(EXTRA_MODEL)!!
                 val speakersFirst = intent.getBooleanExtra(EXTRA_SPEAKERS_FIRST, false) && Recording.canFindSpeakers
                 if (lecture != null && !session.isRecording && !compressing && Recording.refineModels(lecture.language).any { it.id == model }) {
@@ -81,7 +80,7 @@ class RecordingService : Service() {
             ACTION_SPEAKERS -> {
                 val wanted = intent.getStringExtra(EXTRA_LECTURE)
                 val lecture = if (wanted == null) Recording.lastLecture.value
-                    else Recording.store.load(intent.getStringExtra(EXTRA_NOTEBOOK)!!, wanted)
+                    else Recording.store.load(wanted)
                 if (lecture != null && !session.isRecording && !compressing) {
                     findSpeakers(lecture)
                 } else {
@@ -122,7 +121,7 @@ class RecordingService : Service() {
                 .onFailure { android.util.Log.e("RecordingService", "speaker pass failed", it) }
             Recording.findingSpeakers.value = null
             compressing = false
-            val next = Recording.store.load(lecture.notebookId, lecture.id) ?: lecture
+            val next = Recording.store.load(lecture.id) ?: lecture
             launch(Dispatchers.Main) { if (then != null) then(next) else compressPending() }
         }
     }
@@ -147,7 +146,7 @@ class RecordingService : Service() {
                 if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
             }.onFailure { android.util.Log.e("RecordingService", "refine pass failed", it) }
-            Recording.settings.removeImprovePending(lecture.notebookId, lecture.id)
+            Recording.settings.removeImprovePending(lecture.id)
             Recording.refining.value = null
             compressing = false
             launch(Dispatchers.Main) { if (!improveNextPending()) compressPending() }
@@ -163,10 +162,10 @@ class RecordingService : Service() {
      */
     private fun improveNextPending(): Boolean {
         if (!charging() || Recording.session.isRecording) return false
-        for ((notebookId, lectureId) in Recording.settings.improvePending) {
-            val lecture = Recording.store.load(notebookId, lectureId)
+        for (lectureId in Recording.settings.improvePending) {
+            val lecture = Recording.store.load(lectureId)
             val model = lecture?.let { Recording.improveModelFor(it.language) }
-            if (lecture == null || model == null || lecture.refinedWith != null) { Recording.settings.removeImprovePending(notebookId, lectureId); continue }
+            if (lecture == null || model == null || lecture.refinedWith != null) { Recording.settings.removeImprovePending(lectureId); continue }
             refine(lecture, model.id)
             return true
         }
@@ -256,8 +255,8 @@ class RecordingService : Service() {
         private const val ACTION_COMPRESS = "compress"
         private const val ACTION_SPEAKERS = "speakers"
         private const val ACTION_REFINE = "refine"
-        private const val EXTRA_NOTEBOOK = "notebook"
-        private const val EXTRA_NOTEBOOK_TITLE = "notebookTitle"
+        private const val EXTRA_LABELS = "labels"
+        private const val EXTRA_LABEL_NAMES = "labelNames"
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_LECTURE = "lecture"
@@ -265,10 +264,11 @@ class RecordingService : Service() {
         private const val EXTRA_SPEAKERS_FIRST = "speakersFirst"
         private const val ACTION_IMPROVE_PENDING = "improvePending"
 
-        fun start(context: Context, notebook: Notebook, title: String) = context.startForegroundService(
+        /** Records a moment with these [labels] (ids; [labelNames] for its screen) in [language]. */
+        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
-                .putExtra(EXTRA_NOTEBOOK, notebook.id).putExtra(EXTRA_NOTEBOOK_TITLE, notebook.title)
-                .putExtra(EXTRA_LANGUAGE, notebook.language).putExtra(EXTRA_TITLE, title),
+                .putExtra(EXTRA_LABELS, labels.toTypedArray()).putExtra(EXTRA_LABEL_NAMES, labelNames)
+                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title),
         )
 
         fun stop(context: Context) =
@@ -277,7 +277,7 @@ class RecordingService : Service() {
         /** Improves [lecture] with [modelId], after the speaker pass when [speakersFirst]. */
         fun refine(context: Context, lecture: Lecture, modelId: String, speakersFirst: Boolean = false) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_REFINE)
-                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_NOTEBOOK, lecture.notebookId).putExtra(EXTRA_MODEL, modelId)
+                .putExtra(EXTRA_LECTURE, lecture.id).putExtra(EXTRA_MODEL, modelId)
                 .putExtra(EXTRA_SPEAKERS_FIRST, speakersFirst),
         )
 
@@ -288,7 +288,7 @@ class RecordingService : Service() {
         /** Runs the speaker pass on [lecture] (again), or on [Recording.lastLecture]. */
         fun findSpeakers(context: Context, lecture: Lecture? = null) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_SPEAKERS).apply {
-                lecture?.let { putExtra(EXTRA_LECTURE, it.id).putExtra(EXTRA_NOTEBOOK, it.notebookId) }
+                lecture?.let { putExtra(EXTRA_LECTURE, it.id) }
             },
         )
 

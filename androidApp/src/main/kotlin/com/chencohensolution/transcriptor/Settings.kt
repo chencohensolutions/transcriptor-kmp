@@ -73,7 +73,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             }
         }
     }
-    val languages = (library.notebooks.map { it.language } + library.unfiledLanguage + Recording.phoneLanguage() + added).distinct()
+    val languages = (library.moments.map { it.language } + library.lastLanguage + Recording.phoneLanguage() + added).distinct()
     val state = ModelsState(
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),

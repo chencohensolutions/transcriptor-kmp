@@ -5,7 +5,6 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Note
-import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.speech.LiveOutput
@@ -65,20 +64,20 @@ class LectureSession(
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    /** The notebooks' known voices: speakers the user named, labeled by name in later lectures. */
+    /** The app's known voices: speakers the user named, labeled by name in later moments. */
     private val voices: VoiceStore? = null,
     /** The speaker pass's models are on the phone (it can run after Stop). */
     private val speakerPassReady: () -> Boolean = { false },
     /** Samples the battery while a lecture records, for its `power.json` and `power-log.csv`; null: not measured. */
     private val power: PowerMeter? = null,
     /**
-     * Starts live transcription for a language, with the voices the notebook knows; null when no live model is
+     * Starts live transcription for a language, with the voices the app knows; null when no live model is
      * downloaded for it.
      */
     private val live: (language: String, scope: CoroutineScope, known: List<Voice>) -> LiveModel? = { _, _, _ -> null },
 ) {
     private data class Recording(
-        val notebookTitle: String,
+        val labelNames: String,
         val lecture: Lecture,
         val paused: Boolean,
         val finishing: Boolean = false,
@@ -97,7 +96,7 @@ class LectureSession(
         combine(recording, recorder.positionMillis, recorder.level, liveOutput) { r, position, level, out ->
             r?.let {
                 LiveLectureState(
-                    notebookTitle = it.notebookTitle,
+                    labelNames = it.labelNames,
                     lecture = it.lecture.copy(durationMillis = if (it.finishing) it.lecture.durationMillis else position),
                     partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else level,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
@@ -112,19 +111,20 @@ class LectureSession(
 
     val isRecording get() = recording.value != null
 
-    fun start(notebook: Notebook, title: String): Lecture {
+    /** Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. */
+    fun start(labels: List<String>, labelNames: String, language: String, title: String): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         val format = settings.audioFormat
         val lecture = Lecture(
-            id = "lecture-$startedAt", notebookId = notebook.id, title = title, language = notebook.language,
+            id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
             audioFile = if (format == AudioFormat.FlacLive) AUDIO_FLAC else AUDIO_WAV,
         )
         store.save(lecture)
         names = emptyMap()
         edits = emptyMap()
-        liveModel = live(notebook.language, scope, voices?.load(notebook.id).orEmpty())?.also { model ->
+        liveModel = live(language, scope, voices?.load().orEmpty())?.also { model ->
             val live = model.liveSpeakers
             recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {
@@ -146,7 +146,7 @@ class LectureSession(
             if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
             settings.flacLevel,
         )
-        recording.value = Recording(notebook.title, lecture, paused = false)
+        recording.value = Recording(labelNames, lecture, paused = false)
         saving = scope.launch {
             while (isActive) {
                 delay(SAVE_EVERY_MILLIS)
@@ -170,7 +170,7 @@ class LectureSession(
     }
 
     /**
-     * Names a speaker ("Lecturer"): in this lecture, and in the notebook's voices, so its next lectures label them by
+     * Names a speaker ("Lecturer"): in this moment, and in the app's voices, so the next moments label them by
      * name from the start.
      */
     fun renameSpeaker(id: String, name: String) {
@@ -183,8 +183,8 @@ class LectureSession(
         saveNow()
         val tracker = liveModel?.speakers ?: return
         val print = tracker.print(id) ?: return
-        if (old.isNotEmpty() && old != clean) voices?.rename(r.lecture.notebookId, old, clean)
-        voices?.save(r.lecture.notebookId, Voice(clean, print, tracker.model))
+        if (old.isNotEmpty() && old != clean) voices?.rename(old, clean)
+        voices?.save(Voice(clean, print, tracker.model))
     }
 
     /** The models this lecture used and where, for its power report. */
@@ -267,11 +267,11 @@ class LectureSession(
             following?.cancel()
             val (lines, who) = shown(model, model.transcriber.output.value, model.liveSpeakers?.state?.value ?: LiveSpeakers.State())
             recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
-            // The named speakers' voices, as this whole lecture heard them, for the notebook's next lectures.
+            // The named speakers' voices, as this whole moment heard them, for the next moments.
             val tracker = liveModel?.speakers
             if (tracker != null && voices != null) {
                 for (s in recording.value!!.lecture.speakers) {
-                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(r.lecture.notebookId, Voice(s.name, it, tracker.model)) }
+                    if (s.name.isNotEmpty()) tracker.print(s.id)?.let { voices.save(Voice(s.name, it, tracker.model)) }
                 }
             }
         }
@@ -280,7 +280,7 @@ class LectureSession(
             runCatching {
                 val report = PowerReport.of(meter.stop(), duration, modelsInUse())
                 store.savePower(r.lecture, report)
-                store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.notebookId, r.lecture.startedAtMillis, report))
+                store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.labels.joinToString("+"), r.lecture.startedAtMillis, report))
             }
         }
         // What live speaker turns decided, for regrouping or tuning on this lecture later.
