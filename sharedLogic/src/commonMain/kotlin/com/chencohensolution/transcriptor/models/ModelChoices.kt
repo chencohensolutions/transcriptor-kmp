@@ -15,7 +15,7 @@ object ModelChoices {
      */
     fun fits(model: SpeechModel, job: ModelJob) = when (job) {
         ModelJob.Live -> model.kind.transcribes && model.runsLive
-        ModelJob.Improve -> model.kind == ModelKind.Whisper || model.kind == ModelKind.WhisperNpu
+        ModelJob.Improve -> model.kind == ModelKind.Whisper || model.kind == ModelKind.WhisperNpu || model.kind == ModelKind.WhisperNpuEncoder
     }
 
     /**

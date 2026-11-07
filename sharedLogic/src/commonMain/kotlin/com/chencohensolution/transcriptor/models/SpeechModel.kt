@@ -14,6 +14,14 @@ enum class ModelKind {
      */
     WhisperNpu,
 
+    /**
+     * Whisper on whisper.cpp ([Whisper]: its `model.bin`) with its encoder on one Qualcomm NPU (`encoder.bin`, a
+     * context binary from sherpa-onnx's Whisper QNN export): the NPU writes the decoder's cross-attention K/V and
+     * whisper.cpp decodes, on the chips in [SpeechModel.chips]. For a model whose decoder is too slow on the NPU.
+     * Its window is always 30 s (the encoder's fixed input).
+     */
+    WhisperNpuEncoder,
+
     /** A streaming transducer (sherpa-onnx: encoder, decoder, joiner, tokens): words as the audio arrives. */
     StreamingTransducer,
 
@@ -31,7 +39,10 @@ enum class ModelKind {
     ;
 
     /** Turns speech into text. */
-    val transcribes get() = this == Whisper || this == WhisperNpu || this == StreamingTransducer || this == StreamingTransducerNpu
+    val transcribes get() = this == Whisper || this == WhisperNpu || this == WhisperNpuEncoder || this == StreamingTransducer || this == StreamingTransducerNpu
+
+    /** Runs (in part) on a Qualcomm NPU: checked there once, loaded inside the NPU memory guard. */
+    val onNpu get() = this == WhisperNpu || this == WhisperNpuEncoder || this == StreamingTransducerNpu
 }
 
 /**

@@ -317,7 +317,7 @@ private fun ReviewPasses() {
             refineModels = models.map {
                 ModelChoice(
                     it.id, it.name, ModelChoices.estimateMinutes(Recording.settings.improveSpeed(it.id), lecture.durationMillis),
-                    npu = it.kind == ModelKind.WhisperNpu,
+                    npu = it.kind.onNpu,
                 )
             },
             improveDefault = default?.id,

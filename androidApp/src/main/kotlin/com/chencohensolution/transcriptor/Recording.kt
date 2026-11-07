@@ -144,7 +144,17 @@ object Recording {
 
     /** [make]s a streaming engine, inside [npuGuard] when [model] runs on the NPU. */
     fun <T> npuEngine(model: SpeechModel, make: () -> T): T =
-        if (model.kind == ModelKind.StreamingTransducerNpu || model.kind == ModelKind.WhisperNpu) npuGuard.load(model, make) else make()
+        if (model.kind.onNpu) npuGuard.load(model, make) else make()
+
+    /** whisper.cpp with [model]'s `model.bin`; for [ModelKind.WhisperNpuEncoder], its encoder on the NPU (`encoder.bin`). */
+    fun whisperEngine(model: SpeechModel): WhisperEngine {
+        val model0 = model.files.first { it.name == "model.bin" }
+        return if (model.kind == ModelKind.WhisperNpuEncoder) {
+            WhisperEngine(models.file(model, model0).path, File(models.dir(model), "encoder.bin"), nativeLibDir)
+        } else {
+            WhisperEngine(models.file(model, model0).path)
+        }
+    }
 
     /** The catalog's models and those added from Hugging Face. */
     lateinit var modelLibrary: ModelLibrary
@@ -181,6 +191,10 @@ object Recording {
                         engine.transcribe(FloatArray(16_000), language, null)
                     }
                 }
+                ModelKind.WhisperNpuEncoder -> npuEngine(model) { whisperEngine(model) }.use { engine ->
+                    val language = model.languages.firstOrNull { it != SpeechModel.MULTILINGUAL } ?: "en"
+                    engine.transcribe(FloatArray(16_000), language, null)
+                }
                 ModelKind.StreamingTransducerNpu -> npuEngine(model) { SherpaStreamingEngine(dir, nativeLibDir) }.use { engine ->
                     engine.accept(FloatArray(16_000))
                     engine.text
@@ -207,7 +221,7 @@ object Recording {
         val audio = { a: Long, b: Long -> RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, a, b) }
         val started = System.currentTimeMillis()
         val done = when (model.kind) {
-            ModelKind.Whisper -> WhisperEngine(models.file(model).path).use { engine ->
+            ModelKind.Whisper, ModelKind.WhisperNpuEncoder -> npuEngine(model) { whisperEngine(model) }.use { engine ->
                 RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
             }
             ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
@@ -514,9 +528,8 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     // Lines at pauses, or ~30 s windows for a model too slow for lines.
     val limits = model.liveWindowSeconds?.let(UtteranceLimits::window) ?: UtteranceLimits.lines
     val transcriber = when (model.kind) {
-        ModelKind.Whisper -> {
-            val path = Recording.models.file(model).path
-            UtteranceTranscriber(language, model.id, scope, worker, labeler, limits) { WhisperEngine(path) }
+        ModelKind.Whisper, ModelKind.WhisperNpuEncoder -> {
+            UtteranceTranscriber(language, model.id, scope, worker, labeler, limits) { Recording.npuEngine(model) { Recording.whisperEngine(model) } }
         }
         ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)

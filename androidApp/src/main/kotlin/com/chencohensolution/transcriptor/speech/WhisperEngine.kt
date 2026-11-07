@@ -1,8 +1,22 @@
 package com.chencohensolution.transcriptor.speech
 
-/** whisper.cpp (src/main/cpp) with a model file loaded: slow to create (the file is read into memory), then reused. */
-class WhisperEngine(path: String) : SpeechEngine {
-    private var handle = nativeInit(path).also { check(it != 0L) { "Couldn't load the model ($path)" } }
+import java.io.File
+
+/**
+ * whisper.cpp (src/main/cpp) with a model file loaded: slow to create (the file is read into memory), then reused.
+ * With [npuEncoder] (an `encoder.bin` for this phone's NPU, [com.chencohensolution.transcriptor.models.ModelKind.WhisperNpuEncoder])
+ * the encoder runs on the NPU through Qualcomm's runtime in [libDir] (the app's native libraries) and whisper.cpp
+ * decodes; every piece is then a 30 s window to the encoder.
+ */
+class WhisperEngine(path: String, npuEncoder: File? = null, libDir: String? = null) : SpeechEngine {
+    private var handle = run {
+        if (npuEncoder != null) {
+            SherpaNpuWhisperEngine.useNpuLibraries(checkNotNull(libDir))
+            // The encoder's C API is in sherpa-onnx's library; whisper's JNI finds it there.
+            System.loadLibrary("sherpa-onnx-jni")
+        }
+        nativeInit(path, npuEncoder?.path, libDir?.let { "$it/libQnnHtp.so" }, libDir?.let { "$it/libQnnSystem.so" })
+    }.also { check(it != 0L) { if (npuEncoder != null) "Couldn't load the model or its NPU encoder ($path)" else "Couldn't load the model ($path)" } }
     private val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 6)
 
     override fun transcribe(samples: FloatArray, language: String, prompt: String?): List<Piece> {
@@ -28,7 +42,7 @@ class WhisperEngine(path: String) : SpeechEngine {
         fun quantize(input: String, output: String, type: String) = nativeQuantize(input, output, type)
 
         @JvmStatic private external fun nativeQuantize(input: String, output: String, type: String): Boolean
-        @JvmStatic private external fun nativeInit(path: String): Long
+        @JvmStatic private external fun nativeInit(path: String, encoder: String?, backend: String?, system: String?): Long
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeTranscribe(handle: Long, samples: FloatArray, language: String, prompt: String?, threads: Int): Array<String>?
     }
