@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the notebooks screen's option a (labels, chosen before or after). -->
+<resources>
+    <string name="notebooks_a_labels">Labels</string>
+    <string name="notebooks_a_labels_more">Labels…</string>
+    <string name="notebooks_a_add_labels">Add labels</string>
+    <string name="notebooks_a_add">Add %1$s</string>
+    <string name="notebooks_a_no_labels">No labels</string>
+    <string name="notebooks_a_no_label_chip">No label (%1$d)</string>
+    <string name="notebooks_a_no_label_title">No labels yet</string>
+    <string name="notebooks_a_new_label">New label</string>
+    <string name="notebooks_a_edit_label">Edit label</string>
+    <string name="notebooks_a_delete_label">Delete label</string>
+    <string name="notebooks_a_delete_label_note">Its moments stay, without this label.</string>
+    <string name="notebooks_a_done">Done</string>
+    <string name="notebooks_a_labels_of">Labels of %1$s</string>
+    <string name="notebooks_a_labels_of_many">Labels of %1$d moments</string>
+    <string name="notebooks_a_usually">Usually %1$s on %2$s</string>
+    <string name="notebooks_a_label_later">You can add labels later</string>
+    <string name="notebooks_a_language_title">The moment\'s language</string>
+    <string name="notebooks_a_empty_title">Record a moment</string>
+    <string name="notebooks_a_empty_note">It is transcribed on the phone, with your notes. Give it labels (a course, a person, a project) to find it later.</string>
+</resources>

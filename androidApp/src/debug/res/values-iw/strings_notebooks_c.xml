@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the notebooks screen's option c (labels in a drawer). -->
+<resources>
+    <string name="notebooks_c_labels">תוויות</string>
+    <string name="notebooks_c_labels_more">תוויות…</string>
+    <string name="notebooks_c_add_labels">הוספת תוויות</string>
+    <string name="notebooks_c_add">הוספת %1$s</string>
+    <string name="notebooks_c_no_labels">בלי תוויות</string>
+    <string name="notebooks_c_no_label_chip">בלי תווית (%1$d)</string>
+    <string name="notebooks_c_no_label_title">עוד בלי תוויות</string>
+    <string name="notebooks_c_new_label">תווית חדשה</string>
+    <string name="notebooks_c_edit_label">עריכת תווית</string>
+    <string name="notebooks_c_delete_label">מחיקת התווית</string>
+    <string name="notebooks_c_delete_label_note">הרגעים שלה נשארים, בלי התווית הזו.</string>
+    <string name="notebooks_c_done">סיום</string>
+    <string name="notebooks_c_labels_of">התוויות של %1$s</string>
+    <string name="notebooks_c_labels_of_many">התוויות של %1$d רגעים</string>
+    <string name="notebooks_c_usually">בדרך כלל %1$s ב%2$s</string>
+    <string name="notebooks_c_label_later">אפשר להוסיף תוויות אחר כך</string>
+    <string name="notebooks_c_language_title">שפת הרגע</string>
+    <string name="notebooks_c_empty_title">הקלטת רגע</string>
+    <string name="notebooks_c_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (קורס, אדם, פרויקט) כדי למצוא אותו אחר כך.</string>
+    <string name="notebooks_c_all_moments">כל הרגעים</string>
+</resources>

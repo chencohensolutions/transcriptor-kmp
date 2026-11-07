@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UI lab: the notebooks screen's option b (labels after, one list). -->
+<resources>
+    <string name="notebooks_b_labels">תוויות</string>
+    <string name="notebooks_b_labels_more">תוויות…</string>
+    <string name="notebooks_b_add_labels">הוספת תוויות</string>
+    <string name="notebooks_b_add">הוספת %1$s</string>
+    <string name="notebooks_b_no_labels">בלי תוויות</string>
+    <string name="notebooks_b_no_label_chip">בלי תווית (%1$d)</string>
+    <string name="notebooks_b_no_label_title">עוד בלי תוויות</string>
+    <string name="notebooks_b_new_label">תווית חדשה</string>
+    <string name="notebooks_b_edit_label">עריכת תווית</string>
+    <string name="notebooks_b_delete_label">מחיקת התווית</string>
+    <string name="notebooks_b_delete_label_note">הרגעים שלה נשארים, בלי התווית הזו.</string>
+    <string name="notebooks_b_done">סיום</string>
+    <string name="notebooks_b_labels_of">התוויות של %1$s</string>
+    <string name="notebooks_b_labels_of_many">התוויות של %1$d רגעים</string>
+    <string name="notebooks_b_usually">בדרך כלל %1$s ב%2$s</string>
+    <string name="notebooks_b_label_later">אפשר להוסיף תוויות אחר כך</string>
+    <string name="notebooks_b_language_title">שפת הרגע</string>
+    <string name="notebooks_b_empty_title">הקלטת רגע</string>
+    <string name="notebooks_b_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (קורס, אדם, פרויקט) כדי למצוא אותו אחר כך.</string>
+    <string name="notebooks_b_filter">סינון לפי תווית</string>
+    <string name="notebooks_b_label_after">התוויות נוספות אחר כך, לפי מתי הוא היה</string>
+</resources>
