@@ -135,7 +135,8 @@ class ModelFiles(context: Context) {
         val type = model.quantizeTo
         for (file in model.files) {
             val part = part(model, file)
-            if (type == null) {
+            // Only the ggml model is quantized (an NPU model's encoder.bin is compiled already).
+            if (type == null || file.name != "model.bin") {
                 part.renameTo(file(model, file))
             } else {
                 val temp = File(dir(model), "${file.name}.quantizing")
