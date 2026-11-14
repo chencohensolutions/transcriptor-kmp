@@ -5,8 +5,9 @@
 **Audio Logs** (owner's decision, Nov 7, 2026; two words, since "Audiolog" reads as אודיולוג, audiologist, in
 Hebrew). It records a conversation, transcribes it on the phone, and lets the user write **notes** without stopping
 either. Each recording is a **moment** (Hebrew רגע, רגעים). After the moment a larger model **refines** the transcript
-from the saved audio and tells the **speakers** apart. Everything stays on the phone. A **notebook** groups moments
-for now (labels on moments may replace notebooks: to be mocked in the UI lab first).
+from the saved audio and tells the **speakers** apart. Everything stays on the phone. A moment has any number of
+**labels** (none included: a course, a person, a project) to find it by; labels replaced notebooks (owner's decision,
+Nov 7, 2026, notebooks round 3's a).
 
 The code still says `Lecture` (`Lecture`, `LectureStore`, `LectureSession`, `lecture.json`, `lecture_*` string keys):
 only the words the user sees were renamed, so files on disk and other tools keep working. The Hebrew app name is not
@@ -85,14 +86,14 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   every 0.75 s are grouped by voice, a change lasting two windows splits the line at the nearest word (the streaming
   model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
   two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
-- Names: tapping a speaker's chip names them; the name and their average print go to the notebook's
+- Names: tapping a speaker's chip names them; the name and their average print go to the app's
   `voices.json` (`VoiceStore`), and its next moments start with those voices, labeled by name from their first line.
 - **After the moment, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
   runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
   when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python
   pipeline can't run on a phone, and on a test recording it was 10× slower and merged every voice (its settings
   expect long meetings). The recording is read in 5-minute pieces (`RecordingAudio`: WAV, or FLAC through the system
-  decoder); each piece's speakers are matched across pieces and to the notebook's voices by print, so named voices
+  decoder); each piece's speakers are matched across pieces and to the app's voices by print, so named voices
   keep their names. Lines are then relabeled (`withTurns`): a line with word times (streaming model) splits where the
   turn changes, one stray word staying put; a line without them gets the speaker who spoke most of it; edited lines
   keep their text. It runs after Stop when both models are downloaded (before FLAC compression), and again from the
@@ -183,7 +184,7 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
   time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.
 
-One folder per moment: `notebooks/<notebook id>/<lecture id>/` with `audio.flac`, `lecture.json` and
+One folder per moment, whatever its labels: `moments/<lecture id>/` with `audio.flac`, `lecture.json` and
 `transcript.md`. `lecture.json` is the data (times, text, notes); `transcript.md` is the moment to read beside its
 audio (owner's request, Nov 4, 2026): its title, date and length, then each speaker's turn with its time and the notes
 after the turn they were written in, rewritten on every save (`transcriptMarkdown`). A Word file of the same reading
@@ -195,17 +196,26 @@ finished (stopped, its passes done, compressed to FLAC if that is the setting, n
 folder** outside the app, when the user picked one: `Documents/Transcriptor` is suggested (the system's folder picker
 opens on Documents, and the app makes `Transcriptor` in the folder picked unless it is one). The folder is reached
 through Android's documents provider (`SafFileSystem`, a persisted tree permission), so it outlives the app: after a
-reinstall, picking it again brings back every notebook and lecture. An empty `.nomedia` at its root keeps music and
+reinstall, picking it again brings back every label and moment. An empty `.nomedia` at its root keeps music and
 gallery apps from listing the recordings. Moving a moment copies its folder, checks every file's size and that
 `lecture.json` reads back, then deletes it from the app (`LectureStore.archive`); a failed copy leaves it in the app
-for next time. `notebooks.json` and the voices live in the folder too; settings and models stay in the app. Playback
+for next time. `labels.json` and `voices.json` live in the folder too; settings and models stay in the app. Playback
 and the passes read a moment's audio from either place (`Recording.openAudio`). If the folder can't be reached, new
-moments stay in the app and Notebooks asks to pick it again.
+moments stay in the app and the first screen asks to pick it again.
 
-The notebooks are in `notebooks.json` (`NotebookStore`, v1: id, title, language, color, createdAt). Moments recorded
-without a notebook are in `notebooks/unfiled/` until they are filed (`LectureStore.move`); the notebook a moment's
-weekday and time suggest is `guessNotebook`'s (same weekday, within an hour, at least two earlier moments). Before
-notebooks, every moment was in `notebooks/default/`: those became unfiled on the first launch with notebooks.
+The labels are in `labels.json` (`LabelStore`, v1: id, name, color, createdAt); a moment's labels are their ids in its
+`lecture.json` (`"labels"`), so relabeling never moves files and deleting a label only takes it off its moments. Each
+moment keeps its own language (picked on the Record bar: the guessed label's usual language, else the last
+moment's). The app knows one list of voices, `voices.json` (`VoiceStore`), for every moment. The labels a moment's
+weekday and time suggest are `guessLabels`' (same weekday, within an hour, at least two earlier moments; with the
+first, the labels on most of its moments).
+
+**From notebooks to labels** (`migrateToLabels`, once per place, at launch for the app's storage and before the first
+list for the moments folder, or when a folder from before is picked): each notebook in `notebooks.json` becomes a
+label with its id, name and color; each `notebooks/<notebook>/<lecture>/` moves to `moments/<lecture>/` with its
+notebook as its label (`unfiled`, and `default` from before notebooks, give none); the notebooks' voices join
+`voices.json`, a name two notebooks knew kept apart as "<name> · <notebook>". Nothing is deleted but emptied folders
+and, last, `notebooks.json`; a cut-off run goes on at the next launch and never overwrites a moment already moved.
 
 ```json
 {
@@ -226,7 +236,8 @@ notebooks, every moment was in `notebooks/default/`: those became unfiled on the
     { "id": "s1", "startMs": 2000, "endMs": 14500, "text": "טוב, בוקר טוב לכולם…",
       "model": "ivrit-whisper-large-v3", "edited": false, "speaker": "speaker-1" }
   ],
-  "notes": [{ "id": "n1", "atMs": 33000, "text": "פסיבי ↔ אקטיבי" }]
+  "notes": [{ "id": "n1", "atMs": 33000, "text": "פסיבי ↔ אקטיבי" }],
+  "labels": ["label-1793606400000"]
 }
 ```
 
@@ -256,8 +267,8 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   downloaded. Since Nov 6 (round 2's b) Settings has a page per language, the one place its live and improve models
   are chosen, and two switches after a moment: find the speakers when it stops, improve automatically (while
   charging). Added models are kept in `models.json` in the app's storage.
-- Notebooks (round 1's c2), in the app: the first screen, moments first, recording with or without a notebook, filing
-  unfiled moments, the notebook guessed from when its moments are. The gear opens a temporary Settings page (the old
+- The first screen (round 1's c2; labels since round 3's a, Nov 7), in the app: moments first, recording with the
+  guessed labels or any, labeling moments after, the labels guessed from when their moments are. The gear opens a temporary Settings page (the old
   start screen's audio format and model downloads) until Settings › Models was promoted.
 - Moment, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
   naming speakers, notes after the moment, and the speaker pass and the refine pass ("Improve transcription…", always
@@ -271,7 +282,7 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   (`versions/<id>.json` in the moment's folder: its lines, speakers and edits; `lecture.json` lists them under
   `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
-- Speaker labels during the moment, with names the notebook remembers (above). The voice-print model downloads on
+- Speaker labels during the moment, with names the app remembers (above). The voice-print model downloads on
   the start screen; labels are on once it is there.
 - Fixing a line while recording (the session keeps the user's words over live lines), deleting moments (hold to
   select, Undo), and the Word export (Nov 7, 2026).

@@ -47,7 +47,7 @@ class PowerTest {
     fun theReportIsKeptWithTheLectureAndLogged() = runTest {
         val fs = FakeFileSystem()
         val store = LectureStore(fs, "/d".toPath())
-        val lecture = Lecture(id = "l1", notebookId = "nb", title = "t", language = "he", startedAtMillis = 5, durationMillis = 60_000, segments = emptyList(), notes = emptyList())
+        val lecture = Lecture(id = "l1", title = "t", language = "he", startedAtMillis = 5, durationMillis = 60_000, segments = emptyList(), notes = emptyList())
         store.save(lecture)
         val r = PowerReport.of(listOf(sample(0, -300_000), sample(60_000, -300_000)), 60_000, listOf(PowerModel("speakers", "ResNet293", "NPU")))
         store.savePower(lecture, r)

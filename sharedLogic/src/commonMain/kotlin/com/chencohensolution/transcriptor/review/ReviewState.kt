@@ -21,7 +21,8 @@ data class ModelToGet(val id: String, val name: String, val sizeBytes: Long)
 
 /** A recorded lecture, opened ([LectureReview]). */
 data class ReviewState(
-    val notebookTitle: String,
+    /** The moment's labels' names ("Psychology, Exam"); empty for none. */
+    val labelNames: String,
     val lecture: Lecture,
     val positionMillis: Long,
     val playing: Boolean,

@@ -3,7 +3,7 @@
 The app is **Audio Logs**; a recording is a **moment** (Hebrew רגע) in everything the user sees. The code keeps
 `Lecture` for it (classes, files, `lecture.json`, string keys).
 
-A notebook for classes on Android and iOS: it records the lecture, transcribes it on the phone with a local speech
+An app for classes and conversations on Android and iOS: it records the moment, transcribes it on the phone with a local speech
 model (Hebrew first, other languages by model), and lets the user write notes while it keeps transcribing. Every line
 of speech and every note carries its time in the recording, and the audio is kept as FLAC so lines can be refined,
 re-transcribed and corrected later. **Read [docs/design.md](docs/design.md) first**: the decisions, the models, the
@@ -12,19 +12,19 @@ update those docs whenever a screen changes.
 
 ## Layout
 
-- `sharedLogic/` — all logic, shared. `notebook/`: `Notebook`, `Lecture`, `Segment` (a line of speech with start
+- `sharedLogic/` — all logic, shared. `notebook/`: `Label`, `Lecture`, `Segment` (a line of speech with start
   and end), `Note`, `Speaker`. `models/`: `SpeechModel` and `ModelCatalog` (the models offered, by language).
-  `lab/LabData.kt`: made-up notebooks and a Hebrew lecture for the UI labs. `notebook/LectureStore.kt`: lectures
-  on disk (`lecture.json`, and `transcript.md` from `Transcript.kt`; `move` files a lecture).
-  `notebook/NotebookStore.kt`: `notebooks.json`, `UNFILED` (lectures recorded without a notebook).
-  `notebook/NotebooksController.kt` and `NotebookGuess.kt`: the Notebooks screen's state and the notebook guessed from
-  when lectures are. `notebook/Place.kt` and `LibraryFolder.kt`: the lectures folder outside the app (finished lectures
+  `lab/LabData.kt`: made-up labels, moments and a Hebrew lecture for the UI labs. `notebook/LectureStore.kt`: moments
+  on disk (`moments/<id>/`: `lecture.json` with its labels, and `transcript.md` from `Transcript.kt`).
+  `notebook/LabelStore.kt`: `labels.json`. `notebook/Migration.kt`: `migrateToLabels`, notebooks became labels.
+  `notebook/NotebooksController.kt` and `LabelGuess.kt`: the first screen's state and the labels guessed from when
+  moments are. `notebook/Place.kt` and `LibraryFolder.kt`: the lectures folder outside the app (finished lectures
   move there; `LectureStore.library`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per platform;
   Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
   `SettingsStore`, `AudioFormat`. `speech/`: `LiveTranscriber` (live lines) with `UtteranceTranscriber`
   (Whisper, a line at a time: `SpeechEngine`, `Utterances` splitting at pauses) and `StreamingTranscriber`
   (Zipformer: `StreamingEngine`), `Downsampler`, `Speakers.kt` (`SpeakerTracker`, `SpeakerLabeler`:
-  speaker labels from voice prints). `notebook/VoiceStore.kt`: the voices a notebook knows. `review/`:
+  speaker labels from voice prints). `notebook/VoiceStore.kt`: the voices the app knows (`voices.json`, one list). `review/`:
   `LectureReview` (a recorded lecture opened: playback, edits, speakers, notes), `AudioPlayer`, `ReviewState`.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf`, `titleDirection`, `isolated` and `formatClock`.
@@ -44,8 +44,8 @@ update those docs whenever a screen changes.
 - Logic goes in `sharedLogic` (with tests); the UIs only render state and call controller methods.
 - Android first. When Android gets something iOS will need, add it to [docs/ios-todo.md](docs/ios-todo.md): the
   shared state and controller methods SwiftUI should call, the Android files to mirror, the strings.
-- Hebrew is first-class: a notebook's content (lines, notes) is laid out in its language's direction
-  (`layoutDirectionOf`), the app's chrome in the phone's. Check every screen in Hebrew and in an English notebook.
+- Hebrew is first-class: a moment's content (lines, notes) is laid out in its language's direction
+  (`layoutDirectionOf`), the app's chrome in the phone's. Check every screen in Hebrew and with an English moment.
 - Times are milliseconds from the start of the recording, everywhere.
 - Models are public files only, pinned to a commit with their sha256; nothing is hosted by us. Only models free for
   commercial use go in `ModelCatalog`; models the user adds from Hugging Face may have any license, marked and

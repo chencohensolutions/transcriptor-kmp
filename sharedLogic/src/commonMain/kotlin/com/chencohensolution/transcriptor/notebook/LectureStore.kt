@@ -14,7 +14,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * The lectures on disk: `notebooks/<notebook id>/<lecture id>/` with the audio, `lecture.json` (version 1, the format
+ * The moments on disk: `moments/<lecture id>/` with the audio, `lecture.json` (version 1, the format
  * in docs/design.md) and `transcript.md` (the lecture to read, [transcriptMarkdown]), each written to a temp file and
  * then renamed. A lecture is in one of two places: the app's own storage under [root] (while it is recorded, until
  * [archive] moves it, or always when there is no library), or the [library], the lectures folder outside the app.
@@ -30,23 +30,23 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     var library: Place? = null
 
     /** Where a lecture is: here, or in the library; a new one is here. */
-    private fun placeOf(notebookId: String, lectureId: String): Place {
-        if (local.exists(local.folder(notebookId, lectureId))) return local
+    private fun placeOf(lectureId: String): Place {
+        if (local.exists(local.folder(lectureId))) return local
         val library = library ?: return local
-        return if (library.exists(library.folder(notebookId, lectureId))) library else local
+        return if (library.exists(library.folder(lectureId))) library else local
     }
 
-    fun folder(notebookId: String, lectureId: String): Path = placeOf(notebookId, lectureId).folder(notebookId, lectureId)
+    fun folder(lectureId: String): Path = placeOf(lectureId).folder(lectureId)
 
-    fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path = folder(lecture.notebookId, lecture.id) / file
+    fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path = folder(lecture.id) / file
 
     /** The lecture is in the app's own storage, not (yet) in the library. */
-    fun isLocal(lecture: Lecture) = placeOf(lecture.notebookId, lecture.id) == local
+    fun isLocal(lecture: Lecture) = placeOf(lecture.id) == local
 
     fun save(lecture: Lecture) {
-        val place = placeOf(lecture.notebookId, lecture.id)
+        val place = placeOf(lecture.id)
         val fs = place.fileSystem
-        val folder = place.folder(lecture.notebookId, lecture.id)
+        val folder = place.folder(lecture.id)
         fs.createDirectories(folder)
         val temp = folder / "lecture.json.tmp"
         fs.write(temp) { writeUtf8(json.encodeToString(LectureFileV1.of(lecture))) }
@@ -56,18 +56,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         fs.atomicMove(transcript, folder / TRANSCRIPT)
     }
 
-    /**
-     * Moves a lecture's folder (its audio, transcript and versions) to another notebook, in the place it is, and
-     * returns it there. Not while it is being recorded or a pass runs on it.
-     */
-    fun move(lecture: Lecture, notebookId: String): Lecture {
-        if (lecture.notebookId == notebookId) return lecture
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val to = place.folder(notebookId, lecture.id)
-        place.fileSystem.createDirectories(to.parent!!)
-        place.fileSystem.atomicMove(place.folder(lecture.notebookId, lecture.id), to)
-        return lecture.copy(notebookId = notebookId).also(::save)
-    }
+    /** Gives the moment these labels (ids), and returns it. Not while it is being recorded or a pass runs on it. */
+    fun setLabels(lecture: Lecture, labels: List<String>): Lecture =
+        if (lecture.labels == labels) lecture else lecture.copy(labels = labels).also(::save)
 
     /**
      * Moves a finished lecture from the app's storage to the library: copied, checked file by file, then deleted here.
@@ -76,12 +67,12 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      */
     fun archive(lecture: Lecture): Boolean {
         val library = library ?: return false
-        val from = local.folder(lecture.notebookId, lecture.id)
+        val from = local.folder(lecture.id)
         if (!local.exists(from)) return false
-        val to = library.folder(lecture.notebookId, lecture.id)
+        val to = library.folder(lecture.id)
         if (library.exists(to)) library.fileSystem.deleteRecursively(to)
         copyChecked(local, from, library, to)
-        checkNotNull(read(library, lecture.notebookId, lecture.id)) { "${lecture.id}'s lecture.json doesn't read back" }
+        checkNotNull(read(library, lecture.id)) { "${lecture.id}'s lecture.json doesn't read back" }
         local.fileSystem.deleteRecursively(from)
         return true
     }
@@ -90,35 +81,35 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      * Deletes a lecture's folder for good, wherever it is (here or in the library): its audio, `lecture.json`, the
      * transcript and its versions. False when there was none. Not while it is being recorded or a pass runs on it.
      */
-    fun delete(notebookId: String, lectureId: String): Boolean {
-        val place = placeOf(notebookId, lectureId)
-        val folder = place.folder(notebookId, lectureId)
+    fun delete(lectureId: String): Boolean {
+        val place = placeOf(lectureId)
+        val folder = place.folder(lectureId)
         if (!place.exists(folder)) return false
         place.fileSystem.deleteRecursively(folder)
         return true
     }
 
-    /** The lecture as a Word file ([transcriptDocx]), under [notebookTitle]. */
-    fun word(lecture: Lecture, notebookTitle: String?): ByteArray = transcriptDocx(lecture, notebookTitle, utcOffset(lecture.startedAtMillis))
+    /** The lecture as a Word file ([transcriptDocx]), with its labels ([labelNames]). */
+    fun word(lecture: Lecture, labelNames: String?): ByteArray = transcriptDocx(lecture, labelNames, utcOffset(lecture.startedAtMillis))
 
     /** Saves the lecture's Word file in its folder, beside its recording (replacing an earlier one); returns its name. */
-    fun saveWord(lecture: Lecture, notebookTitle: String?): String {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val folder = place.folder(lecture.notebookId, lecture.id)
+    fun saveWord(lecture: Lecture, labelNames: String?): String {
+        val place = placeOf(lecture.id)
+        val folder = place.folder(lecture.id)
         val name = docxName(lecture)
         val temp = folder / "$name.tmp"
-        place.fileSystem.write(temp) { write(word(lecture, notebookTitle)) }
+        place.fileSystem.write(temp) { write(word(lecture, labelNames)) }
         place.fileSystem.atomicMove(temp, folder / name)
         return name
     }
 
     /** The lecture; null when there is none. */
-    fun load(notebookId: String, lectureId: String): Lecture? = read(placeOf(notebookId, lectureId), notebookId, lectureId)
+    fun load(lectureId: String): Lecture? = read(placeOf(lectureId), lectureId)
 
-    private fun read(place: Place, notebookId: String, lectureId: String): Lecture? {
-        val file = place.folder(notebookId, lectureId) / "lecture.json"
+    private fun read(place: Place, lectureId: String): Lecture? {
+        val file = place.folder(lectureId) / "lecture.json"
         if (!place.exists(file)) return null
-        return json.decodeFromString<LectureFileV1>(place.fileSystem.read(file) { readUtf8() }).toLecture(notebookId)
+        return json.decodeFromString<LectureFileV1>(place.fileSystem.read(file) { readUtf8() }).toLecture()
     }
 
     /**
@@ -133,8 +124,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     /** Keeps [version] in the lecture's folder (`versions/<id>.json`); the lecture lists it in [Lecture.versions]. */
     fun saveVersion(lecture: Lecture, version: Version) {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val dir = place.folder(lecture.notebookId, lecture.id) / "versions"
+        val place = placeOf(lecture.id)
+        val dir = place.folder(lecture.id) / "versions"
         place.fileSystem.createDirectories(dir)
         val temp = dir / "${version.info.id}.json.tmp"
         place.fileSystem.write(temp) { writeUtf8(json.encodeToString(VersionFileV1.of(version))) }
@@ -142,8 +133,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     }
 
     fun loadVersion(lecture: Lecture, id: String): Version? {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val file = place.folder(lecture.notebookId, lecture.id) / "versions" / "$id.json"
+        val place = placeOf(lecture.id)
+        val file = place.folder(lecture.id) / "versions" / "$id.json"
         if (!place.exists(file)) return null
         return json.decodeFromString<VersionFileV1>(place.fileSystem.read(file) { readUtf8() }).toVersion()
     }
@@ -154,8 +145,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      * can be regrouped or the thresholds tuned on it later.
      */
     fun saveLiveSpeakers(lecture: Lecture, model: String, stretches: List<LiveStretch>, turns: String? = null) {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val folder = place.folder(lecture.notebookId, lecture.id)
+        val place = placeOf(lecture.id)
+        val folder = place.folder(lecture.id)
         place.fileSystem.createDirectories(folder)
         val temp = folder / "$LIVE_SPEAKERS.tmp"
         val file = LiveSpeakersFileV1(model = model, turns = turns, stretches = stretches.map { LiveStretchV1(it.startMillis, it.endMillis, it.speaker, it.print, it.follows) })
@@ -165,8 +156,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     /** What [saveLiveSpeakers] kept; null for a lecture recorded without live speaker turns. */
     fun loadLiveSpeakers(lecture: Lecture): KeptLiveSpeakers? {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val file = place.folder(lecture.notebookId, lecture.id) / LIVE_SPEAKERS
+        val place = placeOf(lecture.id)
+        val file = place.folder(lecture.id) / LIVE_SPEAKERS
         if (!place.exists(file)) return null
         val f = compact.decodeFromString<LiveSpeakersFileV1>(place.fileSystem.read(file) { readUtf8() })
         return KeptLiveSpeakers(f.model, f.stretches.map { LiveStretch(it.startMs, it.endMs, it.speaker, it.print, it.follows) }, f.turns)
@@ -176,8 +167,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     /** Keeps how much power recording [lecture] took (`power.json`, version 1), beside its audio. */
     fun savePower(lecture: Lecture, report: PowerReport) {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val folder = place.folder(lecture.notebookId, lecture.id)
+        val place = placeOf(lecture.id)
+        val folder = place.folder(lecture.id)
         place.fileSystem.createDirectories(folder)
         val temp = folder / "$POWER.tmp"
         place.fileSystem.write(temp) { writeUtf8(json.encodeToString(report)) }
@@ -186,8 +177,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     /** [savePower]'s report; null for a lecture recorded before it existed. */
     fun loadPower(lecture: Lecture): PowerReport? {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        val file = place.folder(lecture.notebookId, lecture.id) / POWER
+        val place = placeOf(lecture.id)
+        val file = place.folder(lecture.id) / POWER
         if (!place.exists(file)) return null
         return runCatching { json.decodeFromString<PowerReport>(place.fileSystem.read(file) { readUtf8() }) }.getOrNull()
     }
@@ -204,8 +195,8 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     }
 
     fun deleteVersion(lecture: Lecture, id: String) {
-        val place = placeOf(lecture.notebookId, lecture.id)
-        place.fileSystem.delete(place.folder(lecture.notebookId, lecture.id) / "versions" / "$id.json")
+        val place = placeOf(lecture.id)
+        place.fileSystem.delete(place.folder(lecture.id) / "versions" / "$id.json")
     }
 
     /**
@@ -219,15 +210,13 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         return lecture.copy(versions = lecture.versions + version.info)
     }
 
-    /** Every lecture, in every notebook (unfiled ones included), here and in the library. */
+    /** Every moment, here and in the library. */
     fun all(): List<Lecture> = listOfNotNull(local, library).flatMap { place ->
-        place.folders(place.notebooks).flatMap { notebook -> place.folders(notebook).mapNotNull { runCatching { read(place, notebook.name, it.name) }.getOrNull() } }
-    }.distinctBy { it.notebookId to it.id }
+        place.folders(place.moments).mapNotNull { runCatching { read(place, it.name) }.getOrNull() }
+    }.distinctBy { it.id }
 
     /** The lectures still in the app's own storage. */
-    fun localLectures(): List<Lecture> = local.folders(local.notebooks).flatMap { notebook ->
-        local.folders(notebook).mapNotNull { runCatching { read(local, notebook.name, it.name) }.getOrNull() }
-    }
+    fun localLectures(): List<Lecture> = local.folders(local.moments).mapNotNull { runCatching { read(local, it.name) }.getOrNull() }
 }
 
 /** The readable transcript beside the audio. */
@@ -249,10 +238,12 @@ private data class LectureFileV1(
     val speakers: List<SpeakerV1> = emptyList(),
     val segments: List<SegmentV1> = emptyList(),
     val notes: List<NoteV1> = emptyList(),
+    /** Its labels' ids (`labels.json`). */
+    val labels: List<String> = emptyList(),
 ) {
     @OptIn(ExperimentalTime::class)
-    fun toLecture(notebookId: String) = Lecture(
-        id = id, notebookId = notebookId, title = title, language = language,
+    fun toLecture() = Lecture(
+        id = id, title = title, language = language, labels = labels,
         startedAtMillis = Instant.parse(startedAt).toEpochMilliseconds(), durationMillis = durationMs,
         segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
@@ -274,6 +265,7 @@ private data class LectureFileV1(
                 SegmentV1(it.id, it.startMillis, it.endMillis, it.text, it.modelId, it.edited, it.speakerId, it.words.map { w -> WordV1(w.atMillis, w.text) })
             },
             notes = lecture.notes.map { NoteV1(it.id, it.atMillis, it.text) },
+            labels = lecture.labels,
         )
     }
 }

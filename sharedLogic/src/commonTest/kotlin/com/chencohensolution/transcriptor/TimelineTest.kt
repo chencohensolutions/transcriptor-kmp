@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 class TimelineTest {
     private fun lecture(segments: List<Segment>, notes: List<Note>) =
-        Lecture("l", "nb", "t", "he", 0, 60_000, segments, notes)
+        Lecture("l", "t", "he", 0, 60_000, segments, notes)
 
     private fun line(id: String, start: Long, end: Long) = Segment(id, start, end, id, "m")
 

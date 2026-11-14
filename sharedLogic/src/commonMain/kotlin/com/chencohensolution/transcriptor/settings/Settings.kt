@@ -77,7 +77,7 @@ private data class SettingsFileV1(
     val autoImprove: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
-    /** Lectures to improve on their own once the phone is charging ("notebookId/lectureId"). */
+    /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
     val improvePending: List<String> = emptyList(),
     /** The lectures folder outside the app (Android: a document URI under the picked tree); null before one is picked. */
     val lectureFolder: String? = null,
@@ -132,15 +132,18 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         write(read().let { it.copy(improveSpeeds = it.improveSpeeds + (modelId to workMillis.toDouble() / audioMillis)) })
     }
 
-    /** Lectures waiting to be improved on their own, as (notebook id, lecture id), oldest first. */
-    val improvePending: List<Pair<String, String>>
-        get() = read().improvePending.mapNotNull { it.split('/').takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
+    /**
+     * Moments waiting to be improved on their own, by id, oldest first (kept before labels as "notebook id/lecture
+     * id": read as the lecture id).
+     */
+    val improvePending: List<String>
+        get() = read().improvePending.map { it.substringAfterLast('/') }.distinct()
 
-    fun addImprovePending(notebookId: String, lectureId: String) =
-        write(read().let { it.copy(improvePending = (it.improvePending + "$notebookId/$lectureId").distinct()) })
+    fun addImprovePending(lectureId: String) =
+        write(read().let { it.copy(improvePending = (it.improvePending.map { p -> p.substringAfterLast('/') } + lectureId).distinct()) })
 
-    fun removeImprovePending(notebookId: String, lectureId: String) =
-        write(read().let { it.copy(improvePending = it.improvePending - "$notebookId/$lectureId") })
+    fun removeImprovePending(lectureId: String) =
+        write(read().let { it.copy(improvePending = it.improvePending.filter { p -> p.substringAfterLast('/') != lectureId }) })
 
     /** Where finished lectures are kept, outside the app; null keeps them in the app's storage. */
     var lectureFolder: String?

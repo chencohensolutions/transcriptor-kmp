@@ -3,25 +3,25 @@ package com.chencohensolution.transcriptor.notebook
 import com.chencohensolution.transcriptor.models.Languages
 
 /**
- * The lecture as a Word file (.docx) to share or keep beside its audio: its title, a line with the notebook, the date
+ * The lecture as a Word file (.docx) to share or keep beside its audio: its title, a line with its labels, the date
  * and the length, then a paragraph per speaker's turn with the speaker's name in bold and the turn's time in grey above
  * it, and the notes, as shaded italic paragraphs, after the turn they were written in (the same reading as
  * [transcriptMarkdown]). A right-to-left lecture (Hebrew, Arabic…) has right-to-left paragraphs. [utcOffsetMillis] is
  * the phone's, for the date.
  */
-fun transcriptDocx(lecture: Lecture, notebookTitle: String?, utcOffsetMillis: Long = 0): ByteArray =
+fun transcriptDocx(lecture: Lecture, labelNames: String?, utcOffsetMillis: Long = 0): ByteArray =
     storedZip(
         listOf(
             "[Content_Types].xml" to CONTENT_TYPES,
             "_rels/.rels" to RELS,
-            "word/document.xml" to transcriptDocumentXml(lecture, notebookTitle, utcOffsetMillis),
+            "word/document.xml" to transcriptDocumentXml(lecture, labelNames, utcOffsetMillis),
         ).map { (name, text) -> name to text.encodeToByteArray() },
     )
 
 /** The file's name for a lecture: its title, without the characters file systems refuse. */
 fun docxName(lecture: Lecture): String = lecture.title.replace(Regex("""[\\/:*?"<>|\n\r\t]"""), " ").trim().ifEmpty { lecture.id } + ".docx"
 
-internal fun transcriptDocumentXml(lecture: Lecture, notebookTitle: String?, utcOffsetMillis: Long = 0): String {
+internal fun transcriptDocumentXml(lecture: Lecture, labelNames: String?, utcOffsetMillis: Long = 0): String {
     val language = Languages.normalize(lecture.language)
     val rtl = language in RTL
     val speaker = SPEAKER[language] ?: "Speaker"
@@ -41,7 +41,7 @@ internal fun transcriptDocumentXml(lecture: Lecture, notebookTitle: String?, utc
     }
     paragraph(lecture.title, bold = true, size = 40, after = 60)
     paragraph(
-        listOfNotNull(notebookTitle, dateOf(lecture.startedAtMillis + utcOffsetMillis), clock(lecture.durationMillis)).joinToString(" · "),
+        listOfNotNull(labelNames?.takeIf { it.isNotEmpty() }, dateOf(lecture.startedAtMillis + utcOffsetMillis), clock(lecture.durationMillis)).joinToString(" · "),
         color = GREY, after = 360,
     )
     val turns = mutableListOf<MutableList<Segment>>()

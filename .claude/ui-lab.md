@@ -35,7 +35,7 @@ Once the iOS app exists its lab goes in `iosApp/iosApp/Lab/`, with the same scre
 ## Fakes and edge cases
 
 - Usual fakes: data the shared logic lacks; timing, the microphone, live transcription, the models.
-- Edge cases: Hebrew (RTL) and an English notebook, long lines and notes, empty, paused, the keyboard open.
+- Edge cases: Hebrew (RTL) and an English moment, long lines and notes, empty, paused, the keyboard open.
 
 ## Screenshots
 

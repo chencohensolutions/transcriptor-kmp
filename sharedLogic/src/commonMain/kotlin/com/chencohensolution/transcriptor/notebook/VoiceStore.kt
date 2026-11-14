@@ -8,9 +8,8 @@ import okio.FileSystem
 import okio.Path
 
 /**
- * The voices a notebook knows: `notebooks/<notebook id>/voices.json` in the [place] the lectures are kept (the library
- * once there is one), a name and an average voice print per person the user named in one of its lectures, so the next
- * lectures label them by name. A person has a print per voice-print model (prints of different models don't compare);
+ * The voices the app knows: `voices.json` in the [place] the moments are kept (the library once there is one), a name
+ * and an average voice print per person the user named in any moment, so the next moments label them by name. A person has a print per voice-print model (prints of different models don't compare);
  * [model] is the one in use: [load] gives its prints, and [save] files a print without a model under it. A voice without
  * a print of the model in use is learned again the next time the user names it.
  */
@@ -21,43 +20,52 @@ class VoiceStore(private val model: () -> String = { DEFAULT_MODEL }, private va
     private val root: Path get() = place().root
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
-    private fun file(notebookId: String) = root / "notebooks" / notebookId / "voices.json"
+    private val file get() = root / FILE
 
     /** The voices with a print of the model in use. */
-    fun load(notebookId: String): List<Voice> = all(notebookId).filter { it.model == model() }
+    fun load(): List<Voice> = all().filter { it.model == model() }
 
     /** Every voice, a print per model. */
-    fun all(notebookId: String): List<Voice> {
-        val file = file(notebookId)
+    fun all(): List<Voice> {
+        val file = file
         if (!fileSystem.exists(file)) return emptyList()
         return json.decodeFromString<VoicesFileV1>(fileSystem.read(file) { readUtf8() }).voices
             .map { Voice(it.name, it.print, it.model.ifEmpty { DEFAULT_MODEL }) }
     }
 
     /** Adds or replaces (by name and model) a voice; one without a model is the model in use's. */
-    fun save(notebookId: String, voice: Voice) {
+    fun save(voice: Voice) {
         val v = voice.copy(model = voice.model.ifEmpty { model() })
-        write(notebookId, all(notebookId).filter { it.name != v.name || it.model != v.model } + v)
+        write(all().filter { it.name != v.name || it.model != v.model } + v)
     }
 
-    /** Renames a voice (every model's print), as when the user renames a speaker the notebook already knew. */
-    fun rename(notebookId: String, from: String, to: String) {
-        val voices = all(notebookId)
+    /** Renames a voice (every model's print), as when the user renames a speaker the app already knew. */
+    fun rename(from: String, to: String) {
+        val voices = all()
         val moved = voices.filter { it.name == from }
         if (moved.isEmpty()) return
         val models = moved.map { it.model }.toSet()
-        write(notebookId, voices.filter { it.name != from && !(it.name == to && it.model in models) } + moved.map { it.copy(name = to) })
+        write(voices.filter { it.name != from && !(it.name == to && it.model in models) } + moved.map { it.copy(name = to) })
     }
 
-    private fun write(notebookId: String, voices: List<Voice>) {
-        val file = file(notebookId)
+    /** Adds voices kept elsewhere (a notebook's, when notebooks became labels): those it lacks by name and model. */
+    internal fun add(voices: List<Voice>) {
+        val here = all()
+        val added = voices.filter { v -> here.none { it.name == v.name && it.model == v.model } }
+        if (added.isNotEmpty()) write(here + added)
+    }
+
+    private fun write(voices: List<Voice>) {
+        val file = file
         fileSystem.createDirectories(file.parent!!)
-        val temp = file.parent!! / "voices.json.tmp"
+        val temp = file.parent!! / "$FILE.tmp"
         fileSystem.write(temp) { writeUtf8(json.encodeToString(VoicesFileV1(voices = voices.map { VoiceV1(it.name, it.print, it.model) }))) }
         fileSystem.atomicMove(temp, file)
     }
 
     companion object {
+        const val FILE = "voices.json"
+
         /** The model of prints saved before voices had one: CAM++, the only model then. */
         val DEFAULT_MODEL = ModelCatalog.voicePrints.id
     }

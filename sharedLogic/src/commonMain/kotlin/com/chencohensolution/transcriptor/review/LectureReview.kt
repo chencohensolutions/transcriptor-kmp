@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.update
 
 /**
  * A recorded lecture, opened: playing it ([AudioPlayer]), correcting its lines and their speakers, naming the speakers
- * (in the notebook's [voices] too, with a voice print from [printOf]), and notes after the lecture. Every change is
+ * (in the app's [voices] too, with a voice print from [printOf]), and notes after the lecture. Every change is
  * saved to `lecture.json` at once. [passes] is fed by the app, which runs the passes in the background.
  */
 class LectureReview(
@@ -37,7 +37,7 @@ class LectureReview(
     private val speakerTuning: (modelId: String) -> Float = { 0f },
     private val setSpeakerTuning: (modelId: String, more: Float) -> Unit = { _, _ -> },
 ) {
-    private class Open(val notebookTitle: String, val lecture: Lecture, val speed: Float) {
+    private class Open(val labelNames: String, val lecture: Lecture, val speed: Float) {
         var power: com.chencohensolution.transcriptor.recording.PowerReport? = null
         var powerRead = false
         /** The live stretches kept with the lecture (model id, stretches), read once. */
@@ -93,7 +93,7 @@ class LectureReview(
         combine(open, player.positionMillis, player.playing, passes) { o, position, playing, p ->
             o?.let {
                 ReviewState(
-                    notebookTitle = it.notebookTitle, lecture = it.lecture, positionMillis = position, playing = playing,
+                    labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                     improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
                 )
@@ -103,12 +103,12 @@ class LectureReview(
     val lecture get() = open.value?.lecture
 
     /** Opens a lecture; false when it isn't there. */
-    fun open(notebookId: String, lectureId: String, notebookTitle: String): Boolean {
+    fun open(lectureId: String, labelNames: String): Boolean {
         close()
-        val lecture = store.load(notebookId, lectureId) ?: return false
+        val lecture = store.load(lectureId) ?: return false
         store.repairAudio(lecture)
         player.load(store.audioPath(lecture))
-        open.value = Open(notebookTitle, lecture, 1f)
+        open.value = Open(labelNames, lecture, 1f)
         return true
     }
 
@@ -122,20 +122,20 @@ class LectureReview(
     /** The open lecture as a Word file, with its file name: to share. Files: not on the main thread. */
     fun word(): Pair<String, ByteArray>? {
         val o = open.value ?: return null
-        return docxName(o.lecture) to store.word(o.lecture, o.notebookTitle)
+        return docxName(o.lecture) to store.word(o.lecture, o.labelNames)
     }
 
     /** Saves the open lecture's Word file in its folder; returns its name. Files: not on the main thread. */
     fun saveWord(): String? {
         val o = open.value ?: return null
-        return store.saveWord(o.lecture, o.notebookTitle)
+        return store.saveWord(o.lecture, o.labelNames)
     }
 
     /** Reads the open lecture again from disk (after a pass changed it), keeping the playback. */
     fun reload() {
         val o = open.value ?: return
-        val lecture = store.load(o.lecture.notebookId, o.lecture.id) ?: return
-        open.value = Open(o.notebookTitle, lecture, o.speed)
+        val lecture = store.load(o.lecture.id) ?: return
+        open.value = Open(o.labelNames, lecture, o.speed)
     }
 
     /**
@@ -151,7 +151,7 @@ class LectureReview(
         )
         synchronized(saveLock) { store.save(switched) }
         store.deleteVersion(o.lecture, versionId)
-        open.value = Open(o.notebookTitle, switched, o.speed)
+        open.value = Open(o.labelNames, switched, o.speed)
     }
 
     fun playPause() {
@@ -179,7 +179,7 @@ class LectureReview(
         val o = open.value ?: return
         val speed = SPEEDS[(SPEEDS.indexOf(o.speed) + 1) % SPEEDS.size]
         player.setSpeed(speed)
-        open.value = Open(o.notebookTitle, o.lecture, speed)
+        open.value = Open(o.labelNames, o.lecture, speed)
     }
 
     /** The user's text for a line: marked edited, so the refine pass keeps it. */
@@ -192,7 +192,7 @@ class LectureReview(
     fun setLineSpeaker(lineId: String, speakerId: String) =
         change { l -> l.copy(segments = l.segments.map { if (it.id == lineId) it.copy(speakerId = speakerId) else it }) }
 
-    /** Names a speaker in this lecture and, when a voice print can be made, in the notebook's voices. */
+    /** Names a speaker in this lecture and, when a voice print can be made, in the app's voices. */
     fun renameSpeaker(id: String, name: String) {
         val clean = name.trim()
         val before = lecture ?: return
@@ -200,8 +200,8 @@ class LectureReview(
         val old = before.speakers.firstOrNull { it.id == id }?.name.orEmpty()
         val after = change { l -> l.copy(speakers = l.speakers.map { if (it.id == id) it.copy(name = clean) else it }) } ?: return
         if (voices == null) return
-        if (old.isNotEmpty() && old != clean) voices.rename(after.notebookId, old, clean)
-        printOf(after, id)?.let { voices.save(after.notebookId, Voice(clean, it)) }
+        if (old.isNotEmpty() && old != clean) voices.rename(old, clean)
+        printOf(after, id)?.let { voices.save(Voice(clean, it)) }
     }
 
     /**
@@ -248,7 +248,7 @@ class LectureReview(
             o ?: return@update null
             val changed = edit(o.lecture)
             saved = changed.takeIf { it != o.lecture }
-            Open(o.notebookTitle, changed, o.speed)
+            Open(o.labelNames, changed, o.speed)
         }
         saved?.let { synchronized(saveLock) { store.save(it) } }
         return open.value?.lecture

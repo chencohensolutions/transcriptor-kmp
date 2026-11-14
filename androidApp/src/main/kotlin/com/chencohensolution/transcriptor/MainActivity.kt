@@ -25,9 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.notebook.RecordingNow
-import com.chencohensolution.transcriptor.notebook.UNFILED
+import com.chencohensolution.transcriptor.notebook.labelNames
 import com.chencohensolution.transcriptor.notebook.notebooksState
 import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.models.ModelChoices
@@ -46,6 +45,7 @@ import com.chencohensolution.transcriptor.ui.TranscriptorTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
@@ -101,13 +101,14 @@ class MainActivity : ComponentActivity() {
                     val lecture = last
                     if (openAfterStop && live == null && lecture != null) {
                         openAfterStop = false
-                        openLecture(lecture.notebookId, lecture.id)
+                        openLecture(lecture.id)
                     }
                 }
                 // The lists again when a lecture stops, one closes, or a pass on one ends; and finished lectures move
                 // to the lectures folder.
                 LaunchedEffect(live == null, opened == null, working.keys) {
                     withContext(Dispatchers.IO) {
+                        Recording.migrateLibrary()
                         Recording.library.reload()
                         runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
                     }
@@ -182,9 +183,9 @@ class MainActivity : ComponentActivity() {
                         Settings(onBack = { settings = false }, chooseFolder = chooseFolder)
                     }
                     else -> Notebooks(
-                        recordingNow = state?.let { RecordingNow(it.lecture.notebookId.takeIf { id -> id != UNFILED }, it.lecture.title, it.elapsedMillis, it.lecture.id) },
+                        recordingNow = state?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
                         working = working,
-                        onRecord = { notebookId, language -> startLecture(notebookId, language); showLive = true },
+                        onRecord = { labels, language -> startLecture(labels, language); showLive = true },
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
@@ -198,7 +199,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
-        onRecord: (notebookId: String?, language: String) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
+        onRecord: (labels: List<String>, language: String) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
         chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -217,24 +218,26 @@ class MainActivity : ComponentActivity() {
                 value = System.currentTimeMillis()
             }
         }
-        var recordIn by remember { mutableStateOf<Pair<String?, String>?>(null) }
+        var recordIn by remember { mutableStateOf<Pair<List<String>, String>?>(null) }
         val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            val (notebookId, language) = recordIn ?: return@rememberLauncherForActivityResult
-            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(notebookId, language)
+            val (labels, language) = recordIn ?: return@rememberLauncherForActivityResult
+            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language)
         }
         val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
             notebooksState(library, now, Recording.utcOffset, recordingNow, working),
             NotebooksActions(
                 openLecture = ::openLecture,
-                record = { notebookId, language ->
-                    recordIn = notebookId to language
+                record = { labels, language ->
+                    recordIn = labels to language
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
                 },
                 backToRecording = onBackToRecording,
-                newNotebook = { title, language -> io { Recording.library.create(title, language) } },
-                assign = { lectureId, notebookId -> io { Recording.file(lectureId, notebookId) } },
-                assignToNew = { lectureId, title, language -> io { Recording.file(lectureId, Recording.library.create(title, language).id) } },
+                // Made here, not in the background: the sheet that asked puts the new label on its moments at once.
+                newLabel = { name -> runBlocking(Dispatchers.IO) { Recording.library.newLabel(name).id } },
+                setLabels = { ids, add, remove -> io { Recording.setLabels(ids, add, remove) } },
+                renameLabel = { id, name -> io { Recording.library.renameLabel(id, name) } },
+                deleteLabel = { id -> io { Recording.deleteLabel(id) } },
                 settings = onSettings,
                 chooseFolder = chooseFolder,
                 keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
@@ -260,18 +263,17 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(send, name))
     }
 
-    /** Opens a recorded lecture, under its notebook's title ("Not in a notebook" for an unfiled one). */
-    private fun openLecture(notebookId: String, lectureId: String) {
-        val title = Recording.library.library.value.notebooks.firstOrNull { it.id == notebookId }?.title ?: getString(R.string.notebooks_unfiled_title)
-        Recording.review.open(notebookId, lectureId, title)
+    /** Opens a recorded moment, under its labels' names. */
+    private fun openLecture(lectureId: String) {
+        val library = Recording.library.library.value
+        val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
+        Recording.review.open(lectureId, labelNames(labels, library.labels))
     }
 
-    /** Records a lecture titled with today's date, in a notebook, or in none ([UNFILED]) in [language]. */
-    private fun startLecture(notebookId: String?, language: String) {
+    /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
+    private fun startLecture(labels: List<String>, language: String) {
         val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
-        val notebook = Recording.library.library.value.notebooks.firstOrNull { it.id == notebookId }
-            ?: Notebook(UNFILED, getString(R.string.notebooks_unfiled_title), language, emptyList())
-        RecordingService.start(this, notebook, title)
+        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title)
     }
 }
 
