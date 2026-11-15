@@ -413,7 +413,7 @@ object Recording {
 
     /**
      * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
-     * relabeled and split to match, and the speakers named from the app's voices. Saves and returns it.
+     * relabeled and split to match. Speakers keep no names from other moments. Saves and returns it.
      */
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
@@ -423,7 +423,10 @@ object Recording {
         val embedder = voiceEmbedder(model)
         try {
             RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
-                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load()) { at ->
+                // Speakers aren't guessed from other moments (see LectureSession.start): the only known voices are
+                // the ones the user named in this very moment, so running the pass again keeps their names.
+                val here = lecture.speakers.map { it.name }.filter { it.isNotEmpty() }.toSet()
+                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load().filter { it.name in here }) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
                 val done = lecture.withTurns(result.turns, result.speakers)

@@ -82,7 +82,7 @@ class SpeakerTest {
     }
 
     @Test
-    fun linesGetSpeakersAndANameCarriesToTheNextLecture() = runTest {
+    fun linesGetSpeakersAndANameIsNotGuessedInTheNextMoment() = runTest {
         val recorder = FakeRecorder(fs)
         val first = session(recorder)
         first.start(listOf("psych"), "פסיכולוגיה", "he", "1")
@@ -99,7 +99,7 @@ class SpeakerTest {
         assertEquals(listOf(Speaker("speaker-1", "המרצה"), Speaker("speaker-2", "")), stopped.speakers)
         assertEquals(listOf("המרצה"), voices.load().map { it.name })
 
-        // The next lecture: the student speaks first, then the lecturer, who is named from the start.
+        // The next moment: the same lecturer speaks second, and is not named: voices aren't guessed between moments.
         val recorder2 = FakeRecorder(fs)
         val second = session(recorder2)
         testScheduler.advanceTimeBy(1_000)
@@ -109,7 +109,9 @@ class SpeakerTest {
         runCurrent()
         val lecture = second.state.value!!.lecture
         assertEquals(listOf("speaker-1", "speaker-2"), lecture.segments.map { it.speakerId })
-        assertEquals(listOf(Speaker("speaker-1", ""), Speaker("speaker-2", "המרצה")), lecture.speakers)
+        assertEquals(listOf(Speaker("speaker-1", ""), Speaker("speaker-2", "")), lecture.speakers)
+        // The name is still kept, to offer when naming.
+        assertEquals(listOf("המרצה"), voices.load().map { it.name })
     }
 
     @Test

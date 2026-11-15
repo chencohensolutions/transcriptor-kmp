@@ -59,7 +59,7 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
   appears 2.5–5 s after its text, and a line may then split where the speaker changed.
 
 - Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
-  it names the speaker, and the app remembers the voice for the next moments.
+  it names the speaker in this moment. Voices aren't guessed in later moments; the name is offered when naming there.
 
 - **Recording only** (After on the Record bar, or no live model for the language; `LiveLectureState.recordOnly`): no
   lines and no model lines, only "Recording only. This moment is transcribed after you stop." above the notes.
