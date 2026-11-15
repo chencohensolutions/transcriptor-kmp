@@ -43,7 +43,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
     var quiet by remember { mutableStateOf(Recording.settings.quietRecording) }
-    var tileStopTwice by remember { mutableStateOf(Recording.settings.tileStopTwice) }
+    var stopTwice by remember { mutableStateOf(Recording.settings.stopTwice) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
@@ -87,7 +87,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, tileStopTwice = tileStopTwice, folder = folder, processorMeters = meters,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -125,7 +125,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             setQuietRecording = { quiet = it; io { Recording.settings.quietRecording = it } },
-            setTileStopTwice = { tileStopTwice = it; io { Recording.settings.tileStopTwice = it } },
+            setStopTwice = { stopTwice = it; io { Recording.settings.stopTwice = it } },
             openNotificationSettings = {
                 context.startActivity(
                     android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)

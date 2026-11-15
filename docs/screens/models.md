@@ -51,8 +51,9 @@ for an app that records in the background, so the row says so and links to the p
 the app, where its notifications can be turned off altogether. The phone's own microphone indicator is not ours to
 hide.
 
-Under it, **Two taps to stop from Quick Settings** (`SettingsStore.tileStopTwice`, off by default; owner's choice, Nov
-15, 2026): on, the Record tile asks "Tap again to stop" and stops on a second tap within 4 seconds.
+Under it, **Two taps to stop** (`SettingsStore.stopTwice`, off by default; owner's choice, Nov 15, 2026): on, Stop in
+the recording screens arms first (`rememberArmedStop`) and the Record tile asks "Tap again to stop"; the second tap
+stops.
 
 ## What it shows
 

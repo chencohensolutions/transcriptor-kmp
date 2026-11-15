@@ -142,9 +142,10 @@ class MainActivity : ComponentActivity() {
                         BackHandler { showLive = false }
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
                         val meterStyle = remember { Recording.settings.processorMeters }
+                        val stopTwice = remember { Recording.settings.stopTwice }
                         val meters = rememberProcessorMeters(meterStyle)
                         LectureScreen(
-                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history),
+                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history, stopTwice = stopTwice),
                             LiveLectureActions(
                                 back = { showLive = false },
                                 pauseOrResume = Recording.session::pauseOrResume,

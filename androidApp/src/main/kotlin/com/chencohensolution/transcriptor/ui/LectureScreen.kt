@@ -214,7 +214,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                             stringResource(if (state.paused) R.string.lecture_resume else R.string.lecture_pause),
                         )
                     }
-                    val stop = rememberArmedStop(actions.stop)
+                    val stop = rememberArmedStop(state.stopTwice, actions.stop)
                     FilledIconButton(
                         onClick = stop.tap,
                         enabled = !state.finishing,

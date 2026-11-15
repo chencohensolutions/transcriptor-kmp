@@ -143,8 +143,8 @@ data class ModelsState(
     val autoImprove: Boolean = false,
     /** The notification while recording says nothing about it ([com.chencohensolution.transcriptor.settings.SettingsStore.quietRecording]). */
     val quietRecording: Boolean = false,
-    /** The Quick Settings tile's Stop asks for a second tap ([com.chencohensolution.transcriptor.settings.SettingsStore.tileStopTwice]). */
-    val tileStopTwice: Boolean = false,
+    /** Stop asks for a second tap, in the app and on the tile ([com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
+    val stopTwice: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
     /** The voice-print model speaker labels use (its id; [Recording.voiceModel]); null without one. */
     val voiceModel: String? = null,
@@ -239,7 +239,7 @@ class ModelsActions(
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val setQuietRecording: (Boolean) -> Unit = {},
-    val setTileStopTwice: (Boolean) -> Unit = {},
+    val setStopTwice: (Boolean) -> Unit = {},
     /** Opens the phone's notification settings for the app, where its notifications can be turned off altogether. */
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
@@ -401,9 +401,9 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
                 Text(stringResource(R.string.settings_quiet_system))
             }
             SwitchRow(
-                stringResource(R.string.settings_tile_stop_twice),
-                stringResource(if (state.tileStopTwice) R.string.settings_tile_stop_twice_on else R.string.settings_tile_stop_twice_off),
-                state.tileStopTwice, actions.setTileStopTwice,
+                stringResource(R.string.settings_stop_twice),
+                stringResource(if (state.stopTwice) R.string.settings_stop_twice_on else R.string.settings_stop_twice_off),
+                state.stopTwice, actions.setStopTwice,
             )
             HorizontalDivider(Modifier.padding(top = 16.dp))
             NavRow(stringResource(R.string.settings_advanced), stringResource(R.string.settings_advanced_note), openAdvanced)
