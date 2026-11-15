@@ -89,6 +89,11 @@ class NpuGuardTest {
         val measured = pair.copy(npuPeakBytes = 5_000 * mb)
         assertEquals(5_000 * mb + NpuLoadGuard.HEADROOM, NpuLoadGuard.needs(measured))
         assertFailsWith<NpuLoadGuard.Refused> { NpuLoadGuard(installed) { 5_000 * mb }.load(measured) { } }
+        // A load says what it kept: the free memory before and after, for the model's measured peak.
+        val logged = mutableListOf<String>()
+        var free = 8_000_000_000L
+        NpuLoadGuard(installed, log = { logged += it }) { free }.load(measured) { free = 5_600_000_000L }
+        assertEquals(listOf("large-8bit loaded: 8.0 GB free before, 5.6 GB after (guard asked 5.7 GB)"), logged)
         // A ggml Whisper model's model.bin isn't an NPU binary.
         assertEquals(0, ModelCatalog.all.first { it.kind == com.chencohensolution.transcriptor.models.ModelKind.Whisper }.npuBinaryBytes)
     }

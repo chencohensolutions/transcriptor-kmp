@@ -8,6 +8,7 @@ import com.chencohensolution.transcriptor.speech.RefinePass
 import com.chencohensolution.transcriptor.speech.SpeechEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class RefineTest {
@@ -42,6 +43,21 @@ class RefineTest {
         assertEquals(listOf(800L to 5_300L, 9_800L to 10_700L), asked)
         assertEquals(listOf(1f / 3, 2f / 3, 1f), progress)
         assertEquals("large", refined.refinedWith)
+    }
+
+    @Test
+    fun aRecordingStartingStopsThePassBeforeTheNextLine() {
+        val lecture = Lecture(
+            "l", "t", "he", 0, 40_000,
+            segments = listOf(Segment("s1", 1_000, 5_000, "א", "turbo"), Segment("s2", 6_000, 9_000, "ב", "turbo")),
+            notes = emptyList(),
+        )
+        var asked = 0
+        var recording = false
+        val pass = RefinePass(LargeModel(), "he") { a, b -> asked++; recording = true; FloatArray(((b - a) * 16).toInt()) }
+        // The first line is read, then a recording starts: the pass ends before the second, for its model to be closed.
+        assertFailsWith<RefinePass.Stopped> { pass.run(lecture, "large", stop = { recording }) }
+        assertEquals(1, asked)
     }
 
     /** Times its words: "מילה<t>" every second of the stretch, t its second in the stretch, said at t s + 0.5 s. */

@@ -27,7 +27,11 @@ class RefinePass(
     constructor(engine: SpeechEngine, language: String, audio: (Long, Long) -> FloatArray) :
         this({ samples -> transcribeLine(engine, samples, language) }, audio, if (engine.timesWords) { samples -> timedWords(engine, samples, language) } else null)
 
-    fun run(lecture: Lecture, modelId: String, progress: (Float) -> Unit = {}): Lecture {
+    /**
+     * Improves [lecture]'s lines with [modelId]. [stop] is asked before each line or window: true ends the pass at once
+     * with [Stopped] (a recording started and needs the memory its model holds), nothing written.
+     */
+    fun run(lecture: Lecture, modelId: String, progress: (Float) -> Unit = {}, stop: () -> Boolean = { false }): Lecture {
         val lines = lecture.segments
         val endOfAudio = lecture.durationMillis.takeIf { it > 0 } ?: Long.MAX_VALUE
         val refined = ArrayList<Segment>(lines.size)
@@ -43,6 +47,7 @@ class RefinePass(
         }
         var i = 0
         while (i < lines.size) {
+            if (stop()) throw Stopped()
             val line = lines[i]
             if (line.edited) { done(line); i++; continue }
             if (words == null) { oneLine(line); i++; continue }
@@ -62,6 +67,9 @@ class RefinePass(
 
     private fun refine(line: Segment, text: String, modelId: String) =
         if (text.isEmpty()) line else line.copy(text = text, modelId = modelId, words = emptyList())
+
+    /** The pass was stopped before its end ([run]'s stop). */
+    class Stopped : Exception("Improving stopped: a recording started")
 
     companion object {
         const val LEAD_MILLIS = 200L

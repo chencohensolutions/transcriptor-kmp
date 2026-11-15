@@ -26,6 +26,12 @@ recording goes on). After Stop, "Finishing the last lines…" until the waiting 
 When the picked live model's NPU build doesn't fit in the free memory at the start, the next ready model runs, and a
 red line under the status says so: "Not enough free memory now for <model>; using <other>. Close other apps and try
 again." (`LiveLectureState.skippedForMemory`; Nov 7, 2026). The model isn't disabled: the next recording tries it again.
+When the language has a model to improve with, the line is calm instead (the time's color), and the moment is improved
+as soon as it stops, once the live model is closed, charger or not: "<other> writes the live lines: <model> didn't fit
+in the free memory with the recording. This moment is improved when you stop." (`LiveLectureState.improveOnStop`,
+`ImproveAfterStop`; Nov 15, 2026). If its model still doesn't fit then (other apps), the moment waits for the charger.
+An improve pass running when a recording starts stops before its next window, closing its model, and starts again
+when the recording stops (`RefinePass.run(stop)`, `Recording.improveAfterRecording`).
 
 Under it, the other models the recording uses (owner's request, Nov 6, 2026), in the same small grey
 (`LiveLectureState.voicePrints`, `speakerPassOnStop`; `ModelsInUse` in `LectureScreen.kt`):

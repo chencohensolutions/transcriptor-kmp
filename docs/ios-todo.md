@@ -109,6 +109,9 @@ anything left to decide. Remove an entry once it is built.
   read the old `afterLecture`) and `autoImprove` (off by default): after Stop and the speaker pass, improve with the
   language's model if charging, else `addImprovePending` until the app is open on the charger (Android:
   `RecordingService` ACTION_STOP and `improveNextPending`, `MainActivity.improvePendingIfCharging`).
+  `ImproveAfterStop.of(...)` decides (Nov 15, 2026): a moment whose live model was skipped for memory
+  (`LiveLectureState.improveOnStop`) is improved right after Stop; string `lecture_model_skipped_improve`. An improve
+  pass stops when a recording starts (`RefinePass.run(stop = …)`, `RefinePass.Stopped`) and runs again after it.
 - Improve transcription… on the moment, always offered: `ReviewState.refineModels` (`ModelChoice` with `minutes`
   and `npu`), `improveDefault`, `improveToGet`; the sheet in `ReviewScreen.kt` (`ImproveSheet`); speakers first then
   improve (`RecordingService.refine(…, speakersFirst)`); `SettingsStore.recordImproveSpeed`/`improveSpeed` and
