@@ -195,6 +195,8 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         s.copy(
             liveModels = defaults.live?.takeIf { language !in s.liveModels }?.let { s.liveModels + (language to it.id) } ?: s.liveModels,
             refineModels = defaults.improve?.takeIf { language !in s.refineModels }?.let { s.refineModels + (language to it.id) } ?: s.refineModels,
+            voiceModel = s.voiceModel ?: defaults.voicePrints.id,
+            segmentationModel = s.segmentationModel ?: defaults.segmentation.id,
         )
     })
 

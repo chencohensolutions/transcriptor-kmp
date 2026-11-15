@@ -47,8 +47,9 @@ update those docs whenever a screen changes.
 - Hebrew is first-class: a moment's content (lines, notes) is laid out in its language's direction
   (`layoutDirectionOf`), the app's chrome in the phone's. Check every screen in Hebrew and with an English moment.
 - Times are milliseconds from the start of the recording, everywhere.
-- Models are public files only, pinned to a commit with their sha256; nothing is hosted by us. Only models free for
-  commercial use go in `ModelCatalog`; models the user adds from Hugging Face may have any license, marked and
+- Models are public files only, pinned to a commit with their sha256; nothing is hosted by us. `ModelCatalog` offers models free for
+  commercial use, plus the owner's picks that are the most promising whatever their license (their call, Nov 15,
+  2026: defaults are the best models, e.g. DiariZen for speaker turns), marked with their license; models the user adds from Hugging Face may have any license, marked and
   asked for in Settings › Models.
 - Files other tools will read (the lecture's data file) are versioned (`"v": 1`) and written to a temp file, then
   renamed.

@@ -37,14 +37,18 @@ class DefaultModelsTest {
     }
 
     @Test
-    fun noDefaultIsNonCommercialOrCopiedByHand() {
-        val nonCommercial = Regex("NC|noncommercial", RegexOption.IGNORE_CASE)
+    fun everyDefaultDownloadsAndTheSpeakerPassCanRun() {
         for (chip in chips) for (language in languages) {
-            for (m in DefaultModels.forLanguage(language, chip).toDownload) {
-                assertTrue(!m.manual && m.files.all { it.url.isNotEmpty() }, "${m.id} is not downloadable")
-                assertTrue(!nonCommercial.containsMatchIn(m.license), "${m.id} is ${m.license}")
-            }
+            val d = DefaultModels.forLanguage(language, chip)
+            for (m in d.toDownload) assertTrue(!m.manual && m.files.all { it.url.isNotEmpty() && it.sha256.isNotEmpty() }, "${m.id} is not downloadable")
+            assertTrue(ModelCatalog.speakerSegmentation in d.toDownload)
         }
+    }
+
+    @Test
+    fun speakerTurnsAreDiariZenOnTheS25AndPyannoteElsewhere() {
+        assertEquals(ModelCatalog.diarizenBaseS80Npu.id, DefaultModels.forLanguage("en", "SM8750").segmentation.id)
+        assertEquals(ModelCatalog.speakerSegmentation.id, DefaultModels.forLanguage("en", "SM8650").segmentation.id)
     }
 
     @Test
@@ -74,6 +78,10 @@ class DefaultModelsTest {
         settings.useDefaults("he", DefaultModels.forLanguage("he", null))
         assertEquals(ModelCatalog.ivritZipformer.id, settings.liveModel("he"))
         assertEquals("mine", settings.refineModel("he"))
+        assertEquals(ModelCatalog.speakerSegmentation.id, settings.segmentationModel)
+        settings.segmentationModel = "picked"
+        settings.useDefaults("he", DefaultModels.forLanguage("he", "SM8750"))
+        assertEquals("picked", settings.segmentationModel)
         assertTrue(!settings.firstRunDone)
         settings.firstRunDone = true
         assertTrue(settings.firstRunDone)

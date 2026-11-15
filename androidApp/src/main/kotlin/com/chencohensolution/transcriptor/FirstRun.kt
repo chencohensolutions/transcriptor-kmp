@@ -48,6 +48,7 @@ fun FirstRun(onDone: () -> Unit) {
         defaults.improve?.let { it to FirstRunJob.Improve },
         defaults.voicePrints to FirstRunJob.Voices,
         defaults.segmentation to FirstRunJob.Turns,
+        defaults.speakerPass to FirstRunJob.Pass,
     ).distinctBy { it.first.id }
     val statuses by produceState(emptyMap<String, ModelStatus>(), models) {
         while (true) {

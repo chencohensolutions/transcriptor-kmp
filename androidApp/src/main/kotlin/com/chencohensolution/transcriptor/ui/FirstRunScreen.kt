@@ -31,7 +31,7 @@ import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.speech.ModelStatus
 
 /** What a model on first run is for, shown under its name. */
-enum class FirstRunJob { Live, Improve, Voices, Turns }
+enum class FirstRunJob { Live, Improve, Voices, Turns, Pass }
 
 data class FirstRunModel(val model: SpeechModel, val job: FirstRunJob, val status: ModelStatus)
 
@@ -100,12 +100,18 @@ private fun ModelRow(item: FirstRunModel, actions: FirstRunActions) {
                         FirstRunJob.Improve -> R.string.first_run_improve
                         FirstRunJob.Voices -> R.string.first_run_voices
                         FirstRunJob.Turns -> R.string.first_run_turns
+                        FirstRunJob.Pass -> R.string.first_run_pass
                     },
                 ),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                "${isolated(item.model.name.replace(" · ", " · "))} · ${modelsSize(item.model.sizeBytes)}",
+                listOfNotNull(
+                    isolated(item.model.name.replace(" · ", "\u00A0·\u00A0")),
+                    modelsSize(item.model.sizeBytes),
+                    // A default not free for commercial use says so.
+                    item.model.license.takeIf { "NC" in it.uppercase() },
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

@@ -323,6 +323,7 @@
     <string name="first_run_improve">Improve after recording</string>
     <string name="first_run_voices">Telling voices apart</string>
     <string name="first_run_turns">Who speaks when</string>
+    <string name="first_run_pass">Speakers after recording</string>
     <string name="first_run_total">Total %1$s</string>
     <string name="first_run_background">They keep downloading if you leave this screen. Settings › Models shows them.</string>
     <string name="first_run_download">Download</string>

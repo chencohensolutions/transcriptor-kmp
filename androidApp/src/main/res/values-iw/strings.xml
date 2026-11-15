@@ -323,6 +323,7 @@
     <string name="first_run_improve">שיפור אחרי ההקלטה</string>
     <string name="first_run_voices">הבחנה בין קולות</string>
     <string name="first_run_turns">מי מדבר מתי</string>
+    <string name="first_run_pass">דוברים אחרי ההקלטה</string>
     <string name="first_run_total">סך הכול %1$s</string>
     <string name="first_run_background">ההורדה ממשיכה גם אם יוצאים מהמסך הזה. אפשר לראות אותה בהגדרות › מודלים.</string>
     <string name="first_run_download">הורדה</string>

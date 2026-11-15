@@ -5,7 +5,8 @@ package com.chencohensolution.transcriptor.models
  * after, plus the speaker models every language shares. Each job lists its picks best first; the first that runs on the
  * phone's chip is the default, so a Snapdragon 8 Elite gets the NPU build and any other phone the CPU one.
  *
- * Only catalog models, so every default is free for commercial use.
+ * Only catalog models. The most promising one per job, whatever its license (the owner's call, Nov 15, 2026): a
+ * non-commercial default shows its license in Settings › Models.
  */
 object DefaultModels {
     /** The defaults for one language on one phone. A job is null when no pick runs there. */
@@ -13,10 +14,14 @@ object DefaultModels {
         val live: SpeechModel?,
         val improve: SpeechModel?,
         val voicePrints: SpeechModel,
+        /** Live speaker turns. */
         val segmentation: SpeechModel,
     ) {
+        /** The speaker pass's segmentation (pyannote's, the only one it runs): got too, so the pass can run. */
+        val speakerPass get() = ModelCatalog.speakerSegmentation
+
         /** What first run downloads: each model once, smallest first so live works soonest. */
-        val toDownload get() = listOfNotNull(live, improve, voicePrints, segmentation).distinctBy { it.id }.sortedBy { it.sizeBytes }
+        val toDownload get() = listOfNotNull(live, improve, voicePrints, segmentation, speakerPass).distinctBy { it.id }.sortedBy { it.sizeBytes }
     }
 
     /** The language a new install starts in: the app ships English first. */
@@ -32,6 +37,9 @@ object DefaultModels {
         "he" to listOf(ModelCatalog.ivritLargeV3Q8),
     )
 
+    /** Live speaker turns: DiariZen on the S25's NPU (the owner's pick, best in the sweep), else pyannote's. */
+    private val segmentationPicks = listOf(ModelCatalog.diarizenBaseS80Npu, ModelCatalog.speakerSegmentation)
+
     /** For a language without picks of its own: the multilingual models. */
     private val multilingualLive = listOf(ModelCatalog.whisperTurbo)
     private val multilingualImprove = listOf(ModelCatalog.whisperLargeV3)
@@ -44,8 +52,7 @@ object DefaultModels {
         live = (livePicks[language] ?: multilingualLive).firstOrNull { it.runsOn(chip) && !fails(it) },
         improve = (improvePicks[language] ?: multilingualImprove).firstOrNull { it.runsOn(chip) && !fails(it) },
         voicePrints = ModelCatalog.voicePrints,
-        // The owner uses DiariZen for speaker turns; it is non-commercial, so new installs get pyannote's.
-        segmentation = ModelCatalog.speakerSegmentation,
+        segmentation = segmentationPicks.first { it.runsOn(chip) && !fails(it) },
     )
 
     /**
