@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                // The system's picker opens on Documents, where the app suggests its Transcriptor folder.
+                // The system's picker opens on Documents, where the app suggests its Audio Logs folder.
                 val chooseFolder = { pickFolder.launch(DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents")) }
                 CompressPending()
                 ReviewPasses()

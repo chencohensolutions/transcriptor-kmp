@@ -26,8 +26,9 @@ enum class AacProfile {
 data class AacSettings(
     val profile: AacProfile = AacProfile.Lc,
     val sampleRate: Int = 48_000,
-    val channels: Int = 1,
-    val bitrateKbps: Int = 64,
+    // The owner's settings (Nov 15, 2026): stereo at 256 kbps, about 115 MB an hour.
+    val channels: Int = 2,
+    val bitrateKbps: Int = 256,
     val encoder: String? = null,
 ) {
     /** The sample rates for [profile]: whole fractions of the microphone's 48 kHz (no resampling filter beyond a low-pass). */

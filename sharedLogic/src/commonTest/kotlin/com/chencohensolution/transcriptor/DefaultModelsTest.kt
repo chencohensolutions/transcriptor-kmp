@@ -17,7 +17,8 @@ class DefaultModelsTest {
     fun theSnapdragon8EliteGetsTheNpuBuildsAndOtherPhonesTheCpuOnes() {
         val elite = DefaultModels.forLanguage("he", "SM8750")
         assertEquals(ModelCatalog.ivritZipformerNpu.id, elite.live?.id)
-        assertEquals(ModelCatalog.ivritLargeV3Q8.id, elite.improve?.id)
+        assertEquals(ModelCatalog.ivritLargeV3NpuEncoder.id, elite.improve?.id)
+        assertEquals(ModelCatalog.voicePrintsResNet293.id, elite.voicePrints.id)
         val other = DefaultModels.forLanguage("he", "SM8650")
         assertEquals(ModelCatalog.ivritZipformer.id, other.live?.id)
         assertEquals(ModelCatalog.ivritLargeV3Q8.id, other.improve?.id)
@@ -47,7 +48,9 @@ class DefaultModelsTest {
 
     @Test
     fun speakerTurnsAreDiariZenOnTheS25AndPyannoteElsewhere() {
-        assertEquals(ModelCatalog.diarizenBaseS80Npu.id, DefaultModels.forLanguage("en", "SM8750").segmentation.id)
+        assertEquals(ModelCatalog.diarizenLargeS80Npu.id, DefaultModels.forLanguage("en", "SM8750").segmentation.id)
+        // Its NPU build doesn't load: the base build, then pyannote's.
+        assertEquals(ModelCatalog.diarizenBaseS80Npu.id, DefaultModels.forLanguage("en", "SM8750") { it.id == ModelCatalog.diarizenLargeS80Npu.id }.segmentation.id)
         assertEquals(ModelCatalog.speakerSegmentation.id, DefaultModels.forLanguage("en", "SM8650").segmentation.id)
     }
 

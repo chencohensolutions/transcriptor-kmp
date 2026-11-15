@@ -42,6 +42,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var encodeAfter by remember { mutableStateOf(Recording.settings.encodeAfter) }
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
+    var quiet by remember { mutableStateOf(Recording.settings.quietRecording) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
     var hub by remember { mutableStateOf(HubSearch()) }
@@ -84,7 +86,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder, processorMeters = meters,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, folder = folder, processorMeters = meters,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -121,6 +123,13 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
+            setQuietRecording = { quiet = it; io { Recording.settings.quietRecording = it } },
+            openNotificationSettings = {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            },
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },

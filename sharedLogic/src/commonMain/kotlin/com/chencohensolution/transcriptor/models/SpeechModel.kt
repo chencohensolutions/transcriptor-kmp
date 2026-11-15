@@ -461,8 +461,31 @@ object ModelCatalog {
         chips = listOf("SM8750"),
     )
 
+    /**
+     * DiariZen WavLM Large s80 from the owner's Hugging Face, downloaded as [diarizenBaseS80Npu] is: the owner's own
+     * pick for live speaker turns on the S25 (read from the phone, Nov 15, 2026), so the first default there. Its id is
+     * the one it got when added from Hugging Face, so phones that added it keep their download. Non-commercial.
+     */
+    private const val DIARIZEN_LARGE_NPU = "https://huggingface.co/hencohen83/diarizen-wavlm-large-s80-qnn-sm8750/resolve/75969ec807b5b878aeb1e5e18ad93e285dcea9a9"
+    val diarizenLargeS80Npu = SpeechModel(
+        id = "hf:hencohen83/diarizen-wavlm-large-s80-qnn-sm8750:model + NPU",
+        name = "DiariZen WavLM Large s80 · NPU",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "70M",
+        license = "CC-BY-NC-4.0",
+        fitsLive = true,
+        source = "https://huggingface.co/hencohen83/diarizen-wavlm-large-s80-qnn-sm8750",
+        kind = ModelKind.SpeakerSegmentation,
+        files = listOf(
+            ModelFile("model.onnx", "$DIARIZEN_LARGE_NPU/model.onnx", "bad9a8c8feb3587cd71131fd77d10329755d2d0d8b0e4be7cb5acd193f2897c7", 320_994_754),
+            ModelFile("window.bin", "$DIARIZEN_LARGE_NPU/window.bin", "44a216bf83aa960d36b686f762492e5395a871be588c6f183efe60218b5bd65b", 195_653_632),
+        ),
+        credit = "DiariZen by BUT-FIT (CC-BY-NC-4.0: not for commercial use); 16 s chunks",
+        chips = listOf("SM8750"),
+    )
+
     /** The segmentation models for speaker turns, pyannote's first (the speaker pass's, and the fallback). */
-    val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80Npu, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
+    val segmentationModels get() = listOf(speakerSegmentation, diarizenLargeS80Npu, diarizenBaseS80Npu, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
 
     val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
 

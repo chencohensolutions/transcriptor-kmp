@@ -136,16 +136,17 @@ class ProcessorMetersTest {
     }
 
     @Test
-    fun theMeterStyleIsASettingOffByDefault() {
+    fun theMeterStyleIsASettingGraphsByDefault() {
         val fs = FakeFileSystem()
         val root = "/files".toPath()
-        assertEquals(ProcessorMeterStyle.Off, SettingsStore(fs, root).processorMeters)
-        SettingsStore(fs, root).processorMeters = ProcessorMeterStyle.Graphs
+        // The owner's setting (Nov 15, 2026).
         assertEquals(ProcessorMeterStyle.Graphs, SettingsStore(fs, root).processorMeters)
-        assert("\"processorMeters\": \"graphs\"" in fs.read(root / "settings.json") { readUtf8() })
+        SettingsStore(fs, root).processorMeters = ProcessorMeterStyle.Chip
+        assertEquals(ProcessorMeterStyle.Chip, SettingsStore(fs, root).processorMeters)
+        assert("\"processorMeters\": \"chip\"" in fs.read(root / "settings.json") { readUtf8() })
         // A style a newer version wrote reads as off, and the other settings still read.
         val file = root / "settings.json"
-        val newer = fs.read(file) { readUtf8() }.replace("\"graphs\"", "\"radar\"")
+        val newer = fs.read(file) { readUtf8() }.replace("\"chip\"", "\"radar\"")
         fs.write(file) { writeUtf8(newer) }
         assertEquals(ProcessorMeterStyle.Off, SettingsStore(fs, root).processorMeters)
         assertEquals(ProcessorMeterStyle.Off, ProcessorMeterStyle.of(null))

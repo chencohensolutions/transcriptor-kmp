@@ -69,7 +69,7 @@ anything left to decide. Remove an entry once it is built.
 
 ## The moments folder
 
-- Android: finished moments move from the app to a folder the user picks (`Documents/Transcriptor`), through
+- Android: finished moments move from the app to a folder the user picks (`Documents/Audio Logs`), through
   `storage/SafFileSystem.kt` (an okio `FileSystem` on the documents provider) and `Recording.chooseFolder`/`archive`/
   `openAudio`; a `.nomedia` in it.
 - Shared: `LectureStore.library` (a `Place`), `adoptLibrary`, `archiveFinished`, `SettingsStore.lectureFolder`.

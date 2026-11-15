@@ -114,7 +114,7 @@
     <string name="folder_lost">Can\'t reach “%1$s”: new moments stay in the app until it is chosen again.</string>
     <string name="folder_choose_again">Choose again</string>
     <string name="folder_ask_title">Where should moments be kept?</string>
-    <string name="folder_ask_note">In a folder outside the app (Documents/Transcriptor is suggested) they stay if the app is removed, and the transcripts sit beside their audio.</string>
+    <string name="folder_ask_note">In a folder outside the app (Documents/Audio Logs is suggested) they stay if the app is removed, and the transcripts sit beside their audio.</string>
     <string name="folder_not_now">Not now</string>
     <string name="folder_failed">Couldn\'t use that folder: %1$s</string>
     <!-- Settings › Models -->
@@ -474,4 +474,9 @@
     <string name="settings_recommended_get">Get the recommended models · %1$s</string>
     <string name="settings_recommended_use">Use the recommended models</string>
     <string name="settings_language_get">No model yet.</string>
+    <string name="recording_quiet_channel">Recording, quiet</string>
+    <string name="settings_quiet">Hide the recording notification</string>
+    <string name="settings_quiet_off">Off: the notification shows the clock, with Pause, Mark and Stop.</string>
+    <string name="settings_quiet_on">On: it shows only the app\'s name, makes no sound, stays off the lock screen and has no buttons. Android keeps one entry for an app that records; to remove it altogether, turn off the app\'s notifications.</string>
+    <string name="settings_quiet_system">Open the phone\'s notification settings</string>
 </resources>

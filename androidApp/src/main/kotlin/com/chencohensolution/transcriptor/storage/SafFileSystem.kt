@@ -29,7 +29,7 @@ val LIBRARY_ROOT = "/library".toPath()
  * folder are renames, between folders the provider's move. Document ids are cached by path.
  */
 class SafFileSystem(private val resolver: ContentResolver, private val tree: Uri) : FileSystem() {
-    // The picked tree itself, or a folder in it (a document URI under the tree: the Transcriptor folder made in it).
+    // The picked tree itself, or a folder in it (a document URI under the tree: the Audio Logs folder made in it).
     private val rootId = runCatching { DocumentsContract.getDocumentId(tree) }.getOrElse { DocumentsContract.getTreeDocumentId(tree) }
     private val ids = ConcurrentHashMap<Path, String>()
 
@@ -37,7 +37,7 @@ class SafFileSystem(private val resolver: ContentResolver, private val tree: Uri
         val isDirectory get() = mime == Document.MIME_TYPE_DIR
     }
 
-    /** The folder's name, as the user knows it ("Transcriptor"). */
+    /** The folder's name, as the user knows it ("Audio Logs"). */
     val name: String get() = doc(rootId)?.name ?: ""
 
     /** The document id of a file or folder in it, for a URI to it. */
