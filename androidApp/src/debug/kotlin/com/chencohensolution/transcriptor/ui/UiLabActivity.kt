@@ -65,7 +65,7 @@ class UiLabActivity : ComponentActivity() {
                         // The lab's own bar above the option: back to the options, and the one before and after, so
                         // options are compared without going through the list. The option's screen is drawn under
                         // it, and its own back arrow leaves the option too (LocalLabBack).
-                        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.inverseSurface)) {
+                        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                             LabBar(
                                 title = "${option.id} · ${at + 1}/${screen.options.size}",
                                 onList = leave,
@@ -107,15 +107,15 @@ class UiLabActivity : ComponentActivity() {
 internal val LocalLabBack = staticCompositionLocalOf<() -> Unit> { {} }
 
 /**
- * The bar over an open option, in the inverse colors so it never reads as part of the screen under it: the options
+ * The bar over an open option, on a darker surface than the screens use, so it reads as the lab's and the status bar's icons stay readable: the options
  * list, the option's id with its place among the screen's options, and the option before and after.
  */
 @Composable
 private fun LabBar(title: String, onList: () -> Unit, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?) {
-    val on = MaterialTheme.colorScheme.inverseOnSurface
+    val on = MaterialTheme.colorScheme.onSurface
     Row(Modifier.fillMaxWidth().statusBarsPadding().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "‹ Options", color = on, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            "‹ Options", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable(onClick = onList).padding(horizontal = 16.dp, vertical = 10.dp),
         )
         Text(title, color = on, fontSize = 13.sp, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
