@@ -84,9 +84,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Asks to show the moment recording now (a long press on the Quick Settings tile): counted, so each one shows it. */
+    private val showRecording = androidx.compose.runtime.mutableIntStateOf(0)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_SHOW_RECORDING, false)) showRecording.intValue++
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_SHOW_RECORDING, false)) showRecording.intValue++
         setContent {
             TranscriptorTheme {
               // Model names in the lecture's screen include those added from Hugging Face.
@@ -101,6 +110,7 @@ class MainActivity : ComponentActivity() {
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(showRecording.intValue) { if (showRecording.intValue > 0) { showLive = true; settings = false } }
                 // A new install opens on "Get your models" (FirstRun), until it is answered.
                 var firstRun by rememberSaveable { mutableStateOf<Boolean?>(null) }
                 LaunchedEffect(Unit) { if (firstRun == null) firstRun = withContext(Dispatchers.IO) { offerFirstRun() } }
@@ -330,6 +340,11 @@ class MainActivity : ComponentActivity() {
     private fun startLecture(labels: List<String>, language: String, mode: RecordMode) {
         val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
         RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title, mode)
+    }
+
+    companion object {
+        /** Opens on the moment recording now, if one is (else on the moments). */
+        const val EXTRA_SHOW_RECORDING = "showRecording"
     }
 }
 
