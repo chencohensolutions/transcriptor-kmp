@@ -80,3 +80,34 @@ internal fun civil(days: Long): Triple<Int, Int, Int> {
     val m = (if (mp < 10) mp + 3 else mp - 9).toInt()
     return Triple((yoe + era * 400 + if (m <= 2) 1 else 0).toInt(), m, d)
 }
+
+/**
+ * A moment as plain text, to paste into a message: its title, then each speaker's turn as "Name: what they said",
+ * with the notes in brackets after the turn they were written in ("[note 0:33] …", "[marked 0:40]").
+ */
+fun transcriptText(lecture: Lecture): String {
+    val speaker = SPEAKER[com.chencohensolution.transcriptor.models.Languages.normalize(lecture.language)] ?: "Speaker"
+    val names = lecture.speakers.mapIndexed { i, s -> s.id to s.name.ifBlank { "$speaker ${i + 1}" } }.toMap()
+    val out = StringBuilder(lecture.title.trim()).append("\n")
+    val turns = mutableListOf<MutableList<Segment>>()
+    for (line in lecture.segments.sortedBy { it.startMillis }) {
+        val last = turns.lastOrNull()
+        if (last != null && last.last().speakerId == line.speakerId) last.add(line) else turns.add(mutableListOf(line))
+    }
+    val notes = lecture.notes.sortedBy { it.atMillis }.toMutableList()
+    fun notesBefore(millis: Long) {
+        while (notes.isNotEmpty() && notes.first().atMillis < millis) {
+            val note = notes.removeAt(0)
+            out.append("\n[").append(if (note.text.isEmpty()) "marked ${clock(note.atMillis)}]" else "note ${clock(note.atMillis)}] ${note.text.trim()}").append("\n")
+        }
+    }
+    turns.forEachIndexed { i, turn ->
+        if (i == 0) notesBefore(turn.first().startMillis)
+        out.append("\n")
+        names[turn.first().speakerId]?.let { out.append(it).append(": ") }
+        out.append(turn.joinToString(" ") { it.text.trim() }).append("\n")
+        notesBefore(turns.getOrNull(i + 1)?.first()?.startMillis ?: Long.MAX_VALUE)
+    }
+    notesBefore(Long.MAX_VALUE)
+    return out.toString().trimEnd() + "\n"
+}

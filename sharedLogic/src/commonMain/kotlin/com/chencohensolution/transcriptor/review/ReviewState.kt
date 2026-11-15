@@ -49,6 +49,8 @@ data class ReviewState(
     val power: com.chencohensolution.transcriptor.recording.PowerReport? = null,
     /** The names of the voices the app knows, to offer when naming a speaker (those not in this moment yet first). */
     val knownNames: List<String> = emptyList(),
+    /** Playback keeps to this speaker's turns, skipping the others'; null: everyone. */
+    val onlySpeaker: String? = null,
 ) {
     /** The moment's speakers for "Who was here?", the one who talked most first. */
     val people: List<Person> get() = peopleOf(lecture)

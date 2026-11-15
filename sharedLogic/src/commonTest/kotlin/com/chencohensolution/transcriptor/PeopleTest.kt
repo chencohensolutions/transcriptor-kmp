@@ -8,6 +8,7 @@ import com.chencohensolution.transcriptor.notebook.VoiceStore
 import com.chencohensolution.transcriptor.review.AudioPlayer
 import com.chencohensolution.transcriptor.review.LectureReview
 import com.chencohensolution.transcriptor.review.mergingSpeakers
+import com.chencohensolution.transcriptor.review.onlyOf
 import com.chencohensolution.transcriptor.review.peopleOf
 import com.chencohensolution.transcriptor.speech.Voice
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,5 +137,42 @@ class PeopleTest {
         review.playPerson("speaker-3")
         assertEquals(30_000L, player.positionMillis.value)
         assertTrue(player.playing.value)
+    }
+
+    @Test
+    fun playingOnlyOneSpeakerSkipsTheOthersAndStopsAfterTheirLast() = runTest {
+        val review = review()
+        runCurrent()
+        // Maya-to-be (speaker-2) speaks at 0:20-0:30 and 0:49-1:15.
+        review.playOnly("speaker-2")
+        runCurrent()
+        assertEquals("speaker-2", review.state.value?.onlySpeaker)
+        assertEquals(20_000L, player.positionMillis.value)
+        assertTrue(player.playing.value)
+        // Inside their line it stays; past its end it jumps to their next.
+        player.positionMillis.value = 25_000; runCurrent()
+        assertEquals(25_000L, player.positionMillis.value)
+        player.positionMillis.value = 30_050; runCurrent()
+        assertEquals(49_000L, player.positionMillis.value)
+        // After their last line, it pauses.
+        player.positionMillis.value = 75_010; runCurrent()
+        assertFalse(player.playing.value)
+        // The same speaker again: everyone, and nothing is skipped.
+        review.playOnly("speaker-2")
+        player.play(); player.positionMillis.value = 30_050; runCurrent()
+        assertEquals(null, review.state.value?.onlySpeaker)
+        assertEquals(30_050L, player.positionMillis.value)
+        assertEquals(49_000L, dinner.onlyOf("speaker-2", 31_000))
+        assertEquals(null, dinner.onlyOf("speaker-3", 50_000))
+    }
+
+    @Test
+    fun theMomentAsTextToPaste() {
+        val text = com.chencohensolution.transcriptor.notebook.transcriptText(
+            dinner.copy(notes = listOf(com.chencohensolution.transcriptor.notebook.Note("n1", 21_000, "the boat"), com.chencohensolution.transcriptor.notebook.Note("n2", 50_000, ""))),
+        )
+        assertTrue(text.startsWith("Sat dinner\n\nHen: text s1\n\nSpeaker 2: text s2\n\n[note 0:21] the boat\n\nSpeaker 3: text s3"), text)
+        assertTrue("[marked 0:50]" in text, text)
+        assertTrue(text.trimEnd().endsWith("text s7"), text)
     }
 }

@@ -341,4 +341,9 @@
         <item quantity="one">%1$d line</item>
         <item quantity="other">%1$d lines</item>
     </plurals>
+    <string name="review_share">Share</string>
+    <string name="review_share_text">Share as text</string>
+    <string name="review_draft">Live draft. The better model hasn\'t written it yet.</string>
+    <string name="review_draft_improve">Improve</string>
+    <string name="review_draft_improve_minutes">Improve · about %1$d min</string>
 </resources>
