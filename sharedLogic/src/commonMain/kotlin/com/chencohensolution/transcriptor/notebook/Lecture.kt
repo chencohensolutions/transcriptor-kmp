@@ -21,6 +21,8 @@ data class LectureSummary(
     val refined: Boolean,
     val language: String = "en",
     val labels: List<String> = emptyList(),
+    /** Recorded without live transcription and not transcribed yet ([Lecture.pendingTranscript]). */
+    val pendingTranscript: Boolean = false,
 )
 
 /**
@@ -51,6 +53,12 @@ data class Lecture(
     val versions: List<VersionInfo> = emptyList(),
     /** Its labels' ids ([Label]), in the order they were given. */
     val labels: List<String> = emptyList(),
+    /**
+     * Recorded without live transcription ("After" on the Record bar, or no live model for its language) and not
+     * transcribed yet: it has its audio and notes, no lines. The transcribe pass
+     * ([com.chencohensolution.transcriptor.speech.lineTimes], then the improve model) clears it.
+     */
+    val pendingTranscript: Boolean = false,
 )
 
 /**

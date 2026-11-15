@@ -33,6 +33,8 @@ data class NotebooksState(
     val recording: RecordingNow? = null,
     /** Moments with a pass running on them (the speaker pass, refining, compressing to FLAC): their progress. */
     val working: Map<String, Float> = emptyMap(),
+    /** The Record bar's Live (true) or After, as the settings keep it ([com.chencohensolution.transcriptor.settings.SettingsStore.recordLive]). */
+    val recordLive: Boolean = false,
 )
 
 /**
@@ -64,7 +66,7 @@ private fun usualLanguage(moments: List<LectureSummary>): String? =
     moments.groupingBy { it.language }.eachCount().maxByOrNull { it.value }?.key
 
 /** A moment as a list shows it. */
-fun Lecture.summary() = LectureSummary(id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels)
+fun Lecture.summary() = LectureSummary(id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels, pendingTranscript)
 
 /** The names of [ids]' labels, in order, joined ("Psychology, Exam"); empty for none. */
 fun labelNames(ids: List<String>, labels: List<Label>): String = ids.mapNotNull { id -> labels.firstOrNull { it.id == id }?.name }.joinToString(", ")

@@ -102,6 +102,8 @@ private data class SettingsFileV1(
     val speakerPassOnStop: Boolean = false,
     /** A lecture is improved on its own after it stops (while charging). */
     val autoImprove: Boolean = false,
+    /** Moments are transcribed live while they record; off (the default): recorded only, transcribed after. */
+    val recordLive: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -159,6 +161,15 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var autoImprove: Boolean
         get() = read().autoImprove
         set(value) = write(read().copy(autoImprove = value))
+
+    /**
+     * The Record bar's Live or After: live transcription while a moment records, or (off, the default; owner's choice,
+     * Nov 15, 2026, to save the battery) the moment is only recorded and transcribed after it stops with its
+     * language's improve model: at once on the charger, else when the phone next charges or the user asks.
+     */
+    var recordLive: Boolean
+        get() = read().recordLive
+        set(value) = write(read().copy(recordLive = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]

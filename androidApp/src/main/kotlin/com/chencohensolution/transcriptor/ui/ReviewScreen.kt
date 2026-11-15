@@ -75,6 +75,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -181,6 +182,10 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
         text = { Text(stringResource(R.string.review_tune_none)) },
     )
     val turns = remember(state.lecture.segments) { turnsOf(state.lecture.segments) }
+    // Only recorded so far: no lines yet, a card says what it waits for.
+    val waiting = state.lecture.pendingTranscript && state.lecture.segments.isEmpty()
+    // The app's own text goes in the phone's direction, among the moment's content.
+    val appDirection = LocalLayoutDirection.current
 
     renaming?.let { s -> RenameSpeakerDialog(s, onDismiss = { renaming = null }) { actions.renameSpeaker(s.id, it); renaming = null } }
     moving?.let { line -> MoveLineDialog(line, state.lecture.speakers, onDismiss = { moving = null }) { actions.setLineSpeaker(line.id, it); moving = null } }
@@ -247,7 +252,9 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         }
                     }
                 }
-                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_improving, (it.progress * 100).toInt()), it.progress) }
+                (state.refine as? PassState.Running)?.let {
+                    Banner(stringResource(if (waiting) R.string.review_transcribing else R.string.review_improving, (it.progress * 100).toInt()), it.progress)
+                }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
                 state.power?.let { PowerLine(it) }
                 HorizontalDivider()
@@ -255,6 +262,11 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
         }
         CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
             LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.weight(1f)) {
+                if (waiting) {
+                    item(key = "waiting") { CompositionLocalProvider(LocalLayoutDirection provides appDirection) { NotTranscribedYet(state, actions) } }
+                    // Its notes, which have no lines to sit under yet.
+                    items(state.lecture.notes, key = { "note-${it.id}" }) { n -> NotePill(n, onTime = { actions.seek(n.atMillis) }, onHold = { note = n }) }
+                }
                 items(turns, key = { it.first().id }) { turn ->
                     val next = turns.getOrNull(turns.indexOf(turn) + 1)?.first()?.startMillis ?: Long.MAX_VALUE
                     val notes = state.lecture.notes.filter { n -> n.atMillis >= turn.first().startMillis && n.atMillis < next || (turn === turns.first() && n.atMillis < turn.first().startMillis) }
@@ -280,6 +292,41 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                             Icon(Icons.Filled.EditNote, stringResource(R.string.review_note_here, formatClock(state.positionMillis)))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A moment that was only recorded: what it waits for, and the way to transcribe it now with its language's improve
+ * model, or to get one.
+ */
+@Composable
+private fun NotTranscribedYet(state: ReviewState, actions: ReviewActions) {
+    val running = state.refine is PassState.Running
+    val model = state.refineModels.firstOrNull { it.id == state.improveDefault } ?: state.refineModels.firstOrNull()
+    val toGet = state.improveToGet
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(if (running) R.string.review_waiting_running_title else R.string.review_waiting_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                when {
+                    running -> stringResource(R.string.review_waiting_running)
+                    model != null -> stringResource(R.string.review_waiting_note)
+                    toGet != null -> stringResource(R.string.review_waiting_no_model)
+                    else -> stringResource(R.string.review_waiting_no_model_settings)
+                },
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!running && model != null) {
+                Button(onClick = { actions.improve(model.id, false) }) {
+                    Text(model.minutes?.let { stringResource(R.string.review_transcribe_now_minutes, it) } ?: stringResource(R.string.review_transcribe_now))
+                }
+                Text(isolated(model.name), style = MaterialTheme.typography.labelSmall, color = LocalTranscriptorColors.current.time)
+            } else if (!running && toGet != null) {
+                Button(onClick = { actions.getModel(toGet.id) }) {
+                    Text(stringResource(R.string.review_waiting_get, isolated(toGet.name), android.text.format.Formatter.formatShortFileSize(LocalContext.current, toGet.sizeBytes)))
                 }
             }
         }

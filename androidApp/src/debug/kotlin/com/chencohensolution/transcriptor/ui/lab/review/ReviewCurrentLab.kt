@@ -36,16 +36,24 @@ internal val reviewCurrentNoModel = LabOption("current-none", "The app's, nothin
     ReviewScreen(state, actions)
 }
 
+// Fakes: as `current`, for a moment that was only recorded (After on the Record bar): no lines until Transcribe now,
+// which takes six seconds and then shows the sample's lines; its notes are there from the start.
+internal val reviewCurrentWaiting = LabOption("current-waiting", "The app's, recorded and not transcribed yet", "A moment recorded with After: Transcribe now, then its lines") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, waiting = true)
+    ReviewScreen(state, actions)
+}
+
 /**
  * Fakes for the lab: playback (a clock that runs at the speed), the improve pass (six seconds, then the lines as the
  * large model wrote them, edited lines kept) and the speaker pass (four seconds, then the student's question split
  * off and named speakers kept); edits, notes and renames in memory.
  */
 @Composable
-private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, ReviewActions> {
+private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = false): Pair<ReviewState, ReviewActions> {
     val context = LocalContext.current
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
-    var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)) }
+    val recorded = LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)
+    var lecture by remember { mutableStateOf(if (waiting) recorded.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true) else recorded) }
     var position by remember { mutableStateOf(65_000L) }
     var playing by remember { mutableStateOf(false) }
     var speed by remember { mutableStateOf(1f) }
@@ -63,6 +71,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         if (refine !is PassState.Running) return@LaunchedEffect
         for (i in 1..60) { delay(100); refine = PassState.Running(i / 60f) }
         val large = LabData.refinedLecture.segments.associateBy { it.id }
+        if (lecture.pendingTranscript) lecture = lecture.copy(segments = recorded.segments, speakers = recorded.speakers, pendingTranscript = false)
         lecture = lecture.copy(segments = lecture.segments.map { s -> if (s.edited) s else s.copy(text = large[s.id]?.text ?: s.text, modelId = large[s.id]?.modelId ?: s.modelId) })
         refine = PassState.Done
     }

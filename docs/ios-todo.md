@@ -147,3 +147,14 @@ anything left to decide. Remove an entry once it is built.
   ADTS, the `AacEncode` for encoding afterwards, a BGProcessingTask with `requiresExternalPower` for "when charging"
   (Android's `EncodeJob`), and Settings' Recording format pages (`ui/RecordingFormat.kt`; strings `rec_format_*`).
   `PowerReport.audio` / `phase` and `power-encode.json` go with the power log above.
+
+## Record now, transcribe after (Nov 15, 2026)
+
+- Shared: `SettingsStore.recordLive`, `LectureSession.start(transcribeLive)`, `LiveLectureState.recordOnly`,
+  `Lecture.pendingTranscript`, `LectureSummary.pendingTranscript`, `NotebooksState.recordLive`, `lineTimes` and
+  `transcribed` (`speech/LineTimes.kt`).
+- Android to mirror: the Live/After chips on the Record bar (`NotebooksScreen.kt`), the status line
+  (`LectureScreen.kt`), the Not transcribed yet card (`NotTranscribedYet` in `ReviewScreen.kt`), and the pass itself
+  (`Recording.transcribe`, queued in `RecordingService`: at Stop on the charger, else when it charges).
+- Strings: `notebooks_record_*`, `notebooks_not_transcribed`, `lecture_record_only`, `transcribing`,
+  `review_transcribing`, `review_waiting_*`, `review_transcribe_now*`.

@@ -23,7 +23,6 @@
     <string name="flac_effort_note_live">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, ומעמיסה יותר על הטלפון בזמן ההקלטה (וגם על הסוללה).</string>
     <string name="start_lecture">התחלת רגע</string>
     <string name="start_last">הרגע האחרון: %1$s · %2$s · %3$d הערות · %4$s</string>
-    <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
     <string name="lecture_speakers_model">דוברים: %1$s · %2$s</string>
     <string name="lecture_speakers_live">דוברים: %1$s · %2$s, בזמן אמת</string>
@@ -86,7 +85,6 @@
     <string name="notebooks_record">הקלטה</string>
     <string name="notebooks_language_title">שפת הרגע</string>
     <string name="notebooks_suggested">מוצעת</string>
-    <string name="notebooks_usually">בדרך כלל %1$s ב%2$s</string>
     <string name="notebooks_slot">%1$s ב־%2$s</string>
     <string name="notebooks_all">הכול</string>
     <string name="notebooks_today">היום</string>
@@ -266,7 +264,6 @@
     <string name="notebooks_done">סיום</string>
     <string name="notebooks_labels_of">התוויות של %1$s</string>
     <string name="notebooks_labels_of_many">התוויות של %1$d רגעים</string>
-    <string name="notebooks_label_later">אפשר להוסיף תוויות אחר כך</string>
     <string name="notebooks_deleted_one">הרגע נמחק</string>
     <string name="notebooks_deleted_many">%1$d רגעים נמחקו</string>
     <string name="notebooks_undo">ביטול</string>
@@ -377,4 +374,21 @@
     <string name="rec_format_use">להשתמש בזה</string>
     <string name="rec_format_wav_short">בלי דחיסה: הכי גדול, בערך \u2066690 MB\u2069 לשעה, בלי שום קידוד.</string>
     <string name="rec_format_while_recording_short">בזמן ההקלטה</string>
+    <string name="lecture_record_only">מקליט בלבד. הרגע יתומלל אחרי העצירה.</string>
+    <string name="transcribing">מתמלל את הרגע…</string>
+    <string name="notebooks_record_live">חי</string>
+    <string name="notebooks_record_after">אחר כך</string>
+    <string name="notebooks_record_live_note">מתמלל תוך כדי דיבור</string>
+    <string name="notebooks_record_after_note">מקליט עכשיו, מתמלל אחר כך. חוסך סוללה.</string>
+    <string name="notebooks_not_transcribed">עדיין לא תומלל</string>
+    <string name="review_transcribing">מתמלל · %1$d%%</string>
+    <string name="review_waiting_title">עדיין לא תומלל</string>
+    <string name="review_waiting_running_title">מתמלל…</string>
+    <string name="review_waiting_running">השורות יופיעו כאן בסיום. אפשר להאזין בינתיים.</string>
+    <string name="review_waiting_note">הרגע הזה רק הוקלט. הוא יתומלל כשהטלפון בטעינה, או עכשיו.</string>
+    <string name="review_waiting_no_model">הרגע הזה רק הוקלט, ועדיין אין בטלפון מודל לשפה שלו.</string>
+    <string name="review_waiting_no_model_settings">הרגע הזה רק הוקלט, ועדיין אין בטלפון מודל לשפה שלו. אפשר להוריד אחד בהגדרות.</string>
+    <string name="review_transcribe_now">לתמלל עכשיו</string>
+    <string name="review_transcribe_now_minutes">לתמלל עכשיו · כ־%1$d דק׳</string>
+    <string name="review_waiting_get">להוריד את %1$s · %2$s</string>
 </resources>

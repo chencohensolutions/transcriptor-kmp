@@ -186,7 +186,7 @@ class MainActivity : ComponentActivity() {
                     else -> Notebooks(
                         recordingNow = state?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
                         working = working,
-                        onRecord = { labels, language -> startLecture(labels, language); showLive = true },
+                        onRecord = { labels, language, liveNow -> startLecture(labels, language, liveNow); showLive = true },
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
-        onRecord: (labels: List<String>, language: String) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
+        onRecord: (labels: List<String>, language: String, live: Boolean) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
         chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -219,18 +219,21 @@ class MainActivity : ComponentActivity() {
                 value = System.currentTimeMillis()
             }
         }
-        var recordIn by remember { mutableStateOf<Pair<List<String>, String>?>(null) }
+        var recordIn by remember { mutableStateOf<Triple<List<String>, String, Boolean>?>(null) }
         val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            val (labels, language) = recordIn ?: return@rememberLauncherForActivityResult
-            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language)
+            val (labels, language, liveNow) = recordIn ?: return@rememberLauncherForActivityResult
+            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language, liveNow)
         }
+        // The Record bar's Live or After, as last picked (After until then).
+        val recordLive = remember { Recording.settings.recordLive }
         val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordLive = recordLive),
             NotebooksActions(
                 openLecture = ::openLecture,
-                record = { labels, language ->
-                    recordIn = labels to language
+                setRecordLive = { liveNow -> io { Recording.settings.recordLive = liveNow } },
+                record = { labels, language, liveNow ->
+                    recordIn = Triple(labels, language, liveNow)
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
                 },
                 backToRecording = onBackToRecording,
@@ -272,9 +275,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
-    private fun startLecture(labels: List<String>, language: String) {
+    private fun startLecture(labels: List<String>, language: String, live: Boolean) {
         val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
-        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title)
+        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title, live)
     }
 }
 
