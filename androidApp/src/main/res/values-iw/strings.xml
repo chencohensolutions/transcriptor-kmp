@@ -53,7 +53,7 @@
     <string name="start_speakers_note">כל שורה מקבלת את הדובר שהקול שלו הכי קרוב, כבר במהלך הרגע; אחריו, מעבר נוסף מוצא מי דיבר מתי, גם כשמדברים יחד, ומתקן את השורות. נותנים שם לדובר פעם אחת, והמחברת תזהה אותו ברגעים הבאים.</string>
     <string name="speaker_n">דובר %1$d</string>
     <string name="speaker_rename_title">שם עבור %1$s</string>
-    <string name="speaker_rename_note">המחברת תזהה את הקול הזה ברגעים הבאים שלה.</string>
+    <string name="speaker_rename_note">השם הוא לרגע הזה. הוא יוצע שוב כשנותנים שמות לדוברים ברגעים אחרים.</string>
     <string name="speaker_rename_hint">דנה</string>
     <string name="speaker_rename_save">שמירה</string>
     <string name="speaker_rename_cancel">ביטול</string>
@@ -210,7 +210,7 @@
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
     <string name="settings_recognition">זיהוי דוברים</string>
-    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, והרגעים הבאים במחברת יכירו אותו.</string>
+    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. כל רגע מתחיל עם דוברים בלי שם: קולות לא מנוחשים מרגעים אחרים.</string>
     <string name="settings_voice_model">מודל הקולות</string>
     <string name="settings_turns">חילופי דוברים</string>
     <string name="settings_turns_note">מוצא איפה דובר אחד מסיים והבא מתחיל, תוך כדי הקלטה.</string>

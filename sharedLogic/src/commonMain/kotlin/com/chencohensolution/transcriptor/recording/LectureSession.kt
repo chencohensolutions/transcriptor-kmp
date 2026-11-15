@@ -66,7 +66,7 @@ class LectureSession(
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    /** The app's known voices: speakers the user named, labeled by name in later moments. */
+    /** The app's voices: the speakers the user named are saved here. They are not used to name speakers in later moments. */
     private val voices: VoiceStore? = null,
     /** The speaker pass's models are on the phone (it can run after Stop). */
     private val speakerPassReady: () -> Boolean = { false },
@@ -127,7 +127,10 @@ class LectureSession(
         store.save(lecture)
         names = emptyMap()
         edits = emptyMap()
-        liveModel = live(language, scope, voices?.load().orEmpty())?.also { model ->
+        // Every moment starts with unnamed speakers: a voice named in another moment isn't guessed here (owner's
+        // decision, Nov 15, 2026: matching voices between moments wasn't accurate enough). The names are still kept
+        // ([VoiceStore]), to be offered when the user names a speaker.
+        liveModel = live(language, scope, emptyList())?.also { model ->
             val live = model.liveSpeakers
             recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {

@@ -87,7 +87,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
   two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
 - Names: tapping a speaker's chip names them; the name and their average print go to the app's
-  `voices.json` (`VoiceStore`), and its next moments start with those voices, labeled by name from their first line.
+  `voices.json` (`VoiceStore`). **Speakers are not guessed between moments** (owner's decision, Nov 15, 2026: it
+  wasn't accurate enough): every moment starts with unnamed speakers, live and in the speaker pass (which knows only
+  the voices named in that same moment, so running it again keeps their names). The saved names are only offered when the user names a speaker.
 - **After the moment, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
   runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
   when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python

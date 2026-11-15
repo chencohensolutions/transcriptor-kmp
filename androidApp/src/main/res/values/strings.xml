@@ -50,10 +50,10 @@
     <string name="model_delete">Delete</string>
     <string name="model_in_use">Used for live transcription</string>
     <string name="start_speakers">Speaker labels</string>
-    <string name="start_speakers_note">Each line gets the speaker whose voice is closest, during the moment; after it, a speaker pass finds who spoke when, overlaps included, and fixes the lines. Name a speaker once and the notebook\'s next moments know them.</string>
+    <string name="start_speakers_note">Each line gets the speaker whose voice is closest, during the moment; after it, a speaker pass finds who spoke when, overlaps included, and fixes the lines. Each moment starts with unnamed speakers: voices aren\'t guessed from other moments.</string>
     <string name="speaker_n">Speaker %1$d</string>
     <string name="speaker_rename_title">Name %1$s</string>
-    <string name="speaker_rename_note">The notebook will recognize this voice in its next moments.</string>
+    <string name="speaker_rename_note">The name is for this moment. It is offered again when you name speakers in other moments.</string>
     <string name="speaker_rename_hint">Dana</string>
     <string name="speaker_rename_save">Save</string>
     <string name="speaker_rename_cancel">Cancel</string>
