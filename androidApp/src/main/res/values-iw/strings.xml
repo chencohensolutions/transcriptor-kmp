@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Audio Logs</string>
+    <string name="app_name">יומן קול</string>
     <string name="lecture_back">חזרה</string>
     <string name="lecture_pause">השהיה</string>
     <string name="lecture_resume">המשך</string>
@@ -463,7 +463,7 @@
     <string name="settings_meters_section">בזמן הקלטה</string>
     <!-- First run: "Get your models" -->
     <string name="first_run_title">הורדת המודלים</string>
-    <string name="first_run_body">Audio Logs מתמלל בטלפון, בלי לשלוח דבר לשום מקום. אלה המודלים שהוא משתמש בהם ל%1$s. הם יורדים ב־Wi-Fi.</string>
+    <string name="first_run_body">יומן קול מתמלל בטלפון, בלי לשלוח דבר לשום מקום. אלה המודלים שהוא משתמש בהם ל%1$s. הם יורדים ב־Wi-Fi.</string>
     <string name="first_run_live">תמלול חי</string>
     <string name="first_run_improve">שיפור אחרי ההקלטה</string>
     <string name="first_run_voices">הבחנה בין קולות</string>
