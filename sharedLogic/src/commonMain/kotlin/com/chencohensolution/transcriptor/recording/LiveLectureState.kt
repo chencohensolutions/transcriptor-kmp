@@ -42,6 +42,8 @@ data class LiveLectureState(
      * ([Lecture.pendingTranscript]); "After" was picked, or no live model is downloaded for its language.
      */
     val recordOnly: Boolean = false,
+    /** With [recordOnly]: false when "Only record" was picked, so the moment waits for "Transcribe now" instead. */
+    val transcribeAfter: Boolean = true,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
     val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     /** How hard the processors are working (refreshed about every second); null until the first reading. */

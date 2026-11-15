@@ -31,8 +31,9 @@ The code still calls it `NotebooksScreen`.
   later"). Tapping them (or +) opens a menu of checkboxes, the guessed ones first, and New label. The language chip:
   the guessed label's usual language, else the last moment's. Record asks for the microphone, then records titled
   with the date.
-- Under the chips, **Live** or **After** (After by default, kept in the settings): Live transcribes as the moment
-  records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026)).
+- Under the chips, **Live**, **After** or **Only record** (kept in the settings, `SettingsStore.recordMode`): Live
+  transcribes as the moment records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026));
+  Only record (owner's request, Nov 15, 2026) records it and transcribes nothing until "Transcribe now" on the moment.
   One line beside them says which. (The "Usually … on Monday" line is gone: the guessed labels keep their ✦.)
   A moment waiting for its transcript says **Not transcribed yet** in the list.
 - While a moment records, a red banner replaces the bar: its clock and labels, and **Back to it**. That moment is not
@@ -53,7 +54,7 @@ here or in the moments folder. A moment a pass is working on can't be selected, 
 skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`).
 
 **Quick Settings tile** (Nov 15, 2026): "Record" in the notification shade's quick controls (added from the shade's
-edit list). A tap records a moment as the Record bar would now: the guessed labels and language, Live or After as last
+edit list). A tap records a moment as the Record bar would now: the guessed labels and language, Live, After or Only record as last
 picked, and the recording format and hide-notification settings. It records in the background: nothing opens and
 the shade stays (while System UI is bound to the tile the app shares its microphone access; if Android refuses anyway,
 an invisible activity starts it from the foreground). On a locked phone it asks to unlock

@@ -116,6 +116,8 @@ private data class SettingsFileV1(
     val autoImprove: Boolean = false,
     /** Moments are transcribed live while they record; off (the default): recorded only, transcribed after. */
     val recordLive: Boolean = true,
+    /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
+    val recordOnly: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
     val quietRecording: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
@@ -186,6 +188,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var recordLive: Boolean
         get() = read().recordLive
         set(value) = write(read().copy(recordLive = value))
+
+    /** The Record bar's choice, also what the Quick Settings tile records with: Live, After or Only record. */
+    var recordMode: RecordMode
+        get() = read().let { if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
+        set(value) = write(read().copy(recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
 
     /**
      * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
@@ -308,4 +315,13 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         fileSystem.write(temp) { writeUtf8(json.encodeToString(settings)) }
         fileSystem.atomicMove(temp, file)
     }
+}
+
+/** How a moment records: transcribed as it records, after it stops, or not at all until the user asks. */
+enum class RecordMode {
+    Live,
+    /** Recorded, then transcribed with the improve model: at once on the charger, else when the phone next charges. */
+    After,
+    /** Recorded only: it waits for "Transcribe now" on the moment. */
+    Only,
 }

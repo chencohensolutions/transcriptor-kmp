@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.recording.ImproveAfterStop
+import com.chencohensolution.transcriptor.settings.RecordMode
 import com.chencohensolution.transcriptor.speech.RefinePass
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,9 @@ class RecordingService : Service() {
 
     /** Settings › Recordings › Hide the recording notification, read when a recording starts. */
     private var quiet = false
+
+    /** Only record: the moment recording now isn't transcribed after it stops; it waits for "Transcribe now". */
+    private var onlyRecord = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -59,6 +63,8 @@ class RecordingService : Service() {
         when (intent?.action) {
             ACTION_START -> if (!session.isRecording) {
                 quiet = Recording.settings.quietRecording
+                val mode = RecordMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: RecordMode.Live.name)
+                onlyRecord = mode == RecordMode.Only
                 try {
                     startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 } catch (e: RuntimeException) {
@@ -77,7 +83,7 @@ class RecordingService : Service() {
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
-                    transcribeLive = intent.getBooleanExtra(EXTRA_LIVE, true),
+                    transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord,
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()
@@ -88,6 +94,8 @@ class RecordingService : Service() {
                 // Returns once live transcription has finished the last lines (and closed the live model).
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
                 val model = lecture?.let { Recording.improveModelFor(it.language) }
+                // Only record: nothing runs on it but the encoding; "Transcribe now" on the moment when wanted.
+                if (onlyRecord && lecture != null && lecture.pendingTranscript) { if (!improveNextPending()) compressPending(); return@launch }
                 val after = ImproveAfterStop.of(lecture?.segments?.isNotEmpty() == true, model != null, skipped, Recording.settings.autoImprove, charging())
                 if (lecture != null && after == ImproveAfterStop.WhenCharging) Recording.settings.addImprovePending(lecture.id)
                 val then = model?.takeIf { after == ImproveAfterStop.Now }?.let { m -> { done: Lecture -> refine(done, m.id) } }
@@ -337,7 +345,7 @@ class RecordingService : Service() {
         private const val EXTRA_LABEL_NAMES = "labelNames"
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
-        private const val EXTRA_LIVE = "live"
+        private const val EXTRA_MODE = "mode"
         private const val EXTRA_FROM_TILE = "fromTile"
         private const val EXTRA_LECTURE = "lecture"
         private const val EXTRA_MODEL = "model"
@@ -346,12 +354,12 @@ class RecordingService : Service() {
 
         /**
          * Records a moment with these [labels] (ids; [labelNames] for its screen) in [language], transcribed as it
-         * records when [live], else after it stops. [fromTile]: from the Quick Settings tile, in the background.
+         * records, after it stops, or not until asked ([mode]). [fromTile]: from the Quick Settings tile, in the background.
          */
-        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String, live: Boolean, fromTile: Boolean = false) = context.startForegroundService(
+        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String, mode: RecordMode, fromTile: Boolean = false) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
                 .putExtra(EXTRA_LABELS, labels.toTypedArray()).putExtra(EXTRA_LABEL_NAMES, labelNames)
-                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_LIVE, live)
+                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_MODE, mode.name)
                 .putExtra(EXTRA_FROM_TILE, fromTile),
         )
 

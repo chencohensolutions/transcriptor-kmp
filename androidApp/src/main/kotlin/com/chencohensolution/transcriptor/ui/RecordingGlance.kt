@@ -95,6 +95,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                         when {
                             state.finishing -> R.string.lecture_finishing
                             state.paused -> R.string.lecture_paused
+                            state.recordOnly && !state.transcribeAfter -> R.string.glance_recording_no_transcript
                             state.recordOnly -> R.string.glance_recording_only
                             else -> R.string.glance_recording_live
                         },

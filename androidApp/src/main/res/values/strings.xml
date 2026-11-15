@@ -481,4 +481,8 @@
     <string name="settings_quiet_system">Open the phone\'s notification settings</string>
     <string name="tile_stop_again">Tap again to stop</string>
     <string name="tile_finishing">Finishing…</string>
+    <string name="notebooks_record_only">Only record</string>
+    <string name="notebooks_record_only_note">Records only. Transcribe it from the moment when you want.</string>
+    <string name="glance_recording_no_transcript">Recording · not transcribed</string>
+    <string name="lecture_record_no_transcript">Recording only. Tap Transcribe now on the moment when you want its transcript.</string>
 </resources>

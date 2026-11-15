@@ -14,6 +14,7 @@ import com.chencohensolution.transcriptor.notebook.Library
 import com.chencohensolution.transcriptor.notebook.labelNames
 import com.chencohensolution.transcriptor.notebook.notebooksState
 import com.chencohensolution.transcriptor.recording.LiveLectureState
+import com.chencohensolution.transcriptor.settings.RecordMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -120,10 +121,10 @@ class RecordTileService : TileService() {
     }
 }
 
-/** The moment the Record bar would start now: its guessed labels and language, its Live or After. */
-class NextMoment(val labels: List<String>, val labelNames: String, val language: String, val live: Boolean) {
+/** The moment the Record bar would start now: its guessed labels and language, its Live, After or Only record. */
+class NextMoment(val labels: List<String>, val labelNames: String, val language: String, val mode: RecordMode) {
     fun start(context: android.content.Context, fromTile: Boolean = false) = RecordingService.start(
-        context, labels, labelNames, language, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date()), live, fromTile,
+        context, labels, labelNames, language, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date()), mode, fromTile,
     )
 }
 
@@ -134,7 +135,7 @@ fun nextFromRecordBar(): NextMoment {
     val library = Recording.library.library.value
     val next = notebooksState(library, System.currentTimeMillis(), Recording.utcOffset)
     val labels = next.guess?.labels.orEmpty().filter { id -> library.labels.any { it.id == id } }
-    return NextMoment(labels, labelNames(labels, library.labels), next.language, Recording.settings.recordLive)
+    return NextMoment(labels, labelNames(labels, library.labels), next.language, Recording.settings.recordMode)
 }
 
 /**

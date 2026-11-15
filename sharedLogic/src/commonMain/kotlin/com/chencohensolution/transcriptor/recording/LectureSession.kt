@@ -84,6 +84,7 @@ class LectureSession(
         val lecture: Lecture,
         val paused: Boolean,
         val finishing: Boolean = false,
+        val transcribeAfter: Boolean = true,
     )
 
     private val recording = MutableStateFlow<Recording?>(null)
@@ -109,7 +110,7 @@ class LectureSession(
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
                     improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
-                    recordOnly = liveModel == null,
+                    recordOnly = liveModel == null, transcribeAfter = it.transcribeAfter,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -118,9 +119,13 @@ class LectureSession(
 
     /**
      * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or
-     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after.
+     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after,
+     * unless not [transcribeAfter] ("Only record": the platform leaves it for the user's "Transcribe now").
      */
-    fun start(labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true): Lecture {
+    fun start(
+        labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true,
+        transcribeAfter: Boolean = true,
+    ): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         val format = settings.audioFormat
@@ -168,7 +173,7 @@ class LectureSession(
             settings.flacLevel,
             settings.aac,
         )
-        recording.value = Recording(labelNames, lecture, paused = false)
+        recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter)
         saving = scope.launch {
             while (isActive) {
                 delay(SAVE_EVERY_MILLIS)

@@ -264,6 +264,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                         val error = state.liveError
                         val status = when {
                             state.finishing -> stringResource(R.string.lecture_finishing)
+                            state.recordOnly && !state.transcribeAfter -> stringResource(R.string.lecture_record_no_transcript)
                             state.recordOnly || model == null -> stringResource(R.string.lecture_record_only)
                             error != null -> stringResource(R.string.lecture_live_failed, error)
                             state.liveLoading -> stringResource(R.string.lecture_live_loading, model)

@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.settings.allows
+import com.chencohensolution.transcriptor.settings.RecordMode
 import android.content.ClipData
 import java.io.File
 import androidx.core.content.FileProvider
@@ -226,7 +227,7 @@ class MainActivity : ComponentActivity() {
                     else -> Notebooks(
                         recordingNow = state?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
                         working = working,
-                        onRecord = { labels, language, liveNow -> startLecture(labels, language, liveNow); showLive = true },
+                        onRecord = { labels, language, mode -> startLecture(labels, language, mode); showLive = true },
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
@@ -240,7 +241,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
-        onRecord: (labels: List<String>, language: String, live: Boolean) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
+        onRecord: (labels: List<String>, language: String, mode: RecordMode) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
         chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -259,23 +260,23 @@ class MainActivity : ComponentActivity() {
                 value = System.currentTimeMillis()
             }
         }
-        var recordIn by remember { mutableStateOf<Triple<List<String>, String, Boolean>?>(null) }
+        var recordIn by remember { mutableStateOf<Triple<List<String>, String, RecordMode>?>(null) }
         val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            val (labels, language, liveNow) = recordIn ?: return@rememberLauncherForActivityResult
-            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language, liveNow)
+            val (labels, language, mode) = recordIn ?: return@rememberLauncherForActivityResult
+            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language, mode)
         }
-        // The Record bar's Live or After, as last picked (After until then).
-        val recordLive = remember { Recording.settings.recordLive }
+        // The Record bar's Live, After or Only record, as last picked.
+        val recordMode = remember { Recording.settings.recordMode }
         val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordLive = recordLive),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode),
             NotebooksActions(
                 openLecture = ::openLecture,
-                setRecordLive = { liveNow -> io { Recording.settings.recordLive = liveNow } },
+                setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
                 openLectureAt = { id, at -> openLecture(id, at) },
                 search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
-                record = { labels, language, liveNow ->
-                    recordIn = Triple(labels, language, liveNow)
+                record = { labels, language, mode ->
+                    recordIn = Triple(labels, language, mode)
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
                 },
                 backToRecording = onBackToRecording,
@@ -317,9 +318,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
-    private fun startLecture(labels: List<String>, language: String, live: Boolean) {
+    private fun startLecture(labels: List<String>, language: String, mode: RecordMode) {
         val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
-        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title, live)
+        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title, mode)
     }
 }
 
