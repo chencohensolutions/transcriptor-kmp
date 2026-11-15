@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -213,11 +214,12 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                             stringResource(if (state.paused) R.string.lecture_resume else R.string.lecture_pause),
                         )
                     }
+                    val stop = rememberArmedStop(actions.stop)
                     FilledIconButton(
-                        onClick = actions.stop,
+                        onClick = stop.tap,
                         enabled = !state.finishing,
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.recording, contentColor = Color.White),
-                    ) { Icon(Icons.Filled.Stop, stringResource(R.string.lecture_stop)) }
+                    ) { Icon(if (stop.armed) Icons.Filled.Check else Icons.Filled.Stop, stringResource(if (stop.armed) R.string.lecture_stop_again else R.string.lecture_stop)) }
                 }
                 HorizontalDivider()
                 val meters = state.meters

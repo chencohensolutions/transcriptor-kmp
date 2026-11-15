@@ -103,7 +103,7 @@
     <string name="notebooks_recording">מקליט · %1$s</string>
     <string name="notebooks_back_to_lecture">חזרה לרגע</string>
     <string name="notebooks_empty_title">הקלטת רגע</string>
-    <string name="notebooks_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (קורס, אדם, פרויקט) כדי למצוא אותו אחר כך.</string>
+    <string name="notebooks_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (אדם, מקום, פרויקט) כדי למצוא אותו אחר כך.</string>
     <string name="notebooks_new_name">שם</string>
     <string name="notebooks_new_name_hint">מבוא לפסיכולוגיה</string>
     <string name="notebooks_create">יצירה</string>
@@ -208,7 +208,7 @@
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
     <string name="settings_recognition">זיהוי דוברים</string>
-    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, והרגעים הבאים במחברת יכירו אותו.</string>
+    <string name="settings_recognition_note">מבחין בין הקולות: כל שורה מקבלת את הדובר שהקול שלו הכי קרוב. מספיק לתת שם לדובר פעם אחת, והרגעים הבאים יכירו אותו.</string>
     <string name="settings_voice_model">מודל הקולות</string>
     <string name="settings_turns">חילופי דוברים</string>
     <string name="settings_turns_note">מוצא איפה דובר אחד מסיים והבא מתחיל, תוך כדי הקלטה.</string>
@@ -359,4 +359,5 @@
         <item quantity="two">%1$d סימונים והערות</item>
         <item quantity="other">%1$d סימונים והערות</item>
     </plurals>
+    <string name="lecture_stop_again">הקשה נוספת על סיום תסיים את הרגע</string>
 </resources>

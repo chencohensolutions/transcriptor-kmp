@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,3 +48,23 @@ fun LevelBars(level: Float, modifier: Modifier = Modifier, height: Int = 18) {
         }
     }
 }
+
+/**
+ * Stop in two taps, so a slip of the finger doesn't end a long recording: the first tap arms it ([armed], for
+ * [STOP_ARMED_MILLIS]: the button shows a check and the screen says to tap again), the second calls [stop].
+ */
+class ArmedStop(val armed: Boolean, val tap: () -> Unit)
+
+@Composable
+fun rememberArmedStop(stop: () -> Unit): ArmedStop {
+    var armed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(armed) {
+        if (armed) {
+            kotlinx.coroutines.delay(STOP_ARMED_MILLIS)
+            armed = false
+        }
+    }
+    return ArmedStop(armed) { if (armed) { armed = false; stop() } else armed = true }
+}
+
+private const val STOP_ARMED_MILLIS = 3_000L
