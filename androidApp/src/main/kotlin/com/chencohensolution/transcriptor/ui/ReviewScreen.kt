@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -457,12 +458,13 @@ private fun NotePill(note: Note, onTime: () -> Unit, onHold: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Icon(Icons.Filled.EditNote, null, tint = colors.onNote, modifier = Modifier.size(16.dp))
+        // A mark (a note without words) shows its flag; holding it gives it words.
+        Icon(if (note.isMark) Icons.Filled.Flag else Icons.Filled.EditNote, null, tint = colors.onNote, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
         Text(formatClock(note.atMillis), style = MaterialTheme.typography.labelSmall, color = colors.onNote, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable(onClick = onTime))
         Spacer(Modifier.width(6.dp))
-        Text(note.text, style = MaterialTheme.typography.bodySmall, color = colors.onNote, maxLines = if (open) 10 else 1, overflow = TextOverflow.Ellipsis)
+        Text(note.text.ifEmpty { stringResource(R.string.note_mark) }, style = MaterialTheme.typography.bodySmall, color = colors.onNote, maxLines = if (open) 10 else 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

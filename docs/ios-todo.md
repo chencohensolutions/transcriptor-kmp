@@ -151,3 +151,10 @@ anything left to decide. Remove an entry once it is built.
   (`Recording.transcribe`, queued in `RecordingService`: at Stop on the charger, else when it charges).
 - Strings: `notebooks_record_*`, `notebooks_not_transcribed`, `lecture_record_only`, `transcribing`,
   `review_transcribing`, `review_waiting_*`, `review_transcribe_now*`.
+
+## Recording at a glance, and Mark (Nov 15, 2026)
+
+- Shared: `LectureSession.mark`, `Note.isMark` (exports show a mark as ⚑ and its time).
+- Android to mirror: `ui/RecordingGlance.kt`, `LectureScreen(startInTranscript)`, the flag on `NotePill`
+  (`ReviewScreen.kt`), the notification's Mark action (`RecordingService`).
+- Strings: `glance_*` (plurals `glance_people`, `glance_notes`), `note_mark`.

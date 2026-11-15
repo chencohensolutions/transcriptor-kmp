@@ -339,4 +339,22 @@
     <string name="review_transcribe_now">Transcribe now</string>
     <string name="review_transcribe_now_minutes">Transcribe now · about %1$d min</string>
     <string name="review_waiting_get">Get %1$s · %2$s</string>
+    <string name="glance_recording_live">Recording · transcribing as you talk</string>
+    <string name="glance_recording_only">Recording · transcribed after you stop</string>
+    <string name="glance_live_stopped">Live transcription stopped. The recording goes on and is transcribed after.</string>
+    <string name="glance_model_skipped">%1$s didn\'t fit in the free memory now.</string>
+    <string name="glance_mark">Mark</string>
+    <string name="glance_mark_hint">Mark flags this second, to find it later.</string>
+    <string name="glance_marked">Marked at %1$s</string>
+    <string name="glance_open_transcript">Show the transcript</string>
+    <string name="glance_open_notes">Write a note</string>
+    <string name="note_mark">Marked</string>
+    <plurals name="glance_people">
+        <item quantity="one">%1$d voice so far</item>
+        <item quantity="other">%1$d voices so far</item>
+    </plurals>
+    <plurals name="glance_notes">
+        <item quantity="one">%1$d mark or note</item>
+        <item quantity="other">%1$d marks and notes</item>
+    </plurals>
 </resources>

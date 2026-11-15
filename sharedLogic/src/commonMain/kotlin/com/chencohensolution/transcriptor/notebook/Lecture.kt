@@ -119,7 +119,10 @@ data class Note(
     val id: String,
     val atMillis: Long,
     val text: String,
-)
+) {
+    /** A mark: a place flagged with one tap while recording, with no words (yet; editing it gives it some). */
+    val isMark: Boolean get() = text.isEmpty()
+}
 
 /** A voice the refine pass told apart ("Speaker 1"), renamed by the user ("Lecturer"). */
 data class Speaker(

@@ -339,4 +339,24 @@
     <string name="review_transcribe_now">לתמלל עכשיו</string>
     <string name="review_transcribe_now_minutes">לתמלל עכשיו · כ־%1$d דק׳</string>
     <string name="review_waiting_get">להוריד את %1$s · %2$s</string>
+    <string name="glance_recording_live">מקליט · מתמלל תוך כדי דיבור</string>
+    <string name="glance_recording_only">מקליט · יתומלל אחרי העצירה</string>
+    <string name="glance_live_stopped">התמלול החי נעצר. ההקלטה ממשיכה ותתומלל אחר כך.</string>
+    <string name="glance_model_skipped">%1$s לא נכנס לזיכרון הפנוי כרגע.</string>
+    <string name="glance_mark">סימון</string>
+    <string name="glance_mark_hint">סימון מדגיש את השנייה הזו, כדי למצוא אותה אחר כך.</string>
+    <string name="glance_marked">סומן ב־%1$s</string>
+    <string name="glance_open_transcript">להציג את התמלול</string>
+    <string name="glance_open_notes">לכתוב הערה</string>
+    <string name="note_mark">סומן</string>
+    <plurals name="glance_people">
+        <item quantity="one">קול אחד עד כה</item>
+        <item quantity="two">%1$d קולות עד כה</item>
+        <item quantity="other">%1$d קולות עד כה</item>
+    </plurals>
+    <plurals name="glance_notes">
+        <item quantity="one">סימון או הערה אחת</item>
+        <item quantity="two">%1$d סימונים והערות</item>
+        <item quantity="other">%1$d סימונים והערות</item>
+    </plurals>
 </resources>

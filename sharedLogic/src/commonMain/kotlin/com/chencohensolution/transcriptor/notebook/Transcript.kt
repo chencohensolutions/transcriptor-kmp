@@ -22,7 +22,8 @@ fun transcriptMarkdown(lecture: Lecture, utcOffsetMillis: Long = 0): String {
     fun notesBefore(millis: Long) {
         while (notes.isNotEmpty() && notes.first().atMillis < millis) {
             val note = notes.removeAt(0)
-            out.append("\n> 📝 ").append(clock(note.atMillis)).append(" — ").append(escape(note.text).replace("\n", "\n> ")).append("\n")
+            if (note.isMark) out.append("\n> ⚑ ").append(clock(note.atMillis)).append("\n")
+            else out.append("\n> 📝 ").append(clock(note.atMillis)).append(" — ").append(escape(note.text).replace("\n", "\n> ")).append("\n")
         }
     }
     turns.forEachIndexed { i, turn ->

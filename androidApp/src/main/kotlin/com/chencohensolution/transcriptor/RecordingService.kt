@@ -56,6 +56,7 @@ class RecordingService : Service() {
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()
+            ACTION_MARK -> session.mark()
             ACTION_STOP -> scope.launch {
                 // The live model chosen didn't fit in the free memory at the start: improved with it once this one is unloaded.
                 val skipped = session.state.value?.skippedForMemory != null
@@ -271,6 +272,7 @@ class RecordingService : Service() {
             .setShowWhen(!paused)
             .setUsesChronometer(!paused)
             .setWhen(System.currentTimeMillis() - elapsed)
+            .apply { if (!paused) addAction(action(ACTION_MARK, R.string.glance_mark)) }
             .addAction(action(ACTION_PAUSE, if (paused) R.string.lecture_resume else R.string.lecture_pause))
             .addAction(action(ACTION_STOP, R.string.lecture_stop))
             .build()
@@ -300,6 +302,7 @@ class RecordingService : Service() {
         private const val ID = 1
         private const val ACTION_START = "start"
         private const val ACTION_PAUSE = "pause"
+        private const val ACTION_MARK = "mark"
         private const val ACTION_STOP = "stop"
         private const val ACTION_COMPRESS = "compress"
         private const val ACTION_SPEAKERS = "speakers"

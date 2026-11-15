@@ -7,6 +7,19 @@ Android, in the app: recording, live lines and notes. iOS after Android is finis
 Recording a class: the live transcript grows as the lecturer speaks, and the user writes notes without stopping the
 recording or the transcription.
 
+## At a glance (Nov 15, 2026)
+
+The screen opens at a glance (`RecordingGlance.kt`), for a phone lying on the table in a conversation: the title, a
+large clock, "Recording · transcribing as you talk" or "· transcribed after you stop", the microphone's level, and when
+transcribing live a card with who is talking, how many voices so far and their last words (tapping it opens the
+transcript). The model lines aren't here; only a problem is said (live transcription stopped, a model that didn't fit).
+
+- **Mark**, the large button between Pause and Stop, flags this second with one tap: a note without words
+  (`LectureSession.mark`, `Note.isMark`). "Marked at 12:20" shows for a moment. On the moment after, a mark is a pill
+  with a flag and its time; holding it gives it words. The recording's notification has Mark too.
+- **Show the transcript** (or **Write a note** when only recording) opens the timeline below; Back returns to the
+  glance.
+
 ## What it shows
 
 - The moment's title and its labels, the elapsed time, a red dot that breathes while recording, the microphone's
@@ -112,7 +125,7 @@ starts afresh. Amber from 70%, red from 90%.
   `MeterProbeReceiver` reads the real files as an ordinary app (`adb shell am broadcast -n
   com.chencohensolution.transcriptor.uilab/com.chencohensolution.transcriptor.ui.MeterProbeReceiver`, then
   `adb logcat -s MeterProbe`).
-- Lab: `lecture current-record-only` (recording only), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
+- Lab: `lecture current-glance` (as it opens), `lecture current-record-only` (recording only), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
   screen with a faked recording and live transcription that keeps making lines (`LectureGrowingLab.kt`;
   `./scripts/ui-lab.sh lecture current`).
 
