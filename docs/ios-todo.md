@@ -140,3 +140,10 @@ anything left to decide. Remove an entry once it is built.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
   iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.
+- Recording format (Nov 15, 2026): `AudioFormat.AacLive` and `WavThenAac`, `AacSettings` (`SettingsStore.aac`),
+  `EncodeAfter` (`SettingsStore.encodeAfter`; `allows(charging, batteryPercent)`, `ENCODE_MIN_BATTERY`),
+  `Lecture.pendingAac`, `AudioCompression` with an `AacEncode`, `PcmReducer` and `Adts` (shared). iOS: an
+  `AudioRecorder` with an AAC sink (AVAudioConverter or AudioToolbox; Apple's AAC encoder is hardware-backed) writing
+  ADTS, the `AacEncode` for encoding afterwards, a BGProcessingTask with `requiresExternalPower` for "when charging"
+  (Android's `EncodeJob`), and Settings' Recording format pages (`ui/RecordingFormat.kt`; strings `rec_format_*`).
+  `PowerReport.audio` / `phase` and `power-encode.json` go with the power log above.

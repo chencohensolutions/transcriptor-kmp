@@ -58,6 +58,8 @@ internal fun ModelsLab(
     var refine by remember { mutableStateOf(emptyMap<String, String>()) }
     var format by remember { mutableStateOf(AudioFormat.WavThenFlac) }
     var flacLevel by remember { mutableStateOf(5) }
+    var aac by remember { mutableStateOf(com.chencohensolution.transcriptor.settings.AacSettings()) }
+    var encodeAfter by remember { mutableStateOf(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop) }
     var speakers by remember { mutableStateOf(false) }
     var auto by remember { mutableStateOf(false) }
     var hub by remember { mutableStateOf(HubSearch()) }
@@ -106,7 +108,9 @@ internal fun ModelsLab(
     screen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
-            audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto,
+            audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
+            aacEncoders = com.chencohensolution.transcriptor.recording.AacEncoders.all,
+            autoAacEncoder = com.chencohensolution.transcriptor.recording.AacEncoders.candidates(aac.copy(encoder = null)).first(), findSpeakersOnStop = speakers, autoImprove = auto,
             voiceModel = voiceModel, npuVoiceModels = if (chip == "SM8750") setOf(ModelCatalog.voicePrintsResNet293.id) else emptySet(),
             speakerTuning = tuning, segmentationModel = segmentation,
         ),
@@ -118,6 +122,8 @@ internal fun ModelsLab(
             useRefine = { l, m -> refine = refine + (l to m.id) },
             setAudioFormat = { format = it },
             setFlacLevel = { flacLevel = it },
+            setAac = { aac = it.valid() },
+            setEncodeAfter = { encodeAfter = it },
             setFindSpeakersOnStop = { speakers = it },
             useVoicePrints = { voiceModel = it.id },
             setSpeakerTuning = { m, v -> tuning = tuning + (m.id to v) },

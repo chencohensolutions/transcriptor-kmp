@@ -1,37 +1,30 @@
 package com.chencohensolution.transcriptor.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.TextButton
-import com.chencohensolution.transcriptor.settings.EncodeAfter
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material3.FilterChip
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.activity.compose.BackHandler
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.Arrangement
-import com.chencohensolution.transcriptor.settings.AacSettings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +36,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,66 +51,60 @@ import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.settings.AacProfile
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.settings.EncodeAfter
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import kotlin.math.roundToInt
 
-/** Option b2's pages: Settings, Recording format, and AAC's and FLAC's own. */
-private enum class PageB3 { Settings, Format, Aac, Flac }
+/** Settings' recording-format pages, opened from its Recording format row. */
+enum class FormatPage { Format, Aac, Flac }
 
 /** The codec a format records to in the end. */
-private fun codecOfB3(format: AudioFormat) = when (format) {
+private fun codecOf(format: AudioFormat) = when (format) {
     AudioFormat.Wav -> AudioFormat.Wav
     AudioFormat.AacLive, AudioFormat.WavThenAac -> AudioFormat.AacLive
     AudioFormat.FlacLive, AudioFormat.WavThenFlac -> AudioFormat.FlacLive
 }
 
 /**
- * Option b2 (b, as hen asked): one row in Settings › Storage opens "Recording format" with WAV, AAC and FLAC. AAC and
- * FLAC each open a page of their own, which starts with "Record as WAV, encode afterwards" (after the moment, or on
- * the charger above 30%), then that codec's settings.
+ * Settings › Recording format and the AAC and FLAC pages it opens ([page]): WAV, AAC and FLAC, and under them "Record
+ * as WAV, encode afterwards" (when the moment ends, or when charging with 30% battery or more) for AAC and FLAC alike.
+ * AAC's page: profile, sample rate, channels, bitrate and encoder; FLAC's: the compression effort.
  */
 @Composable
-fun ModelsScreenB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) {
-    var page by rememberSaveable { mutableStateOf(PageB3.Settings) }
+fun RecordingFormatPages(page: FormatPage, state: ModelsState, actions: ModelsActions, open: (FormatPage) -> Unit, back: () -> Unit) {
     when (page) {
-        PageB3.Settings -> SettingsB3(state, actions) { page = PageB3.Format }
-        PageB3.Format -> {
-            BackHandler { page = PageB3.Settings }
-            FormatPageB3(state, actions, open = { page = it }) { page = PageB3.Settings }
-        }
-        PageB3.Aac, PageB3.Flac -> {
-            BackHandler { page = PageB3.Format }
-            CodecPageB3(state, actions, aac = page == PageB3.Aac) { page = PageB3.Format }
-        }
+        FormatPage.Format -> FormatList(state, actions, open, back)
+        FormatPage.Aac, FormatPage.Flac -> CodecPage(state, actions, aac = page == FormatPage.Aac, back)
     }
 }
 
 @Composable
-private fun aacLineB3(state: ModelsOptionB3State): String {
+private fun aacLine(state: ModelsState): String {
     val aac = state.aac
-    val profile = stringResource(when (aac.profile) { AacProfile.Lc -> R.string.models_b3_profile_lc; AacProfile.He -> R.string.models_b3_profile_he; AacProfile.HeV2 -> R.string.models_b3_profile_he2 })
-    val channels = stringResource(if (aac.channels == 1) R.string.models_b3_mono else R.string.models_b3_stereo)
-    val where = stringResource(if (state.encoder?.hardware == true) R.string.models_b3_summary_hardware else R.string.models_b3_summary_software)
-    return stringResource(R.string.models_b3_summary_aac, profile, aac.bitrateKbps, channels, aac.sampleRate / 1000, where)
+    val profile = stringResource(when (aac.profile) { AacProfile.Lc -> R.string.rec_format_profile_lc; AacProfile.He -> R.string.rec_format_profile_he; AacProfile.HeV2 -> R.string.rec_format_profile_he2 })
+    val channels = stringResource(if (aac.channels == 1) R.string.rec_format_mono else R.string.rec_format_stereo)
+    val where = stringResource(if (state.aacEncoder?.hardware == true) R.string.rec_format_summary_hardware else R.string.rec_format_summary_software)
+    return stringResource(R.string.rec_format_summary_aac, profile, aac.bitrateKbps, channels, aac.sampleRate / 1000, where)
 }
 
 @Composable
-private fun whenLineB3(state: ModelsOptionB3State): String = when (state.format) {
+private fun encodeLine(state: ModelsState): String = when (state.audioFormat) {
     AudioFormat.WavThenAac, AudioFormat.WavThenFlac ->
-        stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.models_b3_later_stop_short else R.string.models_b3_later_charging_short)
-    else -> stringResource(R.string.models_b3_while_recording_short)
+        stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_stop_short else R.string.rec_format_later_charging_short)
+    else -> stringResource(R.string.rec_format_while_recording_short)
 }
 
+/** The Recording format row's line in Settings: the codec, its settings, and when it encodes. */
 @Composable
-private fun summaryB3(state: ModelsOptionB3State): String = when (codecOfB3(state.format)) {
-    AudioFormat.AacLive -> stringResource(R.string.models_b3_codec_aac) + " · " + aacLineB3(state) + " · " + whenLineB3(state)
-    AudioFormat.FlacLive -> stringResource(R.string.models_b3_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + whenLineB3(state)
-    else -> stringResource(R.string.models_b3_summary_wav)
+fun recordingFormatSummary(state: ModelsState): String = when (codecOf(state.audioFormat)) {
+    AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
+    AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + encodeLine(state)
+    else -> stringResource(R.string.rec_format_summary_wav)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TopBarB3(title: String, back: () -> Unit) {
+private fun FormatTopBar(title: String, back: () -> Unit) {
     TopAppBar(
         navigationIcon = { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
         title = { Text(title) },
@@ -124,53 +112,34 @@ private fun TopBarB3(title: String, back: () -> Unit) {
 }
 
 @Composable
-private fun SettingsB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions, open: () -> Unit) {
-    Scaffold(topBar = { TopBarB3(stringResource(R.string.notebooks_settings), actions.back) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            Text(
-                stringResource(R.string.settings_storage), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 4.dp),
-            )
-            Row(Modifier.fillMaxWidth().clickable(onClick = open).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.models_b3_format), style = MaterialTheme.typography.bodyLarge)
-                    Text(summaryB3(state), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FormatPageB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions, open: (PageB3) -> Unit, back: () -> Unit) {
-    val codec = codecOfB3(state.format)
-    Scaffold(topBar = { TopBarB3(stringResource(R.string.models_b3_format), back) }) { padding ->
+private fun FormatList(state: ModelsState, actions: ModelsActions, open: (FormatPage) -> Unit, back: () -> Unit) {
+    val codec = codecOf(state.audioFormat)
+    Scaffold(topBar = { FormatTopBar(stringResource(R.string.rec_format_format), back) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).selectableGroup()) {
-            PageNoteB3(stringResource(R.string.models_b3_format_note))
+            FormatPageNote(stringResource(R.string.rec_format_format_note))
             // WAV: chosen here. AAC and FLAC: chosen and their page opened (the previous way they recorded is kept).
-            CodecRowB3(codec == AudioFormat.Wav, stringResource(R.string.models_b3_codec_wav), stringResource(R.string.models_b3_wav_short), page = false) {
-                actions.setFormat(AudioFormat.Wav)
+            CodecRow(codec == AudioFormat.Wav, stringResource(R.string.rec_format_codec_wav), stringResource(R.string.rec_format_wav_short), page = false) {
+                actions.setAudioFormat(AudioFormat.Wav)
             }
-            CodecRowB3(codec == AudioFormat.AacLive, stringResource(R.string.models_b3_codec_aac),
-                if (codec == AudioFormat.AacLive) aacLineB3(state) + " · " + whenLineB3(state) else stringResource(R.string.models_b3_aac_short), page = true) {
-                if (codec != AudioFormat.AacLive) actions.setFormat(if (state.format == AudioFormat.WavThenFlac) AudioFormat.WavThenAac else AudioFormat.AacLive)
-                open(PageB3.Aac)
+            CodecRow(codec == AudioFormat.AacLive, stringResource(R.string.rec_format_codec_aac),
+                if (codec == AudioFormat.AacLive) aacLine(state) + " · " + encodeLine(state) else stringResource(R.string.rec_format_aac_short), page = true) {
+                if (codec != AudioFormat.AacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenFlac) AudioFormat.WavThenAac else AudioFormat.AacLive)
+                open(FormatPage.Aac)
             }
-            CodecRowB3(codec == AudioFormat.FlacLive, stringResource(R.string.models_b3_codec_flac),
-                if (codec == AudioFormat.FlacLive) stringResource(R.string.models_b3_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + whenLineB3(state)
-                else stringResource(R.string.models_b3_flac_short), page = true) {
-                if (codec != AudioFormat.FlacLive) actions.setFormat(if (state.format == AudioFormat.WavThenAac) AudioFormat.WavThenFlac else AudioFormat.FlacLive)
-                open(PageB3.Flac)
+            CodecRow(codec == AudioFormat.FlacLive, stringResource(R.string.rec_format_codec_flac),
+                if (codec == AudioFormat.FlacLive) stringResource(R.string.rec_format_flac_line, state.flacLevel, FLAC_LEVELS.last) + " · " + encodeLine(state)
+                else stringResource(R.string.rec_format_flac_short), page = true) {
+                if (codec != AudioFormat.FlacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenAac) AudioFormat.WavThenFlac else AudioFormat.FlacLive)
+                open(FormatPage.Flac)
             }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            LaterB3(state, actions)
+            EncodeLater(state, actions)
         }
     }
 }
 
 @Composable
-private fun CodecRowB3(selected: Boolean, title: String, note: String, page: Boolean, onClick: () -> Unit) {
+private fun CodecRow(selected: Boolean, title: String, note: String, page: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onClick).padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -189,13 +158,13 @@ private fun CodecRowB3(selected: Boolean, title: String, note: String, page: Boo
  * keeps the codec: AAC live becomes WAV then AAC, FLAC live WAV then FLAC.
  */
 @Composable
-private fun LaterB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) {
-    val codec = codecOfB3(state.format)
-    val on = state.format == AudioFormat.WavThenAac || state.format == AudioFormat.WavThenFlac
+private fun EncodeLater(state: ModelsState, actions: ModelsActions) {
+    val codec = codecOf(state.audioFormat)
+    val on = state.audioFormat == AudioFormat.WavThenAac || state.audioFormat == AudioFormat.WavThenFlac
     val enabled = codec != AudioFormat.Wav
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, enabled = enabled, role = Role.Checkbox) { checked ->
-            actions.setFormat(when (codec) {
+            actions.setAudioFormat(when (codec) {
                 AudioFormat.AacLive -> if (checked) AudioFormat.WavThenAac else AudioFormat.AacLive
                 else -> if (checked) AudioFormat.WavThenFlac else AudioFormat.FlacLive
             })
@@ -204,10 +173,10 @@ private fun LaterB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) 
     ) {
         Checkbox(checked = on, onCheckedChange = null, enabled = enabled)
         Column(Modifier.padding(start = 16.dp)) {
-            Text(stringResource(R.string.models_b3_later), style = MaterialTheme.typography.bodyLarge,
+            Text(stringResource(R.string.rec_format_later), style = MaterialTheme.typography.bodyLarge,
                 color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
             Text(
-                stringResource(if (enabled) R.string.models_b3_later_note else R.string.models_b3_later_wav),
+                stringResource(if (enabled) R.string.rec_format_later_note else R.string.rec_format_later_wav),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -215,8 +184,8 @@ private fun LaterB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) 
     if (on) {
         Column(Modifier.selectableGroup().padding(start = 52.dp, end = 20.dp, bottom = 16.dp)) {
             listOf(
-                EncodeAfter.Stop to (R.string.models_b3_later_stop to R.string.models_b3_later_stop_note),
-                EncodeAfter.Charging to (R.string.models_b3_later_charging to R.string.models_b3_later_charging_note),
+                EncodeAfter.Stop to (R.string.rec_format_later_stop to R.string.rec_format_later_stop_note),
+                EncodeAfter.Charging to (R.string.rec_format_later_charging to R.string.rec_format_later_charging_note),
             ).forEach { (option, labels) ->
                 Row(
                     Modifier.fillMaxWidth().selectable(selected = state.encodeAfter == option, role = Role.RadioButton) { actions.setEncodeAfter(option) }
@@ -236,37 +205,37 @@ private fun LaterB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) 
 
 /** AAC's or FLAC's page: the codec's settings (whether it encodes live or afterwards is on Recording format). */
 @Composable
-private fun CodecPageB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions, aac: Boolean, back: () -> Unit) {
+private fun CodecPage(state: ModelsState, actions: ModelsActions, aac: Boolean, back: () -> Unit) {
     val live = if (aac) AudioFormat.AacLive else AudioFormat.FlacLive
     val later = if (aac) AudioFormat.WavThenAac else AudioFormat.WavThenFlac
-    val chosen = state.format == live || state.format == later
-    Scaffold(topBar = { TopBarB3(stringResource(if (aac) R.string.models_b3_codec_aac else R.string.models_b3_codec_flac), back) }) { padding ->
+    val chosen = state.audioFormat == live || state.audioFormat == later
+    Scaffold(topBar = { FormatTopBar(stringResource(if (aac) R.string.rec_format_codec_aac else R.string.rec_format_codec_flac), back) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             if (!chosen) {
                 // Opened while another codec records: the settings apply once this one is chosen.
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.models_b3_not_chosen), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { actions.setFormat(live) }) { Text(stringResource(R.string.models_b3_use)) }
+                    Text(stringResource(R.string.rec_format_not_chosen), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { actions.setAudioFormat(live) }) { Text(stringResource(R.string.rec_format_use)) }
                 }
             }
-            if (state.format == later) PageNoteB3(stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.models_b3_later_here_stop else R.string.models_b3_later_here_charging))
+            if (state.audioFormat == later) FormatPageNote(stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_here_stop else R.string.rec_format_later_here_charging))
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-            if (aac) AacSettingsB3(state, actions) else FlacEffortB3(state.flacLevel, if (state.format == AudioFormat.WavThenFlac) state.format else AudioFormat.FlacLive, actions.setFlacLevel)
+            if (aac) AacSettingsPart(state, actions) else FlacEffortPart(state.flacLevel, if (state.audioFormat == AudioFormat.WavThenFlac) state.audioFormat else AudioFormat.FlacLive, actions.setFlacLevel)
         }
     }
 }
 
 @Composable
-private fun PageNoteB3(text: String) =
+private fun FormatPageNote(text: String) =
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun AacSettingsB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) {
+private fun AacSettingsPart(state: ModelsState, actions: ModelsActions) {
     val aac = state.aac
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        LabelB3(stringResource(R.string.models_b3_profile))
-        val profiles = listOf(AacProfile.Lc to R.string.models_b3_profile_lc, AacProfile.He to R.string.models_b3_profile_he, AacProfile.HeV2 to R.string.models_b3_profile_he2)
+        FormatLabel(stringResource(R.string.rec_format_profile))
+        val profiles = listOf(AacProfile.Lc to R.string.rec_format_profile_lc, AacProfile.He to R.string.rec_format_profile_he, AacProfile.HeV2 to R.string.rec_format_profile_he2)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             profiles.forEachIndexed { i, (p, label) ->
                 SegmentedButton(
@@ -275,26 +244,26 @@ private fun AacSettingsB3(state: ModelsOptionB3State, actions: ModelsOptionB3Act
                 ) { Text(stringResource(label)) }
             }
         }
-        NoteB3(stringResource(when (aac.profile) {
-            AacProfile.Lc -> R.string.models_b3_profile_lc_note
-            AacProfile.He -> R.string.models_b3_profile_he_note
-            AacProfile.HeV2 -> R.string.models_b3_profile_he2_note
+        FormatNote(stringResource(when (aac.profile) {
+            AacProfile.Lc -> R.string.rec_format_profile_lc_note
+            AacProfile.He -> R.string.rec_format_profile_he_note
+            AacProfile.HeV2 -> R.string.rec_format_profile_he2_note
         }))
 
-        LabelB3(stringResource(R.string.models_b3_rate))
+        FormatLabel(stringResource(R.string.rec_format_rate))
         val rates = listOf(16_000, 24_000, 48_000)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             rates.forEachIndexed { i, r ->
                 SegmentedButton(
                     selected = aac.sampleRate == r, onClick = { actions.setAac(aac.copy(sampleRate = r).valid()) },
                     enabled = r in aac.sampleRates, shape = SegmentedButtonDefaults.itemShape(i, rates.size),
-                ) { Text(stringResource(R.string.models_b3_khz, r / 1000)) }
+                ) { Text(stringResource(R.string.rec_format_khz, r / 1000)) }
             }
         }
-        NoteB3(stringResource(R.string.models_b3_rate_note))
+        FormatNote(stringResource(R.string.rec_format_rate_note))
 
-        LabelB3(stringResource(R.string.models_b3_channels))
-        val channels = listOf(1 to R.string.models_b3_mono, 2 to R.string.models_b3_stereo)
+        FormatLabel(stringResource(R.string.rec_format_channels))
+        val channels = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             channels.forEachIndexed { i, (c, label) ->
                 SegmentedButton(
@@ -303,43 +272,43 @@ private fun AacSettingsB3(state: ModelsOptionB3State, actions: ModelsOptionB3Act
                 ) { Text(stringResource(label)) }
             }
         }
-        NoteB3(stringResource(R.string.models_b3_channels_note))
+        FormatNote(stringResource(R.string.rec_format_channels_note))
 
         Row(Modifier.padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.models_b3_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.models_b3_size, aac.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.rec_format_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.rec_format_size, aac.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             aac.bitrates.forEach { kbps ->
                 FilterChip(
                     selected = aac.bitrateKbps == kbps, onClick = { actions.setAac(aac.copy(bitrateKbps = kbps)) },
-                    label = { Text(stringResource(R.string.models_b3_kbps, kbps)) },
+                    label = { Text(stringResource(R.string.rec_format_kbps, kbps)) },
                 )
             }
         }
-        if (aac.profile != AacProfile.Lc && aac.bitrateKbps > 64) NoteB3(stringResource(R.string.models_b3_bitrate_he_high))
+        if (aac.profile != AacProfile.Lc && aac.bitrateKbps > 64) FormatNote(stringResource(R.string.rec_format_bitrate_he_high))
 
-        LabelB3(stringResource(R.string.models_b3_encoder))
-        EncoderPickerB3(state, actions)
+        FormatLabel(stringResource(R.string.rec_format_encoder))
+        AacEncoderPicker(state, actions)
 
         Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
-private fun EncoderPickerB3(state: ModelsOptionB3State, actions: ModelsOptionB3Actions) {
+private fun AacEncoderPicker(state: ModelsState, actions: ModelsActions) {
     var open by remember { mutableStateOf(false) }
-    val running = state.encoder
-    val auto = state.encoders.firstOrNull { it.name == state.autoEncoder }
+    val running = state.aacEncoder
+    val auto = state.aacEncoders.firstOrNull { it.name == state.autoAacEncoder }
     Box {
         Row(Modifier.fillMaxWidth().clickable { open = true }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (state.aac.encoder == null) stringResource(R.string.models_b3_encoder_auto) else isolated(state.aac.encoder.orEmpty()),
+                    if (state.aac.encoder == null) stringResource(R.string.rec_format_encoder_auto) else isolated(state.aac.encoder.orEmpty()),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 if (running != null) Text(
-                    stringResource(if (running.hardware) R.string.models_b3_encoder_hardware else R.string.models_b3_encoder_software, isolated(running.name)),
+                    stringResource(if (running.hardware) R.string.rec_format_encoder_hardware else R.string.rec_format_encoder_software, isolated(running.name)),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -349,13 +318,13 @@ private fun EncoderPickerB3(state: ModelsOptionB3State, actions: ModelsOptionB3A
             DropdownMenuItem(
                 text = {
                     Column {
-                        Text(stringResource(R.string.models_b3_encoder_auto))
+                        Text(stringResource(R.string.rec_format_encoder_auto))
                         if (auto != null) Text(isolated(auto.name), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 onClick = { open = false; actions.setAac(state.aac.copy(encoder = null)) },
             )
-            state.encoders.forEach { e ->
+            state.aacEncoders.forEach { e ->
                 val fits = state.aac.profile in e.profiles
                 DropdownMenuItem(
                     enabled = fits,
@@ -364,9 +333,9 @@ private fun EncoderPickerB3(state: ModelsOptionB3State, actions: ModelsOptionB3A
                             Text(isolated(e.name))
                             Text(
                                 stringResource(when {
-                                    !fits -> R.string.models_b3_encoder_no_profile
-                                    e.hardware -> R.string.models_b3_encoder_kind_hardware
-                                    else -> R.string.models_b3_encoder_kind_software
+                                    !fits -> R.string.rec_format_encoder_no_profile
+                                    e.hardware -> R.string.rec_format_encoder_kind_hardware
+                                    else -> R.string.rec_format_encoder_kind_software
                                 }),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -377,12 +346,12 @@ private fun EncoderPickerB3(state: ModelsOptionB3State, actions: ModelsOptionB3A
             }
         }
     }
-    if (state.encoders.none { it.hardware }) NoteB3(stringResource(R.string.models_b3_encoder_none_hardware))
+    if (state.aacEncoders.none { it.hardware }) FormatNote(stringResource(R.string.rec_format_encoder_none_hardware))
 }
 
 /** FLAC's compression level, as the app's Settings has it. */
 @Composable
-private fun FlacEffortB3(level: Int, format: AudioFormat, set: (Int) -> Unit) {
+private fun FlacEffortPart(level: Int, format: AudioFormat, set: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.flac_effort), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -398,14 +367,14 @@ private fun FlacEffortB3(level: Int, format: AudioFormat, set: (Int) -> Unit) {
             Text(stringResource(R.string.flac_effort_fast), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.flac_effort_small), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        NoteB3(stringResource(if (format == AudioFormat.FlacLive) R.string.flac_effort_note_live else R.string.flac_effort_note_after))
+        FormatNote(stringResource(if (format == AudioFormat.FlacLive) R.string.flac_effort_note_live else R.string.flac_effort_note_after))
     }
 }
 
 @Composable
-private fun LabelB3(text: String) =
+private fun FormatLabel(text: String) =
     Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
 
 @Composable
-private fun NoteB3(text: String) =
+private fun FormatNote(text: String) =
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
