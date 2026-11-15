@@ -321,6 +321,30 @@ object ModelCatalog {
         credit = "icefall streaming Zipformer by Zengwei Yao, k2-fsa (Apache-2.0), trained on LibriSpeech (CC-BY-4.0)",
     )
 
+    // englishZipformer's full-precision checkpoint (Zengwei's pretrained.pt, commit 37cb5606; not the int8 files)
+    // exported by icefall's export-onnx-streaming.py (fixed shapes, chunk 64 = 1.28 s, left context 256) and compiled
+    // with QAIRT 2.40.0.251030 for the Snapdragon 8 Elite's NPU, 16-bit. Published on the owner's Hugging Face
+    // (Nov 15, 2026).
+    private const val ZIPFORMER_EN_NPU_SM8750 = "https://huggingface.co/hencohen83/zipformer2-66m-streaming-en-qnn-sm8750/resolve/b485d680298101aa1f24ca7602232f994c4903d9"
+    val englishZipformerNpu = SpeechModel(
+        id = "zipformer2-66m-streaming-en-npu-sm8750",
+        name = "Zipformer streaming (English) · NPU",
+        languages = listOf("en"),
+        parameters = "66M",
+        license = "Apache-2.0",
+        fitsLive = true,
+        source = "https://huggingface.co/Zengwei/icefall-asr-librispeech-streaming-zipformer-2023-05-17",
+        kind = ModelKind.StreamingTransducerNpu,
+        files = listOf(
+            ModelFile("encoder.bin", "$ZIPFORMER_EN_NPU_SM8750/encoder.bin", "3eb6f7cf877ec4aa3051df7221be472064a59986823a517bd979106d31470528", 154_628_096),
+            ModelFile("decoder.bin", "$ZIPFORMER_EN_NPU_SM8750/decoder.bin", "bf5a6a8d7f129cd56da9c1ccaca5941650b5e115afbcfa90024e7f9b65819591", 1_163_264),
+            ModelFile("joiner.bin", "$ZIPFORMER_EN_NPU_SM8750/joiner.bin", "bdf0d6511d2539cf80517c398256caab3b86eec0fa873569baa4ff92921b4541", 581_632),
+            ModelFile("tokens.txt", "$ZIPFORMER_EN_NPU_SM8750/tokens.txt", "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb", 5_048),
+        ),
+        credit = "icefall streaming Zipformer by Zengwei Yao, k2-fsa (Apache-2.0), trained on LibriSpeech (CC-BY-4.0)",
+        chips = listOf("SM8750"),
+    )
+
     /** Voice prints for speaker labels, in every language. Not in [all]: it doesn't transcribe. */
     val voicePrints = SpeechModel(
         id = "3dspeaker-campplus-zh-en-advanced",
@@ -461,7 +485,7 @@ object ModelCatalog {
     /** The segmentation models for speaker turns, the default (pyannote) first. */
     val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, englishZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, englishZipformerNpu, englishZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id

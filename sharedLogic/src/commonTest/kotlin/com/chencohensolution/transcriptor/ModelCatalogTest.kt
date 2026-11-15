@@ -27,5 +27,6 @@ class ModelCatalogTest {
     fun anNpuModelIsOfferedFirstOnItsChipOnly() {
         assertEquals("ivrit-whisper-large-v3-turbo-npu-sm8750", ModelCatalog.forLanguage("he", "SM8750").first().id)
         assertEquals(ModelCatalog.forLanguage("he", chip = null), ModelCatalog.forLanguage("he", "SM8650"))
+        assertEquals("zipformer2-66m-streaming-en-npu-sm8750", ModelCatalog.forLanguage("en", "SM8750").first().id)
     }
 }
