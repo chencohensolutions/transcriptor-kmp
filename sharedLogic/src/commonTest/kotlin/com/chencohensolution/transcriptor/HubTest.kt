@@ -300,6 +300,21 @@ class HubTest {
     }
 
     @Test
+    fun aLargeSpeakerRepoGetsNoWhisperSize() {
+        val id = "hencohen83/diarizen-wavlm-large-s80-qnn-sm8750"
+        val tags = listOf("speaker-diarization", "diarizen", "sherpa-onnx", "qnn", "license:cc-by-nc-4.0")
+        val repo = """{"id":"$id","sha":"bbcdfb1c","cardData":{"license":"cc-by-nc-4.0"},"tags":[${tags.joinToString { "\"$it\"" }}],"siblings":[
+            ${small("README.md", 2_000)}, ${lfs("model.onnx", 280_000_000, "m1")}, ${lfs("window.bin", 150_000_000, "w1")}]}"""
+        val m = assertNotNull(hubModel(parseSearch("[${summary(id, listOf("README.md", "model.onnx", "window.bin"), tags, sha = "bbcdfb1c")}]").single(), parseRepo(repo)))
+        assertEquals(HubKind.SpeakerTurns, m.kind)
+        val v = m.variants.single()
+        assertEquals(listOf("model.onnx", "window.bin"), v.files.map { it.name })
+        // "large" is a Whisper size (1.55B), not this model's: its size isn't guessed.
+        assertEquals("?", v.parameters)
+        assertEquals(ModelKind.SpeakerSegmentation, m.toSpeechModel(v).kind)
+    }
+
+    @Test
     fun aBlankSpeakerSearchLooksForSpeakerRepos() {
         assertTrue("wespeaker" in HubClient.defaultTerms(HubKind.VoicePrints))
         assertTrue("segmentation" in HubClient.defaultTerms(HubKind.SpeakerTurns))
