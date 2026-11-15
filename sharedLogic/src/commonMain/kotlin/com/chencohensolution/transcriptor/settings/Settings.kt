@@ -71,12 +71,23 @@ enum class ProcessorMeterStyle(val key: String) {
 val FLAC_LEVELS = 0..8
 
 /** The level used before it was a setting, and the reference encoder's default. */
-const val FLAC_DEFAULT_LEVEL = 5
+const val FLAC_DEFAULT_LEVEL = 8
+
+/**
+ * "Fewer ↔ more speakers" for a voice-print model the user hasn't moved the slider of: the owner's settings on the
+ * S25 (Nov 15, 2026), by model id. Any other model starts in the middle (0).
+ */
+val DEFAULT_SPEAKER_TUNING = mapOf(
+    "wespeaker-resnet293-lm" to 0.5f,
+    "3dspeaker-campplus-zh-en-advanced" to -0.2f,
+    "3dspeaker-eres2netv2-zh-cn" to -0.3f,
+)
 
 @Serializable
 private data class SettingsFileV1(
     val v: Int = 1,
-    val audioFormat: AudioFormat = AudioFormat.Wav,
+    /** A new install records as the owner does (Nov 15, 2026): AAC as it records, [AacSettings]' defaults. */
+    val audioFormat: AudioFormat = AudioFormat.AacLive,
     /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
@@ -104,7 +115,9 @@ private data class SettingsFileV1(
     /** A lecture is improved on its own after it stops (while charging). */
     val autoImprove: Boolean = false,
     /** Moments are transcribed live while they record; off (the default): recorded only, transcribed after. */
-    val recordLive: Boolean = false,
+    val recordLive: Boolean = true,
+    /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
+    val quietRecording: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -120,7 +133,7 @@ private data class SettingsFileV1(
     /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
     val segmentationModel: String? = null,
     /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
-    val processorMeters: String = ProcessorMeterStyle.Off.key,
+    val processorMeters: String = ProcessorMeterStyle.Graphs.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
 )
@@ -174,6 +187,16 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         get() = read().recordLive
         set(value) = write(read().copy(recordLive = value))
 
+    /**
+     * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
+     * name only, silent, not on the lock screen, without the clock or Pause, Mark and Stop. Android keeps one entry for
+     * an app that records in the background; it disappears altogether only when the app's notifications are turned off
+     * in the phone's settings, which the screen links to.
+     */
+    var quietRecording: Boolean
+        get() = read().quietRecording
+        set(value) = write(read().copy(quietRecording = value))
+
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]
 
@@ -224,10 +247,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         set(value) = write(read().copy(processorMeters = value.key))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
-    fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: 0f
+    fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: DEFAULT_SPEAKER_TUNING[modelId] ?: 0f
 
     fun setSpeakerTuning(modelId: String, more: Float) = write(read().let {
-        it.copy(speakerTuning = if (more == 0f) it.speakerTuning - modelId else it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
+        // Kept even at 0: a model with a default of its own ([DEFAULT_SPEAKER_TUNING]) can be set back to the middle.
+        it.copy(speakerTuning = it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
     })
 
     /** First run's "Get your models" was answered: it isn't offered again ([DefaultModels.offerFirstRun]). */

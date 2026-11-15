@@ -30,12 +30,22 @@ class RecordingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var compressing = false
 
+    /** Settings › Recordings › Hide the recording notification, read when a recording starts. */
+    private var quiet = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, getString(R.string.recording_channel), NotificationManager.IMPORTANCE_LOW),
+        )
+        // The quiet one (Settings › Recordings): the lowest importance, never on the lock screen, no badge.
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(QUIET_CHANNEL, getString(R.string.recording_quiet_channel), NotificationManager.IMPORTANCE_MIN).apply {
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
+                setShowBadge(false)
+            },
         )
         scope.launch {
             Recording.session.state.filterNotNull().map { it.paused to it.finishing }.distinctUntilChanged().collect { (paused, finishing) ->
@@ -48,6 +58,7 @@ class RecordingService : Service() {
         val session = Recording.session
         when (intent?.action) {
             ACTION_START -> if (!session.isRecording) {
+                quiet = Recording.settings.quietRecording
                 startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
@@ -253,6 +264,15 @@ class RecordingService : Service() {
         getSystemService(NotificationManager::class.java).notify(ID, notification)
 
     private fun recordingNotification(paused: Boolean): Notification {
+        // Quiet: the app's name and nothing else. The recording goes on; it is paused and stopped from the app.
+        if (quiet) return Notification.Builder(this, QUIET_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+            .setOngoing(true)
+            .setShowWhen(false)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .build()
         val elapsed = Recording.session.state.value?.elapsedMillis ?: 0
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
@@ -269,7 +289,7 @@ class RecordingService : Service() {
             .build()
     }
 
-    private fun finishingNotification() = Notification.Builder(this, CHANNEL)
+    private fun finishingNotification() = if (quiet) recordingNotification(paused = false) else Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle(getString(R.string.lecture_finishing))
         .setProgress(0, 0, true)
@@ -290,6 +310,7 @@ class RecordingService : Service() {
 
     companion object {
         private const val CHANNEL = "recording"
+        private const val QUIET_CHANNEL = "recording-quiet"
         private const val ID = 1
         private const val ACTION_START = "start"
         private const val ACTION_PAUSE = "pause"

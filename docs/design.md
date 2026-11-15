@@ -229,8 +229,10 @@ after the turn they were written in, rewritten on every save (`transcriptMarkdow
 
 **Where the files are** (owner's decision, Nov 4, 2026): a moment records in the app's own storage, and once it is
 finished (stopped, its passes done, compressed to FLAC if that is the setting, not open) it moves to the **moments
-folder** outside the app, when the user picked one: `Documents/Transcriptor` is suggested (the system's folder picker
-opens on Documents, and the app makes `Transcriptor` in the folder picked unless it is one). The folder is reached
+folder** outside the app, when the user picked one: `Documents/Audio Logs` is suggested (the system's folder picker
+opens on Documents, and the app makes `Audio Logs` in the folder picked unless it is one; a folder from before the
+rename, `Transcriptor`, is still a library, and one that sits inside the picked folder is renamed in place at launch,
+`Recording.renamedLibrary`; owner's request, Nov 15, 2026). The folder is reached
 through Android's documents provider (`SafFileSystem`, a persisted tree permission), so it outlives the app: after a
 reinstall, picking it again brings back every label and moment. An empty `.nomedia` at its root keeps music and
 gallery apps from listing the recordings. Moving a moment copies its folder, checks every file's size and that

@@ -34,11 +34,13 @@ object DefaultModels {
     )
     private val improvePicks = mapOf(
         "en" to listOf(ModelCatalog.whisperLargeV3),
-        "he" to listOf(ModelCatalog.ivritLargeV3Q8),
+        // The owner's pick on the S25 (read from the phone, Nov 15, 2026): large-v3 with its encoder on the NPU; the
+        // q8 build on the CPU elsewhere.
+        "he" to listOf(ModelCatalog.ivritLargeV3NpuEncoder, ModelCatalog.ivritLargeV3Q8),
     )
 
     /** Live speaker turns: DiariZen on the S25's NPU (the owner's pick, best in the sweep), else pyannote's. */
-    private val segmentationPicks = listOf(ModelCatalog.diarizenBaseS80Npu, ModelCatalog.speakerSegmentation)
+    private val segmentationPicks = listOf(ModelCatalog.diarizenLargeS80Npu, ModelCatalog.diarizenBaseS80Npu, ModelCatalog.speakerSegmentation)
 
     /** For a language without picks of its own: the multilingual models. */
     private val multilingualLive = listOf(ModelCatalog.whisperTurbo)
@@ -51,7 +53,8 @@ object DefaultModels {
     fun forLanguage(language: String, chip: String?, fails: (SpeechModel) -> Boolean = { false }): Defaults = Defaults(
         live = (livePicks[language] ?: multilingualLive).firstOrNull { it.runsOn(chip) && !fails(it) },
         improve = (improvePicks[language] ?: multilingualImprove).firstOrNull { it.runsOn(chip) && !fails(it) },
-        voicePrints = ModelCatalog.voicePrints,
+        // The owner's pick (Nov 15, 2026): WeSpeaker ResNet293-LM, on the NPU where its build runs, else its ONNX on the CPU.
+        voicePrints = ModelCatalog.voicePrintsResNet293,
         segmentation = segmentationPicks.first { it.runsOn(chip) && !fails(it) },
     )
 

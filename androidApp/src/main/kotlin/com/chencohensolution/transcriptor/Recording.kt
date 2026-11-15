@@ -81,7 +81,10 @@ import okio.Path.Companion.toOkioPath
  * screen off) and [MainActivity] (which shows it). Files are in the app's private storage, `files/`.
  */
 /** The folder made in the one the user picks, unless it is one already. */
-private const val LIBRARY_FOLDER = "Transcriptor"
+private const val LIBRARY_FOLDER = "Audio Logs"
+
+/** The folder's name before the app was named Audio Logs: still a library when picked, and renamed when it can be. */
+private const val OLD_LIBRARY_FOLDER = "Transcriptor"
 
 object Recording {
     lateinit var store: LectureStore
@@ -482,7 +485,7 @@ object Recording {
     /** The folder in the settings, if the app may still use it: the lectures' library from now on. */
     private fun connectLibrary() {
         val saved = settings.lectureFolder ?: return
-        val uri = Uri.parse(saved)
+        val uri = renamedLibrary(Uri.parse(saved))
         val fs = SafFileSystem(resolver, uri)
         val name = runCatching { fs.name }.getOrDefault("")
         if (!canUse(uri) || name.isEmpty()) {
@@ -493,6 +496,25 @@ object Recording {
         folder.value = Folder.Ready(name)
     }
 
+    /**
+     * A moments folder still named Transcriptor becomes "Audio Logs" (the app's name since Nov 7, 2026; owner's
+     * request, Nov 15): renamed in place by the documents provider, with everything in it, and the settings point at
+     * it under its new name. Only when the folder sits inside the one the user picked: the picked folder itself can't
+     * be renamed without losing the permission it was picked with, so that one keeps its name. Any failure (a folder
+     * named Audio Logs is already there, the provider refuses) leaves it as it was.
+     */
+    private fun renamedLibrary(uri: Uri): Uri {
+        val inside = runCatching { DocumentsContract.getDocumentId(uri) != DocumentsContract.getTreeDocumentId(uri) }.getOrDefault(false)
+        if (!inside || !canUse(uri)) return uri
+        val name = runCatching { SafFileSystem(resolver, uri).name }.getOrDefault("")
+        if (name != OLD_LIBRARY_FOLDER) return uri
+        val renamed = runCatching { DocumentsContract.renameDocument(resolver, uri, LIBRARY_FOLDER) }
+            .onFailure { android.util.Log.w("Recording", "the moments folder keeps its old name", it) }.getOrNull() ?: return uri
+        settings.lectureFolder = renamed.toString()
+        android.util.Log.i("Recording", "the moments folder is now $LIBRARY_FOLDER")
+        return renamed
+    }
+
     /** The app still holds the read and write permission the folder's tree was picked with. */
     private fun canUse(folderUri: Uri): Boolean {
         val tree = DocumentsContract.buildTreeDocumentUri(folderUri.authority, DocumentsContract.getTreeDocumentId(folderUri))
@@ -501,7 +523,7 @@ object Recording {
 
     /**
      * Makes the folder the user picked ([tree], from the system's folder picker) the lectures folder (files: not on the
-     * main thread): a `Transcriptor` folder in it unless it is one already (by name, or a library from before), an
+     * main thread): an `Audio Logs` folder in it unless it is one already (by name, or a library from before), an
      * empty `.nomedia` so music and gallery apps skip the recordings, then the labels, voices and finished moments
      * move in ([adoptLibrary]), from the app or from the folder used before, whose permission is then given back.
      */
@@ -509,12 +531,18 @@ object Recording {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         resolver.takePersistableUriPermission(tree, flags)
         val treeFs = SafFileSystem(resolver, tree)
-        val isLibrary = treeFs.name == LIBRARY_FOLDER || treeFs.exists(LIBRARY_ROOT / LabelStore.FILE) || treeFs.exists(LIBRARY_ROOT / NOTEBOOKS_FILE)
+        val isLibrary = treeFs.name == LIBRARY_FOLDER || treeFs.name == OLD_LIBRARY_FOLDER || treeFs.exists(LIBRARY_ROOT / LabelStore.FILE) || treeFs.exists(LIBRARY_ROOT / NOTEBOOKS_FILE)
         val folderUri = if (isLibrary) {
             DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         } else {
-            treeFs.createDirectories(LIBRARY_ROOT / LIBRARY_FOLDER)
-            DocumentsContract.buildDocumentUriUsingTree(tree, treeFs.documentId(LIBRARY_ROOT / LIBRARY_FOLDER))
+            // A library from before the rename, in the folder picked: used (and renamed), not left beside a new one.
+            val old = LIBRARY_ROOT / OLD_LIBRARY_FOLDER
+            if (!treeFs.exists(LIBRARY_ROOT / LIBRARY_FOLDER) && treeFs.exists(old)) {
+                renamedLibrary(DocumentsContract.buildDocumentUriUsingTree(tree, treeFs.documentId(old)))
+            } else {
+                treeFs.createDirectories(LIBRARY_ROOT / LIBRARY_FOLDER)
+                DocumentsContract.buildDocumentUriUsingTree(tree, treeFs.documentId(LIBRARY_ROOT / LIBRARY_FOLDER))
+            }
         }
         val fs = SafFileSystem(resolver, folderUri)
         if (!fs.exists(LIBRARY_ROOT / ".nomedia")) fs.write(LIBRARY_ROOT / ".nomedia") {}

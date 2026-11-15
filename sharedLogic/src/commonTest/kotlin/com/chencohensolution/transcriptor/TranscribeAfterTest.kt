@@ -98,11 +98,17 @@ class TranscribeAfterTest {
     private val recorder = FakeRecorder(fs)
 
     @Test
-    fun afterIsTheDefaultAndIsKept() {
+    fun liveIsTheDefaultAndAfterIsKept() {
+        // The owner's setting (Nov 15, 2026): transcribe as it records; After stays one tap away on the Record bar.
         val settings = SettingsStore(fs, root)
-        assertFalse(settings.recordLive)
-        settings.recordLive = true
-        assertTrue(SettingsStore(fs, root).recordLive)
+        assertTrue(settings.recordLive)
+        settings.recordLive = false
+        assertFalse(SettingsStore(fs, root).recordLive)
+        // The slider of a voice-print model starts where the owner set it, and can be put back to the middle.
+        assertEquals(0.5f, settings.speakerTuning("wespeaker-resnet293-lm"))
+        assertEquals(0f, settings.speakerTuning("some-other-model"))
+        settings.setSpeakerTuning("wespeaker-resnet293-lm", 0f)
+        assertEquals(0f, SettingsStore(fs, root).speakerTuning("wespeaker-resnet293-lm"))
     }
 
     @Test

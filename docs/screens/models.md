@@ -28,6 +28,29 @@ for this phone's chip; `DefaultModels.setup`, `ModelsState.setup`), without mode
 There are no Fast / Balanced / Best tiers: each language has one combination worth recommending, and a second tier
 would only offer models that are worse. The language's page still lists every model for another choice.
 
+## The owner's settings as the defaults (Nov 15, 2026)
+
+A new install starts as the owner's S25 was set that day (read from its `settings.json`):
+
+- **Audio**: AAC as it records, LC, 48 kHz, stereo, 256 kbps (about 115 MB an hour); FLAC effort 8 for the FLAC ways.
+- **Record bar**: Live. After stays one tap away and is remembered.
+- **Recommended models** (`DefaultModels`): Hebrew live on the streaming Zipformer (NPU on the S25) and improved by
+  ivrit.ai large-v3 with its encoder on the NPU (the q8 build on the CPU elsewhere); voice prints by WeSpeaker
+  ResNet293-LM; live speaker turns by DiariZen WavLM Large s80 on the S25's NPU (now in the catalog, with the id it
+  had when added from Hugging Face), then the Base build, then pyannote's.
+- **Fewer ↔ more speakers** starts at the owner's value per voice model (`DEFAULT_SPEAKER_TUNING`: ResNet293 +0.5,
+  CAM++ -0.2, ERes2NetV2 -0.3); a slider put back to the middle stays there.
+- **Processor meters**: the last minute as graphs.
+
+## Hide the recording notification (Nov 15, 2026)
+
+Settings › Recordings has **Hide the recording notification** (`SettingsStore.quietRecording`, off by default). On,
+a recording's notification is the app's name only, on its own channel of the lowest importance: silent, not on the
+lock screen, no clock and no Pause, Mark or Stop (`RecordingService.recordingNotification`). Android keeps one entry
+for an app that records in the background, so the row says so and links to the phone's notification settings for
+the app, where its notifications can be turned off altogether. The phone's own microphone indicator is not ours to
+hide.
+
 ## What it shows
 
 - **Settings**: **Languages**, one row per language in use (the moments', the phone's, those

@@ -74,11 +74,17 @@ class RecordingTest {
     private val settings = SettingsStore(fs, root)
     private val recorder = FakeRecorder(fs)
 
+    /** These tests record WAV (the fake recorder writes one), whatever a new install's format is. */
+    private fun wav() { settings.audioFormat = AudioFormat.Wav }
+
     private fun TestScope.session() = LectureSession(recorder, store, settings, backgroundScope, now = { 1_793_600_000_000 })
 
     @Test
-    fun theDefaultIsWav() {
-        assertEquals(AudioFormat.Wav, settings.audioFormat)
+    fun theDefaultIsAacAsItRecordsStereoAt256() {
+        // A new install records as the owner does: AAC live, LC, 48 kHz, stereo, 256 kbps, FLAC effort 8.
+        assertEquals(AudioFormat.AacLive, settings.audioFormat)
+        assertEquals(com.chencohensolution.transcriptor.settings.AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.Lc, 48_000, 2, 256, null), settings.aac)
+        assertEquals(8, settings.flacLevel)
         settings.audioFormat = AudioFormat.FlacLive
         assertEquals(AudioFormat.FlacLive, SettingsStore(fs, root).audioFormat)
         assertNull(settings.liveModel("he"))
@@ -95,7 +101,7 @@ class RecordingTest {
         settings.autoImprove = true
         assertEquals(true, SettingsStore(fs, root).findSpeakersOnStop)
         assertEquals(true, SettingsStore(fs, root).autoImprove)
-        assertEquals(AudioFormat.Wav, SettingsStore(fs, root).audioFormat)
+        assertEquals(AudioFormat.AacLive, SettingsStore(fs, root).audioFormat)
     }
 
     @Test
@@ -121,6 +127,7 @@ class RecordingTest {
 
     @Test
     fun startCreatesTheFolderTheJsonAndTheAudio() = runTest {
+        wav()
         val lecture = session().start(listOf("psych"), "פסיכולוגיה", "he", "זיכרון עבודה")
         val folder = store.folder(lecture.id)
         assertTrue(fs.exists(folder / "lecture.json"))
@@ -199,6 +206,7 @@ class RecordingTest {
 
     @Test
     fun theDurationIsSavedWhileRecordingAndOnStop() = runTest {
+        wav()
         val session = session()
         val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(31_000)
@@ -217,6 +225,7 @@ class RecordingTest {
 
     @Test
     fun theJsonHasTheDocumentedFields() = runTest {
+        wav()
         val session = session()
         val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         session.addNote(1_000, "n")

@@ -40,7 +40,7 @@ The code still calls it `NotebooksScreen`.
 - The gear opens Settings.
 
 - The **moments folder** card on top: until a folder is picked, "Where should moments be kept?" with Choose a
-  folder (the system's picker, on Documents; `Transcriptor` is made there) and Not now; while moments move there, its
+  folder (the system's picker, on Documents; `Audio Logs` is made there) and Not now; while moments move there, its
   progress; when it can't be reached, Choose again. Settings has the same choice (Change).
 
 Empty (no moments): a line on recording a moment and giving it labels; Record still works.
