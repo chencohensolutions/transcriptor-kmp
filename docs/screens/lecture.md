@@ -73,8 +73,10 @@ starts afresh. Amber from 70%, red from 90%.
   and lays them over live transcription's lines every time they are made again (`LectureSession.editLine`, `shown`),
   before and after they are split by speaker. The line being spoken now can't be edited.
 - The transcript is laid out from the bottom, so the live line stays in view by itself: the lines above glide up as it
-  grows and as new lines come, with no scrolling (a scroll running all the time would swallow taps). Each new word
-  fades in quickly (200 ms); a finished line settles from grey into the text's color. Scrolling back stops following
+  grows and as new lines come, with no scrolling (a scroll running all the time would swallow taps). The text moves as
+  one: everything in view, the grey words too, moves up together in a single ease-in-out tween (320 ms), no spring and
+  no line on its own. New words fade in (200 ms) once the move ends; a finished line settles from grey into the text's
+  color where the grey line was. Scrolling back stops following
   until "Back to live".
 
 ## Code
