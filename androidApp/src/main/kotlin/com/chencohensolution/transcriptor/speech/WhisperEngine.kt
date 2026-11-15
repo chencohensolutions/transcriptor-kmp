@@ -5,9 +5,15 @@ class WhisperEngine(path: String) : SpeechEngine {
     private var handle = nativeInit(path).also { check(it != 0L) { "Couldn't load the model ($path)" } }
     private val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 6)
 
-    override fun transcribe(samples: FloatArray, language: String, prompt: String?): List<Piece> {
+    override fun transcribe(samples: FloatArray, language: String, prompt: String?): List<Piece> = run(samples, language, prompt, words = false)
+
+    override val timesWords = true
+
+    override fun transcribeWords(samples: FloatArray, language: String): List<Piece> = run(samples, language, null, words = true)
+
+    private fun run(samples: FloatArray, language: String, prompt: String?, words: Boolean): List<Piece> {
         check(handle != 0L) { "Closed" }
-        val lines = nativeTranscribe(handle, samples, language, prompt, threads) ?: error("whisper failed")
+        val lines = nativeTranscribe(handle, samples, language, prompt, threads, words) ?: error("whisper failed")
         return lines.map { line ->
             val (start, end, noSpeech, text) = line.split('\t', limit = 4)
             Piece(start.toLong(), end.toLong(), text, noSpeech.toFloat())
@@ -30,6 +36,6 @@ class WhisperEngine(path: String) : SpeechEngine {
         @JvmStatic private external fun nativeQuantize(input: String, output: String, type: String): Boolean
         @JvmStatic private external fun nativeInit(path: String): Long
         @JvmStatic private external fun nativeFree(handle: Long)
-        @JvmStatic private external fun nativeTranscribe(handle: Long, samples: FloatArray, language: String, prompt: String?, threads: Int): Array<String>?
+        @JvmStatic private external fun nativeTranscribe(handle: Long, samples: FloatArray, language: String, prompt: String?, threads: Int, words: Boolean): Array<String>?
     }
 }

@@ -13,4 +13,13 @@ data class Piece(val startMillis: Long, val endMillis: Long, val text: String, v
 interface SpeechEngine : AutoCloseable {
     /** [samples]: 16 kHz mono, -1..1. [prompt]: text to condition on (names, spelling); null for none. */
     fun transcribe(samples: FloatArray, language: String, prompt: String?): List<Piece>
+
+    /** It times words ([transcribeWords]). */
+    val timesWords: Boolean get() = false
+
+    /**
+     * The samples' words, a [Piece] each with its own times, for the refine pass to hand them back to the lines they
+     * were said in; null when the engine can't time words (it then improves a line at a time).
+     */
+    fun transcribeWords(samples: FloatArray, language: String): List<Piece>? = null
 }

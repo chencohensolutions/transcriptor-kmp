@@ -42,7 +42,8 @@ interface LiveTranscriber {
  * eight words) said three or more times in a row (a model stuck in a loop: "אתם, אתם, אתם") kept once.
  */
 fun cleanLine(text: String): String {
-    var t = text.trim().trimStart { !it.isLetterOrDigit() }.replace(Regex("""\s+"""), " ")
+    // Without the direction marks Whisper writes into Hebrew (U+202A..E, U+2066..9): the app lays lines out itself.
+    var t = text.replace(Regex("[\u202A-\u202E\u2066-\u2069]"), "").trim().trimStart { !it.isLetterOrDigit() }.replace(Regex("""\s+"""), " ")
     t = Regex("""((?<!\S)[^\s,.]+(?:\s+[^\s,.]+){0,7}[,.]?)(?:\s+\1){2,}""").replace(t) { it.groupValues[1] }
     return t.trim()
 }

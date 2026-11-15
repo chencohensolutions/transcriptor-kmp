@@ -42,10 +42,10 @@ Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeFree(JNIEnv *
 }
 
 // Returns "t0\tt1\tno_speech\ttext" per segment, times in milliseconds, no_speech the model's probability that
-// there was no speech (0..1); null if whisper_full failed.
+// there was no speech (0..1); null if whisper_full failed. With `words`, a segment is a word, with its own times.
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeTranscribe(
-        JNIEnv *env, jclass, jlong handle, jfloatArray samples, jstring language, jstring prompt, jint threads) {
+        JNIEnv *env, jclass, jlong handle, jfloatArray samples, jstring language, jstring prompt, jint threads, jboolean words) {
     auto *ctx = reinterpret_cast<whisper_context *>(handle);
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads = threads;
@@ -56,6 +56,11 @@ Java_com_chencohensolution_transcriptor_speech_WhisperEngine_nativeTranscribe(
     params.translate = false;
     params.no_context = true;
     params.suppress_nst = true;
+    if (words) {
+        params.token_timestamps = true;
+        params.max_len = 1;
+        params.split_on_word = true;
+    }
     // The encoder's window fitted to the audio (50 per second, plus a margin) instead of 30 s: several times faster
     // for a line of a few seconds. Never under 8 s: with less, the model invents and repeats.
     jsize count_samples = env->GetArrayLength(samples);
