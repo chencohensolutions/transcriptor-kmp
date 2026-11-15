@@ -36,11 +36,27 @@ fun interface PowerProbe {
 data class PowerModel(val role: String, val name: String, val runsOn: String)
 
 /**
+ * How the audio was kept while the power was measured: the setting ([format], as `settings.json` names it), the
+ * [codec] written then ("wav", "flac", "aac"), the MediaCodec [encoder] (null for WAV: nothing encodes), whether it is
+ * [hardware], and its settings in words ([details]: "LC · 64 kbps · mono · 48 kHz", "level 5").
+ */
+@Serializable
+data class PowerAudio(
+    val format: String,
+    val codec: String,
+    val encoder: String? = null,
+    val hardware: Boolean = false,
+    val details: String = "",
+)
+
+/**
  * How much power a lecture's recording took, from [PowerMeter]'s samples, as `power.json` keeps it (version 1).
  *
  * - The battery's power is the whole phone's, screen and other apps included; the app's own share shows in
  *   [cpuSecondsPerMinute] (the process's CPU time).
  * - When [charging] (any sample on a charger), the power figures are null: the current then isn't what the phone uses.
+ * - [phase] is "record" (the recording, `power.json`), or "encode" (a WAV encoded to FLAC or AAC afterwards,
+ *   `power-encode.json`): together they tell whether recording as WAV and encoding later saves anything.
  */
 @Serializable
 data class PowerReport(
@@ -59,18 +75,31 @@ data class PowerReport(
     val screenOnShare: Double?,
     val charging: Boolean,
     val models: List<PowerModel> = emptyList(),
+    val audio: PowerAudio? = null,
+    val phase: String = PHASE_RECORD,
+    /** Battery percent used ([batteryPercentStart] − [batteryPercentEnd]); null on the charger. */
+    val batteryPercentUsed: Int? = null,
+    /** [batteryPercentUsed] per hour of [durationMillis]; whole percents make this rough for short ones. */
+    val batteryPercentPerHour: Double? = null,
 ) {
     /** The temperature's change over the lecture, °C. */
     val temperatureRise get() = if (temperatureStart != null && temperatureEnd != null) temperatureEnd - temperatureStart else null
 
     companion object {
-        /** The report of [samples] over [durationMillis] of recording, with [models]. */
-        fun of(samples: List<PowerSample>, durationMillis: Long, models: List<PowerModel>): PowerReport {
+        const val PHASE_RECORD = "record"
+        const val PHASE_ENCODE = "encode"
+
+        /** The report of [samples] over [durationMillis] of recording (or encoding: [phase]), with [models] and [audio]. */
+        fun of(
+            samples: List<PowerSample>, durationMillis: Long, models: List<PowerModel>,
+            audio: PowerAudio? = null, phase: String = PHASE_RECORD,
+        ): PowerReport {
             val charging = samples.any { it.charging }
             val watts = samples.filter { !it.charging }.map { abs(it.currentMicroAmps) / 1e6 * it.voltageMillivolts / 1e3 }
             val avgMw = if (charging || watts.isEmpty()) null else watts.average() * 1000
             val minutes = durationMillis / 60_000.0
             val hours = durationMillis / 3_600_000.0
+            val used = if (charging) null else samples.firstOrNull()?.levelPercent?.let { start -> samples.last().levelPercent.let { start - it } }
             val cpu = if (samples.size >= 2 && minutes > 0) (samples.last().cpuSeconds - samples.first().cpuSeconds) / minutes else null
             return PowerReport(
                 durationMillis = durationMillis,
@@ -87,6 +116,10 @@ data class PowerReport(
                 screenOnShare = if (samples.isEmpty()) null else (samples.count { it.screenOn }.toDouble() / samples.size).round(2),
                 charging = charging,
                 models = models,
+                audio = audio,
+                phase = phase,
+                batteryPercentUsed = used,
+                batteryPercentPerHour = if (used != null && hours > 0) (used / hours).round(1) else null,
             )
         }
 
@@ -129,7 +162,8 @@ class PowerMeter(private val probe: PowerProbe, private val intervalMillis: Long
 
 /** A row of `power-log.csv` (the app's files folder): one per lecture, the header first. */
 object PowerLogCsv {
-    const val HEADER = "lecture,notebook,started,duration_s,avg_mw,mwh_total,mwh_per_min,j_per_min,battery_start,battery_end,temp_start,temp_end,cpu_s_per_min,screen_on,charging,models"
+    const val HEADER = "lecture,notebook,started,duration_s,avg_mw,mwh_total,mwh_per_min,j_per_min,battery_start,battery_end,temp_start,temp_end,cpu_s_per_min,screen_on,charging,models," +
+        "phase,audio_format,audio_codec,audio_encoder,audio_hardware,audio_settings,battery_used,battery_per_hour"
 
     fun row(lectureId: String, labels: String, startedAtMillis: Long, r: PowerReport): String = listOf(
         lectureId, labels, startedAtMillis.toString(), (r.durationMillis / 1000).toString(),
@@ -138,6 +172,10 @@ object PowerLogCsv {
         r.temperatureStart.str(), r.temperatureEnd.str(), r.cpuSecondsPerMinute.str(), r.screenOnShare.str(),
         r.charging.toString(),
         "\"" + r.models.joinToString("; ") { "${it.role}: ${it.name} (${it.runsOn})" }.replace("\"", "'") + "\"",
+        r.phase, r.audio?.format.orEmpty(), r.audio?.codec.orEmpty(), r.audio?.encoder.orEmpty(),
+        r.audio?.let { if (it.hardware) "hardware" else if (it.encoder == null) "" else "software" }.orEmpty(),
+        "\"" + r.audio?.details.orEmpty().replace("\"", "'") + "\"",
+        r.batteryPercentUsed?.toString().orEmpty(), r.batteryPercentPerHour.str(),
     ).joinToString(",")
 
     private fun Double?.str() = this?.toString().orEmpty()

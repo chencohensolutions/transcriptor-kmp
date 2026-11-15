@@ -5,7 +5,9 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.recording.AudioFileFormat
 import com.chencohensolution.transcriptor.recording.AudioRecorder
-import com.chencohensolution.transcriptor.recording.FlacCompression
+import com.chencohensolution.transcriptor.recording.AudioCompression
+import com.chencohensolution.transcriptor.settings.EncodeAfter
+import com.chencohensolution.transcriptor.settings.allows
 import com.chencohensolution.transcriptor.recording.FlacEncode
 import com.chencohensolution.transcriptor.recording.LectureSession
 import com.chencohensolution.transcriptor.recording.WavWriter
@@ -37,14 +39,16 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var file: Path? = null
     var format: AudioFileFormat? = null
     var flacLevel: Int? = null
+    var aac: com.chencohensolution.transcriptor.settings.AacSettings? = null
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings) {
         this.file = file
         this.format = format
         this.flacLevel = flacLevel
+        this.aac = aac
         if (format == AudioFileFormat.Wav) wav = WavWriter(fileSystem, file) else fileSystem.write(file) {}
         level.value = 0.5f
     }
@@ -132,6 +136,20 @@ class RecordingTest {
         assertEquals(AUDIO_FLAC, lecture.audioFile)
         assertEquals(AudioFileFormat.Flac, recorder.format)
         assertEquals(FLAC_DEFAULT_LEVEL, recorder.flacLevel)
+    }
+
+    @Test
+    fun aacLiveRecordsToAacWithItsSettings() = runTest {
+        settings.audioFormat = AudioFormat.AacLive
+        settings.aac = com.chencohensolution.transcriptor.settings.AacSettings(
+            profile = com.chencohensolution.transcriptor.settings.AacProfile.He, sampleRate = 48_000, channels = 2, bitrateKbps = 48,
+        )
+        val lecture = session().start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        assertEquals(com.chencohensolution.transcriptor.notebook.AUDIO_AAC, lecture.audioFile)
+        assertEquals(AudioFileFormat.Aac, recorder.format)
+        assertEquals(48, recorder.aac?.bitrateKbps)
+        assertEquals(AudioFormat.AacLive, SettingsStore(fs, root).audioFormat)
+        assertEquals(2, SettingsStore(fs, root).aac.channels)
     }
 
     @Test
@@ -234,7 +252,7 @@ class RecordingTest {
         assertTrue(stopped.pendingFlac)
         settings.flacLevel = 7
         var level: Int? = null
-        val compression = FlacCompression(fs, store, { _, flac, l, progress ->
+        val compression = AudioCompression(fs, store, { _, flac, l, progress ->
             level = l
             fs.write(flac) { writeUtf8("fLaC") }
             progress(1f)
@@ -250,13 +268,51 @@ class RecordingTest {
     }
 
     @Test
+    fun wavThenAacIsEncodedAfterStopWithTheAacSettings() = runTest {
+        settings.audioFormat = AudioFormat.WavThenAac
+        settings.aac = com.chencohensolution.transcriptor.settings.AacSettings(bitrateKbps = 96)
+        val session = session()
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        assertEquals(AudioFileFormat.Wav, recorder.format)
+        recorder.advance(2_000)
+        val stopped = assertNotNull(session.stop())
+        assertTrue(stopped.pendingAac)
+        assertFalse(stopped.pendingFlac)
+        var kbps: Int? = null
+        val compression = AudioCompression(fs, store, { _, _, _, _ -> error("not FLAC") }, aacEncoder = { _, aac, s, _ ->
+            kbps = s.bitrateKbps
+            fs.write(aac) { writeUtf8("aac") }
+            96_000
+        }, aac = { settings.aac })
+        assertEquals(listOf(stopped.id), compression.pending().map { it.id })
+        val done = compression.compress(stopped)
+        assertEquals(96, kbps)
+        assertEquals(com.chencohensolution.transcriptor.notebook.AUDIO_AAC, done.audioFile)
+        assertEquals(false, store.load(stopped.id)?.pendingAac)
+        assertFalse(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
+        assertTrue(compression.pending().isEmpty())
+    }
+
+    @Test
+    fun encodingWaitsForTheChargerAndThirtyPercentWhenAsked() {
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
+        settings.encodeAfter = com.chencohensolution.transcriptor.settings.EncodeAfter.Charging
+        val after = SettingsStore(fs, root).encodeAfter
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Charging, after)
+        assertFalse(EncodeAfter.Charging.allows(false, 90))
+        assertFalse(EncodeAfter.Charging.allows(true, 29))
+        assertTrue(EncodeAfter.Charging.allows(true, 30))
+        assertTrue(EncodeAfter.Stop.allows(false, 5))
+    }
+
+    @Test
     fun aFailedCompressionKeepsTheWav() = runTest {
         settings.audioFormat = AudioFormat.WavThenFlac
         val session = session()
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(1_000)
         val stopped = assertNotNull(session.stop())
-        val compression = FlacCompression(fs, store, { _, flac, _, _ -> fs.write(flac) {}; 10 })
+        val compression = AudioCompression(fs, store, { _, flac, _, _ -> fs.write(flac) {}; 10 })
         assertFailsWith<IllegalStateException> { compression.compress(stopped) }
         assertTrue(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
         assertEquals(true, store.load(stopped.id)?.pendingFlac)

@@ -96,7 +96,7 @@ starts afresh. Amber from 70%, red from 90%.
   `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`).
 - State and controller (shared): `recording/LiveLectureState.kt`, `recording/LectureSession.kt` (`start`,
   `pauseOrResume`, `addNote`, `editLine`, `stop`), `notebook/Timeline.kt` (`timelineOf`), `notebook/LectureStore.kt`,
-  `recording/WavWriter.kt`, `recording/FlacCompression.kt`, `settings/Settings.kt` (`AudioFormat`).
+  `recording/WavWriter.kt`, `recording/AudioCompression.kt`, `settings/Settings.kt` (`AudioFormat`).
 - Android: `recording/AndroidRecorder.kt` and `FlacEncoder.kt` (sharedLogic's androidMain); `RecordingService.kt`
   (foreground service: microphone while recording, media processing while compressing); `Recording.kt` (the app's
   one session); `MainActivity.kt` (the temporary start screen, then this screen).

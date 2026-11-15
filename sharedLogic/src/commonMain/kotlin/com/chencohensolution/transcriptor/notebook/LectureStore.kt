@@ -170,9 +170,10 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val place = placeOf(lecture.id)
         val folder = place.folder(lecture.id)
         place.fileSystem.createDirectories(folder)
-        val temp = folder / "$POWER.tmp"
+        val name = if (report.phase == PowerReport.PHASE_ENCODE) "power-encode.json" else POWER
+        val temp = folder / "$name.tmp"
         place.fileSystem.write(temp) { writeUtf8(json.encodeToString(report)) }
-        place.fileSystem.atomicMove(temp, folder / POWER)
+        place.fileSystem.atomicMove(temp, folder / name)
     }
 
     /** [savePower]'s report; null for a lecture recorded before it existed. */
@@ -187,7 +188,12 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     fun appendPowerLog(row: String) {
         val file = local.root / POWER_LOG
         val fs = local.fileSystem
-        val before = if (fs.exists(file)) fs.read(file) { readUtf8() } else PowerLogCsv.HEADER + "\n"
+        var before = if (fs.exists(file)) fs.read(file) { readUtf8() } else PowerLogCsv.HEADER + "\n"
+        // Columns were added (Nov 2026): the old file is kept beside it as it was, and a new one starts.
+        if (before.substringBefore('\n') != PowerLogCsv.HEADER) {
+            fs.atomicMove(file, local.root / "power-log-before-${before.substringBefore('\n').split(',').size}-columns.csv")
+            before = PowerLogCsv.HEADER + "\n"
+        }
         val temp = local.root / "$POWER_LOG.tmp"
         fs.createDirectories(local.root)
         fs.write(temp) { writeUtf8(before + row + "\n") }
@@ -232,6 +238,7 @@ private data class LectureFileV1(
     val durationMs: Long,
     val audio: String,
     val pendingFlac: Boolean = false,
+    val pendingAac: Boolean = false,
     val speakerPass: Boolean = false,
     val refinedWith: String? = null,
     val versions: List<VersionInfoV1> = emptyList(),
@@ -248,7 +255,7 @@ private data class LectureFileV1(
         segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
-        audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass, refinedWith = refinedWith,
+        audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, speakerPass = speakerPass, refinedWith = refinedWith,
         versions = versions.map { it.toInfo() },
     )
 
@@ -257,7 +264,7 @@ private data class LectureFileV1(
         fun of(lecture: Lecture) = LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
-            durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac,
+            durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac, pendingAac = lecture.pendingAac,
             speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
             versions = lecture.versions.map { VersionInfoV1.of(it) },
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },

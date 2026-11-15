@@ -1,0 +1,65 @@
+package com.chencohensolution.transcriptor.recording
+
+import com.chencohensolution.transcriptor.notebook.AUDIO_AAC
+import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
+import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
+import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.notebook.LectureStore
+import com.chencohensolution.transcriptor.notebook.pendingEncode
+import com.chencohensolution.transcriptor.settings.AacSettings
+import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
+import okio.FileSystem
+import okio.Path
+
+/**
+ * Encodes a WAV file to FLAC at [level] (0 the fastest, 8 the smallest), reporting progress 0..1, and returns the
+ * number of frames (samples per channel) written.
+ */
+fun interface FlacEncode {
+    fun encode(wav: Path, flac: Path, level: Int, progress: (Float) -> Unit): Long
+}
+
+/**
+ * Encodes a WAV file to AAC (ADTS) as [settings] say, reporting progress 0..1, and returns the number of the WAV's frames
+ * (samples per channel, at 48 kHz) it took in.
+ */
+fun interface AacEncode {
+    fun encode(wav: Path, aac: Path, settings: AacSettings, progress: (Float) -> Unit): Long
+}
+
+/**
+ * Encodes a lecture recorded with "WAV, then FLAC" or "WAV, then AAC": the WAV to `audio.flac.tmp` or `audio.aac.tmp`,
+ * checked to hold every frame, renamed, `lecture.json` pointed at it, then the WAV deleted. Interrupted, the WAV
+ * stays and the lecture stays pending, so [compress] runs again from the start.
+ */
+class AudioCompression(
+    private val fileSystem: FileSystem,
+    private val store: LectureStore,
+    private val encoder: FlacEncode,
+    /** The compression level, read when each lecture is compressed (the setting can change in between). */
+    private val level: () -> Int = { FLAC_DEFAULT_LEVEL },
+    private val aacEncoder: AacEncode? = null,
+    /** The AAC settings, read when each lecture is encoded. */
+    private val aac: () -> AacSettings = { AacSettings() },
+) {
+    fun pending(): List<Lecture> = store.all().filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
+
+    fun compress(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
+        val toAac = lecture.pendingAac && !lecture.pendingFlac
+        val name = if (toAac) AUDIO_AAC else AUDIO_FLAC
+        val wav = store.audioPath(lecture, AUDIO_WAV)
+        val out = store.audioPath(lecture, name)
+        val temp = store.audioPath(lecture, "$name.tmp")
+        fileSystem.delete(temp)
+        WavWriter.repair(fileSystem, wav)
+        val expected = WavWriter.read(fileSystem, wav).frames
+        val written = if (toAac) checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac().valid(), progress)
+        else encoder.encode(wav, temp, level(), progress)
+        check(written == expected) { "${if (toAac) "AAC" else "FLAC"} took $written frames, the WAV has $expected" }
+        fileSystem.atomicMove(temp, out)
+        val done = lecture.copy(audioFile = name, pendingFlac = false, pendingAac = false)
+        store.save(done)
+        fileSystem.delete(wav)
+        return done
+    }
+}

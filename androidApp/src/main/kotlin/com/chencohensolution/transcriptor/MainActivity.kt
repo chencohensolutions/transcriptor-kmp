@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.transcriptor.settings.allows
 import android.content.ClipData
 import java.io.File
 import androidx.core.content.FileProvider
@@ -277,13 +278,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Lectures recorded as WAV and waiting to be compressed to FLAC (the app was closed first): compressed on launch. */
+/** Lectures recorded as WAV and waiting for FLAC or AAC: encoded on launch, or left to [EncodeJob] when that waits for the charger. */
 @Composable
 private fun CompressPending() {
     val context = LocalContext.current
     LaunchedEffect(Unit) {
         val pending = withContext(Dispatchers.IO) { Recording.compression.pending() }
-        if (pending.isNotEmpty() && Recording.compressing.value == null) RecordingService.compressPending(context)
+        if (pending.isEmpty() || Recording.compressing.value != null) return@LaunchedEffect
+        val (percent, charging) = Recording.battery(context)
+        // "Encode when charging": the job runs once the phone is on the charger, the app open or not.
+        if (Recording.settings.encodeAfter.allows(charging, percent)) RecordingService.compressPending(context) else EncodeJob.schedule(context)
     }
 }
 

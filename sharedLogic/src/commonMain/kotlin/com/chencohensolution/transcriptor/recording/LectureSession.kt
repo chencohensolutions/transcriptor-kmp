@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.recording
 
+import com.chencohensolution.transcriptor.notebook.AUDIO_AAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
@@ -122,7 +123,11 @@ class LectureSession(
         val lecture = Lecture(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
-            audioFile = if (format == AudioFormat.FlacLive) AUDIO_FLAC else AUDIO_WAV,
+            audioFile = when (format) {
+                AudioFormat.FlacLive -> AUDIO_FLAC
+                AudioFormat.AacLive -> AUDIO_AAC
+                else -> AUDIO_WAV
+            },
         )
         store.save(lecture)
         names = emptyMap()
@@ -146,8 +151,13 @@ class LectureSession(
         power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
-            if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
+            when (format) {
+                AudioFormat.FlacLive -> AudioFileFormat.Flac
+                AudioFormat.AacLive -> AudioFileFormat.Aac
+                else -> AudioFileFormat.Wav
+            },
             settings.flacLevel,
+            settings.aac,
         )
         recording.value = Recording(labelNames, lecture, paused = false)
         saving = scope.launch {
@@ -191,6 +201,25 @@ class LectureSession(
     }
 
     /** The models this lecture used and where, for its power report. */
+    /** The audio's format and encoder for the power report, from the setting it was recorded with and the recorder. */
+    private fun audioInUse(file: String): PowerAudio {
+        val format = settings.audioFormat
+        val codec = file.substringAfterLast('.')
+        val aac = settings.aac
+        val details = when (codec) {
+            "aac" -> "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
+            "flac" -> "level ${settings.flacLevel}"
+            else -> when (format) {
+                AudioFormat.WavThenAac -> "then AAC ${aac.profile.name} · ${aac.bitrateKbps} kbps, ${settings.encodeAfter.name.lowercase()}"
+                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel}, ${settings.encodeAfter.name.lowercase()}"
+                else -> ""
+            }
+        }
+        return PowerAudio(
+            format = format.name, codec = codec, encoder = recorder.encoderName, hardware = recorder.encoderHardware, details = details,
+        )
+    }
+
     private fun modelsInUse(): List<PowerModel> {
         val m = liveModel ?: return emptyList()
         val out = mutableListOf(PowerModel("live", m.name, if ("NPU" in m.name) "NPU" else "CPU"))
@@ -253,8 +282,8 @@ class LectureSession(
 
     /**
      * Ends the lecture: the recording stops at once, then live transcription finishes the lines still waiting
-     * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" it is saved as [Lecture.pendingFlac] for
-     * [FlacCompression].
+     * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" or "WAV, then AAC" it is saved as [Lecture.pendingFlac] or [Lecture.pendingAac] for
+     * [AudioCompression].
      */
     suspend fun stop(): Lecture? {
         val r = recording.value ?: return null
@@ -281,7 +310,7 @@ class LectureSession(
         // How much power it took: power.json beside the audio, a row in power-log.csv.
         power?.let { meter ->
             runCatching {
-                val report = PowerReport.of(meter.stop(), duration, modelsInUse())
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile))
                 store.savePower(r.lecture, report)
                 store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.labels.joinToString("+"), r.lecture.startedAtMillis, report))
             }
@@ -296,6 +325,7 @@ class LectureSession(
         val lecture = recording.value!!.lecture.copy(
             durationMillis = duration,
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenFlac,
+            pendingAac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenAac,
         )
         save(lecture)
         recording.value = null

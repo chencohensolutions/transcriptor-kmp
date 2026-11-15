@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import kotlinx.coroutines.cancel
 import android.app.Application
 import android.content.ContentResolver
 import android.content.Intent
@@ -20,8 +21,10 @@ import com.chencohensolution.transcriptor.storage.LIBRARY_ROOT
 import com.chencohensolution.transcriptor.storage.SafFileSystem
 import com.chencohensolution.transcriptor.notebook.NotebooksController
 import com.chencohensolution.transcriptor.recording.AndroidRecorder
-import com.chencohensolution.transcriptor.recording.FlacCompression
+import com.chencohensolution.transcriptor.recording.AudioCompression
+import com.chencohensolution.transcriptor.settings.allows
 import com.chencohensolution.transcriptor.recording.LectureSession
+import com.chencohensolution.transcriptor.recording.androidAacEncode
 import com.chencohensolution.transcriptor.recording.androidFlacEncode
 import com.chencohensolution.transcriptor.models.HubClient
 import com.chencohensolution.transcriptor.models.InstalledModels
@@ -85,7 +88,7 @@ object Recording {
         private set
     lateinit var session: LectureSession
         private set
-    lateinit var compression: FlacCompression
+    lateinit var compression: AudioCompression
         private set
     lateinit var models: ModelFiles
         private set
@@ -100,8 +103,72 @@ object Recording {
     /** The refine pass: the lecture it runs on and 0..1; null when not running. */
     val refining = MutableStateFlow<Pair<String, Float>?>(null)
 
-    /** Compressing to FLAC: the lecture and 0..1, null when not. */
+    /** Encoding a WAV to FLAC or AAC: the lecture and 0..1, null when not. */
     val compressing = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** The battery and process readings behind the power reports (recording, and encoding afterwards). */
+    private lateinit var powerProbe: com.chencohensolution.transcriptor.recording.PowerProbe
+
+    /** Held while lectures are encoded (by [RecordingService] or [EncodeJob]), so only one runs. */
+    val encoding = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** The power report of encoding [lecture]'s WAV ([samples] over [millis]): `power-encode.json` and a row in power-log.csv. */
+    private fun logEncode(lecture: Lecture, toAac: Boolean, samples: List<com.chencohensolution.transcriptor.recording.PowerSample>, millis: Long) {
+        val aac = settings.aac
+        val encoder = if (toAac) com.chencohensolution.transcriptor.recording.AacEncoders.lastUsed else "c2.android.flac.encoder"
+        val audio = com.chencohensolution.transcriptor.recording.PowerAudio(
+            format = settings.audioFormat.name, codec = if (toAac) "aac" else "flac", encoder = encoder,
+            hardware = com.chencohensolution.transcriptor.recording.AacEncoders.all.any { it.name == encoder && it.hardware },
+            details = (if (toAac) "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
+                else "level ${settings.flacLevel}") + " · ${lecture.durationMillis / 60_000} min of audio · ${settings.encodeAfter.name.lowercase()}",
+        )
+        val report = com.chencohensolution.transcriptor.recording.PowerReport.of(samples, millis, emptyList(), audio, com.chencohensolution.transcriptor.recording.PowerReport.PHASE_ENCODE)
+        val saved = store.load(lecture.id) ?: lecture
+        store.savePower(saved, report)
+        store.appendPowerLog(com.chencohensolution.transcriptor.recording.PowerLogCsv.row(lecture.id, lecture.labels.joinToString("+"), lecture.startedAtMillis, report))
+    }
+
+    /** The battery, 0..100, and whether the phone is on the charger. */
+    fun battery(context: android.content.Context): Pair<Int, Boolean> {
+        val manager = context.getSystemService(android.os.BatteryManager::class.java)
+        return manager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) to manager.isCharging
+    }
+
+    /**
+     * Encodes the lectures waiting for FLAC or AAC, one after another, when the setting allows it now (right after Stop,
+     * or on the charger above 30%); [progress] gets each one's string and 0..1. False when none ran (none waiting, one
+     * already running, or the setting waits for the charger, which then gets an [EncodeJob]).
+     */
+    fun encodePending(context: android.content.Context, progress: (Lecture, Float) -> Unit = { _, _ -> }): Boolean {
+        val pending = compression.pending()
+        if (pending.isEmpty()) return false
+        val (percent, charging) = battery(context)
+        if (!settings.encodeAfter.allows(charging, percent)) { EncodeJob.schedule(context); return false }
+        if (!encoding.compareAndSet(false, true)) return false
+        try {
+            for (lecture in pending) {
+                if (session.isRecording) { EncodeJob.schedule(context); break }
+                // Metered like the recording ("encode" in power-log.csv), so WAV-then-encode can be weighed against encoding live.
+                val meter = com.chencohensolution.transcriptor.recording.PowerMeter(powerProbe, intervalMillis = 5_000)
+                val scope = kotlinx.coroutines.CoroutineScope(Dispatchers.Default)
+                meter.start(scope)
+                val began = System.currentTimeMillis()
+                val toAac = lecture.pendingAac
+                runCatching { compression.compress(lecture) { p -> compressing.value = lecture.id to p; progress(lecture, p) } }
+                    .onSuccess { done -> if (lastLecture.value?.id == done.id) lastLecture.value = done }
+                    .also {
+                        val samples = meter.stop()
+                        scope.cancel()
+                        if (it.isSuccess) runCatching { logEncode(lecture, toAac, samples, System.currentTimeMillis() - began) }
+                    }
+                    .onFailure { android.util.Log.e("Recording", "encoding ${lecture.id} failed", it) }
+            }
+        } finally {
+            compressing.value = null
+            encoding.set(false)
+        }
+        return true
+    }
 
     /** The speaker pass: the lecture it runs on and 0..1, null when not running. */
     val findingSpeakers = MutableStateFlow<Pair<String, Float>?>(null)
@@ -485,9 +552,9 @@ object Recording {
             voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
             speakerPassReady = { canFindSpeakers },
-            power = PowerMeter(AndroidPowerProbe(app)),
+            power = PowerMeter(AndroidPowerProbe(app).also { powerProbe = it }),
         )
-        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
+        compression = AudioCompression(FileSystem.SYSTEM, store, androidFlacEncode, { settings.flacLevel }, androidAacEncode, { settings.aac })
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

@@ -72,6 +72,14 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     default; Nov 6, 2026). Every level is lossless; higher ones make the file a few percent smaller and take longer.
     The encoder is Android's MediaCodec FLAC, which runs on the CPU: the NPU and GPU have no FLAC encoder.
   - FLAC is about 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are alike).
+  - **AAC live** (`AudioFormat.AacLive`): `audio.aac` as it records, lossy and small (about 28 MB an hour at the
+    default AAC-LC, 64 kbps, mono, 48 kHz). `AacSettings` holds the profile (LC, HE, HE v2), sample rate (48, 24 or 16
+    kHz, whole fractions of the microphone's 48, brought down by `PcmReducer`), channels, bitrate and encoder.
+    `AacEncoder` runs on MediaCodec and picks a hardware AAC encoder first, then the phone maker's, then Android's
+    software `c2.android.aac.encoder`; xHE-AAC's encoder is left out. The file is ADTS (each frame with its own
+    header, `Adts`), so a recording cut off by a crash plays up to its last whole frame; HE is signalled implicitly.
+    The microphone is still read at 48 kHz stereo, so live transcription is the same. Reading back (`RecordingAudio`,
+    `Downsampler`) follows the decoder's rate and channels; `AacRoundTripTest` (androidTest) checks each profile.
 - `lecture.json`'s `"audio"` names the file, and `"pendingFlac"` marks a WAV waiting to be compressed.
 - The models get a copy downmixed to mono and resampled to 16 kHz, in memory.
 - Recording goes on with the screen off: a foreground service with the microphone type on Android, the background
@@ -179,7 +187,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   - duration, average mW, mWh in all, mWh and J per minute;
   - battery % and °C at the start and end;
   - the app's CPU seconds per minute, and the screen-on share;
-  - the models used and where (NPU or CPU).
+  - the models used and where (NPU or CPU);
+  - the audio (`audio`): the format setting, the codec written, the MediaCodec encoder, hardware or software, and its
+    settings in words;
+  - battery % used, and per hour.
+
+  Encoding a WAV afterwards (WAV, then FLAC or AAC) is metered the same way, every 5 seconds: `power-encode.json`
+  beside the audio and a row with `phase` = `encode` in `power-log.csv` (the recording's rows say `record`). The
+  recording's row plus the encoding's is what WAV-then-encode costs, against one row for encoding live. Encoded on the
+  charger, its power figures are null, as above. `power-log.csv` gained these columns in Nov 2026: a log with the old
+  header is kept as `power-log-before-16-columns.csv` and a new one starts.
 
   The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
   time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.

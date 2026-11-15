@@ -24,7 +24,7 @@ data class LectureSummary(
 )
 
 /**
- * One recorded class: the audio file (WAV or FLAC, 48 kHz, stereo, 16 bit) and what was said and written in it. Every
+ * One recorded class: the audio file (WAV or FLAC, 48 kHz, stereo, 16 bit; or AAC, as Settings had it) and what was said and written in it. Every
  * time is in milliseconds from the start of the recording, so a line or a note always points into the audio.
  */
 data class Lecture(
@@ -37,10 +37,12 @@ data class Lecture(
     val segments: List<Segment>,
     val notes: List<Note>,
     val speakers: List<Speaker> = emptyList(),
-    /** The audio's file name in the lecture's folder: [AUDIO_WAV] or [AUDIO_FLAC]. */
+    /** The audio's file name in the lecture's folder: [AUDIO_WAV], [AUDIO_FLAC] or [AUDIO_AAC]. */
     val audioFile: String = AUDIO_WAV,
     /** Recorded as WAV with the "WAV, then FLAC" setting, and not compressed yet. */
     val pendingFlac: Boolean = false,
+    /** Recorded as WAV with "WAV, then AAC", and not encoded yet. */
+    val pendingAac: Boolean = false,
     /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
     val speakerPass: Boolean = false,
     /** The model the refine pass transcribed it with again; null before it. */
@@ -84,8 +86,14 @@ fun Lecture.asVersion(now: Long) = Version(
     segments, speakers, speakerPass, refinedWith,
 )
 
+/** Its WAV waits to be encoded (to FLAC or AAC) by [com.chencohensolution.transcriptor.recording.AudioCompression]. */
+val Lecture.pendingEncode get() = pendingFlac || pendingAac
+
 const val AUDIO_WAV = "audio.wav"
 const val AUDIO_FLAC = "audio.flac"
+
+/** AAC in ADTS frames: each frame carries its own header, so a recording cut off by a crash still plays up to its end. */
+const val AUDIO_AAC = "audio.aac"
 
 /** A line or paragraph of speech, from [startMillis] to [endMillis]. */
 data class Segment(

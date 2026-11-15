@@ -1,5 +1,8 @@
 package com.chencohensolution.transcriptor.ui
 
+import com.chencohensolution.transcriptor.recording.AacEncoderInfo
+import com.chencohensolution.transcriptor.settings.EncodeAfter
+import com.chencohensolution.transcriptor.settings.AacSettings
 import kotlin.math.roundToInt
 import androidx.compose.material3.Slider
 import androidx.activity.compose.BackHandler
@@ -125,6 +128,14 @@ data class ModelsState(
     val audioFormat: AudioFormat,
     /** FLAC's compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
+    /** How AAC records, and what "WAV, then AAC" encodes to. */
+    val aac: AacSettings = AacSettings(),
+    /** When "Record as WAV, encode afterwards" encodes. */
+    val encodeAfter: EncodeAfter = EncodeAfter.Stop,
+    /** The phone's AAC encoders, hardware first ([com.chencohensolution.transcriptor.recording.AacEncoders.all]). */
+    val aacEncoders: List<AacEncoderInfo> = emptyList(),
+    /** What "automatic" runs for [aac]: the first of [com.chencohensolution.transcriptor.recording.AacEncoders.candidates]. */
+    val autoAacEncoder: String = "",
     /** The speaker pass runs when a lecture stops. */
     val findSpeakersOnStop: Boolean,
     /** Lectures are improved on their own after they stop (improving by hand is always on the lecture's menu). */
@@ -143,6 +154,9 @@ data class ModelsState(
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
+    /** The AAC encoder the next AAC moment runs on. */
+    val aacEncoder get() = aacEncoders.firstOrNull { it.name == (aac.encoder ?: autoAacEncoder) } ?: aacEncoders.firstOrNull { it.name == autoAacEncoder }
+
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
 
@@ -210,6 +224,8 @@ class ModelsActions(
     val retryNpu: (SpeechModel) -> Unit = {},
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFlacLevel: (Int) -> Unit = {},
+    val setAac: (AacSettings) -> Unit = {},
+    val setEncodeAfter: (EncodeAfter) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
@@ -245,6 +261,8 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
     /** The speaker page open ([HubKind.VoicePrints] or [HubKind.SpeakerTurns]), and its Hugging Face search. */
     var speakerJob by rememberSaveable { mutableStateOf<HubKind?>(null) }
     var speakerHub by rememberSaveable { mutableStateOf(false) }
+    /** Recording format, or the AAC or FLAC page it opened; null when none is open. */
+    var formatPage by rememberSaveable { mutableStateOf<FormatPage?>(null) }
     val openCatalog = { l: String? -> if (l != null) shown = l; page = 1 }
     when {
         page == 2 -> {
@@ -263,11 +281,21 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
             BackHandler { speakerHub = false }
             HubPage(state, hub, actions, startLanguage = null, speakerKind = speakerJob) { speakerHub = false }
         }
+        formatPage != null -> {
+            val shown = formatPage!!
+            BackHandler { formatPage = if (shown == FormatPage.Format) null else FormatPage.Format }
+            RecordingFormatPages(shown, state, actions, open = { formatPage = it }) {
+                formatPage = if (shown == FormatPage.Format) null else FormatPage.Format
+            }
+        }
         speakerJob != null -> {
             BackHandler { speakerJob = null }
             SpeakerPage(state, actions, speakerJob!!, onFindMore = { speakerHub = true }) { speakerJob = null }
         }
-        else -> SettingsPage(state, actions, openLanguage = { language = it }, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) })
+        else -> SettingsPage(
+            state, actions, openLanguage = { language = it }, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) },
+            openFormat = { formatPage = FormatPage.Format },
+        )
     }
 }
 
@@ -278,7 +306,10 @@ const val APP_QNN = "2.40"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit) {
+private fun SettingsPage(
+    state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit,
+    openFormat: () -> Unit,
+) {
     var picking by remember { mutableStateOf(false) }
     if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); picking = false; openLanguage(it) }
     Scaffold(
@@ -338,24 +369,7 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             NavRow(stringResource(R.string.settings_manage), stringResource(R.string.settings_manage_note), openCatalog)
             Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
             LecturesFolder(state.folder, actions.chooseFolder)
-            Column(Modifier.selectableGroup()) {
-                Text(stringResource(R.string.start_format), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, top = 16.dp))
-                listOf(
-                    AudioFormat.Wav to R.string.format_wav,
-                    AudioFormat.WavThenFlac to R.string.format_wav_then_flac,
-                    AudioFormat.FlacLive to R.string.format_flac_live,
-                ).forEach { (option, label) ->
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = state.audioFormat == option, role = Role.RadioButton) { actions.setAudioFormat(option) }
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = state.audioFormat == option, onClick = null)
-                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-            if (state.audioFormat != AudioFormat.Wav) FlacEffort(state.flacLevel, state.audioFormat, actions.setFlacLevel)
+            NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
             HorizontalDivider(Modifier.padding(top = 16.dp))
             SectionTitle(stringResource(R.string.settings_advanced))
             Column(Modifier.selectableGroup()) {
@@ -618,31 +632,6 @@ private fun ChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifie
 @Composable
 private fun PageNote(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-}
-
-/** FLAC's compression level, 0 (fastest) to 8 (smallest), under the audio formats that make a FLAC. */
-@Composable
-private fun FlacEffort(level: Int, format: AudioFormat, set: (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.flac_effort), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.flac_effort_value, level, FLAC_LEVELS.last), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Slider(
-            value = level.toFloat(),
-            onValueChange = { v -> v.roundToInt().let { if (it != level) set(it) } },
-            valueRange = FLAC_LEVELS.first.toFloat()..FLAC_LEVELS.last.toFloat(),
-            steps = FLAC_LEVELS.last - FLAC_LEVELS.first - 1,
-        )
-        Row {
-            Text(stringResource(R.string.flac_effort_fast), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.flac_effort_small), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(
-            stringResource(if (format == AudioFormat.FlacLive) R.string.flac_effort_note_live else R.string.flac_effort_note_after),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp),
-        )
-    }
 }
 
 @Composable
