@@ -37,6 +37,20 @@ or more voices and one still unnamed (`askPeople`).
   talking (`Person.minor`) says it is often a piece of someone else, with Merge beside it.
 - Its share of the talking and its number of lines are under each name.
 
+## As a conversation (Nov 15, 2026)
+
+- **Short turns are compact**: a turn of up to 140 characters is one piece, the speaker's name in their color, its
+  time, then the words (`COMPACT_TURN_CHARS`); tapping the name names the speaker. A longer turn keeps the chip and
+  time above its paragraph, as a lecture reads.
+- **Where the transcript stands**: under the top bar, "Live draft. The better model hasn't written it yet." with
+  **Improve · about n min**, which opens the improve sheet. Shown while the moment has lines, a model to improve with,
+  and hasn't been improved.
+- **One person's turns**: with two or more speakers, a chip per person above the player. Tapping one plays only their
+  turns, skipping the others' and pausing after their last (`LectureReview.playOnly`, `Lecture.onlyOf`,
+  `ReviewState.onlySpeaker`); the others' turns and lanes fade. Tapping it again plays everyone.
+- **Share** opens a menu: **Share as text** (the moment as "Name: what they said", notes in brackets;
+  `transcriptText`, `LectureReview.text`) or **Share as Word**. Holding it still saves the Word file.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.

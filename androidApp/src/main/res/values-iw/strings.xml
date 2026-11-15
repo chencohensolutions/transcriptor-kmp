@@ -430,4 +430,9 @@
         <item quantity="two">%1$d שורות</item>
         <item quantity="other">%1$d שורות</item>
     </plurals>
+    <string name="review_share">שיתוף</string>
+    <string name="review_share_text">שיתוף כטקסט</string>
+    <string name="review_draft">טיוטה חיה. המודל הטוב יותר עוד לא כתב אותה.</string>
+    <string name="review_draft_improve">שיפור</string>
+    <string name="review_draft_improve_minutes">שיפור · כ־%1$d דק׳</string>
 </resources>

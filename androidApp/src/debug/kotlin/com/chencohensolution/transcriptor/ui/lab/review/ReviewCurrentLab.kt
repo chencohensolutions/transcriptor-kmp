@@ -19,6 +19,7 @@ import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
 import com.chencohensolution.transcriptor.review.mergingSpeakers
+import com.chencohensolution.transcriptor.review.onlyOf
 import kotlinx.coroutines.delay
 
 // Fakes: playback (a clock; no audio), the improve pass and the speaker pass (progress, then made-up results), the
@@ -44,6 +45,13 @@ internal val reviewCurrentWaiting = LabOption("current-waiting", "The app's, rec
     ReviewScreen(state, actions)
 }
 
+// Fakes: as `current-people` without the sheet: the conversation as it reads, short turns compact, people as playback
+// filters above the player, the live-draft line with Improve.
+internal val reviewCurrentConversation = LabOption("current-conversation", "The app's, a conversation of four", "ReviewScreen on LabData.conversation: compact turns, play one person, share as text") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = LabData.conversation)
+    ReviewScreen(state, actions)
+}
+
 // Fakes: as `current`, with an English conversation of four (LabData.conversation) as it opens after Stop: "Who was
 // here?" comes up by itself. Names, merging and the samples work in memory (a sample moves the playhead; no audio);
 // the known voices offered are made up.
@@ -65,6 +73,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
     var lecture by remember { mutableStateOf(if (waiting) recorded.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true) else recorded) }
     var position by remember { mutableStateOf(sample?.segments?.firstOrNull()?.startMillis ?: 65_000L) }
     var playing by remember { mutableStateOf(false) }
+    var only by remember { mutableStateOf<String?>(null) }
     var speed by remember { mutableStateOf(1f) }
     var refine by remember { mutableStateOf<PassState>(PassState.NotRun) }
     var speakers by remember { mutableStateOf<PassState>(PassState.NotRun) }
@@ -73,6 +82,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         while (playing) {
             delay(100)
             position = (position + (100 * speed).toLong()).coerceAtMost(lecture.durationMillis)
+            only?.let { o -> when (val to = lecture.onlyOf(o, position)) { null -> playing = false; else -> position = to } }
             if (position >= lecture.durationMillis) playing = false
         }
     }
@@ -92,7 +102,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
-        labelNames = if (sample == null) LabData.labels.first().name else "", knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = if (sample == null) LabData.labels.first().name else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
@@ -116,6 +126,8 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
             lecture = if (same != null) lecture.mergingSpeakers(id, same.id) else lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it })
         },
         mergeSpeakers = { from, into -> lecture = lecture.mergingSpeakers(from, into) },
+        playOnly = { id -> only = id.takeIf { it != only }; only?.let { o -> lecture.onlyOf(o, position)?.let { position = it; playing = true } } },
+        shareText = { Toast.makeText(context, com.chencohensolution.transcriptor.notebook.transcriptText(lecture).take(200), Toast.LENGTH_LONG).show() },
         playPerson = { id -> lecture.segments.filter { it.speakerId == id }.maxByOrNull { it.endMillis - it.startMillis }?.let { position = it.startMillis; playing = true } },
         improve = { _, first ->
             if (first) { thenImprove = true; speakers = PassState.Running(0f) } else if (refine !is PassState.Running) refine = PassState.Running(0f)

@@ -172,3 +172,10 @@ anything left to decide. Remove an entry once it is built.
   `LectureReview.namePerson`, `mergeSpeakers`, `playPerson`.
 - Android to mirror: `ui/PeopleSheet.kt`, the people button and `askPeople` in `ReviewScreen.kt`.
 - Strings: `people_*` (with the plurals `people_summary`, `people_lines`). Lab sample: `LabData.conversation`.
+
+## The moment as a conversation (Nov 15, 2026)
+
+- Shared: `Lecture.onlyOf`, `LectureReview.playOnly`, `ReviewState.onlySpeaker`; `transcriptText`, `LectureReview.text`.
+- Android to mirror in `ReviewScreen.kt`: compact turns in `Turn`, the live-draft line, the people chips above the
+  player and the faded lanes in `Overview`, the share menu.
+- Strings: `review_share`, `review_share_text`, `review_draft*`.

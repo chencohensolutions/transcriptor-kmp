@@ -49,3 +49,14 @@ fun Lecture.mergingSpeakers(from: String, into: String): Lecture {
         speakers = speakers.filter { it.id != from },
     )
 }
+
+/**
+ * Playing only [speakerId]'s turns: where playback at [position] should be. Inside one of their lines it stays
+ * ([position] itself); between them it jumps to the start of their next line; after their last, null: there is
+ * nothing more of theirs to play.
+ */
+fun Lecture.onlyOf(speakerId: String, position: Long): Long? {
+    val theirs = segments.filter { it.speakerId == speakerId }
+    if (theirs.any { position >= it.startMillis && position < it.endMillis }) return position
+    return theirs.filter { it.startMillis >= position }.minOfOrNull { it.startMillis }
+}

@@ -72,6 +72,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -120,6 +122,10 @@ class ReviewActions(
     val mergeSpeakers: (from: String, into: String) -> Unit = { _, _ -> },
     /** Plays a speaker's sample, or pauses it. */
     val playPerson: (id: String) -> Unit = {},
+    /** Keeps playback to one speaker's turns; null, or the same one again: everyone. */
+    val playOnly: (speakerId: String?) -> Unit = {},
+    /** Opens Android's share sheet with the moment as plain text. */
+    val shareText: () -> Unit = {},
     /**
      * Improves the lecture with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id), after the
      * speaker pass when [speakersFirst].
@@ -182,6 +188,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions, askPeople: Boolean 
     var noting by remember { mutableStateOf<Long?>(null) }
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
     // "Who was here?": from its button, and by itself once for a moment just recorded with voices still unnamed.
     var showingPeople by remember(state.lecture.id) { mutableStateOf(askPeople && state.people.size >= 2 && state.people.any { it.name.isEmpty() }) }
     if (showingPeople) PeopleSheet(state, actions, onDismiss = { showingPeople = false })
@@ -215,10 +222,17 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions, askPeople: Boolean 
                         if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     if (state.people.isNotEmpty()) IconButton(onClick = { showingPeople = true }) { Icon(Icons.Filled.Group, stringResource(R.string.people_title)) }
-                    Box(
-                        Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.Share, stringResource(R.string.review_share_word)) }
+                    // Share: as text (to paste in a chat) or as a Word file; holding it saves the Word file beside the recording.
+                    Box {
+                        Box(
+                            Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = { sharing = true }, onLongClick = actions.saveWord),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.Share, stringResource(R.string.review_share)) }
+                        DropdownMenu(expanded = sharing, onDismissRequest = { sharing = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.review_share_text)) }, onClick = { sharing = false; actions.shareText() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.review_share_word)) }, onClick = { sharing = false; actions.shareWord() })
+                        }
+                    }
                     IconButton(onClick = {
                         if (editing) {
                             edits.forEach { (id, text) -> actions.editLine(id, text) }
@@ -268,12 +282,22 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions, askPeople: Boolean 
                     Banner(stringResource(if (waiting) R.string.review_transcribing else R.string.review_improving, (it.progress * 100).toInt()), it.progress)
                 }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
+                // Where the transcript stands, with the next step: a live draft the better model hasn't written yet.
+                if (state.refine == PassState.NotRun && state.lecture.refinedWith == null && state.lecture.segments.isNotEmpty() && state.refineModels.isNotEmpty()) {
+                    val minutes = (state.refineModels.firstOrNull { it.id == state.improveDefault } ?: state.refineModels.first()).minutes
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.review_draft), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { pickingModel = true }) {
+                            Text(if (minutes != null) stringResource(R.string.review_draft_improve_minutes, minutes) else stringResource(R.string.review_draft_improve))
+                        }
+                    }
+                }
                 state.power?.let { PowerLine(it) }
                 HorizontalDivider()
             }
         }
         CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.weight(1f)) {
+            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.weight(1f)) {
                 if (waiting) {
                     item(key = "waiting") { CompositionLocalProvider(LocalLayoutDirection provides appDirection) { NotTranscribedYet(state, actions) } }
                     // Its notes, which have no lines to sit under yet.
@@ -291,6 +315,18 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions, askPeople: Boolean 
         }
         Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
             Column(Modifier.navigationBarsPadding().padding(top = 8.dp)) {
+                // Tap a person to hear only their turns; again for everyone.
+                val people = state.people
+                if (people.size >= 2) LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(people, key = { it.speakerId }) { p ->
+                        val color = speakerColor(p.speakerId)
+                        FilterChip(
+                            selected = state.onlySpeaker == p.speakerId, onClick = { actions.playOnly(p.speakerId) },
+                            label = { Text(speakerLabel(Speaker(p.speakerId, p.name)), maxLines = 1) },
+                            leadingIcon = { Box(Modifier.size(8.dp).clip(CircleShape).background(color)) },
+                        )
+                    }
+                }
                 Overview(state, actions)
                 Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${formatClock(state.positionMillis)} / ${formatClock(state.lecture.durationMillis)}", style = MaterialTheme.typography.labelMedium,
@@ -344,6 +380,9 @@ private fun NotTranscribedYet(state: ReviewState, actions: ReviewActions) {
         }
     }
 }
+
+/** A turn up to this long is drawn compact: the name and the words together. */
+private const val COMPACT_TURN_CHARS = 140
 
 /** Lines in a row by one speaker, as one paragraph. */
 private fun turnsOf(lines: List<Segment>): List<List<Segment>> =
@@ -407,7 +446,8 @@ private fun Overview(state: ReviewState, actions: ReviewActions) {
                 val y = top + i.coerceAtLeast(0) * (lane + gap)
                 val x0 = line.startMillis.toFloat() / duration * size.width
                 val x1 = (line.endMillis.toFloat() / duration * size.width).coerceAtLeast(x0 + 2f)
-                drawRect(if (i >= 0) laneColors[i] else unknown, Offset(x0, y), Size(x1 - x0, lane))
+                val faded = state.onlySpeaker != null && line.speakerId != state.onlySpeaker
+                drawRect((if (i >= 0) laneColors[i] else unknown).copy(alpha = if (faded) 0.25f else 1f), Offset(x0, y), Size(x1 - x0, lane))
             }
             state.lecture.notes.forEach { n -> drawCircle(noteColor, 3.dp.toPx(), Offset(n.atMillis.toFloat() / duration * size.width, 3.dp.toPx())) }
             val px = state.positionMillis.toFloat() / duration * size.width
@@ -424,8 +464,12 @@ private fun Turn(
     val speaker = state.lecture.speakers.firstOrNull { it.id == turn.first().speakerId }
     val colors = LocalTranscriptorColors.current
     val current = state.currentLine?.id
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // A short turn (most of a conversation) is one piece: the name in its color, then the words, with no row of its
+    // own for the name. A long one keeps the name and time above its paragraph.
+    val compact = !editing && speaker != null && turn.sumOf { it.text.length } <= COMPACT_TURN_CHARS
+    val faded = state.onlySpeaker != null && turn.first().speakerId != state.onlySpeaker
+    Column(Modifier.alpha(if (faded) 0.45f else 1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (!compact) Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             speaker?.let { ReviewSpeakerChip(it) { onSpeaker(it) } }
             Spacer(Modifier.width(8.dp))
             Text(formatClock(turn.first().startMillis), style = MaterialTheme.typography.labelSmall, color = colors.time)
@@ -444,7 +488,13 @@ private fun Turn(
             }
         } else {
             val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            val nameColor = speakerColor(speaker?.id)
+            val name = speaker?.let { speakerLabel(it) }.orEmpty()
             val text = buildAnnotatedString {
+                if (compact && speaker != null) {
+                    withLink(LinkAnnotation.Clickable("speaker", TextLinkStyles(SpanStyle(color = nameColor, fontWeight = FontWeight.SemiBold))) { onSpeaker(speaker) }) { append(isolated(name)) }
+                    withStyle(SpanStyle(color = colors.time, fontSize = 11.sp)) { append("  " + formatClock(turn.first().startMillis) + "  ") }
+                }
                 turn.forEachIndexed { i, line ->
                     if (i > 0) append(" ")
                     withLink(LinkAnnotation.Clickable(line.id, TextLinkStyles(SpanStyle())) { actions.playLine(line) }) {

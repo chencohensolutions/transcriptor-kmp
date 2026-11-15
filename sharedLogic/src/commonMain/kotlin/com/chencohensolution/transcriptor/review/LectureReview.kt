@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * A recorded lecture, opened: playing it ([AudioPlayer]), correcting its lines and their speakers, naming the speakers
@@ -97,19 +98,55 @@ class LectureReview(
 
     val passes = MutableStateFlow(Passes())
 
+    /** The speaker playback keeps to ([playOnly]); null: everyone. */
+    private val only = MutableStateFlow<String?>(null)
+
     val state: StateFlow<ReviewState?> =
-        combine(open, player.positionMillis, player.playing, passes) { o, position, playing, p ->
+        combine(open, player.positionMillis, player.playing, passes, only) { o, position, playing, p, onlySpeaker ->
             o?.let {
                 ReviewState(
                     labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                     improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
-                    knownNames = it.knownNames(),
+                    knownNames = it.knownNames(), onlySpeaker = onlySpeaker,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val lecture get() = open.value?.lecture
+
+    init {
+        // Playing only one speaker: when playback leaves their line it jumps to their next, and pauses after their last.
+        scope.launch {
+            player.positionMillis.collect { position ->
+                val speaker = only.value ?: return@collect
+                val l = open.value?.lecture ?: return@collect
+                if (!player.playing.value) return@collect
+                when (val to = l.onlyOf(speaker, position)) {
+                    position -> {}
+                    null -> player.pause()
+                    else -> player.seekTo(to)
+                }
+            }
+        }
+    }
+
+    /**
+     * Keeps playback to one speaker's turns ([speakerId]; null or the same one again: everyone). It starts playing
+     * from their line at or after the playhead, else from their first.
+     */
+    fun playOnly(speakerId: String?) {
+        val l = lecture ?: return
+        val next = speakerId?.takeIf { it != only.value }
+        only.value = next
+        if (next == null) return
+        val to = l.onlyOf(next, player.positionMillis.value) ?: l.onlyOf(next, 0) ?: return
+        player.seekTo(to)
+        player.play()
+    }
+
+    /** The open moment as plain text ([transcriptText]), to share. */
+    fun text(): String? = lecture?.let { com.chencohensolution.transcriptor.notebook.transcriptText(it) }
 
     /** Opens a lecture; false when it isn't there. */
     fun open(lectureId: String, labelNames: String): Boolean {
@@ -122,6 +159,7 @@ class LectureReview(
     }
 
     fun close() {
+        only.value = null
         if (open.value == null) return
         player.pause()
         player.release()

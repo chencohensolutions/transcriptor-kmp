@@ -164,6 +164,12 @@ class MainActivity : ComponentActivity() {
                                 namePerson = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.namePerson(id, name) } },
                                 mergeSpeakers = { from, into -> lifecycleScope.launch(Dispatchers.IO) { r.mergeSpeakers(from, into) } },
                                 playPerson = r::playPerson,
+                                playOnly = r::playOnly,
+                                shareText = {
+                                    r.text()?.let { text ->
+                                        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).putExtra(Intent.EXTRA_SUBJECT, review.lecture.title), null))
+                                    }
+                                },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
                                 tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
                                 improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
