@@ -44,9 +44,34 @@ struct Engine {
     NpuEncoder *npu = nullptr;
 };
 
+// WhisperEngine's npuEncoderStarted/Finished: the encoder's time on the NPU counts on the NPU meter and in the log.
+static JavaVM *jvm = nullptr;
+static jclass engine_class = nullptr;
+static jmethodID npu_started = nullptr, npu_finished = nullptr;
+
+extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *) {
+    jvm = vm;
+    JNIEnv *env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+    jclass c = env->FindClass("com/chencohensolution/transcriptor/speech/WhisperEngine");
+    if (c) {
+        engine_class = static_cast<jclass>(env->NewGlobalRef(c));
+        npu_started = env->GetStaticMethodID(c, "npuEncoderStarted", "()J");
+        npu_finished = env->GetStaticMethodID(c, "npuEncoderFinished", "(J)V");
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear(); // without them the encoder still runs, untimed
+    return JNI_VERSION_1_6;
+}
+
 static bool npu_encode(void *user, const float *mel, int n_mel, int n_frames) {
     auto *e = static_cast<NpuEncoder *>(user);
-    return e->run(e->handle, mel, n_mel, n_frames) == 1;
+    // whisper_full calls this on the thread that called nativeTranscribe, attached to Java already.
+    JNIEnv *env = nullptr;
+    bool timed = jvm && npu_started && npu_finished && jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) == JNI_OK;
+    jlong start = timed ? env->CallStaticLongMethod(engine_class, npu_started) : 0;
+    bool ok = e->run(e->handle, mel, n_mel, n_frames) == 1;
+    if (timed) env->CallStaticVoidMethod(engine_class, npu_finished, start);
+    return ok;
 }
 
 static bool npu_cross(void *user, int il, float *k, float *v) {

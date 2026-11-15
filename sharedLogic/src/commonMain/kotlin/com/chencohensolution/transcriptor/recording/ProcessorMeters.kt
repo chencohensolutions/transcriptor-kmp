@@ -115,6 +115,9 @@ class ProcessorMeterSampler(private val probe: ProcessorProbe, private val keep:
  * The time our models have kept the NPU busy: each NPU call between [begin] and [end]. Calls that overlap (Whisper
  * and voice prints at once) count once, as wall time with at least one call running. [busyMillis] is null until the
  * first call, so a recording with no NPU model shows no NPU meter.
+ *
+ * Each call timed with a job ([time], [begin]/[end] with a start) is also tallied per job ("encoder", "segmentation",
+ * "voice prints") until [drain], for the log: how long each model holds the NPU per window.
  */
 class NpuBusyClock(private val clock: () -> Long) {
     private val lock = SynchronizedObject()
@@ -122,23 +125,30 @@ class NpuBusyClock(private val clock: () -> Long) {
     private var since = 0L
     private var done = 0L
     private var used = false
+    private val jobs = linkedMapOf<String, NpuJobTally>()
 
-    fun begin() = synchronized(lock) {
-        if (running++ == 0) since = clock()
+    /** Starts a call; returns its start, for [end]'s tally. */
+    fun begin(): Long = synchronized(lock) {
+        val now = clock()
+        if (running++ == 0) since = now
         used = true
+        now
     }
 
-    fun end() = synchronized(lock) {
+    /** Ends a call; with [job], tallies it from [start] ([begin]'s value). */
+    fun end(job: String? = null, start: Long = 0) = synchronized(lock) {
         if (running == 0) return@synchronized
-        if (--running == 0) done += clock() - since
+        val now = clock()
+        if (--running == 0) done += now - since
+        if (job != null) jobs[job] = (jobs[job] ?: NpuJobTally()).add(now - start)
     }
 
-    inline fun <T> time(block: () -> T): T {
-        begin()
+    inline fun <T> time(job: String? = null, block: () -> T): T {
+        val start = begin()
         try {
             return block()
         } finally {
-            end()
+            end(job, start)
         }
     }
 
@@ -146,4 +156,18 @@ class NpuBusyClock(private val clock: () -> Long) {
         get() = synchronized(lock) {
             if (!used) null else done + if (running > 0) clock() - since else 0
         }
+
+    /** Each job's calls since the last drain, and starts again. */
+    fun drain(): Map<String, NpuJobTally> = synchronized(lock) { jobs.toMap().also { jobs.clear() } }
 }
+
+/** A job's NPU calls: how many, their total and longest time. */
+data class NpuJobTally(val calls: Int = 0, val totalMillis: Long = 0, val maxMillis: Long = 0) {
+    fun add(millis: Long) = NpuJobTally(calls + 1, totalMillis + millis, maxOf(maxMillis, millis))
+
+    /** "segmentation 12× 14200 ms (max 1300)". */
+    fun describe(job: String) = if (calls == 1) "$job $totalMillis ms" else "$job $calls× $totalMillis ms (max $maxMillis)"
+}
+
+/** The tallies as one log line: "encoder 5400 ms; segmentation 12× 14200 ms (max 1300)". */
+fun Map<String, NpuJobTally>.describe() = entries.joinToString("; ") { (job, t) -> t.describe(job) }

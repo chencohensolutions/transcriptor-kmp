@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.speech
 
+import android.util.Log
+import com.chencohensolution.transcriptor.recording.describe
 import java.io.File
 
 /**
@@ -9,6 +11,7 @@ import java.io.File
  * decodes; every piece is then a 30 s window to the encoder.
  */
 class WhisperEngine(path: String, npuEncoder: File? = null, libDir: String? = null) : SpeechEngine {
+    private val onNpu = npuEncoder != null
     private var handle = run {
         if (npuEncoder != null) {
             SherpaNpuWhisperEngine.useNpuLibraries(checkNotNull(libDir))
@@ -28,6 +31,9 @@ class WhisperEngine(path: String, npuEncoder: File? = null, libDir: String? = nu
     private fun run(samples: FloatArray, language: String, prompt: String?, words: Boolean): List<Piece> {
         check(handle != 0L) { "Closed" }
         val lines = nativeTranscribe(handle, samples, language, prompt, threads, words) ?: error("whisper failed")
+        // Each window on the NPU encoder: how long each model held the NPU since the last one (speaker turns and voice
+        // prints run beside it), e.g. "encoder 5400 ms; segmentation 12× 14200 ms (max 1300); voice prints 20× 310 ms".
+        if (onNpu) Log.i(TAG, "NPU since the last window: ${npuBusy.drain().describe()}")
         return lines.map { line ->
             val (start, end, noSpeech, text) = line.split('\t', limit = 4)
             Piece(start.toLong(), end.toLong(), text, noSpeech.toFloat())
@@ -43,6 +49,14 @@ class WhisperEngine(path: String, npuEncoder: File? = null, libDir: String? = nu
         init {
             System.loadLibrary("transcriptor_whisper")
         }
+
+        private const val TAG = "whisper"
+
+        /** The NPU encoder starts a window (called from whisper's JNI): the NPU meter counts it from now. */
+        @JvmStatic fun npuEncoderStarted(): Long = npuBusy.begin()
+
+        /** The NPU encoder's window ended ([start] from [npuEncoderStarted]). */
+        @JvmStatic fun npuEncoderFinished(start: Long) = npuBusy.end("encoder", start)
 
         /** Shrinks a model file: [type] is a ggml type ("q8_0"). Slow (seconds to a minute); not on the main thread. */
         fun quantize(input: String, output: String, type: String) = nativeQuantize(input, output, type)

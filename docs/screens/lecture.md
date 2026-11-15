@@ -56,6 +56,10 @@ What each meter is (what an app may read, checked on the Galaxy S25 as an ordina
 - **NPU**: only the time this app's models keep it busy: every call into a QNN model (Whisper, streaming, voice
   prints, speaker turns) is timed (`npuBusy`, `NpuBusyClock`; overlapping calls count once). Android doesn't let apps
   read the NPU's whole load, so it is labeled "our use". No NPU model running: no NPU meter.
+  The hybrid model's NPU encoder (large-v3 · NPU encoder) is timed from whisper's JNI (`WhisperEngine.npuEncoderStarted`/
+  `Finished`). After each of its windows the log (tag `whisper`) says how long each job held the NPU since the last
+  one: "NPU since the last window: encoder 5400 ms; segmentation 12× 14200 ms (max 1300); voice prints 20× 310 ms"
+  (`NpuBusyClock.drain`).
 - **Clocks and temperature** (in the chip's sheet): each `cpufreq/policy*`, the GPU's `devfreq/cur_freq` and
   `max_gpuclk`, and the hottest thermal zone named `nsp…`.
 

@@ -56,7 +56,7 @@ class SherpaStreamingEngine(dir: File, npuLibDir: String? = null) : StreamingEng
 
     override fun accept(samples: FloatArray) {
         stream.acceptWaveform(samples, 16_000)
-        while (recognizer.isReady(stream)) if (onNpu) npuBusy.time { recognizer.decode(stream) } else recognizer.decode(stream)
+        while (recognizer.isReady(stream)) if (onNpu) npuBusy.time("streaming") { recognizer.decode(stream) } else recognizer.decode(stream)
     }
 
     override val text: String get() = recognizer.getResult(stream).text
