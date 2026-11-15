@@ -191,3 +191,9 @@ anything left to decide. Remove an entry once it is built.
 - First run, "Get your models" (Nov 15, 2026): `DefaultModels.forLanguage`/`offerFirstRun`, `SettingsStore.firstRunDone`
   and `useDefaults`; the screen in `FirstRunScreen.kt` fed by `FirstRun.kt` (downloads, the NPU check and its CPU
   fallback); strings `first_run_*`. iOS has no NPU builds: it gets the CPU picks.
+
+## Record from the system's controls (Nov 15, 2026)
+
+- Android: a Quick Settings tile (`RecordTileService.kt`) records as the Record bar would (`notebooksState`'s guess and
+  language, `SettingsStore.recordLive`) and stops with a second tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. Strings `tile_stop_again`, `tile_finishing`.

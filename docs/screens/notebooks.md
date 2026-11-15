@@ -52,6 +52,13 @@ deleted · Undo"; when the snackbar closes, their folders (recording, transcript
 here or in the moments folder. A moment a pass is working on can't be selected, and the one recording or open is
 skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`).
 
+**Quick Settings tile** (Nov 15, 2026): "Record" in the notification shade's quick controls (added from the shade's
+edit list). A tap records a moment as the Record bar would now: the guessed labels and language, Live or After as last
+picked, and the recording format and hide-notification settings; the shade closes. On a locked phone it asks to unlock
+first. While recording the tile is on, labeled Stop with Recording or Paused under it; Stop asks for a second tap within
+4 seconds ("Tap again to stop"), as in the app; while the last lines finish it is greyed out. Without the microphone
+permission the tap opens the app, whose Record asks for it.
+
 ## Code
 
 - Screen: `androidApp/.../ui/NotebooksScreen.kt` (`NotebooksScreen`, `NotebooksActions`); wired in `MainActivity`.
@@ -63,6 +70,8 @@ skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`
 - The moments folder: `Recording.folder`, `chooseFolder`, `archive`, `migrateLibrary`, `openAudio`;
   `storage/SafFileSystem.kt`; shared `Place.kt`, `LibraryFolder.kt` (`adoptLibrary`, `archiveFinished`),
   `LectureStore.archive`.
+- The tile: `androidApp/.../RecordTileService.kt` (`RecordTileService`; `RecordFromTileActivity` starts the recording
+  from the foreground, which Android requires for the microphone). Strings `tile_*`.
 - Strings: `notebooks_*`. Lab: `notebooks current`, `notebooks current-no-guess` (`lab/notebooks/NotebooksCurrentLab.kt`).
 
 ## Design history
