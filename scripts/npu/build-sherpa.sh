@@ -32,6 +32,6 @@ if [ ! -f $aar/sherpa_onnx/src/main/jniLibs/arm64-v8a/libonnxruntime.so ]; then 
 fi
 $ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-strip --strip-unneeded \
   -o $aar/sherpa_onnx/src/main/jniLibs/arm64-v8a/libsherpa-onnx-jni.so build-android-arm64-v8a/install/lib/libsherpa-onnx-jni.so
-(cd $aar && JAVA_HOME=${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home} ./gradlew -q :sherpa_onnx:assembleRelease)
+(cd $aar && env -u ANDROID_NDK JAVA_HOME=${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home} ./gradlew -q :sherpa_onnx:assembleRelease)
 cp $aar/sherpa_onnx/build/outputs/aar/sherpa_onnx-release.aar $repo/androidApp/libs/sherpa-onnx-2.0.1-qnn.aar
 shasum -a 256 $repo/androidApp/libs/sherpa-onnx-2.0.1-qnn.aar

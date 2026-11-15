@@ -99,10 +99,10 @@ data class SpeechModel(
     val runsLive get() = fitsLive || liveWindowSeconds != null
 
     /** It loads Qualcomm's runtime with its NPU build, so [NpuLoadGuard] watches its loads. */
-    val loadsOnNpu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
+    val loadsOnNpu get() = kind.onNpu
 
-    /** Its NPU context binaries' size (`.bin` files other than a ggml model): what Qualcomm's runtime loads. */
-    val npuBinaryBytes get() = files.filter { it.name.endsWith(".bin") && kind != ModelKind.Whisper }.sumOf { it.sizeBytes }
+    /** Its NPU context binaries' size (`.bin` files other than a ggml `model.bin`): what Qualcomm's runtime loads. */
+    val npuBinaryBytes get() = files.filter { it.name.endsWith(".bin") && it.name != "model.bin" && kind != ModelKind.Whisper }.sumOf { it.sizeBytes }
 
     fun runsOn(chip: String?) = chips.isEmpty() || chip in chips
 
@@ -166,6 +166,34 @@ object ModelCatalog {
             ModelFile("tokens.txt", "$NPU_SM8750/tokens.txt", "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126", 816_730),
         ),
         chips = listOf("SM8750"),
+    )
+    // ivritLargeV3 (commit 766847c9, release 2025.05.13) with its encoder on the Snapdragon 8 Elite's NPU and
+    // whisper.cpp decoding (ModelKind.WhisperNpuEncoder): the decoder's 32 layers are slow on the NPU, one call per
+    // token, and broke when quantized; the encoder is one big computation per window. The encoder: 8-bit weights,
+    // 16-bit activations (w8a16), calibrated on public FLEURS Hebrew only, QAIRT 2.40.0.251030 (docs/npu-build.md).
+    // model.bin is ivritLargeV3's ggml file; whisper.cpp leaves its encoder's weights unloaded.
+    private const val LARGE_ENCODER_SM8750 = "https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750/resolve/9d90128591ad4b367aea783e0f8daf44cd494f4e"
+    val ivritLargeV3NpuEncoder = SpeechModel(
+        id = "ivrit-whisper-large-v3-npu-encoder-sm8750",
+        name = "ivrit.ai Whisper large-v3 · NPU encoder",
+        languages = listOf("he"),
+        parameters = "1.55B",
+        license = "Apache-2.0",
+        fitsLive = false,
+        // The encoder's window is 30 s; whisper.cpp's decoder on the CPU: live in windows.
+        liveWindowSeconds = 30,
+        source = "https://huggingface.co/ivrit-ai/whisper-large-v3",
+        kind = ModelKind.WhisperNpuEncoder,
+        files = listOf(
+            ivritLargeV3.files.single(),
+            ModelFile("encoder.bin", "$LARGE_ENCODER_SM8750/encoder.bin", "3966ecc80cb7893fe1547fa0b5e9b055b94410f13cc656d7b3025749984525ad", 932_503_552),
+        ),
+        quantizeTo = "q8_0",
+        chips = listOf("SM8750"),
+        // Not measured on a phone yet: whisper.cpp without its encoder 1.36 GB at the peak (on the Mac) and the
+        // encoder's load with its file mapped about 1.2 GB (it took 2.4 GB and more when sherpa-onnx read it into
+        // memory and copied it), with a margin.
+        npuPeakBytes = 2_800_000_000L,
     )
     // ivritLargeV3 (commit 766847c9) compiled the same way, for the refine pass only: 16-bit weights
     // (`--float_bitwidth 16`; at 32-bit the encoder's library is over 2 GB and won't link) and no ONNX simplification
@@ -396,7 +424,7 @@ object ModelCatalog {
     /** The segmentation models for speaker turns, the default (pyannote) first. */
     val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id
