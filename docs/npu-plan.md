@@ -175,6 +175,10 @@ w8a16 encoder runs on the NPU, and whisper.cpp decodes from its cross-attention 
 - **Checked on the Mac:** K/V given through the hook decode to the same text as whisper.cpp's own encoder; the mel it
   hands out equals OpenAI's exactly; the w8a16 encoder's outputs (simulator) decode to the same text as the float
   encoder's.
+- **Download:** 1.9 GB: the encoder (0.93 GB) and whisper.cpp's model in q8_0 without its encoder (`decoder-q8_0.bin`,
+  0.97 GB, made by `scripts/npu/whisper_ggml_decoder_only.py`; whisper.cpp loads it only with `skip_encoder`, and
+  without an external encoder fails cleanly). It was 4 GB: the 3.1 GB f16 model, quantized on the phone, plus the
+  encoder.
 - **On the phone:** one load test before the mmap change ran out of memory (the encoder's load took 2.4 GB and more on
   top of whisper.cpp's 1.6 GB); not measured since. `npuPeakBytes` is an estimate (2.8 GB) until it is. Speed and
   battery against CPU q8_0: to measure.
@@ -208,7 +212,7 @@ credit, what was changed, the sha256 of every file); Qualcomm's runtime librarie
 | [sherpa-onnx-qnn-android](https://huggingface.co/hencohen83/sherpa-onnx-qnn-android) (the AAR and our patch) | 47599a37 | Apache-2.0 | `build.gradle.kts` downloads it |
 | [ivrit-whisper-large-v3-turbo-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-turbo-qnn-sm8750) | d5997a96 | Apache-2.0 | `ivritTurboNpu` |
 | [ivrit-whisper-large-v3-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750) (16-bit) | a5c541a9 | Apache-2.0 | `ivritLargeV3Npu` |
-| [ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750) (Nov 15, encoder only, FLEURS-calibrated) | 9d901285 | Apache-2.0 | `ivritLargeV3NpuEncoder` |
+| [ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750) (Nov 15: the FLEURS-calibrated encoder, and whisper.cpp's q8_0 model without its encoder) | 3bc85b60 | Apache-2.0 | `ivritLargeV3NpuEncoder` |
 | [wespeaker-resnet293-lm-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-resnet293-lm-qnn-sm8750) | 75258f7a | CC-BY-4.0 | `voicePrintsResNet293`, downloadable |
 | [wespeaker-samresnet100-voxblink2-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-samresnet100-voxblink2-qnn-sm8750) | 337cffaa | CC-BY-NC-SA-4.0 | copied by hand (non-commercial) |
 | [diarizen-wavlm-base-s80-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750) | 4e87d479 | CC-BY-NC-4.0 | copied by hand |
