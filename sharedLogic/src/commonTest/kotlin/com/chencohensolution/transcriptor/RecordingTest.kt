@@ -221,6 +221,13 @@ class RecordingTest {
     }
 
     @Test
+    fun afterMomentsWaitForTheChargerByDefault() {
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Charging, settings.transcribeWhen)
+        settings.transcribeWhen = com.chencohensolution.transcriptor.settings.EncodeAfter.Stop
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, SettingsStore(fs, root).transcribeWhen)
+    }
+
+    @Test
     fun pauseAndResumeMoveTheState() = runTest {
         val session = session()
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")

@@ -54,6 +54,14 @@ USB are just the preferred device. The file is 48 kHz stereo either way (the pho
 shows one set. The recording screen says "Microphone: <name>", or in red "<name> isn't connected: recording from the
 phone" (also when it disconnects mid-moment: `AudioRecorder.inputInUse` follows the phone's routing).
 
+## Transcribe moments recorded with After (Nov 16, 2026)
+
+hen's ask: Settings › After a moment › **Transcribe moments recorded with After** (`SettingsStore.transcribeWhen`, an
+`EncodeAfter`): **Right after the moment ends**, or **When charging, with 30% battery or more** (the default). A moment
+recorded with After on the Record bar is transcribed at Stop when that allows it (`RecordingService.transcribeAllowed`),
+else it waits in `improvePending` and starts when the phone charges with enough battery and the app is opened or
+plugged in while open, or after the next pass ends. "No transcript" moments are never transcribed on their own.
+
 ## Hide the recording notification (Nov 15, 2026)
 
 Settings › Recordings has **Hide the recording notification** (`SettingsStore.quietRecording`, off by default). On,

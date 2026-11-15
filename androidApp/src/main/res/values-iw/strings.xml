@@ -553,4 +553,8 @@
     <string name="settings_stop_twice">שתי הקשות לעצירה</string>
     <string name="settings_stop_twice_on">פעיל: סיום מבקש הקשה נוספת לפני שהוא מסיים רגע, באפליקציה ובאריח ההקלטה בהגדרות המהירות.</string>
     <string name="settings_stop_twice_off">כבוי: הקשה אחת על סיום מסיימת את הרגע, באפליקציה ובאריח ההקלטה.</string>
+    <string name="settings_transcribe_when">תמלול רגעים שהוקלטו עם ״אחר כך״</string>
+    <string name="settings_transcribe_when_note">״אחר כך״ בסרגל ההקלטה מקליט בלי לתמלל. התמליל נעשה אז, עם מודל השיפור של השפה.</string>
+    <string name="settings_transcribe_when_stop">מיד כשהרגע נגמר</string>
+    <string name="settings_transcribe_when_charging">בזמן טעינה, עם 30% סוללה ומעלה</string>
 </resources>

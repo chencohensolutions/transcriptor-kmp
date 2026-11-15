@@ -137,6 +137,8 @@ private data class SettingsFileV1(
     val speakerPassOnStop: Boolean = false,
     /** A lecture is improved on its own after it stops (while charging). */
     val autoImprove: Boolean = false,
+    /** When a moment recorded with "After" is transcribed: right after Stop, or on the charger with enough battery. */
+    val transcribeWhen: EncodeAfter = EncodeAfter.Charging,
     /** Moments are transcribed live while they record; off (the default): recorded only, transcribed after. */
     val recordLive: Boolean = true,
     /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
@@ -208,6 +210,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var autoImprove: Boolean
         get() = read().autoImprove
         set(value) = write(read().copy(autoImprove = value))
+
+    /**
+     * When a moment recorded with "After" on the Record bar is transcribed: [EncodeAfter.Stop] right after it ends,
+     * [EncodeAfter.Charging] (the default) once the phone is on the charger with [ENCODE_MIN_BATTERY]% or more.
+     */
+    var transcribeWhen: EncodeAfter
+        get() = read().transcribeWhen
+        set(value) = write(read().copy(transcribeWhen = value))
 
     /**
      * The Record bar's Live or After: live transcription while a moment records, or (off, the default; owner's choice,

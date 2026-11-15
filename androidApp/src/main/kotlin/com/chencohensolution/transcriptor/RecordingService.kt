@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.transcriptor.settings.allows
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -100,10 +101,10 @@ class RecordingService : Service() {
                 if (lecture != null && after == ImproveAfterStop.WhenCharging) Recording.settings.addImprovePending(lecture.id)
                 val then = model?.takeIf { after == ImproveAfterStop.Now }?.let { m -> { done: Lecture -> refine(done, m.id) } }
                 when {
-                    // Only recorded (After, or no live model): transcribed now on the charger, else it waits for it
-                    // (or for "Transcribe now" on the moment), so the battery is spared.
+                    // Only recorded (After, or no live model): transcribed now when Settings says right after Stop, or
+                    // on the charger with 30% or more; else it waits for that (or for "Transcribe now" on the moment).
                     lecture != null && lecture.pendingTranscript -> {
-                        if (model != null && charging()) refine(lecture, model.id)
+                        if (model != null && transcribeAllowed()) refine(lecture, model.id)
                         else {
                             if (model != null) Recording.settings.addImprovePending(lecture.id)
                             if (!improveNextPending()) compressPending()
@@ -230,6 +231,12 @@ class RecordingService : Service() {
     /** The phone is on the charger. */
     private fun charging() = getSystemService(android.os.BatteryManager::class.java).isCharging
 
+    /** A moment recorded with "After" may be transcribed now: right after Stop, or on the charger with enough battery. */
+    private fun transcribeAllowed(): Boolean {
+        val (percent, charging) = Recording.battery(this)
+        return Recording.settings.transcribeWhen.allows(charging, percent)
+    }
+
     /**
      * Improves the next lecture whose pass a recording stopped, else the next waiting for the charger, if the phone charges and its language has a model; drops
      * ones that are gone or can't be improved. False when there is none to start.
@@ -244,11 +251,14 @@ class RecordingService : Service() {
             refine(lecture, modelId)
             return true
         }
-        if (!charging()) return false
+        val charging = charging()
         for (lectureId in Recording.settings.improvePending) {
             val lecture = Recording.store.load(lectureId)
             val model = lecture?.let { Recording.improveModelFor(it.language) }
             if (lecture == null || model == null || lecture.refinedWith != null) { Recording.settings.removeImprovePending(lectureId); continue }
+            // A moment waiting for its transcript follows Settings' "Transcribe After moments"; improving waits for the charger.
+            val transcribing = lecture.pendingTranscript && lecture.segments.isEmpty()
+            if (if (transcribing) !transcribeAllowed() else !charging) continue
             refine(lecture, model.id)
             return true
         }
