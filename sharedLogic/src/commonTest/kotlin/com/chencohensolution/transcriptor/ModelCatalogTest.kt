@@ -14,13 +14,19 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun englishGetsItsZipformerBeforeTheMultilingualOnes() {
+        assertEquals(listOf("zipformer2-66m-streaming-en", "whisper-large-v3-turbo", "whisper-large-v3"), ModelCatalog.forLanguage("en", chip = null).map { it.id })
+    }
+
+    @Test
     fun otherLanguagesGetTheMultilingualModels() {
-        assertEquals(listOf("whisper-large-v3-turbo", "whisper-large-v3"), ModelCatalog.forLanguage("en", chip = null).map { it.id })
+        assertEquals(listOf("whisper-large-v3-turbo", "whisper-large-v3"), ModelCatalog.forLanguage("fr", chip = null).map { it.id })
     }
 
     @Test
     fun anNpuModelIsOfferedFirstOnItsChipOnly() {
         assertEquals("ivrit-whisper-large-v3-turbo-npu-sm8750", ModelCatalog.forLanguage("he", "SM8750").first().id)
         assertEquals(ModelCatalog.forLanguage("he", chip = null), ModelCatalog.forLanguage("he", "SM8650"))
+        assertEquals("zipformer2-66m-streaming-en-npu-sm8750", ModelCatalog.forLanguage("en", "SM8750").first().id)
     }
 }
