@@ -18,6 +18,9 @@ enum class AudioFormat {
 
     /** FLAC as it records. */
     @SerialName("flac-live") FlacLive,
+
+    /** AAC as it records ([AacSettings]), on the phone's hardware encoder when it has one: lossy, about 30 MB an hour at 64 kbps. */
+    @SerialName("aac-live") AacLive,
 }
 
 /** How the lecture screen shows the processors' load while recording (Settings › Advanced). */
@@ -55,6 +58,8 @@ private data class SettingsFileV1(
     val audioFormat: AudioFormat = AudioFormat.Wav,
     /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
+    /** How "AAC live" records. */
+    val aac: AacSettings = AacSettings(),
     /** The live model chosen per language (BCP-47 tag to model id). */
     val liveModels: Map<String, String> = emptyMap(),
     /** The refine model chosen per language; a language without one refines with its first ready large model. */
@@ -106,6 +111,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var flacLevel: Int
         get() = read().flacLevel.coerceIn(FLAC_LEVELS)
         set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
+
+    /** How "AAC live" records: profile, sample rate, channels, bitrate and encoder ([AacSettings.valid] on the way in and out). */
+    var aac: AacSettings
+        get() = read().aac.valid()
+        set(value) = write(read().copy(aac = value.valid()))
 
     /**
      * The speaker pass also runs when a lecture stops (speakers are found live while it records). Off by default: it can

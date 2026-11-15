@@ -9,14 +9,17 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 
 /**
- * A lecture's recording (WAV, or FLAC through the system's decoder; 48 kHz stereo 16 bit) as the models take it, 16 kHz
- * mono, from the start in pieces. It reads [fd], a file in the app's storage or in the lectures folder outside it, and
+ * A lecture's recording (WAV; or FLAC or AAC through the system's decoder, at whatever rate and channels the decoder
+ * gives) as the models take it, 16 kHz mono, from the start in pieces. It reads [fd], a file in the app's storage or in the lectures folder outside it, and
  * closes it.
  */
 class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : AudioSource, AutoCloseable {
     constructor(file: File) : this(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY), file.name.endsWith(".wav"))
 
-    private val downsampler = Downsampler()
+    /** Made for the decoder's output format (48 kHz stereo until it says otherwise: a WAV, or a FLAC from us). */
+    private var downsampler = Downsampler()
+    private var outRate = 48_000
+    private var outChannels = 2
     private val pending = FloatBuilder()
     private val input = FileInputStream(fd.fileDescriptor)
     private val wav = if (isWav) input.channel.apply { position(WavWriter.HEADER_SIZE) } else null
@@ -33,7 +36,7 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     override fun read(maxSamples: Int): FloatArray? {
         while (pending.size < maxSamples && !done) {
             val pcm = nextPcm() ?: run { done = true; null } ?: break
-            pending.add(downsampler.process(pcm, pcm.size))
+            pending.add(downsampler.process(pcm, pcm.size - pcm.size % (outChannels * 2)))
         }
         if (pending.size == 0) return null
         val all = pending.drain()
@@ -64,6 +67,17 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
                 }
             }
             val out = codec.dequeueOutputBuffer(info, 10_000)
+            if (out == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                // An AAC at 24 kHz mono, or an HE-AAC whose decoder found SBR and now gives twice the rate.
+                val format = codec.outputFormat
+                val rate = format.getInteger(android.media.MediaFormat.KEY_SAMPLE_RATE)
+                val channels = format.getInteger(android.media.MediaFormat.KEY_CHANNEL_COUNT)
+                if (rate != outRate || channels != outChannels) {
+                    outRate = rate
+                    outChannels = channels
+                    downsampler = Downsampler(rate, channels)
+                }
+            }
             if (out >= 0) {
                 val bytes = ByteArray(info.size)
                 codec.getOutputBuffer(out)!!.apply { position(info.offset); limit(info.offset + info.size) }.get(bytes)
@@ -76,6 +90,8 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     }
 
     companion object {
+        private const val PRE_ROLL_MILLIS = 100L
+
         /**
          * [startMillis] to [endMillis] of a recording, 16 kHz mono (from the nearest earlier frame, for FLAC); [open]
          * opens it (and it is closed after).
@@ -93,7 +109,8 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
                 }
             }
             return RecordingAudio(open(), isWav = false).use { audio ->
-                audio.extractor!!.seekTo(startMillis * 1000, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                // From a little before: an AAC frame decodes right only after the one before it (FLAC's need nothing).
+                audio.extractor!!.seekTo((startMillis - PRE_ROLL_MILLIS).coerceAtLeast(0) * 1000, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
                 val skip = ((startMillis * 1000 - audio.extractor.sampleTime).coerceAtLeast(0) / 1000 * 16).toInt()
                 val got = audio.read(skip + want) ?: return FloatArray(0)
                 got.copyOfRange(minOf(skip, got.size), got.size)

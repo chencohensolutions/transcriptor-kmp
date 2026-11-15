@@ -37,14 +37,16 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var file: Path? = null
     var format: AudioFileFormat? = null
     var flacLevel: Int? = null
+    var aac: com.chencohensolution.transcriptor.settings.AacSettings? = null
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings) {
         this.file = file
         this.format = format
         this.flacLevel = flacLevel
+        this.aac = aac
         if (format == AudioFileFormat.Wav) wav = WavWriter(fileSystem, file) else fileSystem.write(file) {}
         level.value = 0.5f
     }
@@ -132,6 +134,20 @@ class RecordingTest {
         assertEquals(AUDIO_FLAC, lecture.audioFile)
         assertEquals(AudioFileFormat.Flac, recorder.format)
         assertEquals(FLAC_DEFAULT_LEVEL, recorder.flacLevel)
+    }
+
+    @Test
+    fun aacLiveRecordsToAacWithItsSettings() = runTest {
+        settings.audioFormat = AudioFormat.AacLive
+        settings.aac = com.chencohensolution.transcriptor.settings.AacSettings(
+            profile = com.chencohensolution.transcriptor.settings.AacProfile.He, sampleRate = 48_000, channels = 2, bitrateKbps = 48,
+        )
+        val lecture = session().start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        assertEquals(com.chencohensolution.transcriptor.notebook.AUDIO_AAC, lecture.audioFile)
+        assertEquals(AudioFileFormat.Aac, recorder.format)
+        assertEquals(48, recorder.aac?.bitrateKbps)
+        assertEquals(AudioFormat.AacLive, SettingsStore(fs, root).audioFormat)
+        assertEquals(2, SettingsStore(fs, root).aac.channels)
     }
 
     @Test

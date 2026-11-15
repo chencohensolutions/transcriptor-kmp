@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.recording
 
+import com.chencohensolution.transcriptor.notebook.AUDIO_AAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
@@ -122,7 +123,11 @@ class LectureSession(
         val lecture = Lecture(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
-            audioFile = if (format == AudioFormat.FlacLive) AUDIO_FLAC else AUDIO_WAV,
+            audioFile = when (format) {
+                AudioFormat.FlacLive -> AUDIO_FLAC
+                AudioFormat.AacLive -> AUDIO_AAC
+                else -> AUDIO_WAV
+            },
         )
         store.save(lecture)
         names = emptyMap()
@@ -146,8 +151,13 @@ class LectureSession(
         power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
-            if (format == AudioFormat.FlacLive) AudioFileFormat.Flac else AudioFileFormat.Wav,
+            when (format) {
+                AudioFormat.FlacLive -> AudioFileFormat.Flac
+                AudioFormat.AacLive -> AudioFileFormat.Aac
+                else -> AudioFileFormat.Wav
+            },
             settings.flacLevel,
+            settings.aac,
         )
         recording.value = Recording(labelNames, lecture, paused = false)
         saving = scope.launch {

@@ -1,10 +1,11 @@
 package com.chencohensolution.transcriptor.recording
 
 import kotlinx.coroutines.flow.StateFlow
+import com.chencohensolution.transcriptor.settings.AacSettings
 import okio.Path
 
 /** How the recorder writes the audio while recording. */
-enum class AudioFileFormat { Wav, Flac }
+enum class AudioFileFormat { Wav, Flac, Aac }
 
 /**
  * The microphone, written to a file as it records: 48 kHz, stereo, 16 bit. One per platform (Android's in
@@ -20,8 +21,8 @@ interface AudioRecorder {
     /** Gets every buffer written (48 kHz stereo 16 bit), on the recorder's thread: live transcription. */
     var onPcm: ((pcm: ByteArray, size: Int) -> Unit)?
 
-    /** Starts recording to [file]; a FLAC is encoded at [flacLevel] (0 the fastest, 8 the smallest). */
-    fun start(file: Path, format: AudioFileFormat, flacLevel: Int)
+    /** Starts recording to [file]; a FLAC is encoded at [flacLevel] (0 the fastest, 8 the smallest), an AAC as [aac] says. */
+    fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings = AacSettings())
     fun pause()
     fun resume()
 

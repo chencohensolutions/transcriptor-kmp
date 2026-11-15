@@ -86,6 +86,11 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // On the device or the emulator: the system's codecs (AAC round trips).
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.junit)
 }
 
 android {
@@ -100,6 +105,7 @@ android {
         versionName = "0.1.0"
         // whisper.cpp is built for 64-bit ARM only: every Android 15 phone, and the emulator on Apple silicon.
         ndk { abiFilters += "arm64-v8a" }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     ndkVersion = "30.0.16248370"
     externalNativeBuild {

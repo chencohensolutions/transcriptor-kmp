@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import com.chencohensolution.transcriptor.settings.AacSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import okio.FileSystem
@@ -11,7 +12,7 @@ import okio.Path
 import kotlin.math.sqrt
 
 /**
- * The phone's microphone, 48 kHz stereo 16 bit, read on its own thread into a [WavWriter] or a [FlacEncoder].
+ * The phone's microphone, 48 kHz stereo 16 bit, read on its own thread into a [WavWriter], a [FlacEncoder] or an [AacEncoder].
  * Needs the RECORD_AUDIO permission, and a foreground service of the microphone type to go on with the screen off.
  */
 class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : AudioRecorder {
@@ -30,11 +31,12 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
     private var reads = 0
 
     @SuppressLint("MissingPermission")
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings) {
         check(record == null) { "Already recording" }
         sink = when (format) {
             AudioFileFormat.Wav -> WavWriter(fileSystem, file)
             AudioFileFormat.Flac -> FlacEncoder(file.toFile(), flacLevel)
+            AudioFileFormat.Aac -> AacEncoder(file.toFile(), aac)
         }
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
         record = AudioRecord(
