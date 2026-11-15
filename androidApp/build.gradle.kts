@@ -11,14 +11,36 @@ kotlin {
         jvmTarget = JvmTarget.JVM_11
     }
 }
-/** [name] in libs/ (not in git), downloaded once from [url] and checked against its sha256. */
+/** A file's sha256, read in pieces. */
+fun sha256Of(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(1 shl 20)
+        while (true) {
+            val n = input.read(buffer)
+            if (n < 0) break
+            digest.update(buffer, 0, n)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+/**
+ * [name] in libs/ (not in git), downloaded from [url] and checked against its sha256. A file already there is
+ * checked too, at every build, and downloaded again when it isn't the pinned one: a checkout made before a new pin
+ * would otherwise build with the old file (an old sherpa-onnx AAR on Nov 15 left the NPU-encoder model unable to load).
+ */
 fun pinned(name: String, url: String, sha256: String): File = file("libs/$name").also { out ->
+    if (out.exists() && sha256Of(out) != sha256) {
+        logger.lifecycle("libs/$name isn't the pinned file (sha256 $sha256): downloading it again")
+        out.delete()
+    }
     if (!out.exists()) {
         check(!url.contains("HF_USER")) { "libs/$name isn't published yet: build it (docs/npu-plan.md) and put it in libs/" }
         out.parentFile.mkdirs()
         val temp = File(out.path + ".part")
         uri(url).toURL().openStream().use { input -> temp.outputStream().use { input.copyTo(it) } }
-        val sha = MessageDigest.getInstance("SHA-256").digest(temp.readBytes()).joinToString("") { "%02x".format(it) }
+        val sha = sha256Of(temp)
         check(sha == sha256) { "$name: unexpected sha256 $sha" }
         temp.renameTo(out)
     }
