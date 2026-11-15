@@ -231,6 +231,26 @@ class RecordingTest {
     }
 
     @Test
+    fun pausesAreKeptWithTheirClockTimes() = runTest {
+        var clock = 1_793_600_000_000
+        val session = LectureSession(recorder, store, settings, backgroundScope, now = { clock })
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        recorder.advance(5_000)
+        clock += 5_000
+        session.pauseOrResume()
+        clock += 600_000
+        session.pauseOrResume()
+        recorder.advance(2_000)
+        session.pauseOrResume()
+        runCurrent()
+        val saved = store.load(lecture.id)!!.pauses
+        assertEquals(2, saved.size)
+        assertEquals(com.chencohensolution.transcriptor.notebook.Pause(5_000, 1_793_600_005_000, 1_793_600_605_000), saved[0])
+        assertEquals(7_000, saved[1].atMillis)
+        assertNull(saved[1].resumedAtMillis)
+    }
+
+    @Test
     fun pauseAndResumeMoveTheState() = runTest {
         val session = session()
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")

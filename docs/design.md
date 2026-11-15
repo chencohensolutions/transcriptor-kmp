@@ -276,11 +276,14 @@ and, last, `notebooks.json`; a cut-off run goes on at the next launch and never 
       "model": "ivrit-whisper-large-v3", "edited": false, "speaker": "speaker-1" }
   ],
   "notes": [{ "id": "n1", "atMs": 33000, "text": "פסיבי ↔ אקטיבי" }],
-  "labels": ["label-1793606400000"]
+  "labels": ["label-1793606400000"],
+  "pauses": [{ "atMs": 1200000, "pausedAt": 1793607600000, "resumedAt": 1793608320000 }]
 }
 ```
 
-A note's time is when the user **started** typing it, so it points at what was being said then.
+A note's time is when the user **started** typing it, so it points at what was being said then. A pause's `atMs` is
+where in the audio it was paused (the audio goes on there without a gap); `pausedAt` and `resumedAt` are clock times
+in epoch milliseconds, and `resumedAt` is missing when the moment was stopped while paused (Nov 16, 2026).
 
 ### NPU
 

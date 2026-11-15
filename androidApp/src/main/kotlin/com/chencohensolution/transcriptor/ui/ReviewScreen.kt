@@ -350,14 +350,25 @@ fun ReviewScreen(
                     item(key = "waiting") { CompositionLocalProvider(LocalLayoutDirection provides appDirection) { NotTranscribedYet(state, actions) } }
                     // Its notes, which have no lines to sit under yet.
                     items(state.lecture.notes, key = { "note-${it.id}" }) { n -> NotePill(n, onTime = { actions.seek(n.atMillis) }, onHold = { note = n }) }
+                    items(state.lecture.pauses, key = { "pause-${it.pausedAtMillis}" }) { p -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) } }
+                }
+                // Pauses before the first turn; the others come after the turn they cut into.
+                val firstStart = turns.firstOrNull()?.first()?.startMillis ?: Long.MAX_VALUE
+                if (!waiting) items(state.lecture.pauses.filter { it.atMillis <= firstStart }, key = { "pause-${it.pausedAtMillis}" }) { p ->
+                    CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) }
                 }
                 items(turns, key = { it.first().id }) { turn ->
                     val next = turns.getOrNull(turns.indexOf(turn) + 1)?.first()?.startMillis ?: Long.MAX_VALUE
                     val notes = state.lecture.notes.filter { n -> n.atMillis >= turn.first().startMillis && n.atMillis < next || (turn === turns.first() && n.atMillis < turn.first().startMillis) }
-                    Turn(
-                        turn, state, actions, editing, edits, notes,
-                        onSpeaker = { renaming = it }, onMove = { moving = it }, onNote = { note = it },
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Turn(
+                            turn, state, actions, editing, edits, notes,
+                            onSpeaker = { renaming = it }, onMove = { moving = it }, onNote = { note = it },
+                        )
+                        state.lecture.pauses.filter { it.atMillis > turn.first().startMillis && it.atMillis <= next }.forEach { p ->
+                            CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) }
+                        }
+                    }
                 }
             }
         }

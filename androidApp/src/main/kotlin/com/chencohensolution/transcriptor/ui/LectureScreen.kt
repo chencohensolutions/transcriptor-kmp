@@ -143,7 +143,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
     BackHandler { transcript = false }
     var editingId by remember { mutableStateOf<String?>(null) }
     val colors = LocalTranscriptorColors.current
-    val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
+    val entries = remember(state.lecture.segments, state.lecture.notes, state.lecture.pauses) { timelineOf(state.lecture) }
     // A line shows its speaker where the speaker changes: line id to speaker id.
     val speakerChanges = remember(state.lecture.segments) {
         var previous: String? = null
@@ -243,7 +243,13 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                             }
                         } }
                     }
-                    items(entries.asReversed(), key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
+                    items(entries.asReversed(), key = {
+                        when (it) {
+                            is TimelineEntry.Speech -> it.segment.id
+                            is TimelineEntry.Written -> it.note.id
+                            is TimelineEntry.Paused -> "pause-${it.pause.pausedAtMillis}"
+                        }
+                    }) { entry ->
                         when (entry) {
                             is TimelineEntry.Speech -> SpeechRow(
                                 entry, fresh = entry.segment.id !in shownAtOpen,
@@ -256,6 +262,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                                 onSave = { actions.editLine(entry.segment.id, it); editingId = null },
                             )
                             is TimelineEntry.Written -> NoteCard(entry)
+                            is TimelineEntry.Paused -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(entry.pause, Modifier.padding(horizontal = 16.dp)) }
                         }
                     }
                     // The app's text, in the app's direction, among the notebook's content.

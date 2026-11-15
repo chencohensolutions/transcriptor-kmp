@@ -62,6 +62,15 @@ fun MomentInfoSheet(info: MomentInfo, onDismiss: () -> Unit) {
             info.audioBytes?.let { Item(stringResource(R.string.info_size), stringResource(R.string.info_megabytes, it / 1_048_576.0)) }
             if (r != null) Item(stringResource(R.string.info_mic), audio?.input?.let(::isolated) ?: stringResource(R.string.settings_mic_phone))
             r?.models?.forEach { m -> Item(m.role.replaceFirstChar { it.titlecase() }, "${isolated(m.name)} · ${m.runsOn}") }
+            // Where it was paused: the clock times, with the audio's position (it has no gap there).
+            l.pauses.forEachIndexed { i, p ->
+                val resumed = p.resumedAtMillis
+                Item(
+                    if (i == 0) stringResource(R.string.info_pauses) else "",
+                    "${formatClock(p.atMillis)} · " + if (resumed == null) stringResource(R.string.info_pause_open, clockTime(p.pausedAtMillis))
+                        else stringResource(R.string.info_pause_row, clockTime(p.pausedAtMillis), clockTime(resumed), pauseLength(resumed - p.pausedAtMillis)),
+                )
+            }
 
             Section(stringResource(R.string.info_power_recording))
             if (r == null) Note(stringResource(R.string.info_not_kept)) else PowerRows(r)

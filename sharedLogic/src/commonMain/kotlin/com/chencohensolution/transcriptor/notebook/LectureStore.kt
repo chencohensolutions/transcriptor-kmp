@@ -263,6 +263,8 @@ private data class LectureFileV1(
     val notes: List<NoteV1> = emptyList(),
     /** Its labels' ids (`labels.json`). */
     val labels: List<String> = emptyList(),
+    /** Where it was paused, and when by the clock. */
+    val pauses: List<PauseV1> = emptyList(),
 ) {
     @OptIn(ExperimentalTime::class)
     fun toLecture() = Lecture(
@@ -273,6 +275,7 @@ private data class LectureFileV1(
         speakers = speakers.map { Speaker(it.id, it.name) },
         audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, speakerPass = speakerPass, refinedWith = refinedWith,
         versions = versions.map { it.toInfo() }, pendingTranscript = pendingTranscript,
+        pauses = pauses.map { Pause(it.atMs, it.pausedAt, it.resumedAt) },
     )
 
     companion object {
@@ -290,6 +293,7 @@ private data class LectureFileV1(
             },
             notes = lecture.notes.map { NoteV1(it.id, it.atMillis, it.text) },
             labels = lecture.labels,
+            pauses = lecture.pauses.map { PauseV1(it.atMillis, it.pausedAtMillis, it.resumedAtMillis) },
         )
     }
 }
@@ -315,6 +319,10 @@ private data class WordV1(val atMs: Long, val text: String)
 
 @Serializable
 private data class NoteV1(val id: String, val atMs: Long, val text: String)
+
+/** A pause: [atMs] into the audio; [pausedAt] and [resumedAt] by the clock, epoch milliseconds (no [resumedAt]: stopped while paused). */
+@Serializable
+private data class PauseV1(val atMs: Long, val pausedAt: Long, val resumedAt: Long? = null)
 
 @Serializable
 private data class VersionInfoV1(val id: String, val model: String, val keptAt: Long, val lines: Int, val edited: Int, val refined: Boolean = false) {

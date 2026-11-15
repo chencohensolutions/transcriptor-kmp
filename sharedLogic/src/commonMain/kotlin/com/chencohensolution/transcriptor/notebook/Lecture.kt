@@ -65,7 +65,18 @@ data class Lecture(
      * ([com.chencohensolution.transcriptor.speech.lineTimes], then the improve model) clears it.
      */
     val pendingTranscript: Boolean = false,
+    /** Where the recording was paused, and when by the clock: the audio has no gap there, the clock does. */
+    val pauses: List<Pause> = emptyList(),
 )
+
+/**
+ * A pause in the recording at [atMillis] of the audio (where it went on after Resume), [pausedAtMillis] by the clock
+ * (epoch ms) and [resumedAtMillis] when Resume was pressed; null when the moment was stopped while paused.
+ */
+data class Pause(val atMillis: Long, val pausedAtMillis: Long, val resumedAtMillis: Long? = null) {
+    /** How long it was paused; null when it never resumed. */
+    val lengthMillis get() = resumedAtMillis?.let { it - pausedAtMillis }
+}
 
 /**
  * An earlier transcript, as the lecture lists it: written by [modelId] (the live model, or a refine pass's), kept at

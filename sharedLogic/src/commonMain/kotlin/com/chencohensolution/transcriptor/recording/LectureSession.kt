@@ -6,6 +6,7 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.Pause
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import com.chencohensolution.transcriptor.speech.LiveOutput
@@ -201,7 +202,16 @@ class LectureSession(
         val r = recording.value ?: return
         if (r.finishing) return
         if (r.paused) recorder.resume() else recorder.pause()
-        recording.update { it?.copy(paused = !r.paused) }
+        // The clock time of each pause and resume, kept with the moment: the audio goes on without a gap.
+        val clock = now()
+        recording.update { rec ->
+            rec ?: return@update null
+            val pauses = rec.lecture.pauses
+            val next = if (r.paused) pauses.dropLast(1) + listOfNotNull(pauses.lastOrNull()?.copy(resumedAtMillis = clock))
+                else pauses + Pause(recorder.positionMillis.value, clock)
+            rec.copy(paused = !r.paused, lecture = rec.lecture.copy(pauses = next))
+        }
+        if (r.paused) saveNow()
         if (!r.paused) {
             liveModel?.transcriber?.pause()
             recorder.checkpoint()

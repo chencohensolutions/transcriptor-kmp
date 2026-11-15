@@ -35,5 +35,6 @@ internal val labScreens: List<LabScreen> = listOf(
         reviewCurrentWaiting,
         reviewCurrentPeople,
         reviewCurrentConversation,
+        reviewCurrentPaused,
     )),
 )

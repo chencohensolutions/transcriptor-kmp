@@ -111,6 +111,9 @@ starts afresh. Amber from 70%, red from 90%.
 
 ## Behavior
 
+- Pause keeps its clock time with the moment (`Lecture.pauses`); the transcript shows "Paused at 14:20" while paused,
+  then "Paused 12 min · resumed 14:32" (`PauseDivider`), in the timeline after the line it cut into (`timelineOf`).
+
 - Pause stops recording and transcription; the FLAC continues from the same point on Resume. Stop ends the moment and
   opens it after ([lecture-review.md](lecture-review.md)).
 - Tapping a finished line fixes it in place (round 2's a2): it becomes a field where it is, with Cancel and Save, and

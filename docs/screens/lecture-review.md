@@ -111,6 +111,9 @@ or more voices and one still unnamed (`askPeople`).
   shows the best setting: "Fewer speakers than now: 52 of 60 lines would match your speakers (now 45), with 2 speakers
   (now 4)". Apply sets it, for the next moment (`LectureReview.tuneSpeakers`, `applySpeakerTuning`).
 
+- **Pauses** (hen's ask, Nov 16, 2026): where the recording was paused, a divider between the turns, "Paused 12 min ·
+  resumed 14:32" (the date too when it isn't today), after the turn it cut into (`Lecture.pauses`, `Pause`: the audio's
+  position and the clock times; saved by `LectureSession.pauseOrResume`). The audio has no gap there. Info lists them.
 - **Info** (menu › Info; hen's ask, Nov 16, 2026): a sheet "About this moment" (`MomentInfoSheet`, from
   `LectureReview.info()` → `MomentInfo`): started, length, language, the audio file (and what it was recorded as
   when encoded afterwards), the encoder (hardware or software), the file's size, the microphone, the models; then
