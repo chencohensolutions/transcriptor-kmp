@@ -86,7 +86,8 @@ starts afresh. Amber from 70%, red from 90%.
   grows and as new lines come, with no scrolling (a scroll running all the time would swallow taps). The text moves as
   one: everything in view, the grey words too, moves up together in a single ease-in-out tween (320 ms), no spring and
   no line on its own. New words fade in (200 ms) once the move ends; a finished line settles from grey into the text's
-  color where the grey line was. Scrolling back stops following
+  color where the grey line was. The grey is the text's own color, faded (`onSurface` at 60%), so it reads in the
+  light and the dark theme alike. Scrolling back stops following
   until "Back to live".
 
 ## Code
