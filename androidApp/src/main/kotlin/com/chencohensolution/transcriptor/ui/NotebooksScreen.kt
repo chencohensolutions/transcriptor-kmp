@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.ui
 
 import androidx.activity.compose.BackHandler
+import com.chencohensolution.transcriptor.settings.RecordMode
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -115,10 +116,10 @@ class NotebooksActions(
     val openLectureAt: (lectureId: String, atMillis: Long?) -> Unit = { _, _ -> },
     /** The moments a query is found in (titles, people, labels, notes, what was said); reads files off the main thread. */
     val search: suspend (query: String) -> List<SearchHit> = { emptyList() },
-    /** Starts a moment with these labels (maybe none) in [language], transcribed as it records ([live]) or after. */
-    val record: (labels: List<String>, language: String, live: Boolean) -> Unit = { _, _, _ -> },
+    /** Starts a moment with these labels (maybe none) in [language], transcribed as it records, after, or not ([mode]). */
+    val record: (labels: List<String>, language: String, mode: RecordMode) -> Unit = { _, _, _ -> },
     /** Keeps the Record bar's Live or After for next time. */
-    val setRecordLive: (live: Boolean) -> Unit = {},
+    val setRecordMode: (mode: RecordMode) -> Unit = {},
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -186,7 +187,7 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     var labeling by remember { mutableStateOf<List<String>?>(null) }
     var choosingLabels by remember { mutableStateOf(false) }
     var choosingLanguage by remember { mutableStateOf(false) }
-    var recordLive by rememberSaveable { mutableStateOf(state.recordLive) }
+    var recordMode by rememberSaveable { mutableStateOf(state.recordMode) }
     // Search: the query while the search bar is open (null: closed), and what it found (null: still looking).
     var query by rememberSaveable { mutableStateOf<String?>(null) }
     var hits by remember { mutableStateOf<List<SearchHit>?>(emptyList()) }
@@ -328,26 +329,33 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }
-                            // Live or After: transcribed while it records, or only recorded and transcribed after (the
-                            // default: easier on the battery). The guessed labels keep their ✦ on the chips above.
+                            // Live, After or Only record: transcribed while it records, after it stops (easier on the
+                            // battery), or not until asked. The guessed labels keep their ✦ on the chips above.
                             Row(Modifier.padding(top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    stringResource(if (recordLive) R.string.notebooks_record_live_note else R.string.notebooks_record_after_note),
+                                    stringResource(
+                                        when (recordMode) {
+                                            RecordMode.Live -> R.string.notebooks_record_live_note
+                                            RecordMode.After -> R.string.notebooks_record_after_note
+                                            RecordMode.Only -> R.string.notebooks_record_only_note
+                                        },
+                                    ),
                                     style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
                                 )
-                                FilterChip(
-                                    selected = recordLive, onClick = { recordLive = true; actions.setRecordLive(true) },
-                                    label = { Text(stringResource(R.string.notebooks_record_live)) }, modifier = Modifier.padding(end = 6.dp),
-                                )
-                                FilterChip(
-                                    selected = !recordLive, onClick = { recordLive = false; actions.setRecordLive(false) },
-                                    label = { Text(stringResource(R.string.notebooks_record_after)) },
-                                )
+                                listOf(
+                                    RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
+                                    RecordMode.Only to R.string.notebooks_record_only,
+                                ).forEach { (mode, label) ->
+                                    FilterChip(
+                                        selected = recordMode == mode, onClick = { recordMode = mode; actions.setRecordMode(mode) },
+                                        label = { Text(stringResource(label)) }, modifier = Modifier.padding(start = 6.dp),
+                                    )
+                                }
                             }
                             Button(
-                                onClick = { actions.record(nextLabels, language, recordLive); chosen = null }, shape = RoundedCornerShape(16.dp),
+                                onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)

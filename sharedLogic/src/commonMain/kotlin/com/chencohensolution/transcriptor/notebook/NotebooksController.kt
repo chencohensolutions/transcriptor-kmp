@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.notebook
 
+import com.chencohensolution.transcriptor.settings.RecordMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,8 +34,8 @@ data class NotebooksState(
     val recording: RecordingNow? = null,
     /** Moments with a pass running on them (the speaker pass, refining, compressing to FLAC): their progress. */
     val working: Map<String, Float> = emptyMap(),
-    /** The Record bar's Live (true) or After, as the settings keep it ([com.chencohensolution.transcriptor.settings.SettingsStore.recordLive]). */
-    val recordLive: Boolean = false,
+    /** The Record bar's Live, After or Only record, as the settings keep it ([com.chencohensolution.transcriptor.settings.SettingsStore.recordMode]). */
+    val recordMode: RecordMode = RecordMode.After,
 )
 
 /**

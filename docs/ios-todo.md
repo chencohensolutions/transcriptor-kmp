@@ -206,3 +206,8 @@ anything left to decide. Remove an entry once it is built.
   `LiveLectureState.input` / `inputMissing`. iOS: list `AVAudioSession.availableInputs` (Bluetooth HFP, wired, USB),
   `setPreferredInput`, the `.allowBluetooth` category option, and follow `routeChangeNotification` for `inputInUse`.
   Strings `settings_mic*`, `glance_mic*`. Android: `AndroidAudioInputs.kt`, `MicrophoneRow` in `ModelsScreen.kt`.
+## Record from the system's controls (Nov 15, 2026)
+
+- Android: a Quick Settings tile (`RecordTileService.kt`) records as the Record bar would (`notebooksState`'s guess and
+  language, `SettingsStore.recordLive`) and stops with a second tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. Strings `tile_stop_again`, `tile_finishing`.

@@ -511,4 +511,10 @@
     <string name="settings_mic_close">סגירה</string>
     <string name="glance_mic">מיקרופון: %1$s</string>
     <string name="glance_mic_missing">%1$s לא מחובר: מקליט מהטלפון</string>
+    <string name="tile_stop_again">הקשה נוספת לעצירה</string>
+    <string name="tile_finishing">מסיים…</string>
+    <string name="notebooks_record_only">בלי תמלול</string>
+    <string name="notebooks_record_only_note">מקליט בלבד. אפשר לתמלל מהרגע מתי שרוצים.</string>
+    <string name="glance_recording_no_transcript">מקליט · בלי תמלול</string>
+    <string name="lecture_record_no_transcript">מקליט בלבד. כדי לתמלל, הקישו \"לתמלל עכשיו\" ברגע מתי שרוצים.</string>
 </resources>

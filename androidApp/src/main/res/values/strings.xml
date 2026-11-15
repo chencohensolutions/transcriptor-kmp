@@ -505,4 +505,10 @@
     <string name="settings_mic_close">Close</string>
     <string name="glance_mic">Microphone: %1$s</string>
     <string name="glance_mic_missing">%1$s isn\'t connected: recording from the phone</string>
+    <string name="tile_stop_again">Tap again to stop</string>
+    <string name="tile_finishing">Finishing…</string>
+    <string name="notebooks_record_only">No transcript</string>
+    <string name="notebooks_record_only_note">Records only. Transcribe it from the moment whenever you want.</string>
+    <string name="glance_recording_no_transcript">Recording · not transcribed</string>
+    <string name="lecture_record_no_transcript">Recording only. Tap Transcribe now on the moment when you want its transcript.</string>
 </resources>
