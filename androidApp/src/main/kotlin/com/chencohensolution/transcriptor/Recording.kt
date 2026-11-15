@@ -140,6 +140,9 @@ object Recording {
     lateinit var installedModels: InstalledModels
         private set
 
+    /** Improve passes a recording stopped (moment id, model id), to start again once it stops; in memory only. */
+    val improveAfterRecording: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
+
     /** Loads NPU models so one too big for the phone is refused, or disabled after it got the app killed. */
     lateinit var npuGuard: NpuLoadGuard
         private set
@@ -213,9 +216,10 @@ object Recording {
     /**
      * The refine pass on [lecture] with [modelId] (minutes to hours with a large model; not on the main thread): the
      * current transcript kept as a version first, then every line transcribed again, edited lines kept. Saves and
-     * returns it. [kept] is called once the version is kept, so an open review screen can read it.
+     * returns it. [kept] is called once the version is kept, so an open review screen can read it. [stop] true ends it
+     * early ([RefinePass.Stopped]), its model closed, nothing written.
      */
-    fun refine(lecture: Lecture, modelId: String, kept: () -> Unit = {}, progress: (Float) -> Unit = {}): Lecture {
+    fun refine(lecture: Lecture, modelId: String, kept: () -> Unit = {}, progress: (Float) -> Unit = {}, stop: () -> Boolean = { false }): Lecture {
         val model = refineModels(lecture.language).firstOrNull { it.id == modelId } ?: error("$modelId isn't downloaded")
         store.repairAudio(lecture)
         val withVersion = store.keepCurrent(store.load(lecture.id) ?: lecture, System.currentTimeMillis())
@@ -226,14 +230,14 @@ object Recording {
         val started = System.currentTimeMillis()
         val done = when (model.kind) {
             ModelKind.Whisper, ModelKind.WhisperNpuEncoder -> npuEngine(model) { whisperEngine(model) }.use { engine ->
-                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
+                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress, stop)
             }
             ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
                 npuGuard.load(model) { engine.load(lecture.language) }
-                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress)
+                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress, stop)
             }
             else -> npuEngine(model) { SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }) }.use { engine ->
-                RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress)
+                RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress, stop)
             }
         }
         // Its speed on this phone, for the next estimate.
@@ -459,7 +463,7 @@ object Recording {
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
-        npuGuard = NpuLoadGuard(installedModels) {
+        npuGuard = NpuLoadGuard(installedModels, log = { android.util.Log.i("NpuLoadGuard", it) }) {
             val info = android.app.ActivityManager.MemoryInfo()
             app.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(info)
             info.availMem
@@ -572,6 +576,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     }
     return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation },
         skipped = pick.skipped?.name,
+        improveOnStop = pick.skipped != null && Recording.improveModelFor(language) != null,
     )
 }
 

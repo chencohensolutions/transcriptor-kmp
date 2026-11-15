@@ -48,6 +48,8 @@ class LiveModel(
     val turns: String? = null,
     /** The live model picked that didn't fit in the free memory now (its name), passed over for this one this time. */
     val skipped: String? = null,
+    /** With [skipped]: the moment is improved as soon as it stops ([ImproveAfterStop]), a model to improve with being here. */
+    val improveOnStop: Boolean = false,
 )
 
 /**
@@ -105,6 +107,7 @@ class LectureSession(
                     speakerPassOnStop = liveModel?.voicePrints != null && settings.findSpeakersOnStop && speakerPassReady(),
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
+                    improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)

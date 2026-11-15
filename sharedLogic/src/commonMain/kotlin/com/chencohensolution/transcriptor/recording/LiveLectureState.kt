@@ -35,6 +35,8 @@ data class LiveLectureState(
      * [liveModelName] runs instead, this time only.
      */
     val skippedForMemory: String? = null,
+    /** With [skippedForMemory]: the moment is improved when it stops, so the screen says that instead of a warning. */
+    val improveOnStop: Boolean = false,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
     val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     /** How hard the processors are working (refreshed about every second); null until the first reading. */

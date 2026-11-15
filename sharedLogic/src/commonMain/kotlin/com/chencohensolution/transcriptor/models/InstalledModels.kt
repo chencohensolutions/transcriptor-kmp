@@ -129,7 +129,7 @@ private data class InstalledV1(
  *   ([ModelLibrary.forLanguage]) and the pick falls back to the next model that works. Nothing retries it on its
  *   own; [reenable] does, when the user asks.
  */
-class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes: () -> Long) {
+class NpuLoadGuard(private val installed: InstalledModels, private val log: (String) -> Unit = {}, private val freeBytes: () -> Long) {
     /** A load refused: [now] when only for want of free memory at the moment (not disabled), else the model is disabled. */
     class Refused(message: String, val now: Boolean = false) : Exception(message)
 
@@ -167,7 +167,8 @@ class NpuLoadGuard(private val installed: InstalledModels, private val freeBytes
         if (need > free) throw Refused("Not enough free memory now: needs about ${gb(need)} GB, ${gb(free)} GB free. Close other apps and try again.", now = true)
         installed.setLoading(model.id)
         try {
-            return load()
+            // The free memory before and after: what the load really keeps, to set [SpeechModel.npuPeakBytes] from.
+            return load().also { log("${model.id} loaded: ${gb(free)} GB free before, ${gb(freeBytes())} GB after (guard asked ${gb(need)} GB)") }
         } finally {
             installed.setLoading(null)
         }

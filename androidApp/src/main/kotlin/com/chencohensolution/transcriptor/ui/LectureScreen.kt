@@ -263,10 +263,11 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                             )
                             val skipped = state.skippedForMemory
+                            // Improved with it at Stop: a calm note; else the warning (nothing will use it).
                             if (skipped != null && model != null && !state.finishing) Text(
-                                stringResource(R.string.lecture_model_skipped_memory, skipped, model),
+                                stringResource(if (state.improveOnStop) R.string.lecture_model_skipped_improve else R.string.lecture_model_skipped_memory, skipped, model),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
+                                color = if (state.improveOnStop) colors.time else MaterialTheme.colorScheme.error,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
                             )
                             if (!state.finishing) ModelsInUse(state)

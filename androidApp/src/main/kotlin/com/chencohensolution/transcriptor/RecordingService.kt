@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.recording.ImproveAfterStop
+import com.chencohensolution.transcriptor.speech.RefinePass
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,16 +56,18 @@ class RecordingService : Service() {
             }
             ACTION_PAUSE -> session.pauseOrResume()
             ACTION_STOP -> scope.launch {
-                // Returns once live transcription has finished the last lines.
+                // The live model chosen didn't fit in the free memory at the start: improved with it once this one is unloaded.
+                val skipped = session.state.value?.skippedForMemory != null
+                // Returns once live transcription has finished the last lines (and closed the live model).
                 val lecture = session.stop()?.also { Recording.lastLecture.value = it }
-                val improve = lecture?.takeIf { it.segments.isNotEmpty() && Recording.settings.autoImprove }?.let { Recording.improveModelFor(it.language) }
-                // Improving on its own waits for the charger.
-                if (lecture != null && improve != null && !charging()) Recording.settings.addImprovePending(lecture.id)
-                val then = improve?.takeIf { charging() }?.let { model -> { done: Lecture -> refine(done, model.id) } }
+                val model = lecture?.let { Recording.improveModelFor(it.language) }
+                val after = ImproveAfterStop.of(lecture?.segments?.isNotEmpty() == true, model != null, skipped, Recording.settings.autoImprove, charging())
+                if (lecture != null && after == ImproveAfterStop.WhenCharging) Recording.settings.addImprovePending(lecture.id)
+                val then = model?.takeIf { after == ImproveAfterStop.Now }?.let { m -> { done: Lecture -> refine(done, m.id) } }
                 when {
                     lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.findSpeakersOnStop -> findSpeakers(lecture, then)
                     lecture != null && then != null -> then(lecture)
-                    else -> compressPending()
+                    else -> if (!improveNextPending()) compressPending()
                 }
             }
             ACTION_REFINE -> {
@@ -131,21 +135,38 @@ class RecordingService : Service() {
      * improved while the phone still charges, else any FLAC compression.
      */
     private fun refine(lecture: Lecture, modelId: String) {
+        // Still not enough free memory for its model (other apps): it waits for the charger instead of being dropped.
+        val model = Recording.refineModels(lecture.language).firstOrNull { it.id == modelId }
+        if (model != null && !Recording.npuGuard.fitsNow(model)) {
+            android.util.Log.i("RecordingService", "not enough free memory for ${model.name} now: ${lecture.id} waits for the charger")
+            Recording.settings.addImprovePending(lecture.id)
+            compressPending()
+            return
+        }
         compressing = true
         startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             Recording.refining.value = lecture.id to 0f
             runCatching {
-                Recording.refine(lecture, modelId, kept = { launch(Dispatchers.Main) { if (Recording.review.lecture?.id == lecture.id) Recording.review.reload() } }) { p ->
-                    Recording.refining.value = lecture.id to p
-                    val percent = (p * 100).toInt()
-                    if (percent != shown) { shown = percent; notify(progressNotification(R.string.refining, p)) }
-                }
+                Recording.refine(
+                    lecture, modelId,
+                    kept = { launch(Dispatchers.Main) { if (Recording.review.lecture?.id == lecture.id) Recording.review.reload() } },
+                    progress = { p ->
+                        Recording.refining.value = lecture.id to p
+                        val percent = (p * 100).toInt()
+                        if (percent != shown) { shown = percent; notify(progressNotification(R.string.refining, p)) }
+                    },
+                    // A recording started: its live model needs the memory this model holds. Closed now, done after it stops.
+                    stop = { Recording.session.isRecording },
+                )
             }.onSuccess { done ->
                 if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
-            }.onFailure { android.util.Log.e("RecordingService", "refine pass failed", it) }
+            }.onFailure {
+                if (it is RefinePass.Stopped) Recording.improveAfterRecording += lecture.id to modelId
+                else android.util.Log.e("RecordingService", "refine pass failed", it)
+            }
             Recording.settings.removeImprovePending(lecture.id)
             Recording.refining.value = null
             compressing = false
@@ -157,11 +178,20 @@ class RecordingService : Service() {
     private fun charging() = getSystemService(android.os.BatteryManager::class.java).isCharging
 
     /**
-     * Improves the next lecture waiting for the charger, if the phone charges and its language has a model; drops
+     * Improves the next lecture whose pass a recording stopped, else the next waiting for the charger, if the phone charges and its language has a model; drops
      * ones that are gone or can't be improved. False when there is none to start.
      */
     private fun improveNextPending(): Boolean {
-        if (!charging() || Recording.session.isRecording) return false
+        if (Recording.session.isRecording) return false
+        // First a pass a recording stopped: started again now, charger or not (it was running before the recording).
+        while (Recording.improveAfterRecording.isNotEmpty()) {
+            val (lectureId, modelId) = Recording.improveAfterRecording.removeAt(0)
+            val lecture = Recording.store.load(lectureId) ?: continue
+            if (lecture.refinedWith != null || Recording.refineModels(lecture.language).none { it.id == modelId }) continue
+            refine(lecture, modelId)
+            return true
+        }
+        if (!charging()) return false
         for (lectureId in Recording.settings.improvePending) {
             val lecture = Recording.store.load(lectureId)
             val model = lecture?.let { Recording.improveModelFor(it.language) }
