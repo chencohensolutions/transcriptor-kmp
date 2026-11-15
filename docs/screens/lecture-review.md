@@ -16,6 +16,10 @@ sentence being played highlighted; edited lines marked ✎. Notes are pills afte
 At the bottom: the overview of the whole moment (a lane per speaker with their turns, the notes as dots, the
 playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2×) and a note-here button.
 
+- **The title renames the moment** (tap it; `LectureReview.rename`), and the line under it, its labels or "Add
+  labels", opens the labels sheet of the first screen for this moment (`LectureReview.setLabels`): check, make, rename
+  and delete labels without going back to the list.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.

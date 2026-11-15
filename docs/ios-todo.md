@@ -140,3 +140,12 @@ anything left to decide. Remove an entry once it is built.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
   iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.
+
+## Finding moments (Nov 15, 2026)
+
+- Shared: `LectureSummary.people`, `unnamedPeople`, `preview` (`Lecture.summary`, `previewOf`); `notebook/Search.kt`
+  (`SearchHit`, `searchMoments`), `NotebooksController.search`; `LectureReview.rename`, `setLabels`, `open(atMillis)`.
+- Android to mirror: the search bar and `SearchResults`, `peopleLine` and the preview in `MomentRow`, the one list by
+  date (`NotebooksScreen.kt`); the title and labels taps, `RenameTitleDialog` (`ReviewScreen.kt`).
+- Strings: `notebooks_search*`, `notebooks_people_more`, `notebooks_add_label_quiet`, `review_rename*`,
+  `review_add_labels`, plurals `notebooks_voices`, `notebooks_search_more`. Lab sample: `LabData.conversations`.

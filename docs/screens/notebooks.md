@@ -13,6 +13,15 @@ The code still calls it `NotebooksScreen`.
 - **Today / This week / Earlier**: every moment with labels, newest first, with all its labels in their colors (but
   the one the list is narrowed to), its title, day, length, notes, Improved, and the progress of a pass running on it.
   A title goes by its own first letter, else its language's direction.
+- **One list by date** (Nov 15, 2026): moments without labels are rows like the others, in Today / This week /
+  Earlier, with a quiet **Add <label>** (the one their time suggests) and **Labels…**, or **+ label**. The "No labels
+  yet" block is gone; the No label chip still narrows the list to them.
+- **Each row says who and what** (`LectureSummary.people`, `unnamedPeople`, `preview`): the named speakers, the one who
+  talked most first ("Dan, Hen, Maya and 1 more"), and the moment's first sentence of five words or more in quotes.
+- **Search** (the magnifier in the top bar; `NotebooksController.search`, `searchMoments`): titles, speakers' names,
+  labels, notes and what was said, whatever the case, from two characters. A row per moment, newest first: its title,
+  who said the line (or Note:, With, Label:), the text around the match with the match in bold, the line's time and
+  how many more places match. Tapping opens the moment at that line (`LectureReview.open(atMillis)`). Back closes it.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

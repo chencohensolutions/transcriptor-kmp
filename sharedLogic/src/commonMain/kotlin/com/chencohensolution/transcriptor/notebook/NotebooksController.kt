@@ -64,7 +64,25 @@ private fun usualLanguage(moments: List<LectureSummary>): String? =
     moments.groupingBy { it.language }.eachCount().maxByOrNull { it.value }?.key
 
 /** A moment as a list shows it. */
-fun Lecture.summary() = LectureSummary(id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels)
+fun Lecture.summary(): LectureSummary {
+    val talk = segments.filter { it.speakerId != null }.groupBy { it.speakerId }.mapValues { (_, lines) -> lines.sumOf { it.endMillis - it.startMillis } }
+    val spoke = speakers.filter { it.id in talk }.sortedByDescending { talk[it.id] }
+    return LectureSummary(
+        id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels,
+        people = spoke.filter { it.name.isNotEmpty() }.map { it.name }, unnamedPeople = spoke.count { it.name.isEmpty() },
+        preview = previewOf(this),
+    )
+}
+
+/** The first line with at least [PREVIEW_WORDS] words (a greeting or an "okay" says little), else the first, cut to [PREVIEW_CHARS]. */
+internal fun previewOf(lecture: Lecture): String {
+    val line = lecture.segments.firstOrNull { it.text.trim().split(' ').size >= PREVIEW_WORDS } ?: lecture.segments.firstOrNull() ?: return ""
+    val text = line.text.trim()
+    return if (text.length <= PREVIEW_CHARS) text else text.take(PREVIEW_CHARS).substringBeforeLast(' ').trimEnd(',', ';', ':') + "…"
+}
+
+private const val PREVIEW_WORDS = 5
+private const val PREVIEW_CHARS = 110
 
 /** The names of [ids]' labels, in order, joined ("Psychology, Exam"); empty for none. */
 fun labelNames(ids: List<String>, labels: List<Label>): String = ids.mapNotNull { id -> labels.firstOrNull { it.id == id }?.name }.joinToString(", ")
@@ -96,6 +114,9 @@ class NotebooksController(
     }
 
     fun newLabel(name: String): Label = labels.create(name, now()).also { reload() }
+
+    /** The moments [query] is found in, newest first ([searchMoments]). Reads every moment: not on the main thread. */
+    fun search(query: String): List<SearchHit> = searchMoments(lectures.all(), labels.all(), query)
 
     /** Adds [add] and removes [remove] on each of [lectureIds] that isn't [busy]; returns the ids changed. */
     fun setLabels(lectureIds: Collection<String>, add: Set<String>, remove: Set<String>, busy: (String) -> Boolean = { false }): List<String> {

@@ -102,14 +102,27 @@ class LectureReview(
 
     val lecture get() = open.value?.lecture
 
-    /** Opens a lecture; false when it isn't there. */
-    fun open(lectureId: String, labelNames: String): Boolean {
+    /** Opens a lecture, at [atMillis] when given (a search's line); false when it isn't there. */
+    fun open(lectureId: String, labelNames: String, atMillis: Long? = null): Boolean {
         close()
         val lecture = store.load(lectureId) ?: return false
         store.repairAudio(lecture)
         player.load(store.audioPath(lecture))
         open.value = Open(labelNames, lecture, 1f)
+        if (atMillis != null) player.seekTo(atMillis.coerceIn(0, lecture.durationMillis))
         return true
+    }
+
+    /** The moment's title, in the user's words; a blank one changes nothing. */
+    fun rename(title: String) {
+        val clean = title.trim()
+        if (clean.isNotEmpty()) change { it.copy(title = clean) }
+    }
+
+    /** The moment's labels (their ids, and [labelNames] for the screen), set from its own screen. */
+    fun setLabels(labels: List<String>, labelNames: String) {
+        change { it.copy(labels = labels) }
+        open.update { o -> o?.let { Open(labelNames, it.lecture, it.speed) } }
     }
 
     fun close() {

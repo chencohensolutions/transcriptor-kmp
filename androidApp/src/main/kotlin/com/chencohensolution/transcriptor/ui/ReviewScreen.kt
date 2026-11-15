@@ -90,7 +90,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.review.PassState
@@ -111,6 +113,15 @@ class ReviewActions(
     /** Moves a line to another speaker. */
     val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
+    /** The moment's title, in the user's words. */
+    val rename: (title: String) -> Unit = {},
+    /** The moment's labels (ids), set from its screen. */
+    val setLabels: (labels: List<String>) -> Unit = {},
+    /** Makes a label; returns its id. */
+    val newLabel: (name: String) -> String = { "" },
+    val renameLabel: (labelId: String, name: String) -> Unit = { _, _ -> },
+    /** Deletes a label everywhere: its moments stay, without it. */
+    val deleteLabel: (labelId: String) -> Unit = {},
     /**
      * Improves the lecture with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id), after the
      * speaker pass when [speakersFirst].
@@ -149,7 +160,11 @@ class ReviewActions(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
+fun ReviewScreen(
+    state: ReviewState, actions: ReviewActions,
+    /** Every label there is, to set this moment's from its own screen; empty hides nothing: "Add labels" makes the first. */
+    allLabels: List<Label> = emptyList(),
+) {
     var confirmingDelete by remember { mutableStateOf(false) }
     if (confirmingDelete) AlertDialog(
         onDismissRequest = { confirmingDelete = false },
@@ -173,6 +188,15 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     var noting by remember { mutableStateOf<Long?>(null) }
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
+    var renamingTitle by remember { mutableStateOf(false) }
+    var labeling by remember { mutableStateOf(false) }
+    if (renamingTitle) RenameTitleDialog(state.lecture.title, onDismiss = { renamingTitle = false }) { actions.rename(it); renamingTitle = false }
+    if (labeling) LabelsSheet(
+        labels = allLabels, moments = listOf(state.lecture.summary()), onDismiss = { labeling = false },
+        onSet = { add, remove -> actions.setLabels((state.lecture.labels + add).distinct() - remove) },
+        onNew = { name -> actions.newLabel(name).takeIf { it.isNotEmpty() }?.let { actions.setLabels((state.lecture.labels + it).distinct()) } },
+        onRename = actions.renameLabel, onDelete = actions.deleteLabel,
+    )
     var tuning by remember { mutableStateOf<LectureReview.TuneProposal?>(null) }
     var noTuning by remember { mutableStateOf(false) }
     tuning?.let { p -> TuneDialog(p, onDismiss = { tuning = null }) { actions.applySpeakerTuning(p); tuning = null } }
@@ -194,9 +218,17 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
             Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) }
+                    // The title renames the moment, the line under it sets its labels.
                     Column(Modifier.weight(1f)) {
-                        Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = stringResource(R.string.review_rename)) { renamingTitle = true },
+                        )
+                        Text(
+                            state.labelNames.ifEmpty { stringResource(R.string.review_add_labels) }, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = if (state.labelNames.isEmpty()) MaterialTheme.colorScheme.primary else LocalTranscriptorColors.current.time,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = stringResource(R.string.notebooks_labels)) { labeling = true },
+                        )
                     }
                     Box(
                         Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
@@ -284,6 +316,19 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
             }
         }
     }
+}
+
+/** The moment's title, to change. */
+@Composable
+private fun RenameTitleDialog(title: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(title) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.review_rename)) },
+        text = { TextField(value = text, onValueChange = { text = it }, singleLine = true) },
+        confirmButton = { TextButton(onClick = { onSave(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.review_rename_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_delete_cancel)) } },
+    )
 }
 
 /** Lines in a row by one speaker, as one paragraph. */

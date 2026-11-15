@@ -21,6 +21,12 @@ data class LectureSummary(
     val refined: Boolean,
     val language: String = "en",
     val labels: List<String> = emptyList(),
+    /** The names of its speakers who have one, the one who talked most first: who was in it. */
+    val people: List<String> = emptyList(),
+    /** How many of its speakers have no name yet. */
+    val unnamedPeople: Int = 0,
+    /** Its first sentence of some length, to tell it from the moments around it; empty before it is transcribed. */
+    val preview: String = "",
 )
 
 /**

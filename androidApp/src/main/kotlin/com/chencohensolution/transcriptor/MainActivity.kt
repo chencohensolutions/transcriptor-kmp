@@ -149,12 +149,34 @@ class MainActivity : ComponentActivity() {
                     review != null -> {
                         BackHandler { Recording.review.close() }
                         val r = Recording.review
+                        val library by Recording.library.library.collectAsStateWithLifecycle()
+                        // The open moment isn't touched by the list's own label changes (it saves itself): its
+                        // labels are set through its screen's controller, then the list is read again.
+                        val setLabels = { ids: List<String> ->
+                            r.setLabels(ids, labelNames(ids, Recording.library.library.value.labels))
+                            lifecycleScope.launch(Dispatchers.IO) { Recording.library.reload() }
+                            Unit
+                        }
                         ReviewScreen(
                             review,
-                            ReviewActions(
+                            allLabels = library.labels,
+                            actions = ReviewActions(
                                 back = r::close, playPause = r::playPause, seek = r::seek, playLine = r::playLine,
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
+                                rename = { title -> r.rename(title); lifecycleScope.launch(Dispatchers.IO) { Recording.library.reload() } },
+                                setLabels = setLabels,
+                                newLabel = { name -> runBlocking(Dispatchers.IO) { Recording.library.newLabel(name).id } },
+                                renameLabel = { id, name ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        Recording.library.renameLabel(id, name)
+                                        withContext(Dispatchers.Main) { r.lecture?.let { setLabels(it.labels) } }
+                                    }
+                                },
+                                deleteLabel = { id ->
+                                    setLabels(review.lecture.labels - id)
+                                    lifecycleScope.launch(Dispatchers.IO) { Recording.deleteLabel(id) }
+                                },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
                                 tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
                                 improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
@@ -228,6 +250,8 @@ class MainActivity : ComponentActivity() {
             notebooksState(library, now, Recording.utcOffset, recordingNow, working),
             NotebooksActions(
                 openLecture = ::openLecture,
+                openLectureAt = { id, at -> openLecture(id, at) },
+                search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
                 record = { labels, language ->
                     recordIn = labels to language
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
@@ -264,10 +288,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Opens a recorded moment, under its labels' names. */
-    private fun openLecture(lectureId: String) {
+    private fun openLecture(lectureId: String, atMillis: Long? = null) {
         val library = Recording.library.library.value
         val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-        Recording.review.open(lectureId, labelNames(labels, library.labels))
+        Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
