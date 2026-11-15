@@ -189,6 +189,19 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     fun setRefineModel(language: String, modelId: String) = write(read().let { it.copy(refineModels = it.refineModels + (language to modelId)) })
 
+    /**
+     * Forgets [modelId] wherever it was chosen (live and improve per language, voice prints, speaker turns), when it
+     * is removed or its download deleted: each job then uses its default or first ready model.
+     */
+    fun forgetModel(modelId: String) = write(read().let { s ->
+        s.copy(
+            liveModels = s.liveModels.filterValues { it != modelId },
+            refineModels = s.refineModels.filterValues { it != modelId },
+            voiceModel = s.voiceModel.takeIf { it != modelId },
+            segmentationModel = s.segmentationModel.takeIf { it != modelId },
+        )
+    })
+
     var modelLanguages: List<String>
         get() = read().modelLanguages
         set(value) = write(read().copy(modelLanguages = value.distinct()))

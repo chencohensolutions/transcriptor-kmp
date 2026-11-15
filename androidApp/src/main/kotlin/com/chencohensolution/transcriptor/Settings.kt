@@ -74,6 +74,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         }
     }
     val languages = (library.moments.map { it.language } + library.lastLanguage + Recording.phoneLanguage() + added).distinct()
+    // Recording or improving: the models may be in use, none is removed then.
+    val busy = { Recording.session.isRecording || Recording.refining.value != null }
     val state = ModelsState(
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
@@ -82,6 +84,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
+        busy = remember(statuses) { busy() },
         npuVoiceModels = remember(statuses) {
             // Voice prints and speaker turns with their NPU build here for this phone's chip.
             speakerList.filter { m ->
@@ -101,7 +104,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             back = onBack,
             download = { m -> io { Recording.models.download(m) } },
             cancel = { m -> io { Recording.models.cancel(m) } },
-            delete = { m -> io { Recording.models.delete(m) } },
+            delete = { m -> io { if (!busy()) { Recording.models.delete(m); Recording.settings.forgetModel(m.id) } } },
             useLive = { l, m -> io { Recording.settings.setLiveModel(l, m.id) } },
             useRefine = { l, m -> io { Recording.settings.setRefineModel(l, m.id) } },
             useVoicePrints = { m -> io { Recording.settings.voiceModel = m.id } },
@@ -131,7 +134,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
                     Recording.models.download(model)
                 }
             },
-            remove = { m -> io { Recording.models.delete(m); Recording.installedModels.remove(m.id) } },
+            remove = { m -> io { if (!busy()) { Recording.models.delete(m); Recording.installedModels.remove(m.id); Recording.settings.forgetModel(m.id) } } },
         ),
         hub,
     )

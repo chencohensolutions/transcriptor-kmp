@@ -60,6 +60,11 @@ anything left to decide. Remove an entry once it is built.
 - Shared: `HubClient(fetch)` (iOS: `fetch` on URLSession), `HubModel.toSpeechModel`, `InstalledModels`,
   `ModelLibrary`, `SettingsStore.refineModel`/`setRefineModel`/`modelLanguages`.
 - iOS has no Qualcomm NPU: the NPU filter is off, NPU builds show "not this phone". Core ML builds would be iOS's own.
+- Freeing a model (Nov 15, 2026): a row menu on the language and speaker pages and the card menu offer
+  `ModelChoices.removal(model, downloaded)` (Remove: delete the files, `InstalledModels.remove`; Delete download:
+  delete the files), confirmed in a dialog, refused while recording or improving; both call
+  `SettingsStore.forgetModel(id)` so its jobs go back to their defaults. Sizes ≤ 0 aren't shown. Strings
+  `models_delete_download`, `models_remove_*`, `models_delete_title`/`_text`, `models_removal_chosen`/`_busy`.
 - Strings: `models_*`.
 
 ## The moments folder
