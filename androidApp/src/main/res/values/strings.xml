@@ -455,5 +455,23 @@
     <string name="settings_advanced_note">Speaker models, the model library, processor meters</string>
     <string name="settings_library">Models</string>
     <string name="settings_meters_section">While recording</string>
-    <string name="settings_language_get">No model yet. Tap to get one.</string>
+    <!-- First run: "Get your models" -->
+    <string name="first_run_title">Get your models</string>
+    <string name="first_run_body">Audio Logs transcribes on your phone, with nothing sent anywhere. These are the models it uses for %1$s. They download over Wi-Fi.</string>
+    <string name="first_run_live">Live transcript</string>
+    <string name="first_run_improve">Improve after recording</string>
+    <string name="first_run_voices">Telling voices apart</string>
+    <string name="first_run_turns">Who speaks when</string>
+    <string name="first_run_pass">Speakers after recording</string>
+    <string name="first_run_total">Total %1$s</string>
+    <string name="first_run_background">They keep downloading if you leave this screen. Settings › Models shows them.</string>
+    <string name="first_run_download">Download</string>
+    <string name="first_run_later">Later</string>
+    <string name="first_run_start">Start</string>
+    <string name="first_run_continue">Continue</string>
+    <string name="settings_recommended_ready">Recommended models · ready</string>
+    <string name="settings_recommended_getting">Getting the recommended models…</string>
+    <string name="settings_recommended_get">Get the recommended models · %1$s</string>
+    <string name="settings_recommended_use">Use the recommended models</string>
+    <string name="settings_language_get">No model yet.</string>
 </resources>

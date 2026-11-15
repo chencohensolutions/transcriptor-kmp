@@ -461,5 +461,23 @@
     <string name="settings_advanced_note">מודלים לדוברים, ספריית המודלים, מדי מעבד</string>
     <string name="settings_library">מודלים</string>
     <string name="settings_meters_section">בזמן הקלטה</string>
-    <string name="settings_language_get">עדיין אין מודל. הקשה כדי להוריד.</string>
+    <!-- First run: "Get your models" -->
+    <string name="first_run_title">הורדת המודלים</string>
+    <string name="first_run_body">Audio Logs מתמלל בטלפון, בלי לשלוח דבר לשום מקום. אלה המודלים שהוא משתמש בהם ל%1$s. הם יורדים ב־Wi-Fi.</string>
+    <string name="first_run_live">תמלול חי</string>
+    <string name="first_run_improve">שיפור אחרי ההקלטה</string>
+    <string name="first_run_voices">הבחנה בין קולות</string>
+    <string name="first_run_turns">מי מדבר מתי</string>
+    <string name="first_run_pass">דוברים אחרי ההקלטה</string>
+    <string name="first_run_total">סך הכול %1$s</string>
+    <string name="first_run_background">ההורדה ממשיכה גם אם יוצאים מהמסך הזה. אפשר לראות אותה בהגדרות › מודלים.</string>
+    <string name="first_run_download">הורדה</string>
+    <string name="first_run_later">אחר כך</string>
+    <string name="first_run_start">התחלה</string>
+    <string name="first_run_continue">המשך</string>
+    <string name="settings_recommended_ready">המודלים המומלצים · מוכנים</string>
+    <string name="settings_recommended_getting">מוריד את המודלים המומלצים…</string>
+    <string name="settings_recommended_get">להוריד את המודלים המומלצים · %1$s</string>
+    <string name="settings_recommended_use">להשתמש במודלים המומלצים</string>
+    <string name="settings_language_get">עדיין אין מודל.</string>
 </resources>

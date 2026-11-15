@@ -188,3 +188,6 @@ anything left to decide. Remove an entry once it is built.
   date (`NotebooksScreen.kt`); the title and labels taps, `RenameTitleDialog` (`ReviewScreen.kt`).
 - Strings: `notebooks_search*`, `notebooks_people_more`, `notebooks_add_label_quiet`, `review_rename*`,
   `review_add_labels`, plurals `notebooks_voices`, `notebooks_search_more`. Lab sample: `LabData.conversations`.
+- First run, "Get your models" (Nov 15, 2026): `DefaultModels.forLanguage`/`offerFirstRun`, `SettingsStore.firstRunDone`
+  and `useDefaults`; the screen in `FirstRunScreen.kt` fed by `FirstRun.kt` (downloads, the NPU check and its CPU
+  fallback); strings `first_run_*`. iOS has no NPU builds: it gets the CPU picks.

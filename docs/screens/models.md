@@ -13,6 +13,21 @@ people never change: Speaker recognition with its slider, Speaker turns, Find th
 models, and the processor meters. The speaker pages and the model library open from Advanced and return to it. What
 each section does is as described below.
 
+## Recommended models (Nov 15, 2026)
+
+On the first page each language says where it stands against its recommended models (`DefaultModels.forLanguage`
+for this phone's chip; `DefaultModels.setup`, `ModelsState.setup`), without model names:
+
+- **Recommended models · ready**: they are downloaded and are the ones that run.
+- **No model yet.** with **Get the recommended models · 1.7 GB**: nothing transcribes the language. One tap downloads
+  what is missing and picks them for live and for improving (`ModelsActions.download`, `useLive`, `useRefine`); the row
+  says "Getting the recommended models…" meanwhile.
+- **Live: … / Improve: …** with **Use the recommended models** (or **Get … · size** when some are missing): other
+  models run, the user's own choice or what was on the phone before.
+
+There are no Fast / Balanced / Best tiers: each language has one combination worth recommending, and a second tier
+would only offer models that are worse. The language's page still lists every model for another choice.
+
 ## What it shows
 
 - **Settings**: **Languages**, one row per language in use (the moments', the phone's, those

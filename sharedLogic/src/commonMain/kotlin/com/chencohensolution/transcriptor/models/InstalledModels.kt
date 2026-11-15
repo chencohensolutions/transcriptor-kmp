@@ -54,7 +54,8 @@ class InstalledModels(private val fileSystem: FileSystem, private val root: Path
  * failed their check are left out of what can run.
  */
 class ModelLibrary(private val installed: InstalledModels) {
-    val all: List<SpeechModel> get() = ModelCatalog.all + installed.all().map { it.model }
+    // A model added from Hugging Face that the catalog took in later is listed once, as the catalog's.
+    val all: List<SpeechModel> get() = (ModelCatalog.all + installed.all().map { it.model }).distinctBy { it.id }
 
     /** The models that know [language] and run on [chip]: the ones made for it first, then the multilingual ones. */
     fun forLanguage(language: String, chip: String?): List<SpeechModel> =
