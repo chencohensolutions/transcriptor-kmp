@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -72,6 +73,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
         }
     }
     val notes = state.lecture.notes.size
+    val stop = rememberArmedStop(actions.stop)
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.lecture_back)) }
@@ -137,10 +139,11 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
             }
         }
         Text(
-            marked?.let { stringResource(R.string.glance_marked, formatClock(it)) }
+            if (stop.armed) stringResource(R.string.lecture_stop_again)
+            else marked?.let { stringResource(R.string.glance_marked, formatClock(it)) }
                 ?: if (notes > 0) pluralStringResource(R.plurals.glance_notes, notes, notes) else stringResource(R.string.glance_mark_hint),
             style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
-            color = if (marked != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (stop.armed) MaterialTheme.colorScheme.error else if (marked != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         )
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -158,9 +161,9 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                 Text(stringResource(R.string.glance_mark), Modifier.padding(start = 10.dp), style = MaterialTheme.typography.titleLarge)
             }
             FilledIconButton(
-                onClick = actions.stop, enabled = !state.finishing, modifier = Modifier.size(64.dp),
+                onClick = stop.tap, enabled = !state.finishing, modifier = Modifier.size(64.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.recording, contentColor = Color.White),
-            ) { Icon(Icons.Filled.Stop, stringResource(R.string.lecture_stop), Modifier.size(30.dp)) }
+            ) { Icon(if (stop.armed) Icons.Filled.Check else Icons.Filled.Stop, stringResource(if (stop.armed) R.string.lecture_stop_again else R.string.lecture_stop), Modifier.size(30.dp)) }
         }
         TextButton(onClick = onTranscript, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, bottom = 8.dp)) {
             Text(stringResource(if (state.recordOnly) R.string.glance_open_notes else R.string.glance_open_transcript))

@@ -17,6 +17,9 @@ transcript). The model lines aren't here; only a problem is said (live transcrip
 - **Mark**, the large button between Pause and Stop, flags this second with one tap: a note without words
   (`LectureSession.mark`, `Note.isMark`). "Marked at 12:20" shows for a moment. On the moment after, a mark is a pill
   with a flag and its time; holding it gives it words. The recording's notification has Mark too.
+- **Stop takes two taps** (`rememberArmedStop`): the first turns the button into a check for 3 s and the screen says
+  "Tap Stop again to end the moment"; the second stops. Here and in the transcript's top bar; the notification's Stop
+  is one tap.
 - **Show the transcript** (or **Write a note** when only recording) opens the timeline below; Back returns to the
   glance.
 
