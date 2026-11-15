@@ -273,9 +273,13 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
 - Moment, after (round 1's c2), in the app: playback (MediaPlayer, WAV or FLAC), editing lines and their speakers,
   naming speakers, notes after the moment, and the speaker pass and the refine pass ("Improve transcription…", always
   offered, with an estimate per model from its last run) from its menu. Stop opens it.
-- **Refine pass** (`RefinePass`): each line's audio (a little before and after it, at most 30 s) through the refine
-  model (ivrit.ai large-v3 for Hebrew, q8_0 on the phone), with live transcription's filters (`transcribeLine`: no
-  non-speech pieces, no impossible word counts, loops collapsed). Lines keep their times and speakers; edited lines and
+- **Refine pass** (`RefinePass`): with Whisper on the CPU, consecutive unedited lines go through the refine model
+  together, up to 28 s of audio, and each word (timed by whisper.cpp) goes back to the line it was said in, so the
+  model hears each line in context and words at line edges aren't cut (on a Hebrew lecture: 10% of words differing
+  from Whisper on the whole file, against 13% a line at a time and 18% live). Engines that can't time words (the NPU
+  Whisper, streaming models) take each line's audio alone (a little before and after it, at most 30 s). The refine
+  model is ivrit.ai large-v3 for Hebrew (q8_0 on the phone), with live transcription's filters (no non-speech
+  pieces, no impossible word counts, loops collapsed, no direction marks). Lines keep their times and speakers; edited lines and
   lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. The UI calls it Improve.
   Any downloaded Whisper model for the language can improve (`ModelChoices`; the Zipformer could, a line at a time with
   `transcribeLineStreaming`, but is no longer offered since Nov 6: it writes the live text again). Before a pass, the current transcript is kept as a **version**
