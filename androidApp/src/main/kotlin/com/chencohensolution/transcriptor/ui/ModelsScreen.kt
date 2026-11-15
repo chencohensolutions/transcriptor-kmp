@@ -92,6 +92,7 @@ import com.chencohensolution.transcriptor.models.HubVariant
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.models.LicenseUse
 import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.DefaultModels
 import com.chencohensolution.transcriptor.models.ModelChoices
 import com.chencohensolution.transcriptor.models.ModelJob
 import com.chencohensolution.transcriptor.models.ModelKind
@@ -178,6 +179,11 @@ data class ModelsState(
     fun improveToGet(language: String) = ModelChoices.improveToGet(forLanguage(language), ::ready)
 
     fun liveFor(language: String): SpeechModel? = ModelChoices.running(liveModels(language), live[language], ::ready)
+
+    /** [language]'s recommended models on this phone, and whether they are the ones that run ([DefaultModels.setup]). */
+    fun setup(language: String): DefaultModels.LanguageSetup = DefaultModels.setup(
+        DefaultModels.forLanguage(language, chip) { npu[it.id] is NpuCheck.Fails }, liveFor(language), refineFor(language), ::ready,
+    )
     fun refineFor(language: String): SpeechModel? = ModelChoices.running(refineModels(language), refine[language], ::ready)
 
     val added get() = models.filter { it.fromHub }
@@ -325,21 +331,40 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             state.languages.forEach { l ->
                 val live = state.liveFor(l)
                 val improve = state.refineFor(l)
+                // In plain words: the recommended models run, or one tap gets and picks them. The model names are on the
+                // language's own page, for whoever wants another choice.
+                val setup = state.setup(l)
+                val useRecommended: () -> Unit = {
+                    setup.toGet.forEach(actions.download)
+                    setup.defaults.live?.let { actions.useLive(l, it) }
+                    setup.defaults.improve?.let { actions.useRefine(l, it) }
+                    Unit
+                }
+                val getting = setup.toGet.any { state.status(it) is ModelStatus.Downloading }
                 Row(Modifier.fillMaxWidth().clickable { openLanguage(l) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(languageName(l), style = MaterialTheme.typography.bodyLarge)
-                        // Nothing downloaded for it yet: one calm line that says what to do, not two red ones.
-                        if (live == null && improve == null) Text(stringResource(R.string.settings_language_get), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        else Text(
-                            if (live != null) stringResource(R.string.settings_live_is, isolated(live.name)) else stringResource(R.string.settings_live_none),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (live != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                        )
-                        if (live != null || improve != null) Text(
-                            if (improve != null) stringResource(R.string.settings_improve_is, isolated(improve.name)) else stringResource(R.string.settings_improve_none),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (improve != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                        )
+                        when {
+                            getting -> Text(stringResource(R.string.settings_recommended_getting), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            setup.state == DefaultModels.Setup.Recommended -> Text(stringResource(R.string.settings_recommended_ready), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            setup.state == DefaultModels.Setup.ToGet -> Text(stringResource(R.string.settings_language_get), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            else -> {
+                                Text(
+                                    if (live != null) stringResource(R.string.settings_live_is, isolated(live.name)) else stringResource(R.string.settings_live_none),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    if (improve != null) stringResource(R.string.settings_improve_is, isolated(improve.name)) else stringResource(R.string.settings_improve_none),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (!getting && setup.state != DefaultModels.Setup.Recommended && (setup.defaults.live != null || setup.defaults.improve != null)) {
+                            val label = if (setup.toGet.isEmpty()) stringResource(R.string.settings_recommended_use)
+                                else stringResource(R.string.settings_recommended_get, modelsSize(setup.bytesToGet))
+                            if (setup.state == DefaultModels.Setup.ToGet) FilledTonalButton(onClick = useRecommended, modifier = Modifier.padding(top = 6.dp)) { Text(label) }
+                            else TextButton(onClick = useRecommended, contentPadding = PaddingValues(horizontal = 0.dp)) { Text(label) }
+                        }
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
                 }

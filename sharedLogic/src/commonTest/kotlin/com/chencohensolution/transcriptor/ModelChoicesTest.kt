@@ -18,7 +18,7 @@ class ModelChoicesTest {
         val ids = ModelChoices.candidates(hebrew, ModelJob.Improve, ready()).map { it.id }
         assertEquals(
             listOf(
-                "ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3",
+                "ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "hf:Hezi1991/ivrit-whisper-large-v3-ggml-q8:ivrit-whisper-large-v3-q8_0", "ivrit-whisper-large-v3", "whisper-large-v3",
                 "ivrit-whisper-large-v3-turbo-npu-sm8750", "ivrit-whisper-large-v3-turbo", "whisper-large-v3-turbo",
             ),
             ids,
@@ -70,7 +70,7 @@ class ModelChoicesTest {
     @Test
     fun aModelToGetIsListedOnceOnALanguagesPage() {
         val toGet = ModelChoices.improveToGet(hebrew, ready()).map { it.id }
-        assertEquals(listOf("ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3"), toGet)
+        assertEquals(listOf("ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "hf:Hezi1991/ivrit-whisper-large-v3-ggml-q8:ivrit-whisper-large-v3-q8_0", "ivrit-whisper-large-v3", "whisper-large-v3"), toGet)
     }
 
     @Test

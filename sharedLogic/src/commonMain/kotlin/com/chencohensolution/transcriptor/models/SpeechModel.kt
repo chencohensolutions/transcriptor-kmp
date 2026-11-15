@@ -216,6 +216,21 @@ object ModelCatalog {
         ),
         chips = listOf("SM8750"),
     )
+    // ivritLargeV3 quantized to q8_0 by a third party (Hezi1991), Apache-2.0 like the original: half ivritLargeV3's
+    // download, no quantizing on the phone. The owner's improve model (Nov 15, 2026). Its id is the one Settings ›
+    // Models gave it when it was added from Hugging Face, so phones that added it keep their download.
+    val ivritLargeV3Q8 = SpeechModel(
+        id = "hf:Hezi1991/ivrit-whisper-large-v3-ggml-q8:ivrit-whisper-large-v3-q8_0",
+        name = "ivrit.ai Whisper large-v3 · q8_0",
+        languages = listOf("he"),
+        parameters = "1.55B",
+        license = "Apache-2.0",
+        fitsLive = false,
+        liveWindowSeconds = 30,
+        source = "https://huggingface.co/Hezi1991/ivrit-whisper-large-v3-ggml-q8",
+        kind = ModelKind.Whisper,
+        files = listOf(ModelFile("model.bin", "https://huggingface.co/Hezi1991/ivrit-whisper-large-v3-ggml-q8/resolve/55b71a13450a93c37ae7d8d1575acb347fb4aa34/ggml-ivrit-whisper-large-v3-q8_0.bin", "7f2c747335051ee804800d7c0bb24601a4cebb64196867d1ebca5538b8911004", 1_656_538_283)),
+    )
     val whisperLargeV3 = SpeechModel(
         id = "whisper-large-v3",
         name = "Whisper large-v3",
@@ -422,10 +437,34 @@ object ModelCatalog {
         "DiariZen by BUT-FIT (MIT on Hugging Face, CC-BY-NC-4.0 in its repository: treated as non-commercial); 8 s chunks",
     )
 
-    /** The segmentation models for speaker turns, the default (pyannote) first. */
-    val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
+    /**
+     * DiariZen WavLM Base s80 from the owner's Hugging Face, downloaded: `model.onnx` and `window.bin`, its NPU build for
+     * the Snapdragon 8 Elite. The best speaker turns in the Nov 15, 2026 sweep and the owner's pick, so the default
+     * there by the owner's choice although it is non-commercial (CC-BY-NC-4.0). Its id is the one it got when added
+     * from Hugging Face, so phones that added it keep their download.
+     */
+    private const val DIARIZEN_BASE_NPU = "https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750/resolve/3496d58ff05bac93ea6ee58b75edaebb4f84b842"
+    val diarizenBaseS80Npu = SpeechModel(
+        id = "hf:hencohen83/diarizen-wavlm-base-s80-qnn-sm8750:model + NPU",
+        name = "DiariZen WavLM Base s80 · NPU",
+        languages = listOf(SpeechModel.MULTILINGUAL),
+        parameters = "25M",
+        license = "CC-BY-NC-4.0",
+        fitsLive = true,
+        source = "https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750",
+        kind = ModelKind.SpeakerSegmentation,
+        files = listOf(
+            ModelFile("model.onnx", "$DIARIZEN_BASE_NPU/model.onnx", "3b438a503bbe8f7f4b91c7ed581ed5c59af6a733f5392e5b2b3101923d67802e", 131_529_143),
+            ModelFile("window.bin", "$DIARIZEN_BASE_NPU/window.bin", "10eaec8dce1e901e5a33737ea4144456d7abf7da91fe7ac77dd5af6cd3ef319f", 95_297_536),
+        ),
+        credit = "DiariZen by BUT-FIT (CC-BY-NC-4.0: not for commercial use); 16 s chunks",
+        chips = listOf("SM8750"),
+    )
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    /** The segmentation models for speaker turns, pyannote's first (the speaker pass's, and the fallback). */
+    val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80Npu, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
+
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3NpuEncoder, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id
