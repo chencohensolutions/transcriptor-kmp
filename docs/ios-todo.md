@@ -211,3 +211,8 @@ anything left to decide. Remove an entry once it is built.
 - Android: a Quick Settings tile (`RecordTileService.kt`) records as the Record bar would (`notebooksState`'s guess and
   language, `SettingsStore.recordLive`) and stops with a second tap. iOS: a Control Center control (`ControlWidget`,
   iOS 18) with an App Intent doing the same. Strings `tile_stop_again`, `tile_finishing`.
+
+## Moment info (Nov 16, 2026)
+
+- `LectureReview.info()` (`MomentInfo`: the lecture, `LectureStore.audioBytes`, `loadPower`, `loadEncodePower`);
+  `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.

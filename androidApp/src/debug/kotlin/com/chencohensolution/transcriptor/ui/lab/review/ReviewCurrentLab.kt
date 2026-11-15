@@ -115,6 +115,19 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
     )
     val labBack = LocalLabBack.current
     val actions = ReviewActions(
+        // Fakes: the moment's power reports (a 25-minute AAC recording from earbuds, then nothing encoded afterwards) and its file size.
+        info = {
+            val audio = com.chencohensolution.transcriptor.recording.PowerAudio("AacLive", "aac", "c2.android.aac.encoder", hardware = false, details = "LC · 256 kbps · stereo · 48 kHz", input = "Galaxy Buds3 Pro")
+            com.chencohensolution.transcriptor.review.MomentInfo(
+                lecture.copy(audioFile = "audio.aac"), 48_400_000L,
+                com.chencohensolution.transcriptor.recording.PowerReport(
+                    durationMillis = 1_500_000, samples = 150, averageMilliwatts = 612.0, totalMilliwattHours = 255.0, milliwattHoursPerMinute = 10.2,
+                    joulesPerMinute = 36.7, batteryPercentStart = 84, batteryPercentEnd = 80, temperatureStart = 31.2, temperatureEnd = 33.0,
+                    cpuSecondsPerMinute = 2.4, screenOnShare = 0.08, charging = false, audio = audio, batteryPercentUsed = 4, batteryPercentPerHour = 9.6,
+                ),
+                null,
+            )
+        },
         back = labBack,
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
         seek = { position = it.coerceIn(0, lecture.durationMillis) },

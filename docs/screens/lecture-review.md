@@ -111,5 +111,11 @@ or more voices and one still unnamed (`askPeople`).
   shows the best setting: "Fewer speakers than now: 52 of 60 lines would match your speakers (now 45), with 2 speakers
   (now 4)". Apply sets it, for the next moment (`LectureReview.tuneSpeakers`, `applySpeakerTuning`).
 
+- **Info** (menu › Info; hen's ask, Nov 16, 2026): a sheet "About this moment" (`MomentInfoSheet`, from
+  `LectureReview.info()` → `MomentInfo`): started, length, language, the audio file (and what it was recorded as
+  when encoded afterwards), the encoder (hardware or software), the file's size, the microphone, the models; then
+  "Power while recording" (average W, mWh and mWh/min, battery start → end and %/hour, temperature start → end, the
+  app's CPU s/min and share of one core, screen-on share, readings) and, for "WAV, then encode", "Encoding afterwards"
+  (`power-encode.json`). For comparing formats and microphones on the phone.
 - **Power** (owner's request, Nov 6, 2026): under the moment's bar, one small line from its `power.json`, e.g. "Power:
   2.0 W avg, 33 mWh/min, +4.0 °C", or "Power: not measured (on the charger)". Moments recorded before it have no line.

@@ -2,6 +2,7 @@ package com.chencohensolution.transcriptor.ui
 
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Share
 import com.chencohensolution.transcriptor.review.LectureReview
@@ -108,6 +109,8 @@ val LocalModelNames = androidx.compose.runtime.staticCompositionLocalOf<(String)
 
 class ReviewActions(
     val back: () -> Unit = {},
+    /** The moment's details for its Info sheet; reads files, called off the main thread. */
+    val info: () -> com.chencohensolution.transcriptor.review.MomentInfo? = { null },
     val playPause: () -> Unit = {},
     val seek: (atMillis: Long) -> Unit = {},
     /** Plays from a line's start. */
@@ -198,6 +201,13 @@ fun ReviewScreen(
     var editing by remember { mutableStateOf(false) }
     val edits = remember { mutableStateMapOf<String, String>() }
     var menu by remember { mutableStateOf(false) }
+    var showingInfo by remember { mutableStateOf(false) }
+    if (showingInfo) {
+        val info by androidx.compose.runtime.produceState<com.chencohensolution.transcriptor.review.MomentInfo?>(null) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { actions.info() }
+        }
+        info?.let { MomentInfoSheet(it) { showingInfo = false } }
+    }
     var renaming by remember { mutableStateOf<Speaker?>(null) }
     var moving by remember { mutableStateOf<Segment?>(null) }
     var note by remember { mutableStateOf<Note?>(null) }
@@ -301,6 +311,11 @@ fun ReviewScreen(
                                 text = { Text(stringResource(R.string.review_save_word)) },
                                 leadingIcon = { Icon(Icons.Filled.Description, null) },
                                 onClick = { menu = false; actions.saveWord() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.review_info)) },
+                                leadingIcon = { Icon(Icons.Outlined.Info, null) },
+                                onClick = { menu = false; showingInfo = true },
                             )
                             HorizontalDivider()
                             DropdownMenuItem(

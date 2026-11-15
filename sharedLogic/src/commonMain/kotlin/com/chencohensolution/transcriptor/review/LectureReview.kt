@@ -71,6 +71,15 @@ class LectureReview(
         return power
     }
 
+    /** The open moment's details for its Info sheet ([MomentInfo]); reads its files, so call it off the main thread. */
+    fun info(): MomentInfo? {
+        val lecture = open.value?.lecture ?: return null
+        return MomentInfo(
+            lecture, runCatching { store.audioBytes(lecture) }.getOrNull(),
+            runCatching { store.loadPower(lecture) }.getOrNull(), runCatching { store.loadEncodePower(lecture) }.getOrNull(),
+        )
+    }
+
     private var correctionsFor: Lecture? = null
     private var corrections: Int? = null
 

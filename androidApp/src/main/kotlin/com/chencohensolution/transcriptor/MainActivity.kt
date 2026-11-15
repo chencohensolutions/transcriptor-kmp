@@ -179,6 +179,7 @@ class MainActivity : ComponentActivity() {
                             askPeople = askPeopleOf == review.lecture.id,
                             allLabels = library.labels,
                             actions = ReviewActions(
+                                info = r::info,
                                 back = r::close, playPause = r::playPause, seek = r::seek, playLine = r::playLine,
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
