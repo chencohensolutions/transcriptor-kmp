@@ -57,6 +57,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -83,15 +86,13 @@ import kotlinx.coroutines.delay
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.Animatable as FloatAnimatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.key
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -153,9 +154,26 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     // The list is laid out from the bottom (reversed): the live line is its first item and stays at the bottom by
-    // itself, so following it needs no scrolling (a scroll running all the time would swallow taps). Lines above it
-    // glide up as it grows and as new lines come in. Scrolled back, the lines in view stay put.
+    // itself, so following it needs no scrolling (a scroll running all the time would swallow taps). Scrolled back,
+    // the lines in view stay put.
     val following by remember { derivedStateOf { !list.canScrollBackward } }
+    // While following, the whole transcript moves as one: when the live line wraps to a new row or a line or note
+    // comes in, everything in view (the grey words too) moves up together in a single ease-in-out tween, no spring
+    // and no line on its own, and the new words fade in once it ends. Each layout, a line that was already in view
+    // tells how far the text moved; the list is drawn that far back down, then eased up to its place.
+    val lift = remember { FloatAnimatable(0f) }
+    LaunchedEffect(list) {
+        var before = emptyMap<Any, Int>()
+        snapshotFlow { list.layoutInfo }.collect { info ->
+            val anchor = info.visibleItemsInfo.firstOrNull { it.key != "live" && it.key in before }
+            val moved = anchor?.let { it.offset - before.getValue(it.key) } ?: 0
+            before = info.visibleItemsInfo.associate { it.key to it.offset }
+            if (moved != 0 && following && !list.isScrollInProgress) launch {
+                lift.snapTo(lift.value + moved)
+                lift.animateTo(0f, tween(MOVE_MILLIS, easing = FastOutSlowInEasing))
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
@@ -199,16 +217,15 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
             }
         }
 
-        Box(Modifier.weight(1f)) {
+        Box(Modifier.weight(1f).clipToBounds()) {
             val appDirection = LocalLayoutDirection.current
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-                LazyColumn(state = list, reverseLayout = true, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = list, reverseLayout = true, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize().graphicsLayer { translationY = lift.value }) {
                     item(key = "live") {
-                        // Grows with a glide as words come in, and shrinks as its line becomes a finished one.
-                        Box(Modifier.fillMaxWidth().animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))) { if (state.partial != null) {
+                        Box(Modifier.fillMaxWidth()) { if (state.partial != null) {
                             Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                                 Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
-                                key(state.lecture.segments.size) { FadingWords(state.partial.orEmpty(), colors.partial) }
+                                key(state.lecture.segments.size) { FadingWords(state.partial.orEmpty(), colors.partial, settled = !lift.isRunning) }
                             }
                         } }
                     }
@@ -216,7 +233,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         when (entry) {
                             is TimelineEntry.Speech -> SpeechRow(
                                 entry, fresh = entry.segment.id !in shownAtOpen,
-                                modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                                modifier = Modifier,
                                 speaker = speakerChanges[entry.segment.id]?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } },
                                 onSpeaker = { renaming = it },
                                 editing = entry.segment.id == editingId,
@@ -224,7 +241,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                                 onCancel = { editingId = null },
                                 onSave = { actions.editLine(entry.segment.id, it); editingId = null },
                             )
-                            is TimelineEntry.Written -> Box(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = spring(stiffness = Spring.StiffnessMediumLow))) { NoteCard(entry) }
+                            is TimelineEntry.Written -> NoteCard(entry)
                         }
                     }
                     // The app's text, in the app's direction, among the notebook's content.
@@ -290,6 +307,9 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
 @Composable
 private fun TextStyle.inNotebookDirection() =
     copy(textDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextDirection.Rtl else TextDirection.Ltr)
+
+/** How long the transcript takes to move up as one when the text below grows. */
+private const val MOVE_MILLIS = 320
 
 @Composable
 private fun SpeechRow(
@@ -479,11 +499,13 @@ private fun ModelsInUse(state: LiveLectureState) {
 
 /** The line being spoken, written in a word at a time, each word fading in over 200 ms; keyed by the caller per line. */
 @Composable
-private fun FadingWords(text: String, color: Color) {
+private fun FadingWords(text: String, color: Color, settled: Boolean) {
     val words = text.split(" ")
     val alphas = remember { HashMap<Int, FloatAnimatable<Float, AnimationVector1D>>() }
     for (i in words.indices) alphas.getOrPut(i) { FloatAnimatable(0f) }
-    LaunchedEffect(words.size) {
+    // New words wait for the text to finish moving up, then fade in.
+    LaunchedEffect(words.size, settled) {
+        if (!settled) return@LaunchedEffect
         for (i in words.indices) { val a = alphas.getValue(i); if (a.targetValue < 1f) launch { a.animateTo(1f, tween(200)) } }
     }
     val shown = buildAnnotatedString {
