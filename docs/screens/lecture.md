@@ -17,7 +17,7 @@ transcript). The model lines aren't here; only a problem is said (live transcrip
 - **Mark**, the large button between Pause and Stop, flags this second with one tap: a note without words
   (`LectureSession.mark`, `Note.isMark`). "Marked at 12:20" shows for a moment. On the moment after, a mark is a pill
   with a flag and its time; holding it gives it words. The recording's notification has Mark too.
-- **Stop takes two taps** (`rememberArmedStop`): the first turns the button into a check for 3 s and the screen says
+- **Stop takes one tap, or two with Settings › Two taps to stop** (`rememberArmedStop`, `SettingsStore.stopTwice`, off by default since Nov 15, 2026): with two, the first turns the button into a check for 3 s and the screen says
   "Tap Stop again to end the moment"; the second stops. Here and in the transcript's top bar; the notification's Stop
   is one tap.
 - **Show the transcript** (or **Write a note** when only recording) opens the timeline below; Back returns to the
@@ -63,6 +63,23 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
 
 - **Recording only** (After on the Record bar, or no live model for the language; `LiveLectureState.recordOnly`): no
   lines and no model lines, only "Recording only. This moment is transcribed after you stop." above the notes.
+
+## Sound level meter
+
+hen's ask, Nov 15, 2026: two meters when recording stereo, and other ways to see the sound. Settings › Advanced › While
+recording picks a style (`SettingsStore.levelMeter`, `LevelMeterStyle`, `LiveLectureState.levelMeter`); the glance
+draws it under the clock (`LevelMeter`), the transcript's top bar always the small bars (`StereoLevelBars`):
+- **Bars** (default): the five small bars as before, a set for L and one for R when the recording is stereo.
+- **Lines**: a bar per channel, L and R, with a peak that holds; red near the top, where it would clip.
+- **Strip**: the last 8 seconds scrolling left, L above the middle line, R below.
+- **Spectrum**: the voice range now, 24 bands from 80 Hz to 8 kHz, both channels' levels as thin lines under it.
+- **Spectrogram**: the last 8 seconds of those bands, L/R bars beside it.
+
+The recorder works it out on its thread (`MeterAnalyzer`, shared): each channel's RMS 10 times a second, a peak that
+falls 2.5% a reading, the last 80 readings. The bands are a 2048-point FFT of the last ~43 ms (Hann window), only
+while Spectrum or Spectrogram is on screen (`LectureSession.meterBands`, set by `MainActivity`). A phone that copies
+one microphone into both channels reads as mono (`StereoMeterState.stereo` false) and shows one channel. Meters are
+laid out left to right in Hebrew too: the channels are the file's. Lab: `lecture current-meter-<style>`.
 
 ## Processor meters
 
@@ -112,7 +129,8 @@ starts afresh. Amber from 70%, red from 90%.
 ## Code
 
 - Screen: `androidApp/src/main/kotlin/com/chencohensolution/transcriptor/ui/LectureScreen.kt` (`LectureScreen`,
-  `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`).
+  `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`); `LevelMeters.kt` (`LevelMeter`, `StereoLevelBars`); shared
+  `recording/LevelMeter.kt` (`MeterAnalyzer`, `StereoMeterState`).
 - State and controller (shared): `recording/LiveLectureState.kt`, `recording/LectureSession.kt` (`start`,
   `pauseOrResume`, `addNote`, `editLine`, `stop`), `notebook/Timeline.kt` (`timelineOf`), `notebook/LectureStore.kt`,
   `recording/WavWriter.kt`, `recording/AudioCompression.kt`, `settings/Settings.kt` (`AudioFormat`).
@@ -133,6 +151,8 @@ starts afresh. Amber from 70%, red from 90%.
   `./scripts/ui-lab.sh lecture current`).
 
 ## Design history
+
+- [2026-11-15: stereo sound meters](../ux-history/lecture/2026-11-15-stereo-meters.md)
 
 - [Round 1 (Nov 2, 2026)](../ux-history/lecture/2026-11-02-while-recording.md): a — one timeline (picked), b — two panes, c — document + recorder.
 - [Round 2 (Nov 6, 2026)](../ux-history/lecture/2026-11-06-fix-while-recording.md): fixing a line while recording, and motion: a2 — in place, above the keyboard, lines glide up, words fade in (picked); a, b — in a sheet, c — words fade in, d — letter by letter.

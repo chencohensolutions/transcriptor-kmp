@@ -1,6 +1,6 @@
 # Audio Logs (Kotlin Multiplatform; the code is still named Transcriptor)
 
-The app is **Audio Logs**; a recording is a **moment** (Hebrew רגע) in everything the user sees. The code keeps
+The app is **Audio Logs** (Hebrew: **יומן קול**); a recording is a **moment** (Hebrew רגע) in everything the user sees. The code keeps
 `Lecture` for it (classes, files, `lecture.json`, string keys).
 
 An app for classes and conversations on Android and iOS: it records the moment, transcribes it on the phone with a local speech

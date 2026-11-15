@@ -50,13 +50,14 @@ fun LevelBars(level: Float, modifier: Modifier = Modifier, height: Int = 18) {
 }
 
 /**
- * Stop in two taps, so a slip of the finger doesn't end a long recording: the first tap arms it ([armed], for
- * [STOP_ARMED_MILLIS]: the button shows a check and the screen says to tap again), the second calls [stop].
+ * Stop, in one tap or, when [twice] (Settings), in two so a slip of the finger doesn't end a long recording: the first
+ * tap arms it ([armed], for [STOP_ARMED_MILLIS]: the button shows a check and the screen says to tap again), the
+ * second calls [stop].
  */
 class ArmedStop(val armed: Boolean, val tap: () -> Unit)
 
 @Composable
-fun rememberArmedStop(stop: () -> Unit): ArmedStop {
+fun rememberArmedStop(twice: Boolean, stop: () -> Unit): ArmedStop {
     var armed by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(armed) {
         if (armed) {
@@ -64,7 +65,7 @@ fun rememberArmedStop(stop: () -> Unit): ArmedStop {
             armed = false
         }
     }
-    return ArmedStop(armed) { if (armed) { armed = false; stop() } else armed = true }
+    return ArmedStop(armed) { if (armed || !twice) { armed = false; stop() } else armed = true }
 }
 
 private const val STOP_ARMED_MILLIS = 3_000L

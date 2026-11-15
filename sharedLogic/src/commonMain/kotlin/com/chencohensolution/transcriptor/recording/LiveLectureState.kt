@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.recording
 
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.settings.LevelMeterStyle
 import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 
 /** The lecture screen while recording, as [LectureSession] produces it. */
@@ -12,7 +13,7 @@ data class LiveLectureState(
     val partial: String?,
     /** The position in the audio: what a note typed now is pinned to. */
     val elapsedMillis: Long,
-    /** The microphone's level, 0..1, for the meter. */
+    /** The microphone's level, 0..1 (the louder channel of [stereoMeter]). */
     val level: Float,
     val paused: Boolean,
     /** The live model; null when none is downloaded for the lecture's language. */
@@ -42,6 +43,18 @@ data class LiveLectureState(
      * ([Lecture.pendingTranscript]); "After" was picked, or no live model is downloaded for its language.
      */
     val recordOnly: Boolean = false,
+    /** Both channels' levels, their last seconds and (for a frequency [levelMeter]) the bands; silent when paused. */
+    val stereoMeter: StereoMeterState = StereoMeterState(),
+    /** The microphone recording it when it isn't the phone's own (a headset, earbuds, a USB microphone). */
+    val input: InputInUse? = null,
+    /** The microphone picked in Settings ([MicInput.name]) when the recording isn't coming from it (not connected, or it disconnected). */
+    val inputMissing: String? = null,
+    /** How the sound level is drawn (Settings › While recording). */
+    val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
+    /** With [recordOnly]: false when "Only record" was picked, so the moment waits for "Transcribe now" instead. */
+    val transcribeAfter: Boolean = true,
+    /** Stop takes two taps (Settings; [com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
+    val stopTwice: Boolean = false,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
     val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     /** How hard the processors are working (refreshed about every second); null until the first reading. */

@@ -84,11 +84,13 @@ class LectureSession(
         val lecture: Lecture,
         val paused: Boolean,
         val finishing: Boolean = false,
+        val transcribeAfter: Boolean = true,
     )
 
     private val recording = MutableStateFlow<Recording?>(null)
     private val liveOutput = MutableStateFlow<LiveOutput?>(null)
     private var liveModel: LiveModel? = null
+    private var wantedInput: MicInput? = null
     private var saving: Job? = null
     private var following: Job? = null
 
@@ -96,12 +98,14 @@ class LectureSession(
     private var edits: Map<String, String> = emptyMap()
 
     val state: StateFlow<LiveLectureState?> =
-        combine(recording, recorder.positionMillis, recorder.level, liveOutput) { r, position, level, out ->
+        combine(recording, recorder.positionMillis, recorder.meter, liveOutput, recorder.inputInUse) { r, position, meter, out, input ->
             r?.let {
                 LiveLectureState(
                     labelNames = it.labelNames,
                     lecture = it.lecture.copy(durationMillis = if (it.finishing) it.lecture.durationMillis else position),
-                    partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else level,
+                    partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else meter.now.level,
+                    stereoMeter = if (it.paused) meter.silenced() else meter,
+                    input = input, inputMissing = wantedInput?.takeIf { w -> input?.name != w.name }?.name,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
                     voicePrints = liveModel?.voicePrints?.value,
@@ -109,7 +113,7 @@ class LectureSession(
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
                     improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
-                    recordOnly = liveModel == null,
+                    recordOnly = liveModel == null, transcribeAfter = it.transcribeAfter,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -117,10 +121,22 @@ class LectureSession(
     val isRecording get() = recording.value != null
 
     /**
-     * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or
-     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after.
+     * The sound meter also works out the frequency bands ([StereoMeterState.bands]): set while the recording screen
+     * shows a frequency style, so the small FFT runs only then.
      */
-    fun start(labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true): Lecture {
+    var meterBands: Boolean
+        get() = recorder.wantBands
+        set(value) { recorder.wantBands = value }
+
+    /**
+     * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or
+     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after,
+     * unless not [transcribeAfter] ("Only record": the platform leaves it for the user's "Transcribe now").
+     */
+    fun start(
+        labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true,
+        transcribeAfter: Boolean = true,
+    ): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         val format = settings.audioFormat
@@ -167,8 +183,10 @@ class LectureSession(
             },
             settings.flacLevel,
             settings.aac,
+            settings.micInput,
         )
-        recording.value = Recording(labelNames, lecture, paused = false)
+        wantedInput = settings.micInput
+        recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter)
         saving = scope.launch {
             while (isActive) {
                 delay(SAVE_EVERY_MILLIS)
@@ -315,6 +333,7 @@ class LectureSession(
         val r = recording.value ?: return null
         if (r.finishing) return null
         saving?.cancel()
+        val input = recorder.inputInUse.value?.name
         recorder.stop()
         recorder.onPcm = null
         val duration = recorder.positionMillis.value
@@ -336,7 +355,7 @@ class LectureSession(
         // How much power it took: power.json beside the audio, a row in power-log.csv.
         power?.let { meter ->
             runCatching {
-                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile))
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile).copy(input = input))
                 store.savePower(r.lecture, report)
                 store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.labels.joinToString("+"), r.lecture.startedAtMillis, report))
             }

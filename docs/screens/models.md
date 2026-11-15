@@ -42,6 +42,26 @@ A new install starts as the owner's S25 was set that day (read from its `setting
   CAM++ -0.2, ERes2NetV2 -0.3); a slider put back to the middle stays there.
 - **Processor meters**: the last minute as graphs.
 
+## Microphone (Nov 15, 2026)
+
+hen's ask: pick the microphone, Bluetooth too. Settings › Recordings › **Microphone** (`SettingsStore.micInput`, a
+`MicInput`; null, the default: the phone's own microphones, stereo 48 kHz) opens a list: the phone's own, then every
+input connected now besides it (`AndroidAudioInputs`, refreshed as devices come and go): Bluetooth headsets (hands-free,
+mono, phone-call quality), Bluetooth LE Audio earbuds, wired headsets, USB microphones. The one picked stays picked
+while it is away ("not connected: records from the phone"). Recording from Bluetooth sets it as the communication device
+and records as a call's voice (`VOICE_COMMUNICATION`), the only way a hands-free headset's microphone opens; wired and
+USB are just the preferred device. The file is 48 kHz stereo either way (the phone converts), so a mono headset's meter
+shows one set. The recording screen says "Microphone: <name>", or in red "<name> isn't connected: recording from the
+phone" (also when it disconnects mid-moment: `AudioRecorder.inputInUse` follows the phone's routing).
+
+## Transcribe moments recorded with After (Nov 16, 2026)
+
+hen's ask: Settings › After a moment › **Transcribe moments recorded with After** (`SettingsStore.transcribeWhen`, an
+`EncodeAfter`): **Right after the moment ends**, or **When charging, with 30% battery or more** (the default). A moment
+recorded with After on the Record bar is transcribed at Stop when that allows it (`RecordingService.transcribeAllowed`),
+else it waits in `improvePending` and starts when the phone charges with enough battery and the app is opened or
+plugged in while open, or after the next pass ends. "No transcript" moments are never transcribed on their own.
+
 ## Hide the recording notification (Nov 15, 2026)
 
 Settings › Recordings has **Hide the recording notification** (`SettingsStore.quietRecording`, off by default). On,
@@ -50,6 +70,10 @@ lock screen, no clock and no Pause, Mark or Stop (`RecordingService.recordingNot
 for an app that records in the background, so the row says so and links to the phone's notification settings for
 the app, where its notifications can be turned off altogether. The phone's own microphone indicator is not ours to
 hide.
+
+Under it, **Two taps to stop** (`SettingsStore.stopTwice`, off by default; owner's choice, Nov 15, 2026): on, Stop in
+the recording screens arms first (`rememberArmedStop`) and the Record tile asks "Tap again to stop"; the second tap
+stops.
 
 ## What it shows
 

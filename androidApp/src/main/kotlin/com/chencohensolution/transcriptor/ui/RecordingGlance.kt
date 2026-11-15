@@ -73,7 +73,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
         }
     }
     val notes = state.lecture.notes.size
-    val stop = rememberArmedStop(actions.stop)
+    val stop = rememberArmedStop(state.stopTwice, actions.stop)
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.lecture_back)) }
@@ -95,6 +95,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                         when {
                             state.finishing -> R.string.lecture_finishing
                             state.paused -> R.string.lecture_paused
+                            state.recordOnly && !state.transcribeAfter -> R.string.glance_recording_no_transcript
                             state.recordOnly -> R.string.glance_recording_only
                             else -> R.string.glance_recording_live
                         },
@@ -102,7 +103,18 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
                 )
             }
-            LevelBars(state.level, Modifier.padding(top = 14.dp), height = 30)
+            LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))
+            // Which microphone, when it isn't the phone's own; the one picked in Settings when it isn't recording.
+            val input = state.input
+            val mic = when {
+                state.inputMissing != null -> stringResource(R.string.glance_mic_missing, isolated(state.inputMissing.orEmpty()))
+                input != null -> stringResource(R.string.glance_mic, isolated(input.name))
+                else -> null
+            }
+            if (mic != null) Text(
+                mic, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
+                color = if (state.inputMissing != null) MaterialTheme.colorScheme.error else colors.time,
+            )
             // A problem is said; while things work, the models aren't.
             val problem = when {
                 state.liveError != null -> stringResource(R.string.glance_live_stopped)

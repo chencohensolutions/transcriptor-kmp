@@ -17,11 +17,15 @@ the phone (`DefaultModels.offerFirstRun`). A phone set up before first run exist
 
 ## Behaviour
 
-- The models are `DefaultModels.forLanguage(phone language, chip)`: per job the first pick that runs on this chip, so a
-  Snapdragon 8 Elite (SM8750) gets the NPU build and other phones the CPU one. All are catalog models: the most promising
-  per job whatever its license (the owner's call); a non-commercial one shows its license on its row. Hebrew: Zipformer streaming (NPU, else CPU) live, ivrit.ai large-v3 q8_0 to improve. English:
-  Whisper large-v3 turbo live, Whisper large-v3 to improve. Every language: CAM++ voice prints; speaker turns DiariZen WavLM Base s80 on the SM8750 NPU
-  (CC-BY-NC-4.0), pyannote elsewhere; and pyannote for the speaker pass after recording.
+- The models are `DefaultModels.forLanguage(language, chip)` for the phone's language **and English** (hen, Nov 16,
+  2026: the languages they record; one language when the phone is in English): per job the first pick that runs on
+  this chip, so a Snapdragon 8 Elite (SM8750) gets the NPU build and other phones the CPU one. With two languages the
+  live and improve rows name their language. All are catalog models: the most promising per job whatever its license
+  (the owner's call); a non-commercial one shows its license on its row. Hebrew: Zipformer streaming (NPU, else CPU)
+  live, ivrit.ai large-v3 with its encoder on the NPU (q8_0 on the CPU elsewhere) to improve. English: no live model
+  (recorded, then transcribed after), Whisper large-v3 to improve. Every language: WeSpeaker ResNet293 voice prints;
+  speaker turns DiariZen WavLM Large s80 on the SM8750 NPU (CC-BY-NC-4.0), pyannote elsewhere; and pyannote for the
+  speaker pass after recording. English is added to Settings' languages.
 - Download answers first run, makes them the language's live and improve choices where none was made
   (`SettingsStore.useDefaults`), and gets them smallest first through `ModelFiles` (the same downloads as Settings ›
   Models).

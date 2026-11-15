@@ -9,17 +9,28 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import okio.FileSystem
 import okio.Path
-import kotlin.math.sqrt
 
 /**
  * The phone's microphone, 48 kHz stereo 16 bit, read on its own thread into a [WavWriter], a [FlacEncoder] or an [AacEncoder].
  * Needs the RECORD_AUDIO permission, and a foreground service of the microphone type to go on with the screen off.
  */
-class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : AudioRecorder {
+class AndroidRecorder(
+    private val fileSystem: FileSystem = FileSystem.SYSTEM,
+    /** The microphones besides the phone's own; null: always the phone's own. */
+    private val inputs: AndroidAudioInputs? = null,
+) : AudioRecorder {
+    private val routed = MutableStateFlow<InputInUse?>(null)
+    override val inputInUse: StateFlow<InputInUse?> = routed
+    private var communication = false
+    private val routing = AudioRecord.OnRoutingChangedListener { r -> routed.value = r.routedDevice?.let(::inputOf) }
     private val position = MutableStateFlow(0L)
-    private val meter = MutableStateFlow(0f)
+    private val analyzer = MeterAnalyzer(RATE)
+    private val meterFlow = MutableStateFlow(StereoMeterState())
     override val positionMillis: StateFlow<Long> = position
-    override val level: StateFlow<Float> = meter
+    override val meter: StateFlow<StereoMeterState> = meterFlow
+    override var wantBands: Boolean
+        get() = analyzer.wantBands
+        set(value) { analyzer.wantBands = value }
     @Volatile override var onPcm: ((pcm: ByteArray, size: Int) -> Unit)? = null
 
     private val lock = Any()
@@ -36,7 +47,7 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
         private set
 
     @SuppressLint("MissingPermission")
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings, input: MicInput?) {
         check(record == null) { "Already recording" }
         sink = when (format) {
             AudioFileFormat.Wav -> WavWriter(fileSystem, file)
@@ -50,25 +61,38 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
         }
         encoderHardware = AacEncoders.all.any { it.name == encoderName && it.hardware }
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
+        // A picked input that is connected: a Bluetooth headset's microphone opens only as the communication device,
+        // recorded as a call's voice (mono, the headset's own noise reduction); a wired or USB one is just preferred.
+        // Asked for in 48 kHz stereo like the phone's own, the phone converts it, so the file is the same either way.
+        val device = input?.let { inputs?.find(it) }
+        val bluetooth = device != null && AndroidAudioInputs.kindOf(device.type).let { it == MicInput.Kind.Bluetooth || it == MicInput.Kind.BluetoothLe }
+        communication = bluetooth && inputs?.useForCommunication(device!!) == true
         record = AudioRecord(
-            MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT,
+            if (communication) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.MIC,
+            RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minimum * 4, RATE * BYTES_PER_FRAME / 2),
-        )
+        ).apply {
+            if (device != null) preferredDevice = device
+            addOnRoutingChangedListener(routing, null)
+        }
         frames = 0
         position.value = 0
+        analyzer.reset()
+        meterFlow.value = analyzer.state
         resume()
     }
 
     override fun pause() {
         stopReading()
         record?.stop()
-        meter.value = 0f
+        meterFlow.value = analyzer.silence()
     }
 
     override fun resume() {
         val record = record ?: return
         if (reading) return
         record.startRecording()
+        routed.value = record.routedDevice?.let(::inputOf)
         reading = true
         thread = Thread({ readLoop(record) }, "recorder").apply { start() }
     }
@@ -79,11 +103,14 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
 
     override fun stop() {
         stopReading()
-        record?.run { stop(); release() }
+        record?.run { removeOnRoutingChangedListener(routing); stop(); release() }
         record = null
+        if (communication) inputs?.clearCommunication()
+        communication = false
+        routed.value = null
         synchronized(lock) { sink?.close() }
         sink = null
-        meter.value = 0f
+        meterFlow.value = analyzer.silence()
     }
 
     private fun stopReading() {
@@ -100,30 +127,21 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
             if (read <= 0) continue
             synchronized(lock) { sink?.write(buffer, read) }
             onPcm?.invoke(buffer, read)
+            analyzer.feed(buffer, read)
             frames += read / BYTES_PER_FRAME
             // The clock and the meter at 10 Hz: every buffer (50 Hz) would redraw the screen for nothing.
             if (++reads % 5 == 0) {
                 position.value = frames * 1000 / RATE
-                meter.value = levelOf(buffer, read)
+                meterFlow.value = analyzer.read(buffer, read)
             }
         }
         position.value = frames * 1000 / RATE
     }
 
-    /** RMS of the buffer on a rough dB scale, 0..1 (silence about 0, a voice near the phone 0.5–0.9). */
-    private fun levelOf(pcm: ByteArray, size: Int): Float {
-        var sum = 0.0
-        var i = 0
-        while (i + 1 < size) {
-            val sample = (pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)
-            sum += sample.toDouble() * sample
-            i += 2
-        }
-        val rms = sqrt(sum / (size / 2)) / Short.MAX_VALUE
-        if (rms <= 0) return 0f
-        val db = 20 * kotlin.math.log10(rms)
-        return ((db + 60) / 60).toFloat().coerceIn(0f, 1f)
-    }
+
+    /** The routed device as the screen names it; null for the phone's own microphones. */
+    private fun inputOf(device: android.media.AudioDeviceInfo): InputInUse? =
+        with(AndroidAudioInputs) { device.toInput() }?.let { InputInUse(it.name, it.kind) }
 
     private companion object {
         const val RATE = WavWriter.SAMPLE_RATE

@@ -42,9 +42,18 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var encodeAfter by remember { mutableStateOf(Recording.settings.encodeAfter) }
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
+    var transcribeWhen by remember { mutableStateOf(Recording.settings.transcribeWhen) }
     var quiet by remember { mutableStateOf(Recording.settings.quietRecording) }
+    var stopTwice by remember { mutableStateOf(Recording.settings.stopTwice) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
+    var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
+    var micInput by remember { mutableStateOf(Recording.settings.micInput) }
+    var micInputs by remember { mutableStateOf(Recording.audioInputs.connected()) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val stop = Recording.audioInputs.watch { micInputs = it }
+        onDispose { stop() }
+    }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var checking by remember { mutableStateOf(emptySet<String>()) }
@@ -86,7 +95,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, folder = folder, processorMeters = meters,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -121,9 +130,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setAac = { aac = it.valid(); io { Recording.settings.aac = it } },
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },
+            setTranscribeWhen = { transcribeWhen = it; io { Recording.settings.transcribeWhen = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             setQuietRecording = { quiet = it; io { Recording.settings.quietRecording = it } },
+            setStopTwice = { stopTwice = it; io { Recording.settings.stopTwice = it } },
             openNotificationSettings = {
                 context.startActivity(
                     android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -131,6 +142,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
                 )
             },
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
+            setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
+            setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->

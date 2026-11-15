@@ -34,7 +34,10 @@ import kotlin.test.assertTrue
 /** Writes a WAV of silence as it "records": [advance] moves the position by writing that much audio. */
 class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override val positionMillis = MutableStateFlow(0L)
-    override val level = MutableStateFlow(0f)
+    override val meter = MutableStateFlow(com.chencohensolution.transcriptor.recording.StereoMeterState())
+    override var wantBands = false
+    override val inputInUse = MutableStateFlow<com.chencohensolution.transcriptor.recording.InputInUse?>(null)
+    var input: com.chencohensolution.transcriptor.recording.MicInput? = null
     override var onPcm: ((ByteArray, Int) -> Unit)? = null
     var file: Path? = null
     var format: AudioFileFormat? = null
@@ -44,13 +47,14 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?) {
+        this.input = input
         this.file = file
         this.format = format
         this.flacLevel = flacLevel
         this.aac = aac
         if (format == AudioFileFormat.Wav) wav = WavWriter(fileSystem, file) else fileSystem.write(file) {}
-        level.value = 0.5f
+        meter.value = com.chencohensolution.transcriptor.recording.StereoMeterState(com.chencohensolution.transcriptor.recording.StereoLevel(0.5f, 0.4f), stereo = true)
     }
 
     /** [millis] of silence, or of what [pcm] gives (48 kHz stereo 16 bit). */
@@ -63,7 +67,7 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override fun pause() { paused = true }
     override fun resume() { paused = false }
     override fun checkpoint() { checkpoints++; wav?.checkpoint() }
-    override fun stop() { wav?.close(); level.value = 0f }
+    override fun stop() { wav?.close(); meter.value = com.chencohensolution.transcriptor.recording.StereoMeterState() }
 }
 
 class RecordingTest {
@@ -80,9 +84,12 @@ class RecordingTest {
     private fun TestScope.session() = LectureSession(recorder, store, settings, backgroundScope, now = { 1_793_600_000_000 })
 
     @Test
-    fun theDefaultIsAacAsItRecordsStereoAt256() {
-        // A new install records as the owner does: AAC live, LC, 48 kHz, stereo, 256 kbps, FLAC effort 8.
-        assertEquals(AudioFormat.AacLive, settings.audioFormat)
+    fun theDefaultIsWavThenAacStereoAt256() {
+        // A new install records as the owner does (Nov 16, 2026): WAV, then AAC LC 48 kHz stereo 256 kbps right after
+        // the moment, FLAC effort 8, a quiet notification.
+        assertEquals(AudioFormat.WavThenAac, settings.audioFormat)
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
+        assertTrue(settings.quietRecording)
         assertEquals(com.chencohensolution.transcriptor.settings.AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.Lc, 48_000, 2, 256, null), settings.aac)
         assertEquals(8, settings.flacLevel)
         settings.audioFormat = AudioFormat.FlacLive
@@ -101,7 +108,7 @@ class RecordingTest {
         settings.autoImprove = true
         assertEquals(true, SettingsStore(fs, root).findSpeakersOnStop)
         assertEquals(true, SettingsStore(fs, root).autoImprove)
-        assertEquals(AudioFormat.AacLive, SettingsStore(fs, root).audioFormat)
+        assertEquals(AudioFormat.WavThenAac, SettingsStore(fs, root).audioFormat)
     }
 
     @Test
@@ -190,6 +197,40 @@ class RecordingTest {
     }
 
     @Test
+    fun thePickedMicrophoneRecordsAndIsSaidWhenAway() = runTest {
+        val buds = com.chencohensolution.transcriptor.recording.MicInput("bluetooth:AA:BB:Buds", "Buds", com.chencohensolution.transcriptor.recording.MicInput.Kind.Bluetooth)
+        settings.micInput = buds
+        assertEquals(buds, SettingsStore(fs, root).micInput)
+        val session = session()
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        runCurrent()
+        assertEquals(buds, recorder.input)
+        // Not connected: the phone records, and the screen names the one picked.
+        assertEquals("Buds", session.state.value?.inputMissing)
+        recorder.inputInUse.value = com.chencohensolution.transcriptor.recording.InputInUse("Buds", buds.kind)
+        runCurrent()
+        assertEquals(null, session.state.value?.inputMissing)
+        assertEquals("Buds", session.state.value?.input?.name)
+    }
+
+    @Test
+    fun thePhonesOwnMicrophoneByDefault() = runTest {
+        val session = session()
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        runCurrent()
+        assertEquals(null, recorder.input)
+        assertEquals(null, session.state.value?.inputMissing)
+        assertEquals(null, session.state.value?.input)
+    }
+
+    @Test
+    fun afterMomentsWaitForTheChargerByDefault() {
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Charging, settings.transcribeWhen)
+        settings.transcribeWhen = com.chencohensolution.transcriptor.settings.EncodeAfter.Stop
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, SettingsStore(fs, root).transcribeWhen)
+    }
+
+    @Test
     fun pauseAndResumeMoveTheState() = runTest {
         val session = session()
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
@@ -198,6 +239,7 @@ class RecordingTest {
         assertTrue(recorder.paused)
         assertEquals(true, session.state.value?.paused)
         assertEquals(0f, session.state.value?.level)
+        assertEquals(0f, session.state.value?.stereoMeter?.now?.left)
         session.pauseOrResume()
         runCurrent()
         assertFalse(recorder.paused)

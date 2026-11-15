@@ -7,6 +7,7 @@ import com.chencohensolution.transcriptor.models.ModelJob
 import kotlin.test.Test
 import okio.Path.Companion.toPath
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DefaultModelsTest {
@@ -28,11 +29,12 @@ class DefaultModelsTest {
     fun everyDefaultIsInTheCatalogRunsOnThePhoneAndFitsItsJob() {
         for (chip in chips) for (language in languages) {
             val d = DefaultModels.forLanguage(language, chip)
-            val live = requireNotNull(d.live) { "$language on $chip has no live default" }
+            // English has no live default (the owner's choice, Nov 16, 2026): recorded, then transcribed after.
+            val live = if (language == "en") { assertNull(d.live); null } else requireNotNull(d.live) { "$language on $chip has no live default" }
             val improve = requireNotNull(d.improve) { "$language on $chip has no improve default" }
-            assertTrue(live in ModelCatalog.forLanguage(language, chip))
+            if (live != null) assertTrue(live in ModelCatalog.forLanguage(language, chip))
             assertTrue(improve in ModelCatalog.forLanguage(language, chip))
-            assertTrue(ModelChoices.fits(live, ModelJob.Live) && live.fitsLive)
+            if (live != null) assertTrue(ModelChoices.fits(live, ModelJob.Live) && live.fitsLive)
             assertTrue(ModelChoices.fits(improve, ModelJob.Improve))
         }
     }

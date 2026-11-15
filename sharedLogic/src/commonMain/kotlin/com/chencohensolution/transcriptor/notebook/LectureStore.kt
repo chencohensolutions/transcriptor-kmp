@@ -184,6 +184,20 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         return runCatching { json.decodeFromString<PowerReport>(place.fileSystem.read(file) { readUtf8() }) }.getOrNull()
     }
 
+    /** What encoding [lecture]'s WAV afterwards took (`power-encode.json`); null when it wasn't encoded afterwards. */
+    fun loadEncodePower(lecture: Lecture): PowerReport? {
+        val place = placeOf(lecture.id)
+        val file = place.folder(lecture.id) / "power-encode.json"
+        if (!place.exists(file)) return null
+        return runCatching { json.decodeFromString<PowerReport>(place.fileSystem.read(file) { readUtf8() }) }.getOrNull()
+    }
+
+    /** The size of [lecture]'s audio file in bytes; null when it can't be read. */
+    fun audioBytes(lecture: Lecture): Long? {
+        val place = placeOf(lecture.id)
+        return runCatching { place.fileSystem.metadata(place.folder(lecture.id) / lecture.audioFile).size }.getOrNull()
+    }
+
     /** Adds [row] to `power-log.csv` in the app's own storage (its header first, once). */
     fun appendPowerLog(row: String) {
         val file = local.root / POWER_LOG

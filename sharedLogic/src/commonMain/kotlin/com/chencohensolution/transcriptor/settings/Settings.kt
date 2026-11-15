@@ -64,6 +64,29 @@ enum class ProcessorMeterStyle(val key: String) {
     }
 }
 
+/** How the recording screen draws the sound level (Settings › While recording). */
+enum class LevelMeterStyle(val key: String, val needsBands: Boolean = false) {
+    /** Five small bars that follow the level, as before; a set per channel when the recording is stereo. */
+    Bars("bars"),
+
+    /** A level bar per channel, with a peak that holds; red near the top, where it would clip. */
+    Lines("lines"),
+
+    /** The last 8 seconds as a scrolling strip, the left channel above the middle line and the right one below. */
+    Strip("strip"),
+
+    /** The voice range now, 80 Hz to 8 kHz in bands, with both channels' levels as thin lines. */
+    Spectrum("spectrum", needsBands = true),
+
+    /** The last 8 seconds of the voice range as a spectrogram, with both channels' levels beside it. */
+    Spectrogram("spectrogram", needsBands = true);
+
+    companion object {
+        /** The style kept as [key]; anything else (a newer app's) is [Bars]. */
+        fun of(key: String?) = entries.firstOrNull { it.key == key } ?: Bars
+    }
+}
+
 /**
  * FLAC's compression levels: 0 is the fastest, 8 the smallest file. Every level keeps the same sound (FLAC is lossless);
  * from 0 to 8 the file shrinks by a few percent and encoding takes several times longer.
@@ -87,7 +110,9 @@ val DEFAULT_SPEAKER_TUNING = mapOf(
 private data class SettingsFileV1(
     val v: Int = 1,
     /** A new install records as the owner does (Nov 15, 2026): AAC as it records, [AacSettings]' defaults. */
-    val audioFormat: AudioFormat = AudioFormat.AacLive,
+    // The owner's settings on their S25 (read from the phone, Nov 16, 2026): WAV while recording, AAC (256 kbps
+    // stereo) right after the moment, a quiet notification, no processor meters.
+    val audioFormat: AudioFormat = AudioFormat.WavThenAac,
     /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
@@ -114,10 +139,18 @@ private data class SettingsFileV1(
     val speakerPassOnStop: Boolean = false,
     /** A lecture is improved on its own after it stops (while charging). */
     val autoImprove: Boolean = false,
+    /** When a moment recorded with "After" is transcribed: right after Stop, or on the charger with enough battery. */
+    val transcribeWhen: EncodeAfter = EncodeAfter.Charging,
     /** Moments are transcribed live while they record; off (the default): recorded only, transcribed after. */
     val recordLive: Boolean = true,
+    /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
+    val recordOnly: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
-    val quietRecording: Boolean = false,
+    val quietRecording: Boolean = true,
+    /** The microphone picked to record from ([MicInput]); null: the phone's own. */
+    val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
+    /** Stop asks for a second tap, in the recording screens and on the Quick Settings tile; off by default (owner's choice, Nov 15, 2026). */
+    val stopTwice: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -133,7 +166,9 @@ private data class SettingsFileV1(
     /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
     val segmentationModel: String? = null,
     /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
-    val processorMeters: String = ProcessorMeterStyle.Graphs.key,
+    val processorMeters: String = ProcessorMeterStyle.Off.key,
+    /** [LevelMeterStyle.key]; kept as text so a style this version doesn't know reads as the bars. */
+    val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
 )
@@ -179,6 +214,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         set(value) = write(read().copy(autoImprove = value))
 
     /**
+     * When a moment recorded with "After" on the Record bar is transcribed: [EncodeAfter.Stop] right after it ends,
+     * [EncodeAfter.Charging] (the default) once the phone is on the charger with [ENCODE_MIN_BATTERY]% or more.
+     */
+    var transcribeWhen: EncodeAfter
+        get() = read().transcribeWhen
+        set(value) = write(read().copy(transcribeWhen = value))
+
+    /**
      * The Record bar's Live or After: live transcription while a moment records, or (off, the default; owner's choice,
      * Nov 15, 2026, to save the battery) the moment is only recorded and transcribed after it stops with its
      * language's improve model: at once on the charger, else when the phone next charges or the user asks.
@@ -186,6 +229,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var recordLive: Boolean
         get() = read().recordLive
         set(value) = write(read().copy(recordLive = value))
+
+    /** The Record bar's choice, also what the Quick Settings tile records with: Live, After or Only record. */
+    var recordMode: RecordMode
+        get() = read().let { if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
+        set(value) = write(read().copy(recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
 
     /**
      * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
@@ -196,6 +244,19 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var quietRecording: Boolean
         get() = read().quietRecording
         set(value) = write(read().copy(quietRecording = value))
+
+    /**
+     * The microphone to record from; null: the phone's own (stereo). When it isn't connected as a moment starts, the
+     * phone's own records it and the screen says so.
+     */
+    var micInput: com.chencohensolution.transcriptor.recording.MicInput?
+        get() = read().micInput
+        set(value) = write(read().copy(micInput = value))
+
+    /** Stop takes two taps, in the recording screens and on the Quick Settings tile; off (the default): one (owner's choice, Nov 15, 2026). */
+    var stopTwice: Boolean
+        get() = read().stopTwice
+        set(value) = write(read().copy(stopTwice = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]
@@ -245,6 +306,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var processorMeters: ProcessorMeterStyle
         get() = ProcessorMeterStyle.of(read().processorMeters)
         set(value) = write(read().copy(processorMeters = value.key))
+
+    /** How the recording screen draws the sound level; [LevelMeterStyle.Bars] by default. */
+    var levelMeter: LevelMeterStyle
+        get() = LevelMeterStyle.of(read().levelMeter)
+        set(value) = write(read().copy(levelMeter = value.key))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
     fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: DEFAULT_SPEAKER_TUNING[modelId] ?: 0f
@@ -308,4 +374,13 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         fileSystem.write(temp) { writeUtf8(json.encodeToString(settings)) }
         fileSystem.atomicMove(temp, file)
     }
+}
+
+/** How a moment records: transcribed as it records, after it stops, or not at all until the user asks. */
+enum class RecordMode {
+    Live,
+    /** Recorded, then transcribed with the improve model: at once on the charger, else when the phone next charges. */
+    After,
+    /** Recorded only: it waits for "Transcribe now" on the moment. */
+    Only,
 }

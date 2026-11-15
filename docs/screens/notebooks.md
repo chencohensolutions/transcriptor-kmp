@@ -31,8 +31,9 @@ The code still calls it `NotebooksScreen`.
   later"). Tapping them (or +) opens a menu of checkboxes, the guessed ones first, and New label. The language chip:
   the guessed label's usual language, else the last moment's. Record asks for the microphone, then records titled
   with the date.
-- Under the chips, **Live** or **After** (After by default, kept in the settings): Live transcribes as the moment
-  records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026)).
+- Under the chips, **Live**, **After** or **No transcript** (kept in the settings, `SettingsStore.recordMode`): Live
+  transcribes as the moment records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026));
+  No transcript (owner's request, Nov 15, 2026) records it and transcribes nothing until "Transcribe now" on the moment.
   One line beside them says which. (The "Usually … on Monday" line is gone: the guessed labels keep their ✦.)
   A moment waiting for its transcript says **Not transcribed yet** in the list.
 - While a moment records, a red banner replaces the bar: its clock and labels, and **Back to it**. That moment is not
@@ -52,6 +53,14 @@ deleted · Undo"; when the snackbar closes, their folders (recording, transcript
 here or in the moments folder. A moment a pass is working on can't be selected, and the one recording or open is
 skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`).
 
+**Quick Settings tile** (Nov 15, 2026): "Record" in the notification shade's quick controls (added from the shade's
+edit list). A tap records a moment as the Record bar would now: the guessed labels and language, Live, After or No transcript as last
+picked, and the recording format and hide-notification settings. It records in the background: nothing opens and
+the shade stays (while System UI is bound to the tile the app shares its microphone access; if Android refuses anyway,
+an invisible activity starts it from the foreground). On a locked phone it asks to unlock
+first. While recording the tile is on, labeled Stop with Recording or Paused under it; Stop takes one tap, or two within 4 seconds ("Tap again to stop") with Settings › Two taps to stop; while the last lines finish it is greyed out. Without the microphone
+permission the tap opens the app, whose Record asks for it.
+
 ## Code
 
 - Screen: `androidApp/.../ui/NotebooksScreen.kt` (`NotebooksScreen`, `NotebooksActions`); wired in `MainActivity`.
@@ -63,6 +72,8 @@ skipped (`Recording.delete`, `NotebooksController.delete`, `LectureStore.delete`
 - The moments folder: `Recording.folder`, `chooseFolder`, `archive`, `migrateLibrary`, `openAudio`;
   `storage/SafFileSystem.kt`; shared `Place.kt`, `LibraryFolder.kt` (`adoptLibrary`, `archiveFinished`),
   `LectureStore.archive`.
+- The tile: `androidApp/.../RecordTileService.kt` (`RecordTileService`, `nextFromRecordBar`; `RecordFromTileActivity` is
+  the fallback that starts it from the foreground; `RecordingService`'s `fromTile` start falls back to it). Strings `tile_*`.
 - Strings: `notebooks_*`. Lab: `notebooks current`, `notebooks current-no-guess` (`lab/notebooks/NotebooksCurrentLab.kt`).
 
 ## Design history

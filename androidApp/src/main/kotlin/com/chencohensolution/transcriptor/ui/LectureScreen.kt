@@ -207,14 +207,14 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.width(8.dp))
-                    LevelBars(state.level)
+                    StereoLevelBars(state.stereoMeter)
                     IconButton(onClick = actions.pauseOrResume, enabled = !state.finishing) {
                         Icon(
                             if (state.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                             stringResource(if (state.paused) R.string.lecture_resume else R.string.lecture_pause),
                         )
                     }
-                    val stop = rememberArmedStop(actions.stop)
+                    val stop = rememberArmedStop(state.stopTwice, actions.stop)
                     FilledIconButton(
                         onClick = stop.tap,
                         enabled = !state.finishing,
@@ -264,6 +264,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                         val error = state.liveError
                         val status = when {
                             state.finishing -> stringResource(R.string.lecture_finishing)
+                            state.recordOnly && !state.transcribeAfter -> stringResource(R.string.lecture_record_no_transcript)
                             state.recordOnly || model == null -> stringResource(R.string.lecture_record_only)
                             error != null -> stringResource(R.string.lecture_live_failed, error)
                             state.liveLoading -> stringResource(R.string.lecture_live_loading, model)

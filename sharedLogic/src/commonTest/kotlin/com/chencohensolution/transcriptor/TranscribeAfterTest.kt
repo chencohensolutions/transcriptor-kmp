@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.transcriptor.settings.RecordMode
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Note
@@ -96,6 +97,17 @@ class TranscribeAfterTest {
     private val root = "/files".toPath()
     private val store = LectureStore(fs, root)
     private val recorder = FakeRecorder(fs)
+
+    @Test
+    fun onlyRecordIsKeptAndLeavesTheMomentWaiting() {
+        val settings = SettingsStore(fs, root)
+        assertEquals(RecordMode.Live, settings.recordMode)
+        settings.recordMode = RecordMode.Only
+        assertEquals(RecordMode.Only, SettingsStore(fs, root).recordMode)
+        settings.recordMode = RecordMode.After
+        assertEquals(RecordMode.After, SettingsStore(fs, root).recordMode)
+        assertFalse(settings.recordLive)
+    }
 
     @Test
     fun liveIsTheDefaultAndAfterIsKept() {

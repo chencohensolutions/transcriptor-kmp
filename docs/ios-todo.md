@@ -191,3 +191,30 @@ anything left to decide. Remove an entry once it is built.
 - First run, "Get your models" (Nov 15, 2026): `DefaultModels.forLanguage`/`offerFirstRun`, `SettingsStore.firstRunDone`
   and `useDefaults`; the screen in `FirstRunScreen.kt` fed by `FirstRun.kt` (downloads, the NPU check and its CPU
   fallback); strings `first_run_*`. iOS has no NPU builds: it gets the CPU picks.
+
+## Sound level meter (Nov 15, 2026)
+
+- `AudioRecorder.meter` (`StereoMeterState`) and `wantBands`: iOS's recorder feeds a shared `MeterAnalyzer` (`feed`
+  every buffer, `read` about 10 times a second, `silence` on pause, `reset` on start), as `AndroidRecorder` does.
+- `SettingsStore.levelMeter` (`LevelMeterStyle`), shown as `LiveLectureState.levelMeter`; set `LectureSession.meterBands`
+  while the screen shows a style with `needsBands`. Views to mirror: `ui/LevelMeters.kt`. Strings `lecture_meter_*`,
+  `settings_level_meter*`.
+
+## Microphone (Nov 15, 2026)
+
+- `SettingsStore.micInput` (`MicInput`: key, name, kind); `AudioRecorder.start(..., input)` and `inputInUse`;
+  `LiveLectureState.input` / `inputMissing`. iOS: list `AVAudioSession.availableInputs` (Bluetooth HFP, wired, USB),
+  `setPreferredInput`, the `.allowBluetooth` category option, and follow `routeChangeNotification` for `inputInUse`.
+  Strings `settings_mic*`, `glance_mic*`. Android: `AndroidAudioInputs.kt`, `MicrophoneRow` in `ModelsScreen.kt`.
+## Record from the system's controls (Nov 15, 2026)
+
+- Android: a Quick Settings tile (`RecordTileService.kt`) records as the Record bar would (`notebooksState`'s guess and
+  language, `SettingsStore.recordLive`) and stops with a second tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. Strings `tile_stop_again`, `tile_finishing`.
+
+## Moment info (Nov 16, 2026)
+
+- `LectureReview.info()` (`MomentInfo`: the lecture, `LectureStore.audioBytes`, `loadPower`, `loadEncodePower`);
+  `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.
+  language, `SettingsStore.recordLive`) and stops with one tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. String `tile_finishing`.
