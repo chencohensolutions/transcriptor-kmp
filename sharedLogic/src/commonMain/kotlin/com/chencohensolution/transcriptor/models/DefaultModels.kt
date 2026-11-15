@@ -24,11 +24,12 @@ object DefaultModels {
 
     private val livePicks = mapOf(
         "en" to listOf(ModelCatalog.whisperTurbo),
-        "he" to listOf(ModelCatalog.ivritTurboNpu, ModelCatalog.ivritTurbo),
+        // The owner's picks on the S25 (Nov 15, 2026).
+        "he" to listOf(ModelCatalog.ivritZipformerNpu, ModelCatalog.ivritZipformer),
     )
     private val improvePicks = mapOf(
         "en" to listOf(ModelCatalog.whisperLargeV3),
-        "he" to listOf(ModelCatalog.ivritLargeV3Npu, ModelCatalog.ivritLargeV3),
+        "he" to listOf(ModelCatalog.ivritLargeV3Q8),
     )
 
     /** For a language without picks of its own: the multilingual models. */
@@ -39,6 +40,7 @@ object DefaultModels {
         live = (livePicks[language] ?: multilingualLive).firstOrNull { it.runsOn(chip) },
         improve = (improvePicks[language] ?: multilingualImprove).firstOrNull { it.runsOn(chip) },
         voicePrints = ModelCatalog.voicePrints,
+        // The owner uses DiariZen for speaker turns; it is non-commercial, so new installs get pyannote's.
         segmentation = ModelCatalog.speakerSegmentation,
     )
 }

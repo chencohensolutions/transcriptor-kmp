@@ -15,11 +15,11 @@ class DefaultModelsTest {
     @Test
     fun theSnapdragon8EliteGetsTheNpuBuildsAndOtherPhonesTheCpuOnes() {
         val elite = DefaultModels.forLanguage("he", "SM8750")
-        assertEquals(ModelCatalog.ivritTurboNpu.id, elite.live?.id)
-        assertEquals(ModelCatalog.ivritLargeV3Npu.id, elite.improve?.id)
+        assertEquals(ModelCatalog.ivritZipformerNpu.id, elite.live?.id)
+        assertEquals(ModelCatalog.ivritLargeV3Q8.id, elite.improve?.id)
         val other = DefaultModels.forLanguage("he", "SM8650")
-        assertEquals(ModelCatalog.ivritTurbo.id, other.live?.id)
-        assertEquals(ModelCatalog.ivritLargeV3.id, other.improve?.id)
+        assertEquals(ModelCatalog.ivritZipformer.id, other.live?.id)
+        assertEquals(ModelCatalog.ivritLargeV3Q8.id, other.improve?.id)
     }
 
     @Test

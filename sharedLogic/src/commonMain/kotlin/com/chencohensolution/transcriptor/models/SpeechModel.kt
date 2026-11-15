@@ -176,6 +176,21 @@ object ModelCatalog {
         ),
         chips = listOf("SM8750"),
     )
+    // ivritLargeV3 quantized to q8_0 by a third party (Hezi1991), Apache-2.0 like the original: half ivritLargeV3's
+    // download, no quantizing on the phone. The owner's improve model (Nov 15, 2026). Its id is the one Settings ›
+    // Models gave it when it was added from Hugging Face, so phones that added it keep their download.
+    val ivritLargeV3Q8 = SpeechModel(
+        id = "hf:Hezi1991/ivrit-whisper-large-v3-ggml-q8:ivrit-whisper-large-v3-q8_0",
+        name = "ivrit.ai Whisper large-v3 · q8_0",
+        languages = listOf("he"),
+        parameters = "1.55B",
+        license = "Apache-2.0",
+        fitsLive = false,
+        liveWindowSeconds = 30,
+        source = "https://huggingface.co/Hezi1991/ivrit-whisper-large-v3-ggml-q8",
+        kind = ModelKind.Whisper,
+        files = listOf(ModelFile("model.bin", "https://huggingface.co/Hezi1991/ivrit-whisper-large-v3-ggml-q8/resolve/55b71a13450a93c37ae7d8d1575acb347fb4aa34/ggml-ivrit-whisper-large-v3-q8_0.bin", "7f2c747335051ee804800d7c0bb24601a4cebb64196867d1ebca5538b8911004", 1_656_538_283)),
+    )
     val whisperLargeV3 = SpeechModel(
         id = "whisper-large-v3",
         name = "Whisper large-v3",
@@ -385,7 +400,7 @@ object ModelCatalog {
     /** The segmentation models for speaker turns, the default (pyannote) first. */
     val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id
