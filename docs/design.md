@@ -10,8 +10,9 @@ from the saved audio and tells the **speakers** apart. Everything stays on the p
 Nov 7, 2026, notebooks round 3's a).
 
 The code still says `Lecture` (`Lecture`, `LectureStore`, `LectureSession`, `lecture.json`, `lecture_*` string keys):
-only the words the user sees were renamed, so files on disk and other tools keep working. The Hebrew app name is not
-decided yet (רשמקול is the idea), so Hebrew shows "Audio Logs" too.
+only the words the user sees were renamed, so files on disk and other tools keep working. In Hebrew the app is
+**יומן קול** (owner's decision, Nov 16, 2026; a recording is still a רגע). The folder on disk keeps its name,
+`Audio Logs`, in every language.
 
 Android is built first, then iOS (SwiftUI) on the same shared logic (owner's decision, Nov 2, 2026).
 
