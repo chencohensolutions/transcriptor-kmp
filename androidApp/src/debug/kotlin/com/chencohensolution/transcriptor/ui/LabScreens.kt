@@ -16,6 +16,8 @@ internal val labScreens: List<LabScreen> = listOf(
         modelsOptionAHw,
         modelsOptionB,
         modelsOptionBHw,
+        modelsOptionB2,
+        modelsOptionB2Hw,
         modelsOptionC,
         modelsOptionCHw,
     )),
