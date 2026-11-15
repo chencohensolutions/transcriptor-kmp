@@ -16,9 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.recording.PowerReport
@@ -106,7 +109,15 @@ private fun Section(title: String) {
 private fun Item(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.4f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, textAlign = TextAlign.End, modifier = Modifier.weight(0.6f))
+        // Figures and units ("1.42 W", "33.9 → 33.9 °C") read left to right in a Hebrew app too; a value with Hebrew
+        // words in it is laid out right to left, its figures isolated in the strings.
+        val hebrew = value.any { it in '\u0590'..'\u05FF' }
+        Text(
+            value, style = MaterialTheme.typography.bodyMedium.copy(textDirection = if (hebrew) TextDirection.Rtl else TextDirection.Ltr),
+            fontWeight = FontWeight.Medium, modifier = Modifier.weight(0.6f),
+            // The layout's end edge, whatever the value's own direction.
+            textAlign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextAlign.Left else TextAlign.Right,
+        )
     }
 }
 
