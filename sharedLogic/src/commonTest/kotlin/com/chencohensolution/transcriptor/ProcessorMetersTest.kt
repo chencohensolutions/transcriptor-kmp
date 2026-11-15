@@ -3,6 +3,8 @@ package com.chencohensolution.transcriptor
 import com.chencohensolution.transcriptor.recording.Clock
 import com.chencohensolution.transcriptor.recording.CoreClock
 import com.chencohensolution.transcriptor.recording.NpuBusyClock
+import com.chencohensolution.transcriptor.recording.NpuJobTally
+import com.chencohensolution.transcriptor.recording.describe
 import com.chencohensolution.transcriptor.recording.ProcessorMeterSampler
 import com.chencohensolution.transcriptor.recording.ProcessorSample
 import com.chencohensolution.transcriptor.recording.processorMeters
@@ -107,6 +109,30 @@ class ProcessorMetersTest {
         npu.time { now = 1_250; assertEquals(650, npu.busyMillis) }
         npu.end()
         assertEquals(650, npu.busyMillis)
+    }
+
+    @Test
+    fun eachJobsNpuCallsAreTalliedUntilDrained() {
+        var now = 0L
+        val npu = NpuBusyClock { now }
+        // The encoder's window, and two segmentation calls, one while the encoder runs.
+        val encoder = npu.begin(); now = 100
+        npu.time("segmentation") { now = 400 }
+        now = 5_000
+        npu.end("encoder", encoder)
+        npu.time("segmentation") { now = 6_200 }
+        npu.time("voice prints") { now = 6_210 }
+        // Overlaps count once on the meter; each job keeps its own time.
+        assertEquals(6_210, npu.busyMillis)
+        val jobs = npu.drain()
+        assertEquals(NpuJobTally(1, 5_000, 5_000), jobs["encoder"])
+        assertEquals(NpuJobTally(2, 1_500, 1_200), jobs["segmentation"])
+        // In the order each job first finished.
+        assertEquals("segmentation 2× 1500 ms (max 1200); encoder 5000 ms; voice prints 10 ms", jobs.describe())
+        assertEquals(emptyMap(), npu.drain())
+        // Untallied calls (no job) only count on the meter.
+        npu.time { now = 6_300 }
+        assertEquals(emptyMap(), npu.drain())
     }
 
     @Test
