@@ -16,6 +16,11 @@ sentence being played highlighted; edited lines marked ✎. Notes are pills afte
 At the bottom: the overview of the whole moment (a lane per speaker with their turns, the notes as dots, the
 playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2×) and a note-here button.
 
+A moment that was only recorded (`Lecture.pendingTranscript`, no lines) shows a card instead of the document: **Not
+transcribed yet**, that it is transcribed when the phone charges, and **Transcribe now** with the language's improve
+model and about how long it takes (`ReviewActions.improve`); with no model, the one to get. While the pass runs the
+bar says "Transcribing · n%". Its notes are listed under the card, and the recording plays.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.

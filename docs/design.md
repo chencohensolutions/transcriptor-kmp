@@ -58,6 +58,23 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   queue, none dropped, and each shows as one line when done. Offered for live only once downloaded (it is got for
   improving), after the line models, so it runs live only when chosen (`ModelChoices.candidates`).
 
+### Record now, transcribe after (owner's request, Nov 15, 2026)
+
+The Record bar has **Live** or **After** (`SettingsStore.recordLive`; After is the default, to spare the battery
+during long conversations). With After, or with no live model for the language, the moment is only recorded: no model
+is loaded, `lecture.json` says `"pendingTranscript": true` from its first save, and notes work as always. Recording
+never waits on a model.
+
+- **The transcribe pass** (`Recording.refine` on such a moment): `lineTimes` reads the whole recording in 30 s pieces
+  and finds its lines at the pauses, as live transcription does (`Utterances`), without text; then the language's
+  improve model writes them as the improve pass does (`RefinePass`: several lines together where the engine times
+  words). Lines the model finds no words in are dropped (`transcribed`). The moment is saved with `refinedWith` and
+  without `pendingTranscript`; its speakers are then found by the speaker pass when its models are on the phone.
+- **When:** at Stop if the phone is charging; else the moment waits in `improvePending` for the charger (as improving
+  on its own does), or for **Transcribe now** on the moment. A recording starting stops the pass; it starts again
+  after.
+- With no improve model for the language the moment waits, and its screen offers the one to get.
+
 ### Audio
 
 - Recorded at **48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last seconds. The

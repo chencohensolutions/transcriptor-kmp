@@ -108,26 +108,29 @@ class LectureSession(
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
                     improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
+                    recordOnly = liveModel == null,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val isRecording get() = recording.value != null
 
-    /** Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. */
-    fun start(labels: List<String>, labelNames: String, language: String, title: String): Lecture {
+    /**
+     * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or
+     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after.
+     */
+    fun start(labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         val format = settings.audioFormat
-        val lecture = Lecture(
+        val fresh = Lecture(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
             audioFile = if (format == AudioFormat.FlacLive) AUDIO_FLAC else AUDIO_WAV,
         )
-        store.save(lecture)
         names = emptyMap()
         edits = emptyMap()
-        liveModel = live(language, scope, voices?.load().orEmpty())?.also { model ->
+        liveModel = (if (transcribeLive) live(language, scope, voices?.load().orEmpty()) else null)?.also { model ->
             val live = model.liveSpeakers
             recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {
@@ -143,6 +146,9 @@ class LectureSession(
                 }
             }
         }
+        // Saved as waiting for its transcript from the start, so a moment cut short by a crash is still transcribed.
+        val lecture = fresh.copy(pendingTranscript = liveModel == null)
+        store.save(lecture)
         power?.start(scope)
         recorder.start(
             store.audioPath(lecture),

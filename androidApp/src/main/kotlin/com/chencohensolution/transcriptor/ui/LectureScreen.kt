@@ -250,7 +250,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         val error = state.liveError
                         val status = when {
                             state.finishing -> stringResource(R.string.lecture_finishing)
-                            model == null -> stringResource(R.string.lecture_no_live_model)
+                            state.recordOnly || model == null -> stringResource(R.string.lecture_record_only)
                             error != null -> stringResource(R.string.lecture_live_failed, error)
                             state.liveLoading -> stringResource(R.string.lecture_live_loading, model)
                             else -> stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)

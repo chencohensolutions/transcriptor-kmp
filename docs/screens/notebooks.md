@@ -22,6 +22,10 @@ The code still calls it `NotebooksScreen`.
   later"). Tapping them (or +) opens a menu of checkboxes, the guessed ones first, and New label. The language chip:
   the guessed label's usual language, else the last moment's. Record asks for the microphone, then records titled
   with the date.
+- Under the chips, **Live** or **After** (After by default, kept in the settings): Live transcribes as the moment
+  records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026)).
+  One line beside them says which. (The "Usually … on Monday" line is gone: the guessed labels keep their ✦.)
+  A moment waiting for its transcript says **Not transcribed yet** in the list.
 - While a moment records, a red banner replaces the bar: its clock and labels, and **Back to it**. That moment is not
   in the list until it stops.
 - The gear opens Settings.

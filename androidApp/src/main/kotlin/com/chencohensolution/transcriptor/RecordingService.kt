@@ -52,6 +52,7 @@ class RecordingService : Service() {
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
+                    transcribeLive = intent.getBooleanExtra(EXTRA_LIVE, true),
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()
@@ -65,6 +66,15 @@ class RecordingService : Service() {
                 if (lecture != null && after == ImproveAfterStop.WhenCharging) Recording.settings.addImprovePending(lecture.id)
                 val then = model?.takeIf { after == ImproveAfterStop.Now }?.let { m -> { done: Lecture -> refine(done, m.id) } }
                 when {
+                    // Only recorded (After, or no live model): transcribed now on the charger, else it waits for it
+                    // (or for "Transcribe now" on the moment), so the battery is spared.
+                    lecture != null && lecture.pendingTranscript -> {
+                        if (model != null && charging()) refine(lecture, model.id)
+                        else {
+                            if (model != null) Recording.settings.addImprovePending(lecture.id)
+                            if (!improveNextPending()) compressPending()
+                        }
+                    }
                     lecture != null && lecture.segments.isNotEmpty() && Recording.canFindSpeakers && Recording.settings.findSpeakersOnStop -> findSpeakers(lecture, then)
                     lecture != null && then != null -> then(lecture)
                     else -> if (!improveNextPending()) compressPending()
@@ -135,6 +145,9 @@ class RecordingService : Service() {
      * improved while the phone still charges, else any FLAC compression.
      */
     private fun refine(lecture: Lecture, modelId: String) {
+        // A moment only recorded: this pass writes its first transcript, then its speakers are found.
+        val transcribing = lecture.pendingTranscript && lecture.segments.isEmpty()
+        val title = if (transcribing) R.string.transcribing else R.string.refining
         // Still not enough free memory for its model (other apps): it waits for the charger instead of being dropped.
         val model = Recording.refineModels(lecture.language).firstOrNull { it.id == modelId }
         if (model != null && !Recording.npuGuard.fitsNow(model)) {
@@ -144,9 +157,10 @@ class RecordingService : Service() {
             return
         }
         compressing = true
-        startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        startForeground(ID, progressNotification(title, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
             var shown = -1
+            var speakersNext: Lecture? = null
             Recording.refining.value = lecture.id to 0f
             runCatching {
                 Recording.refine(
@@ -155,7 +169,7 @@ class RecordingService : Service() {
                     progress = { p ->
                         Recording.refining.value = lecture.id to p
                         val percent = (p * 100).toInt()
-                        if (percent != shown) { shown = percent; notify(progressNotification(R.string.refining, p)) }
+                        if (percent != shown) { shown = percent; notify(progressNotification(title, p)) }
                     },
                     // A recording started: its live model needs the memory this model holds. Closed now, done after it stops.
                     stop = { Recording.session.isRecording },
@@ -163,6 +177,7 @@ class RecordingService : Service() {
             }.onSuccess { done ->
                 if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
+                if (transcribing && done.segments.isNotEmpty() && Recording.canFindSpeakers) speakersNext = done
             }.onFailure {
                 if (it is RefinePass.Stopped) Recording.improveAfterRecording += lecture.id to modelId
                 else android.util.Log.e("RecordingService", "refine pass failed", it)
@@ -170,7 +185,11 @@ class RecordingService : Service() {
             Recording.settings.removeImprovePending(lecture.id)
             Recording.refining.value = null
             compressing = false
-            launch(Dispatchers.Main) { if (!improveNextPending()) compressPending() }
+            launch(Dispatchers.Main) {
+                val speakers = speakersNext
+                if (speakers != null && !Recording.session.isRecording) findSpeakers(speakers) { if (!improveNextPending()) compressPending() }
+                else if (!improveNextPending()) compressPending()
+            }
         }
     }
 
@@ -289,16 +308,20 @@ class RecordingService : Service() {
         private const val EXTRA_LABEL_NAMES = "labelNames"
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
+        private const val EXTRA_LIVE = "live"
         private const val EXTRA_LECTURE = "lecture"
         private const val EXTRA_MODEL = "model"
         private const val EXTRA_SPEAKERS_FIRST = "speakersFirst"
         private const val ACTION_IMPROVE_PENDING = "improvePending"
 
-        /** Records a moment with these [labels] (ids; [labelNames] for its screen) in [language]. */
-        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String) = context.startForegroundService(
+        /**
+         * Records a moment with these [labels] (ids; [labelNames] for its screen) in [language], transcribed as it
+         * records when [live], else after it stops.
+         */
+        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String, live: Boolean) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
                 .putExtra(EXTRA_LABELS, labels.toTypedArray()).putExtra(EXTRA_LABEL_NAMES, labelNames)
-                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title),
+                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_LIVE, live),
         )
 
         fun stop(context: Context) =

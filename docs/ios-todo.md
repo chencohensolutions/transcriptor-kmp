@@ -140,3 +140,14 @@ anything left to decide. Remove an entry once it is built.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
   iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.
+
+## Record now, transcribe after (Nov 15, 2026)
+
+- Shared: `SettingsStore.recordLive`, `LectureSession.start(transcribeLive)`, `LiveLectureState.recordOnly`,
+  `Lecture.pendingTranscript`, `LectureSummary.pendingTranscript`, `NotebooksState.recordLive`, `lineTimes` and
+  `transcribed` (`speech/LineTimes.kt`).
+- Android to mirror: the Live/After chips on the Record bar (`NotebooksScreen.kt`), the status line
+  (`LectureScreen.kt`), the Not transcribed yet card (`NotTranscribedYet` in `ReviewScreen.kt`), and the pass itself
+  (`Recording.transcribe`, queued in `RecordingService`: at Stop on the charger, else when it charges).
+- Strings: `notebooks_record_*`, `notebooks_not_transcribed`, `lecture_record_only`, `transcribing`,
+  `review_transcribing`, `review_waiting_*`, `review_transcribe_now*`.

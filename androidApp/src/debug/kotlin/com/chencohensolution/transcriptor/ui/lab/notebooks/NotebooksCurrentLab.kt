@@ -74,7 +74,7 @@ private fun rememberNotebooksLab(now: Long): Pair<NotebooksState, NotebooksActio
     val state = notebooksState(Library(labels, moments, "he"), now, { zone.getOffset(it).toLong() }, recording, working)
     val actions = NotebooksActions(
         openLecture = { toast("Lab: the moment would open ($it)") },
-        record = { ids, language ->
+        record = { ids, language, _ ->
             if (recording == null) {
                 recording = RecordingNow(ids, title(now), 0)
                 recordingLanguage = language

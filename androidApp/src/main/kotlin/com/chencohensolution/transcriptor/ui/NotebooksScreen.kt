@@ -93,8 +93,10 @@ import java.util.Locale
 class NotebooksActions(
     /** Opens a recorded moment. */
     val openLecture: (lectureId: String) -> Unit = {},
-    /** Starts a moment with these labels (maybe none) in [language]. */
-    val record: (labels: List<String>, language: String) -> Unit = { _, _ -> },
+    /** Starts a moment with these labels (maybe none) in [language], transcribed as it records ([live]) or after. */
+    val record: (labels: List<String>, language: String, live: Boolean) -> Unit = { _, _, _ -> },
+    /** Keeps the Record bar's Live or After for next time. */
+    val setRecordLive: (live: Boolean) -> Unit = {},
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -162,6 +164,7 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     var labeling by remember { mutableStateOf<List<String>?>(null) }
     var choosingLabels by remember { mutableStateOf(false) }
     var choosingLanguage by remember { mutableStateOf(false) }
+    var recordLive by rememberSaveable { mutableStateOf(state.recordLive) }
     var creating by remember { mutableStateOf(false) }
 
     val guessed = state.guess?.labels.orEmpty().filter { id -> state.labels.any { it.id == id } }
@@ -265,26 +268,26 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }
-                            val why = when {
-                                chosen == null && filter == null && guessed.isNotEmpty() -> state.guess?.let {
-                                    stringResource(R.string.notebooks_usually, isolated(guessed.mapNotNull { id -> labelsById[id]?.name }.joinToString(", ")), weekdayAndTime(it.usualStartMillis))
-                                }
-                                nextLabels.isEmpty() -> stringResource(R.string.notebooks_label_later)
-                                else -> null
-                            }
-                            Row(Modifier.padding(top = 4.dp, bottom = 8.dp).height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (why != null) {
-                                    val isGuess = chosen == null && filter == null && guessed.isNotEmpty()
-                                    if (isGuess) Icon(Icons.Filled.AutoAwesome, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Text(
-                                        why, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        color = if (isGuess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(start = 4.dp),
-                                    )
-                                }
+                            // Live or After: transcribed while it records, or only recorded and transcribed after (the
+                            // default: easier on the battery). The guessed labels keep their ✦ on the chips above.
+                            Row(Modifier.padding(top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    stringResource(if (recordLive) R.string.notebooks_record_live_note else R.string.notebooks_record_after_note),
+                                    style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
+                                )
+                                FilterChip(
+                                    selected = recordLive, onClick = { recordLive = true; actions.setRecordLive(true) },
+                                    label = { Text(stringResource(R.string.notebooks_record_live)) }, modifier = Modifier.padding(end = 6.dp),
+                                )
+                                FilterChip(
+                                    selected = !recordLive, onClick = { recordLive = false; actions.setRecordLive(false) },
+                                    label = { Text(stringResource(R.string.notebooks_record_after)) },
+                                )
                             }
                             Button(
-                                onClick = { actions.record(nextLabels, language); chosen = null }, shape = RoundedCornerShape(16.dp),
+                                onClick = { actions.record(nextLabels, language, recordLive); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
@@ -412,7 +415,11 @@ private fun MomentRow(
                 if (m.labels.isEmpty()) weekdayAndTime(l.startedAtMillis) else momentDay(l.startedAtMillis, state.nowMillis),
                 momentLength(l.durationMillis),
                 if (l.noteCount > 0) stringResource(R.string.notebooks_notes, l.noteCount) else null,
-                if (l.refined) stringResource(R.string.notebooks_refined) else null,
+                when {
+                    l.pendingTranscript -> stringResource(R.string.notebooks_not_transcribed)
+                    l.refined -> stringResource(R.string.notebooks_refined)
+                    else -> null
+                },
             ).joinToString(" · "),
             style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
         )

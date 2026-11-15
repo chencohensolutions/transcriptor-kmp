@@ -45,6 +45,9 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
 - Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
   it names the speaker, and the app remembers the voice for the next moments.
 
+- **Recording only** (After on the Record bar, or no live model for the language; `LiveLectureState.recordOnly`): no
+  lines and no model lines, only "Recording only. This moment is transcribed after you stop." above the notes.
+
 ## Processor meters
 
 Owner's request, Nov 7, 2026: how hard the phone works while it records and transcribes. Off by default; Settings ›
@@ -109,7 +112,7 @@ starts afresh. Amber from 70%, red from 90%.
   `MeterProbeReceiver` reads the real files as an ordinary app (`adb shell am broadcast -n
   com.chencohensolution.transcriptor.uilab/com.chencohensolution.transcriptor.ui.MeterProbeReceiver`, then
   `adb logcat -s MeterProbe`).
-- Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
+- Lab: `lecture current-record-only` (recording only), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
   screen with a faked recording and live transcription that keeps making lines (`LectureGrowingLab.kt`;
   `./scripts/ui-lab.sh lecture current`).
 

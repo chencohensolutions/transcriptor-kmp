@@ -26,7 +26,6 @@
     <string name="flac_effort_note_live">The sound is the same at every level. Higher makes the file a few percent smaller and uses more of the phone while recording (and battery).</string>
     <string name="start_lecture">Start a moment</string>
     <string name="start_last">Last moment: %1$s · %2$s · %3$d notes · %4$s</string>
-    <string name="lecture_no_live_model">No live model for this notebook\'s language yet: download one in Settings. Recording and notes work.</string>
     <string name="lecture_live_loading">Loading %1$s…</string>
     <string name="lecture_speakers_model">Speakers: %1$s · %2$s</string>
     <string name="lecture_speakers_live">Speakers: %1$s · %2$s, live</string>
@@ -89,7 +88,6 @@
     <string name="notebooks_record">Record</string>
     <string name="notebooks_language_title">The moment\'s language</string>
     <string name="notebooks_suggested">Suggested</string>
-    <string name="notebooks_usually">Usually %1$s on %2$s</string>
     <string name="notebooks_slot">%1$s at %2$s</string>
     <string name="notebooks_all">All</string>
     <string name="notebooks_today">Today</string>
@@ -269,7 +267,6 @@
     <string name="notebooks_done">Done</string>
     <string name="notebooks_labels_of">Labels of %1$s</string>
     <string name="notebooks_labels_of_many">Labels of %1$d moments</string>
-    <string name="notebooks_label_later">You can add labels later</string>
     <string name="notebooks_deleted_one">Moment deleted</string>
     <string name="notebooks_deleted_many">%1$d moments deleted</string>
     <string name="notebooks_undo">Undo</string>
@@ -325,4 +322,21 @@
     <string name="models_delete_text">Its files are deleted from the phone. It stays in the list, to download again.</string>
     <string name="models_removal_chosen">It is chosen now: its default is used instead.</string>
     <string name="models_removal_busy">It may be in use: stop recording or improving first.</string>
+    <string name="lecture_record_only">Recording only. This moment is transcribed after you stop.</string>
+    <string name="transcribing">Transcribing the moment…</string>
+    <string name="notebooks_record_live">Live</string>
+    <string name="notebooks_record_after">After</string>
+    <string name="notebooks_record_live_note">Transcribes as you talk</string>
+    <string name="notebooks_record_after_note">Records now, transcribes after. Easier on the battery.</string>
+    <string name="notebooks_not_transcribed">Not transcribed yet</string>
+    <string name="review_transcribing">Transcribing · %1$d%%</string>
+    <string name="review_waiting_title">Not transcribed yet</string>
+    <string name="review_waiting_running_title">Transcribing…</string>
+    <string name="review_waiting_running">The lines appear here when it is done. You can listen meanwhile.</string>
+    <string name="review_waiting_note">This moment was only recorded. It is transcribed when the phone is charging, or now.</string>
+    <string name="review_waiting_no_model">This moment was only recorded, and there is no model for its language on the phone yet.</string>
+    <string name="review_waiting_no_model_settings">This moment was only recorded, and there is no model for its language on the phone yet. Get one in Settings.</string>
+    <string name="review_transcribe_now">Transcribe now</string>
+    <string name="review_transcribe_now_minutes">Transcribe now · about %1$d min</string>
+    <string name="review_waiting_get">Get %1$s · %2$s</string>
 </resources>
