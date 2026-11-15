@@ -297,11 +297,12 @@ internal fun hubModel(s: HubSummary, d: HubDetail): HubModel? {
             }
         }
         // A speaker model per ONNX file (a repo may hold several models, or fp32 and int8), installed as model.onnx.
-        // With its NPU build when the repo has one (the app uses it on that chip, the ONNX elsewhere).
+        // With its NPU build when the repo has one (the app uses it on that chip, the ONNX elsewhere). Its size isn't
+        // guessed: Whisper's size names would make a "large" one 1.55B.
         kind.speakers -> {
             val npuFiles = speakerNpuFiles(s.id, names, tags).map { file(it) }
             names.filter { it.endsWith(".onnx") }.map { n ->
-                HubVariant(n.removeSuffix(".onnx") + if (npuFiles.isEmpty()) "" else " + NPU", listOf(file(n, "model.onnx")) + npuFiles, parametersOf(s.id), fitsLive = true)
+                HubVariant(n.removeSuffix(".onnx") + if (npuFiles.isEmpty()) "" else " + NPU", listOf(file(n, "model.onnx")) + npuFiles, "?", fitsLive = true)
             }.sortedBy { it.sizeBytes }
         }
         // Not run by the app yet: listed with their ONNX files.

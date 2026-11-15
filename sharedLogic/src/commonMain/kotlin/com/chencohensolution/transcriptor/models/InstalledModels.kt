@@ -93,7 +93,9 @@ private data class InstalledV1(
 ) {
     fun toInstalled() = InstalledModel(
         SpeechModel(
-            id, name, languages, parameters, license, fitsLive, source, kind,
+            // A speaker model's size was once guessed from Whisper's size names ("large": 1.55B); it isn't known.
+            id, name, languages, if (kind == ModelKind.SpeakerEmbedding || kind == ModelKind.SpeakerSegmentation) "?" else parameters,
+            license, fitsLive, source, kind,
             files.map { ModelFile(it.name, it.url, it.sha256, it.size, it.gitSha1) }, quantizeTo = quantizeTo, chips = chips,
             liveWindowSeconds = SpeechModel.liveWindowFor(kind, fitsLive),
             npuPeakBytes = npuPeakBytes,
