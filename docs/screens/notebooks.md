@@ -58,8 +58,7 @@ edit list). A tap records a moment as the Record bar would now: the guessed labe
 picked, and the recording format and hide-notification settings. It records in the background: nothing opens and
 the shade stays (while System UI is bound to the tile the app shares its microphone access; if Android refuses anyway,
 an invisible activity starts it from the foreground). On a locked phone it asks to unlock
-first. While recording the tile is on, labeled Stop with Recording or Paused under it; Stop asks for a second tap within
-4 seconds ("Tap again to stop"), as in the app; while the last lines finish it is greyed out. Without the microphone
+first. While recording the tile is on, labeled Stop with Recording or Paused under it; Stop takes one tap; while the last lines finish it is greyed out. Without the microphone
 permission the tap opens the app, whose Record asks for it.
 
 ## Code

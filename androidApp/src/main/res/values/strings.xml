@@ -479,7 +479,6 @@
     <string name="settings_quiet_off">Off: the notification shows the clock, with Pause, Mark and Stop.</string>
     <string name="settings_quiet_on">On: it shows only the app\'s name, makes no sound, stays off the lock screen and has no buttons. Android keeps one entry for an app that records; to remove it altogether, turn off the app\'s notifications.</string>
     <string name="settings_quiet_system">Open the phone\'s notification settings</string>
-    <string name="tile_stop_again">Tap again to stop</string>
     <string name="tile_finishing">Finishing…</string>
     <string name="notebooks_record_only">No transcript</string>
     <string name="notebooks_record_only_note">Records only. Transcribe it from the moment whenever you want.</string>

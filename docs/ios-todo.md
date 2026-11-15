@@ -195,5 +195,5 @@ anything left to decide. Remove an entry once it is built.
 ## Record from the system's controls (Nov 15, 2026)
 
 - Android: a Quick Settings tile (`RecordTileService.kt`) records as the Record bar would (`notebooksState`'s guess and
-  language, `SettingsStore.recordLive`) and stops with a second tap. iOS: a Control Center control (`ControlWidget`,
-  iOS 18) with an App Intent doing the same. Strings `tile_stop_again`, `tile_finishing`.
+  language, `SettingsStore.recordLive`) and stops with one tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. String `tile_finishing`.

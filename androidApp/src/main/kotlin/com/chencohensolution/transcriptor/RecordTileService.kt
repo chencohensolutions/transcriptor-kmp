@@ -17,25 +17,19 @@ import com.chencohensolution.transcriptor.recording.LiveLectureState
 import com.chencohensolution.transcriptor.settings.RecordMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
 /**
- * The Quick Settings tile: Record, and Stop while a moment records (the tile on). Stop asks for a second tap, as in the
- * app. Record starts the recording service in the background; nothing opens.
+ * The Quick Settings tile: Record, and Stop while a moment records (the tile on); one tap each. Record starts the recording service in the background; nothing opens.
  */
 class RecordTileService : TileService() {
     private var scope: CoroutineScope? = null
     private val clicks = MainScope()
-
-    /** Stop was tapped once: a second tap within [ARM_MILLIS] stops. */
-    private var armed: Job? = null
 
     override fun onStartListening() {
         scope?.cancel()
@@ -45,7 +39,6 @@ class RecordTileService : TileService() {
     override fun onStopListening() {
         scope?.cancel()
         scope = null
-        armed = null
     }
 
     override fun onClick() {
@@ -60,11 +53,7 @@ class RecordTileService : TileService() {
                 else -> record()
             }
             state.finishing -> Unit
-            armed?.isActive == true -> { armed?.cancel(); armed = null; RecordingService.stop(this) }
-            else -> {
-                armed = scope?.launch { delay(ARM_MILLIS); armed = null; show(Recording.session.state.value) }
-                show(state)
-            }
+            else -> RecordingService.stop(this)
         }
     }
 
@@ -101,7 +90,6 @@ class RecordTileService : TileService() {
             tile.subtitle = getString(
                 when {
                     state.finishing -> R.string.tile_finishing
-                    armed?.isActive == true -> R.string.tile_stop_again
                     state.paused -> R.string.lecture_paused
                     else -> R.string.recording_now
                 },
@@ -114,10 +102,6 @@ class RecordTileService : TileService() {
         scope?.cancel()
         clicks.cancel()
         super.onDestroy()
-    }
-
-    private companion object {
-        const val ARM_MILLIS = 4_000L
     }
 }
 

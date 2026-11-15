@@ -485,7 +485,6 @@
     <string name="settings_quiet_off">כבוי: ההתראה מציגה את השעון, עם השהיה, סימון וסיום.</string>
     <string name="settings_quiet_on">פעיל: היא מציגה רק את שם האפליקציה, בלי צליל, בלי מסך הנעילה ובלי כפתורים. אנדרואיד משאיר שורה אחת לאפליקציה שמקליטה; כדי להסיר אותה לגמרי צריך לכבות את ההתראות של האפליקציה.</string>
     <string name="settings_quiet_system">לפתוח את הגדרות ההתראות של הטלפון</string>
-    <string name="tile_stop_again">הקשה נוספת לעצירה</string>
     <string name="tile_finishing">מסיים…</string>
     <string name="notebooks_record_only">בלי תמלול</string>
     <string name="notebooks_record_only_note">מקליט בלבד. אפשר לתמלל מהרגע מתי שרוצים.</string>
