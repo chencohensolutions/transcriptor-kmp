@@ -1066,7 +1066,7 @@ fun modelsSize(bytes: Long) = isolated(if (bytes >= 1e9) "%.1f GB".format(bytes 
 private fun modelFacts(model: SpeechModel) = listOf(isolated(model.parameters), isolated(model.license), modelsSize(model.sizeBytes)).joinToString(" · ")
 
 /** Runs on this phone's NPU. */
-private val SpeechModel.npu get() = kind == ModelKind.WhisperNpu || kind == ModelKind.StreamingTransducerNpu
+private val SpeechModel.npu get() = kind.onNpu
 
 /** A small label: "NPU", "Live", "From Hugging Face". */
 @Composable

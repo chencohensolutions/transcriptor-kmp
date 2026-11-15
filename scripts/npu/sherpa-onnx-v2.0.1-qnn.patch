@@ -644,7 +644,7 @@ index b482acf..9391978 100644
    }
  
 diff --git a/sherpa-onnx/csrc/qnn/qnn-model.cc b/sherpa-onnx/csrc/qnn/qnn-model.cc
-index b008913..993baf4 100644
+index b008913..6e0348c 100644
 --- a/sherpa-onnx/csrc/qnn/qnn-model.cc
 +++ b/sherpa-onnx/csrc/qnn/qnn-model.cc
 @@ -7,6 +7,7 @@
@@ -655,16 +655,76 @@ index b008913..993baf4 100644
  #include <fstream>
  #include <memory>
  #include <string>
-@@ -19,6 +20,8 @@
+@@ -19,8 +20,54 @@
  #include "sherpa-onnx/csrc/qnn/qnn-backend.h"
  #include "sherpa-onnx/csrc/qnn/utils.h"
  
 +#include "QnnMem.h"
 +
++#include <fcntl.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
  namespace sherpa_onnx {
  
++namespace {
++
++// A file's bytes for QnnContext_createFromBinary: mmap'd (read-only, private), else read (data(), size()).
++class MappedFile {
++ public:
++  explicit MappedFile(const std::string &filename) {
++    int fd = open(filename.c_str(), O_RDONLY);
++    struct stat st {};
++    if (fd >= 0 && fstat(fd, &st) == 0 && st.st_size > 0) {
++      void *p = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
++      if (p != MAP_FAILED) {
++        map_ = p;
++        size_ = static_cast<size_t>(st.st_size);
++      }
++    }
++    if (fd >= 0) close(fd);
++    if (!map_) {
++      auto bytes = ReadFile(filename);
++      read_.assign(bytes.begin(), bytes.end());
++      size_ = read_.size();
++    }
++  }
++  ~MappedFile() {
++    if (map_) munmap(map_, size_);
++  }
++  MappedFile(const MappedFile &) = delete;
++  MappedFile &operator=(const MappedFile &) = delete;
++
++  uint8_t *data() { return map_ ? static_cast<uint8_t *>(map_) : read_.data(); }
++  size_t size() const { return size_; }
++
++ private:
++  void *map_ = nullptr;
++  size_t size_ = 0;
++  std::vector<uint8_t> read_;
++};
++
++}  // namespace
++
  class QnnModel::Impl {
-@@ -213,7 +216,7 @@ class QnnModel::Impl {
+  public:
+   Impl(const std::string &model_so, const QnnBackend *backend, bool debug)
+@@ -117,9 +164,10 @@ class QnnModel::Impl {
+           system_interface_providers[i]->QNN_SYSTEM_INTERFACE_VER_NAME;
+     }
+ 
+-    // read file into a buffer
+-    auto char_buffer = ReadFile(binary_context_file);
+-    std::vector<uint8_t> buffer(char_buffer.begin(), char_buffer.end());
++    // The file mapped read-only, not read into memory (and copied again): QNN makes its own copy of what it
++    // needs while creating the context, so a read buffer only adds the file's size (twice) to the load's peak,
++    // which a 1-2 GB Whisper encoder can't afford. The map is released when this function returns.
++    MappedFile buffer(binary_context_file);
+ 
+     QnnSystemContext_Handle_t sys_ctx_handle = nullptr;
+     if (qnn_system_interface_.systemContextCreate(&sys_ctx_handle) !=
+@@ -213,7 +261,7 @@ class QnnModel::Impl {
      return true;
    }
  
@@ -673,7 +733,7 @@ index b008913..993baf4 100644
  
    bool SaveBinaryContext(const std::string &filename) {
      auto qnn_interface = backend_->QnnInterface();
-@@ -399,6 +402,22 @@ class QnnModel::Impl {
+@@ -399,6 +447,22 @@ class QnnModel::Impl {
      return true;
    }
  
@@ -696,7 +756,7 @@ index b008913..993baf4 100644
    std::vector<float> GetOutputTensorData(const std::string &name) {
      if (!HasTensor(name)) {
        SHERPA_ONNX_LOGE("No such tensor '%s'", name.c_str());
-@@ -485,6 +504,20 @@ class QnnModel::Impl {
+@@ -485,6 +549,20 @@ class QnnModel::Impl {
        output_tensors_raw.push_back(*p);
      }
  
@@ -717,7 +777,7 @@ index b008913..993baf4 100644
      auto ret = backend_->QnnInterface().graphExecute(
          graph_handle_, input_tensors_raw.data(), input_tensors_raw.size(),
          output_tensors_raw.data(), output_tensors_raw.size(), nullptr, nullptr);
-@@ -497,8 +530,10 @@ class QnnModel::Impl {
+@@ -497,8 +575,10 @@ class QnnModel::Impl {
  
   private:
    void PostInit() {
@@ -730,7 +790,7 @@ index b008913..993baf4 100644
  
      is_initialized_ = true;
    }
-@@ -660,7 +695,90 @@ class QnnModel::Impl {
+@@ -660,7 +740,90 @@ class QnnModel::Impl {
      }
    }
  
@@ -822,7 +882,7 @@ index b008913..993baf4 100644
    bool debug_ = true;
    std::unique_ptr<void, decltype(&dlclose)> model_lib_handle_{nullptr,
                                                                &dlclose};
-@@ -726,6 +844,12 @@ bool QnnModel::HasTensor(const std::string &name) const {
+@@ -726,6 +889,12 @@ bool QnnModel::HasTensor(const std::string &name) const {
    return impl_->HasTensor(name);
  }
  
@@ -1442,6 +1502,30 @@ index 0000000..31b853c
 +}  // namespace sherpa_onnx
 +
 +#endif  // SHERPA_ONNX_CSRC_SPEAKER_SEGMENTATION_WINDOW_H_
+diff --git a/sherpa-onnx/jni/CMakeLists.txt b/sherpa-onnx/jni/CMakeLists.txt
+index d0ce4e3..3b7ca2b 100644
+--- a/sherpa-onnx/jni/CMakeLists.txt
++++ b/sherpa-onnx/jni/CMakeLists.txt
+@@ -46,6 +46,11 @@ if(SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION)
+   )
+ endif()
+ 
++if(SHERPA_ONNX_ENABLE_QNN)
++  # A C API for another library in the app (the QNN Whisper encoder for whisper.cpp).
++  list(APPEND sources qnn-whisper-encoder.cc)
++endif()
++
+ add_library(sherpa-onnx-jni SHARED ${sources})
+ 
+ target_compile_definitions(sherpa-onnx-jni PRIVATE SHERPA_ONNX_BUILD_SHARED_LIBS=1)
+@@ -62,4 +67,7 @@ elseif(APPLE)
+ endif()
+ 
+ target_link_libraries(sherpa-onnx-jni sherpa-onnx-core)
++if(SHERPA_ONNX_ENABLE_QNN)
++  target_include_directories(sherpa-onnx-jni PRIVATE ${QNN_SDK_ROOT}/include/QNN)
++endif()
+ install(TARGETS sherpa-onnx-jni DESTINATION lib)
 diff --git a/sherpa-onnx/jni/offline-recognizer.cc b/sherpa-onnx/jni/offline-recognizer.cc
 index 422f1f4..ab5948a 100644
 --- a/sherpa-onnx/jni/offline-recognizer.cc
@@ -1780,6 +1864,139 @@ index 7a6af70..9abf226 100644
  }
  
  SHERPA_ONNX_EXTERN_C
+diff --git a/sherpa-onnx/jni/qnn-whisper-encoder.cc b/sherpa-onnx/jni/qnn-whisper-encoder.cc
+new file mode 100644
+index 0000000..9f618d3
+--- /dev/null
++++ b/sherpa-onnx/jni/qnn-whisper-encoder.cc
+@@ -0,0 +1,115 @@
++// sherpa-onnx/jni/qnn-whisper-encoder.cc
++//
++// A Whisper encoder on Qualcomm's NPU for another decoder (the transcriptor app's whisper.cpp): a C API around
++// QnnModel, exported from libsherpa-onnx-jni.so so a library in the same process can call it (dlsym), without
++// copying the cross-attention K/V through the JVM. The context binary is sherpa-onnx's Whisper QNN export's
++// encoder: input the log-mel (frames x mels), outputs cross_k_<i> and cross_v_<i> (frames x state) per decoder
++// layer.
++#if SHERPA_ONNX_ENABLE_QNN
++
++#include <cstring>
++#include <exception>
++#include <memory>
++#include <string>
++#include <vector>
++
++#include "sherpa-onnx/csrc/macros.h"
++#include "sherpa-onnx/csrc/qnn/qnn-backend.h"
++#include "sherpa-onnx/csrc/qnn/qnn-model.h"
++
++namespace {
++
++struct QnnWhisperEncoder {
++  std::unique_ptr<sherpa_onnx::QnnBackend> backend;
++  std::unique_ptr<sherpa_onnx::QnnModel> model;
++  std::string mel_name;
++  std::vector<float> mel;  // frames x mels
++};
++
++}  // namespace
++
++extern "C" {
++
++// Loads `context_binary` with Qualcomm's `backend_lib` (libQnnHtp.so) and `system_lib` (libQnnSystem.so); NULL on
++// failure (the reason is in the log).
++__attribute__((visibility("default"))) void *SherpaOnnxQnnWhisperEncoderCreate(
++    const char *context_binary, const char *backend_lib,
++    const char *system_lib) {
++  try {
++    auto e = std::make_unique<QnnWhisperEncoder>();
++    e->backend = std::make_unique<sherpa_onnx::QnnBackend>(backend_lib, false);
++    e->model = std::make_unique<sherpa_onnx::QnnModel>(
++        context_binary, system_lib, e->backend.get(),
++        sherpa_onnx::BinaryContextTag{}, false);
++    if (!e->model->IsInitialized() || e->model->InputTensorNames().size() != 1) {
++      SHERPA_ONNX_LOGE("QNN Whisper encoder: cannot use '%s'", context_binary);
++      return nullptr;
++    }
++    e->mel_name = e->model->InputTensorNames()[0];
++    return e.release();
++  } catch (const std::exception &ex) {
++    SHERPA_ONNX_LOGE("QNN Whisper encoder: %s", ex.what());
++    return nullptr;
++  }
++}
++
++// Runs the encoder on `mel`: `n_mel` rows of `n_frames` values (whisper.cpp's layout); the graph takes frames x
++// mels. Returns 1 on success.
++__attribute__((visibility("default"))) int SherpaOnnxQnnWhisperEncoderRun(
++    void *encoder, const float *mel, int32_t n_mel, int32_t n_frames) {
++  auto *e = static_cast<QnnWhisperEncoder *>(encoder);
++  try {
++    auto shape = e->model->TensorShape(e->mel_name);
++    int32_t want = 1;
++    for (auto d : shape) want *= d;
++    if (want != n_mel * n_frames) {
++      SHERPA_ONNX_LOGE("QNN Whisper encoder: the graph takes %d values, got %d x %d", want, n_mel, n_frames);
++      return 0;
++    }
++    e->mel.resize(static_cast<size_t>(want));
++    for (int32_t m = 0; m < n_mel; ++m) {
++      for (int32_t f = 0; f < n_frames; ++f) {
++        e->mel[static_cast<size_t>(f) * n_mel + m] = mel[static_cast<size_t>(m) * n_frames + f];
++      }
++    }
++    return e->model->SetInputTensorData(e->mel_name, e->mel.data(), want) && e->model->Run();
++  } catch (const std::exception &ex) {
++    SHERPA_ONNX_LOGE("QNN Whisper encoder: %s", ex.what());
++    return 0;
++  }
++}
++
++// Copies decoder layer `layer`'s cross-attention K and V from the last run into `k` and `v`, `n` floats each
++// (frames x state). Returns 1 on success.
++__attribute__((visibility("default"))) int SherpaOnnxQnnWhisperEncoderCross(
++    void *encoder, int32_t layer, float *k, float *v, int32_t n) {
++  auto *e = static_cast<QnnWhisperEncoder *>(encoder);
++  try {
++    for (int kv = 0; kv < 2; ++kv) {
++      auto name = std::string(kv ? "cross_v_" : "cross_k_") + std::to_string(layer);
++      if (!e->model->HasTensor(name)) {
++        SHERPA_ONNX_LOGE("QNN Whisper encoder: no output '%s'", name.c_str());
++        return 0;
++      }
++      auto data = e->model->GetOutputTensorData(name);
++      if (static_cast<int32_t>(data.size()) != n) {
++        SHERPA_ONNX_LOGE("QNN Whisper encoder: '%s' has %d values, not %d", name.c_str(),
++                         static_cast<int32_t>(data.size()), n);
++        return 0;
++      }
++      std::memcpy(kv ? v : k, data.data(), sizeof(float) * n);
++    }
++    return 1;
++  } catch (const std::exception &ex) {
++    SHERPA_ONNX_LOGE("QNN Whisper encoder: %s", ex.what());
++    return 0;
++  }
++}
++
++__attribute__((visibility("default"))) void SherpaOnnxQnnWhisperEncoderDestroy(void *encoder) {
++  delete static_cast<QnnWhisperEncoder *>(encoder);
++}
++
++}  // extern "C"
++
++#endif  // SHERPA_ONNX_ENABLE_QNN
+diff --git a/sherpa-onnx/jni/sherpa-onnx-symbols.lds b/sherpa-onnx/jni/sherpa-onnx-symbols.lds
+index 4931fa0..fb9daf3 100644
+--- a/sherpa-onnx/jni/sherpa-onnx-symbols.lds
++++ b/sherpa-onnx/jni/sherpa-onnx-symbols.lds
+@@ -1,6 +1,7 @@
+ {
+   global:
+     Java_com_k2fsa_sherpa_onnx*;
++    SherpaOnnxQnnWhisperEncoder*;
+   local:
+     *;
+ };
 diff --git a/sherpa-onnx/jni/speaker-embedding-extractor.cc b/sherpa-onnx/jni/speaker-embedding-extractor.cc
 index 43709fc..78d33f8 100644
 --- a/sherpa-onnx/jni/speaker-embedding-extractor.cc

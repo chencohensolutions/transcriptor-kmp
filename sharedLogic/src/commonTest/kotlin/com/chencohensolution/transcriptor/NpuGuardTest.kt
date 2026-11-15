@@ -41,6 +41,20 @@ class NpuGuardTest {
     }
 
     @Test
+    fun theNpuEncoderModelNeedsItsPeakNotItsFiles() {
+        val m = ModelCatalog.ivritLargeV3NpuEncoder
+        // Only encoder.bin is a context binary (model.bin is whisper.cpp's), and its peak is given.
+        assertEquals(932_503_552L, m.npuBinaryBytes)
+        assertTrue(m.loadsOnNpu)
+        assertEquals(m.npuPeakBytes!! + NpuLoadGuard.HEADROOM, NpuLoadGuard.needs(m))
+        // The S25 with other apps open (about 4.4 GB free) loads it; with 3 GB free it waits for this time only.
+        assertTrue(NpuLoadGuard(installed) { 4_400_000_000 }.fitsNow(m))
+        assertFalse(NpuLoadGuard(installed) { 3_000_000_000 }.fitsNow(m))
+        // The 16-bit build, beside it in the catalog, stays refused there (about 8.7 GB).
+        assertFalse(NpuLoadGuard(installed) { 6_100_000_000 }.fitsNow(ModelCatalog.ivritLargeV3Npu))
+    }
+
+    @Test
     fun thePickFallsBackToTheNextReadyModelThatFitsNow() {
         val zipformer = ModelCatalog.ivritZipformerNpu
         val cpu = ModelCatalog.all.first { it.kind == com.chencohensolution.transcriptor.models.ModelKind.Whisper }

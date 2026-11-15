@@ -17,7 +17,7 @@ class ModelChoicesTest {
         val ids = ModelChoices.candidates(hebrew, ModelJob.Improve, ready()).map { it.id }
         assertEquals(
             listOf(
-                "ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3",
+                "ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3",
                 "ivrit-whisper-large-v3-turbo-npu-sm8750", "ivrit-whisper-large-v3-turbo", "whisper-large-v3-turbo",
             ),
             ids,
@@ -55,12 +55,12 @@ class ModelChoicesTest {
     @Test
     fun aModelToGetIsListedOnceOnALanguagesPage() {
         val toGet = ModelChoices.improveToGet(hebrew, ready()).map { it.id }
-        assertEquals(listOf("ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3"), toGet)
+        assertEquals(listOf("ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "ivrit-whisper-large-v3", "whisper-large-v3"), toGet)
     }
 
     @Test
     fun theLargestModelIsSuggestedOnlyWhenNothingCanImprove() {
-        assertEquals(ModelCatalog.ivritLargeV3Npu, ModelChoices.improveSuggestion(hebrew, ready()))
+        assertEquals(ModelCatalog.ivritLargeV3NpuEncoder, ModelChoices.improveSuggestion(hebrew, ready()))
         assertNull(ModelChoices.improveSuggestion(hebrew, ready(ModelCatalog.ivritTurbo)))
     }
 
