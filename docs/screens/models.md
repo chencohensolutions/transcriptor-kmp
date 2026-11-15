@@ -33,7 +33,12 @@ Settings.
   download), then **Find more on Hugging Face**. Picking marks the model and stays on the page; it applies from the
   next moment or speaker pass (`ModelsActions.useVoicePrints` / `useSegmentation`, `SettingsStore.voiceModel` /
   `segmentationModel`). Each model shows its parameters, "NPU" when its NPU build is on this phone, "Copied by hand",
-  "From Hugging Face", and a non-commercial license in amber.
+  "From Hugging Face", and a non-commercial license in amber. Its size shows when it is known (never "0 MB").
+- **Freeing a model** (a language's page and a speaker page, each row's ⋮; Manage models' card menu): **Remove** for
+  a model added from Hugging Face (its files and its entry go), **Delete download** for a built-in model on the phone
+  (its files go, it stays listed to download again); nothing for one copied by hand (`ModelChoices.removal`). Both ask
+  first, saying that a job it is chosen for goes back to its default (pyannote for turns, the first ready model live;
+  `SettingsStore.forgetModel`). While recording or improving the dialog only says to stop first (`ModelsState.busy`).
   - **Which models:** voice prints: the catalog's (CAM++, ERes2NetV2), those copied by hand (WeSpeaker ResNet293-LM,
     SimAM-ResNet100) once their folder is on the phone, and those added from Hugging Face. Turns: pyannote's,
     DiariZen's once copied by hand, and those added from Hugging Face (`ModelsState.voiceModels`, `turnModels`).
@@ -44,7 +49,7 @@ Settings.
   with "Speakers ✓" and "Turns ✓" on the ones in use. Picking and the slider are on Settings.
 - **Manage models**: chips for the languages in use and Speakers; **Add a language** finds any language Whisper knows
   by name. Each model is a card: its facts, badges (Live, Improve, NPU, Many languages, From Hugging Face, the NPU
-  check), its download at the end, and a menu (delete or remove from the list, model page). A language with no models of its own says the
+  check), its download at the end, and a menu (Delete download or Remove, asked first as above; model page). A language with no models of its own says the
   multilingual ones transcribe it. No storage bar (the owner's choice).
 - **Find on Hugging Face**: a search of Hugging Face's public API, filtered by language (the one the catalog shows,
   to start), by kind (Whisper, Streaming; Parakeet, SenseVoice, Moonshine, Paraformer are listed as not in the app

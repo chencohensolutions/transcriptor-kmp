@@ -1,5 +1,11 @@
 package com.chencohensolution.transcriptor.models
 
+/**
+ * How a model's menu frees it: [Remove] an added model (its files and its entry), [DeleteDownload] a built-in one's
+ * files (the catalog keeps it, to download again).
+ */
+enum class ModelRemoval { Remove, DeleteDownload }
+
 /** What a model is chosen for, per language: writing the lines during the lecture, or improving them after. */
 enum class ModelJob { Live, Improve }
 
@@ -51,4 +57,15 @@ object ModelChoices {
     /** Whole minutes improving [audioMillis] would take at [speed] (work per audio), at least one; null unknown. */
     fun estimateMinutes(speed: Double?, audioMillis: Long): Int? =
         speed?.let { ((audioMillis * it) / 60_000).toInt().coerceAtLeast(1) }
+
+    /**
+     * What [model]'s menu offers ([downloaded]: its files are on the phone): an added model can be removed, a
+     * downloaded built-in one its download deleted; a model copied by hand, or not downloaded, neither.
+     */
+    fun removal(model: SpeechModel, downloaded: Boolean): ModelRemoval? = when {
+        model.fromHub -> ModelRemoval.Remove
+        model.manual -> null
+        downloaded -> ModelRemoval.DeleteDownload
+        else -> null
+    }
 }

@@ -92,6 +92,7 @@ import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.models.ModelChoices
 import com.chencohensolution.transcriptor.models.ModelJob
 import com.chencohensolution.transcriptor.models.ModelKind
+import com.chencohensolution.transcriptor.models.ModelRemoval
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
 import com.chencohensolution.transcriptor.settings.AudioFormat
@@ -139,6 +140,8 @@ data class ModelsState(
     val segmentationModel: String? = null,
     /** The processor meters on the lecture screen while recording (Advanced). */
     val processorMeters: ProcessorMeterStyle = ProcessorMeterStyle.Off,
+    /** Recording or improving: models are in use, none is removed or deleted until it is done. */
+    val busy: Boolean = false,
 ) {
     fun status(model: SpeechModel) = statuses[model.id] ?: ModelStatus.Missing
     fun ready(model: SpeechModel) = status(model) == ModelStatus.Ready && npu[model.id] !is NpuCheck.Fails
@@ -179,6 +182,12 @@ data class ModelsState(
 
     /** The segmentation model in use, when it is here. */
     val turns get() = turnModels.firstOrNull { it.id == segmentationModel && ready(it) }
+
+    /** What the model's menu offers to free ([ModelChoices.removal]): remove an added model, delete a built-in one's download. */
+    fun removal(model: SpeechModel) = ModelChoices.removal(model, status(model) == ModelStatus.Ready)
+
+    /** Chosen for a job (live, improve, voice prints, speaker turns): removing it puts that job back on its default. */
+    fun chosen(model: SpeechModel) = model.id in live.values || model.id in refine.values || model.id == voiceModel || model.id == segmentationModel
 }
 
 /** The models for speaker labels (live) and the speaker pass (after), every one the speakers page may list. */
@@ -428,10 +437,11 @@ private fun speakerName(model: SpeechModel, state: ModelsState) = when {
 private const val NPU_CHIP = "SM8750"
 private val NPU_SPEAKER_FILES = setOf("t150.bin", "t300.bin", "t600.bin", "window.bin")
 
-/** A speaker model's facts: parameters, its NPU build here, copied by hand, from Hugging Face. */
+/** A speaker model's facts: parameters, its download's size (when known), copied by hand, from Hugging Face. */
 @Composable
 private fun speakerFacts(model: SpeechModel, state: ModelsState) = listOfNotNull(
     isolated(model.parameters).takeIf { model.parameters != "?" },
+    modelsSize(model.sizeBytes).takeIf { model.sizeBytes > 0 },
     stringResource(R.string.models_by_hand).takeIf { model.manual },
     stringResource(R.string.models_from_hub).takeIf { model.fromHub },
 )
@@ -505,7 +515,8 @@ private fun Choices(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = chosen == model, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
-                text(model, Modifier)
+                text(model, Modifier.weight(1f))
+                RemovalMenu(model, state, actions)
             }
         }
         all.filter { !state.ready(it) }.forEach { model ->
@@ -534,12 +545,60 @@ private fun Choices(
                     // A text button, so a long name keeps the row's width.
                     ModelStatus.Missing -> TextButton(onClick = { actions.download(model) }) {
                         Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
-                        Text(modelsSize(model.sizeBytes), Modifier.padding(start = 4.dp))
+                        if (model.sizeBytes > 0) Text(modelsSize(model.sizeBytes), Modifier.padding(start = 4.dp))
                     }
                 }
+                RemovalMenu(model, state, actions)
             }
         }
     }
+}
+
+/** A row's "⋮" with what can be freed: Remove (added from Hugging Face) or Delete download (built in); nothing otherwise. */
+@Composable
+private fun RemovalMenu(model: SpeechModel, state: ModelsState, actions: ModelsActions) {
+    val removal = state.removal(model) ?: return
+    var menu by remember { mutableStateOf(false) }
+    var confirming by remember { mutableStateOf(false) }
+    if (confirming) RemovalDialog(model, removal, state, actions) { confirming = false }
+    Box {
+        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text(removalLabel(removal)) }, onClick = { menu = false; confirming = true })
+        }
+    }
+}
+
+@Composable
+private fun removalLabel(removal: ModelRemoval) =
+    stringResource(if (removal == ModelRemoval.Remove) R.string.models_remove else R.string.models_delete_download)
+
+/**
+ * Asks before freeing a model: what goes (its files, and its entry for an added model), and that a job it is chosen for
+ * goes back to its default. While recording or improving it only says to stop first.
+ */
+@Composable
+private fun RemovalDialog(model: SpeechModel, removal: ModelRemoval, state: ModelsState, actions: ModelsActions, onDismiss: () -> Unit) {
+    val remove = removal == ModelRemoval.Remove
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(if (remove) R.string.models_remove_title else R.string.models_delete_title, isolated(model.name))) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.busy) Text(stringResource(R.string.models_removal_busy))
+                else {
+                    Text(stringResource(if (remove) R.string.models_remove_text else R.string.models_delete_text))
+                    if (state.chosen(model)) Text(stringResource(R.string.models_removal_chosen))
+                }
+            }
+        },
+        confirmButton = {
+            if (!state.busy) TextButton(onClick = { onDismiss(); if (remove) actions.remove(model) else actions.delete(model) }) {
+                Text(stringResource(if (remove) R.string.models_remove_confirm else R.string.model_delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
+    )
 }
 
 /** A model in a list to pick: its name ("· NPU" kept with it), streaming or many languages, its size once it is here. */
@@ -550,7 +609,7 @@ private fun ChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifie
         val facts = listOfNotNull(
             stringResource(R.string.settings_streaming).takeIf { model.kind == ModelKind.StreamingTransducer || model.kind == ModelKind.StreamingTransducerNpu },
             stringResource(R.string.models_multilingual).takeIf { SpeechModel.MULTILINGUAL in model.languages },
-            modelsSize(model.sizeBytes).takeIf { state.status(model) == ModelStatus.Ready },
+            modelsSize(model.sizeBytes).takeIf { state.status(model) == ModelStatus.Ready && model.sizeBytes > 0 },
         )
         if (facts.isNotEmpty()) Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -703,6 +762,8 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
     val status = state.status(model)
     val npu = state.npu[model.id]
     var menu by remember { mutableStateOf(false) }
+    var confirming by remember { mutableStateOf<ModelRemoval?>(null) }
+    confirming?.let { RemovalDialog(model, it, state, actions) { confirming = null } }
     val uri = LocalUriHandler.current
     val live = language != null && state.liveFor(language) == model
     val refine = language != null && state.refineFor(language) == model
@@ -743,8 +804,9 @@ private fun ModelCard(model: SpeechModel, language: String?, state: ModelsState,
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.models_more)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (status == ModelStatus.Ready && !model.fromHub && !model.manual) DropdownMenuItem(text = { Text(stringResource(R.string.model_delete)) }, onClick = { menu = false; actions.delete(model) })
-                    if (model.fromHub) DropdownMenuItem(text = { Text(stringResource(R.string.models_remove)) }, onClick = { menu = false; actions.remove(model) })
+                    state.removal(model)?.let { removal ->
+                        DropdownMenuItem(text = { Text(removalLabel(removal)) }, onClick = { menu = false; confirming = removal })
+                    }
                     DropdownMenuItem(text = { Text(stringResource(R.string.models_page)) }, onClick = { menu = false; uri.openUri(model.source) })
                 }
             }
@@ -1063,7 +1125,8 @@ private fun HubSheet(m: HubModel, state: ModelsState, onDismiss: () -> Unit, onI
 fun modelsSize(bytes: Long) = isolated(if (bytes >= 1e9) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6))
 
 /** A model's facts: parameters, license, download size. */
-private fun modelFacts(model: SpeechModel) = listOf(isolated(model.parameters), isolated(model.license), modelsSize(model.sizeBytes)).joinToString(" · ")
+private fun modelFacts(model: SpeechModel) =
+    listOfNotNull(isolated(model.parameters), isolated(model.license), modelsSize(model.sizeBytes).takeIf { model.sizeBytes > 0 }).joinToString(" · ")
 
 /** Runs on this phone's NPU. */
 private val SpeechModel.npu get() = kind.onNpu

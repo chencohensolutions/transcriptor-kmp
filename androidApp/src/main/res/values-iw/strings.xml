@@ -316,4 +316,12 @@
     <string name="meters_mhz">%1$d מתוך %2$d MHz</string>
     <string name="meters_npu_temperature">טמפרטורת ה־NPU</string>
     <string name="meters_celsius">%1$.1f°C</string>
+    <string name="models_delete_download">מחיקת ההורדה</string>
+    <string name="models_remove_title">להסיר את %1$s?</string>
+    <string name="models_remove_text">הקבצים שלו יימחקו מהטלפון והוא יוסר מהרשימה. אפשר להוסיף אותו שוב מ-Hugging Face.</string>
+    <string name="models_remove_confirm">הסרה</string>
+    <string name="models_delete_title">למחוק את ההורדה של %1$s?</string>
+    <string name="models_delete_text">הקבצים שלו יימחקו מהטלפון. הוא יישאר ברשימה ואפשר להוריד אותו שוב.</string>
+    <string name="models_removal_chosen">הוא נבחר כעת: במקומו תשמש ברירת המחדל.</string>
+    <string name="models_removal_busy">ייתכן שהוא בשימוש: קודם צריך לעצור את ההקלטה או את השיפור.</string>
 </resources>

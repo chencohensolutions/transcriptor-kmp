@@ -316,4 +316,12 @@
     <string name="meters_mhz">%1$d of %2$d MHz</string>
     <string name="meters_npu_temperature">NPU temperature</string>
     <string name="meters_celsius">%1$.1f °C</string>
+    <string name="models_delete_download">Delete download</string>
+    <string name="models_remove_title">Remove %1$s?</string>
+    <string name="models_remove_text">Its files are deleted from the phone and it leaves the list. You can add it again from Hugging Face.</string>
+    <string name="models_remove_confirm">Remove</string>
+    <string name="models_delete_title">Delete the download of %1$s?</string>
+    <string name="models_delete_text">Its files are deleted from the phone. It stays in the list, to download again.</string>
+    <string name="models_removal_chosen">It is chosen now: its default is used instead.</string>
+    <string name="models_removal_busy">It may be in use: stop recording or improving first.</string>
 </resources>
