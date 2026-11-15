@@ -260,6 +260,28 @@ object ModelCatalog {
         chips = listOf("SM8750"),
     )
 
+    // icefall's English streaming Zipformer2 (66M, LibriSpeech; the model ivritZipformer was fine-tuned from), as
+    // sherpa-onnx exports it (Apache-2.0): int8, chunk 16 (0.32 s), 128 frames of left context. Writes uppercase words
+    // without punctuation.
+    private const val ZIPFORMER_EN = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26/resolve/672fbf1b30579d6585301139bb363f42a0ad4a24"
+    val englishZipformer = SpeechModel(
+        id = "zipformer2-66m-streaming-en",
+        name = "Zipformer streaming (English)",
+        languages = listOf("en"),
+        parameters = "66M",
+        license = "Apache-2.0",
+        fitsLive = true,
+        source = "https://huggingface.co/Zengwei/icefall-asr-librispeech-streaming-zipformer-2023-05-17",
+        kind = ModelKind.StreamingTransducer,
+        files = listOf(
+            ModelFile("encoder.int8.onnx", "$ZIPFORMER_EN/encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx", "563fde436d16cf7607cf408cd6b30909819d03162652ef389c2450ced3f45ac1", 71_083_163),
+            ModelFile("decoder.int8.onnx", "$ZIPFORMER_EN/decoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx", "98da299f471e38bb4e1a8df579b8cc9122d6039576a77e357b3c60f17dd83b02", 1_307_236),
+            ModelFile("joiner.int8.onnx", "$ZIPFORMER_EN/joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx", "d944208d660d67c8d72cd2acaeac971fa5ceb8c80e76c1968148846fedd6e297", 259_335),
+            ModelFile("tokens.txt", "$ZIPFORMER_EN/tokens.txt", "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb", 5_048),
+        ),
+        credit = "icefall streaming Zipformer by Zengwei Yao, k2-fsa (Apache-2.0), trained on LibriSpeech (CC-BY-4.0)",
+    )
+
     /** Voice prints for speaker labels, in every language. Not in [all]: it doesn't transcribe. */
     val voicePrints = SpeechModel(
         id = "3dspeaker-campplus-zh-en-advanced",
@@ -400,7 +422,7 @@ object ModelCatalog {
     /** The segmentation models for speaker turns, the default (pyannote) first. */
     val segmentationModels get() = listOf(speakerSegmentation, diarizenBaseS80, diarizenLargeS80, diarizenMeetingBase)
 
-    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
+    val all = listOf(ivritTurboNpu, ivritTurbo, ivritZipformerNpu, ivritZipformer, englishZipformer, ivritLargeV3Npu, ivritLargeV3Q8, ivritLargeV3, whisperTurbo, whisperLargeV3)
 
     /** A model's name by its id (a line's or a version's model), or the id when the catalog no longer has it. */
     fun nameOf(id: String): String = (all + voicePrintModels + segmentationModels).firstOrNull { it.id == id }?.name ?: id
