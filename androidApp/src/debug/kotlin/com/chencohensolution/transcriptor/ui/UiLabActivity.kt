@@ -7,7 +7,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -46,9 +58,27 @@ class UiLabActivity : ComponentActivity() {
                 val screen = labScreens.firstOrNull { it.id == screenId }
                 val option = screen?.options?.firstOrNull { it.id == optionId }
                 when {
-                    option != null -> {
-                        BackHandler { optionId = null }
-                        option.content()
+                    option != null && screen != null -> {
+                        val leave = { optionId = null }
+                        BackHandler(onBack = leave)
+                        val at = screen.options.indexOf(option)
+                        // The lab's own bar above the option: back to the options, and the one before and after, so
+                        // options are compared without going through the list. The option's screen is drawn under
+                        // it, and its own back arrow leaves the option too (LocalLabBack).
+                        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.inverseSurface)) {
+                            LabBar(
+                                title = "${option.id} · ${at + 1}/${screen.options.size}",
+                                onList = leave,
+                                onPrevious = screen.options.getOrNull(at - 1)?.let { { optionId = it.id } },
+                                onNext = screen.options.getOrNull(at + 1)?.let { { optionId = it.id } },
+                            )
+                            Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) {
+                                CompositionLocalProvider(LocalLabBack provides leave) {
+                                    // A new option starts fresh: nothing remembered from the one before.
+                                    key(option.id) { option.content() }
+                                }
+                            }
+                        }
                     }
                     screen != null -> {
                         BackHandler { screenId = null }
@@ -56,6 +86,7 @@ class UiLabActivity : ComponentActivity() {
                             title = screen.title,
                             rows = screen.options.map { LabRow("${it.id} · ${it.title}", it.note) },
                             onOpen = { optionId = screen.options[it].id },
+                            onBack = { screenId = null },
                         )
                     }
                     else -> LabList(
@@ -69,6 +100,33 @@ class UiLabActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+/** Leaves the option that is open, back to its screen's options: what a lab option gives its screen's back arrow. */
+internal val LocalLabBack = staticCompositionLocalOf<() -> Unit> { {} }
+
+/**
+ * The bar over an open option, in the inverse colors so it never reads as part of the screen under it: the options
+ * list, the option's id with its place among the screen's options, and the option before and after.
+ */
+@Composable
+private fun LabBar(title: String, onList: () -> Unit, onPrevious: (() -> Unit)?, onNext: (() -> Unit)?) {
+    val on = MaterialTheme.colorScheme.inverseOnSurface
+    Row(Modifier.fillMaxWidth().statusBarsPadding().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            "‹ Options", color = on, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onList).padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+        Text(title, color = on, fontSize = 13.sp, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+        Text(
+            "‹ Prev", color = on.copy(alpha = if (onPrevious != null) 1f else 0.35f), fontSize = 14.sp,
+            modifier = Modifier.clickable(enabled = onPrevious != null) { onPrevious?.invoke() }.padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+        Text(
+            "Next ›", color = on.copy(alpha = if (onNext != null) 1f else 0.35f), fontSize = 14.sp,
+            modifier = Modifier.clickable(enabled = onNext != null) { onNext?.invoke() }.padding(horizontal = 12.dp, vertical = 10.dp),
+        )
     }
 }
 
@@ -87,8 +145,14 @@ private fun optionCount(options: List<LabOption>): String {
 }
 
 @Composable
-private fun LabList(title: String, rows: List<LabRow>, onOpen: (Int) -> Unit) {
+private fun LabList(title: String, rows: List<LabRow>, onOpen: (Int) -> Unit, onBack: (() -> Unit)? = null) {
     LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
+        if (onBack != null) item {
+            Text(
+                "‹ Screens", color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable(onClick = onBack).padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
         item {
             Text(
                 title,

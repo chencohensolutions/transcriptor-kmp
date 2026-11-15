@@ -17,6 +17,9 @@ lab its only launcher entry). It installs beside Transcriptor and never touches 
 
 - The list is [LabScreens.kt](../androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/LabScreens.kt);
   the lab is [UiLabActivity.kt](../androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/UiLabActivity.kt).
+- An open option has the lab's bar above it: **‹ Options** (back to the screen's options; the phone's Back and the
+  screen's own back arrow do the same, through `LocalLabBack`), the option's id with its place ("b2 · 5/12"), and
+  **‹ Prev** / **Next ›** to step through the screen's options without the list. The options list has **‹ Screens**.
 - Suggestions are options, each in its own folder under `lab/<screen>/<option>/`; how they are built, recorded in
   [ux-history/](ux-history/README.md) and promoted into the app is the [ui-lab skill](../.claude/skills/ui-lab/SKILL.md).
 - The made-up data is [LabData.kt](../sharedLogic/src/commonMain/kotlin/com/chencohensolution/transcriptor/lab/LabData.kt)
