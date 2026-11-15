@@ -50,4 +50,5 @@
     <string name="models_b_summary_flac_live">FLAC while recording · effort %1$d of %2$d</string>
     <string name="models_b_summary_flac_after">WAV, then FLAC after the moment · effort %1$d of %2$d</string>
     <string name="models_b_summary_wav">WAV, uncompressed</string>
+    <string name="models_b_bitrate_he_high">HE gains nothing over LC above about 64 kbps: at this bitrate LC sounds as good and costs less to encode.</string>
 </resources>

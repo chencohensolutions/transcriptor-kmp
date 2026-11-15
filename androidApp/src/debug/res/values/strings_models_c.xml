@@ -44,4 +44,5 @@
     <string name="models_c_wav_short">WAV · about 690 MB an hour</string>
     <string name="models_c_custom">Custom AAC</string>
     <string name="models_c_custom_short">Choose the profile, sample rate, channels and bitrate</string>
+    <string name="models_c_bitrate_he_high">HE gains nothing over LC above about 64 kbps: at this bitrate LC sounds as good and costs less to encode.</string>
 </resources>

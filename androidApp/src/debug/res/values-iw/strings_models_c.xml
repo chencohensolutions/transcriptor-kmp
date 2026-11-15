@@ -44,4 +44,5 @@
     <string name="models_c_wav_short">WAV · בערך \u2066690 MB\u2069 לשעה</string>
     <string name="models_c_custom">AAC מותאם</string>
     <string name="models_c_custom_short">בחירת פרופיל, קצב דגימה, ערוצים וקצב סיביות</string>
+    <string name="models_c_bitrate_he_high">מעל בערך \u206664 kbps\u2069 ל־HE אין יתרון על LC: בקצב הזה LC נשמע טוב באותה מידה וזול יותר לקידוד.</string>
 </resources>

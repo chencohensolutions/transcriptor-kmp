@@ -31,4 +31,5 @@
     <string name="models_a_encoder_no_profile">לא תומך בפרופיל הזה</string>
     <string name="models_a_encoder_none_hardware">לטלפון הזה אין מקודד AAC בחומרה: רץ המקודד של Android בתוכנה, חלק קטן מליבת מעבד אחת.</string>
     <string name="models_a_size">בערך \u2066%1$d MB\u2069 לשעה</string>
+    <string name="models_a_bitrate_he_high">מעל בערך \u206664 kbps\u2069 ל־HE אין יתרון על LC: בקצב הזה LC נשמע טוב באותה מידה וזול יותר לקידוד.</string>
 </resources>

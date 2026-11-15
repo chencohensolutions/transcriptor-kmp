@@ -1,6 +1,10 @@
 package com.chencohensolution.transcriptor.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -146,7 +150,7 @@ private fun PresetCardC(selected: Boolean, title: String, note: String, onClick:
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun AacSettingsC(state: ModelsOptionCState, actions: ModelsOptionCActions) {
     val aac = state.aac
@@ -191,28 +195,24 @@ private fun AacSettingsC(state: ModelsOptionCState, actions: ModelsOptionCAction
         }
         NoteC(stringResource(R.string.models_c_channels_note))
 
-        val bitrates = aac.bitrates
-        Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.models_c_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.models_c_kbps, aac.bitrateKbps), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.models_c_size, aac.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Slider(
-            value = bitrates.indexOf(aac.bitrateKbps).coerceAtLeast(0).toFloat(),
-            onValueChange = { v -> bitrates[v.roundToInt()].let { if (it != aac.bitrateKbps) actions.setAac(aac.copy(bitrateKbps = it)) } },
-            valueRange = 0f..(bitrates.size - 1).toFloat(), steps = (bitrates.size - 2).coerceAtLeast(0),
-        )
-        Row {
-            Text(stringResource(R.string.models_c_bitrate_small), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.models_c_bitrate_clear), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            aac.bitrates.forEach { kbps ->
+                FilterChip(
+                    selected = aac.bitrateKbps == kbps, onClick = { actions.setAac(aac.copy(bitrateKbps = kbps)) },
+                    label = { Text(stringResource(R.string.models_c_kbps, kbps)) },
+                )
+            }
         }
+        if (aac.profile != AacProfile.Lc && aac.bitrateKbps > 64) NoteC(stringResource(R.string.models_c_bitrate_he_high))
 
         LabelC(stringResource(R.string.models_c_encoder))
         EncoderPickerC(state, actions)
 
-        Text(
-            stringResource(R.string.models_c_size, aac.megabytesPerHour),
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
-        )
+        Spacer(Modifier.height(24.dp))
     }
 }
 

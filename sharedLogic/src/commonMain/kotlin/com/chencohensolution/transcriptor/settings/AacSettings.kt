@@ -36,7 +36,7 @@ data class AacSettings(
     /** The channel counts for [profile]: HE-AAC v2 is stereo only. */
     val channelCounts get() = if (profile == AacProfile.HeV2) listOf(2) else listOf(1, 2)
 
-    /** The bitrates (kbps) offered for this profile and channel count. */
+    /** The bitrates (kbps) offered: all of [BITRATES]. */
     val bitrates get() = bitrates(profile, channels)
 
     /** This, with each choice moved to the nearest one its profile allows. */
@@ -53,10 +53,13 @@ data class AacSettings(
     companion object {
         fun rates(profile: AacProfile) = if (profile == AacProfile.Lc) listOf(16_000, 24_000, 48_000) else listOf(24_000, 48_000)
 
-        fun bitrates(profile: AacProfile, channels: Int): List<Int> = when (profile) {
-            AacProfile.Lc -> if (channels == 1) listOf(32, 48, 64, 96, 128) else listOf(64, 96, 128, 160, 192)
-            AacProfile.He -> if (channels == 1) listOf(24, 32, 48, 64) else listOf(32, 48, 64, 96)
-            AacProfile.HeV2 -> listOf(16, 24, 32, 48)
-        }
+        /**
+         * Every bitrate offered, whatever the profile: the encoder takes each (checked on Android's), though HE
+         * gains nothing over LC above about 64 kbps.
+         */
+        val BITRATES = listOf(16, 24, 32, 48, 64, 96, 128, 160, 192, 256, 320)
+
+        @Suppress("UNUSED_PARAMETER")
+        fun bitrates(profile: AacProfile, channels: Int): List<Int> = BITRATES
     }
 }

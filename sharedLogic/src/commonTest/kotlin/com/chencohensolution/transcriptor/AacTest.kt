@@ -21,10 +21,11 @@ class AacTest {
         val v2 = AacSettings(profile = AacProfile.HeV2, sampleRate = 16_000, channels = 1, bitrateKbps = 128).valid()
         assertEquals(24_000, v2.sampleRate)
         assertEquals(2, v2.channels)
-        assertEquals(48, v2.bitrateKbps)
+        assertEquals(128, v2.bitrateKbps)
         val lc = AacSettings(profile = AacProfile.Lc, sampleRate = 44_100, channels = 1, bitrateKbps = 70).valid()
         assertEquals(48_000, lc.sampleRate)
         assertEquals(64, lc.bitrateKbps)
+        assertEquals(320, AacSettings(bitrateKbps = 999).valid().bitrateKbps)
         assertEquals(AacSettings(), AacSettings().valid())
     }
 
