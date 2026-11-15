@@ -73,7 +73,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
         }
     }
     val notes = state.lecture.notes.size
-    val stop = rememberArmedStop(actions.stop)
+    val stop = rememberArmedStop(state.stopTwice, actions.stop)
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.lecture_back)) }

@@ -550,7 +550,7 @@
     <string name="info_whole_phone">החשמל והסוללה הם של כל הטלפון (גם המסך ואפליקציות אחרות); המעבד הוא של האפליקציה בלבד, המספר היציב יותר להשוואה בין פורמטים.</string>
     <string name="info_recorded_as">הוקלט כ־</string>
     <string name="tile_stop_again">הקשה נוספת לעצירה</string>
-    <string name="settings_tile_stop_twice">שתי הקשות לעצירה מההגדרות המהירות</string>
-    <string name="settings_tile_stop_twice_on">פעיל: אריח ההקלטה מבקש הקשה נוספת לפני שהוא עוצר רגע.</string>
-    <string name="settings_tile_stop_twice_off">כבוי: הקשה אחת על אריח ההקלטה עוצרת את הרגע.</string>
+    <string name="settings_stop_twice">שתי הקשות לעצירה</string>
+    <string name="settings_stop_twice_on">פעיל: סיום מבקש הקשה נוספת לפני שהוא מסיים רגע, באפליקציה ובאריח ההקלטה בהגדרות המהירות.</string>
+    <string name="settings_stop_twice_off">כבוי: הקשה אחת על סיום מסיימת את הרגע, באפליקציה ובאריח ההקלטה.</string>
 </resources>

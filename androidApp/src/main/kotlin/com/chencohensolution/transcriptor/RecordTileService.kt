@@ -59,7 +59,7 @@ class RecordTileService : TileService() {
                 else -> record()
             }
             state.finishing -> Unit
-            !Recording.settings.tileStopTwice || armed?.isActive == true -> { armed?.cancel(); armed = null; RecordingService.stop(this) }
+            !Recording.settings.stopTwice || armed?.isActive == true -> { armed?.cancel(); armed = null; RecordingService.stop(this) }
             else -> {
                 armed = scope?.launch { delay(ARM_MILLIS); armed = null; show(Recording.session.state.value) }
                 show(state)

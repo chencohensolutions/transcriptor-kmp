@@ -143,6 +143,7 @@ class MainActivity : ComponentActivity() {
                         BackHandler { showLive = false }
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
                         val meterStyle = remember { Recording.settings.processorMeters }
+                        val stopTwice = remember { Recording.settings.stopTwice }
                         val meters = rememberProcessorMeters(meterStyle)
                         val levelMeter = remember { Recording.settings.levelMeter }
                         // The frequency bands cost a small FFT: worked out only while this screen shows them.
@@ -151,7 +152,7 @@ class MainActivity : ComponentActivity() {
                             onDispose { Recording.session.meterBands = false }
                         }
                         LectureScreen(
-                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history, levelMeter = levelMeter),
+                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history, stopTwice = stopTwice, levelMeter = levelMeter),
                             LiveLectureActions(
                                 back = { showLive = false },
                                 pauseOrResume = Recording.session::pauseOrResume,

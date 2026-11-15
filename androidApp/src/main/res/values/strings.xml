@@ -544,7 +544,7 @@
     <string name="info_whole_phone">Power and battery are the whole phone (the screen and other apps too); the app CPU is this app only, the steadier figure for comparing formats.</string>
     <string name="info_recorded_as">Recorded as</string>
     <string name="tile_stop_again">Tap again to stop</string>
-    <string name="settings_tile_stop_twice">Two taps to stop from Quick Settings</string>
-    <string name="settings_tile_stop_twice_on">On: the Record tile asks for a second tap before it stops a moment.</string>
-    <string name="settings_tile_stop_twice_off">Off: one tap on the Record tile stops the moment.</string>
+    <string name="settings_stop_twice">Two taps to stop</string>
+    <string name="settings_stop_twice_on">On: Stop asks for a second tap before it ends a moment, in the app and on the Record tile in Quick Settings.</string>
+    <string name="settings_stop_twice_off">Off: one tap on Stop ends the moment, in the app and on the Record tile.</string>
 </resources>
