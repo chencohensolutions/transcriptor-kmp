@@ -25,6 +25,13 @@ class DefaultModelsTest {
     }
 
     @Test
+    fun englishLiveIsTheZipformerOnTheNpuWhereItRunsAndOnTheCpuElsewhere() {
+        assertEquals(ModelCatalog.englishZipformerNpu.id, DefaultModels.forLanguage("en", "SM8750").live?.id)
+        assertEquals(ModelCatalog.englishZipformer.id, DefaultModels.forLanguage("en", "SM8650").live?.id)
+        assertEquals(ModelCatalog.englishZipformer.id, DefaultModels.forLanguage("en", null).live?.id)
+    }
+
+    @Test
     fun everyDefaultIsInTheCatalogRunsOnThePhoneAndFitsItsJob() {
         for (chip in chips) for (language in languages) {
             val d = DefaultModels.forLanguage(language, chip)
