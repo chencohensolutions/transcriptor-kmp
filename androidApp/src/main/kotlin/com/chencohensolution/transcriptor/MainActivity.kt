@@ -94,6 +94,8 @@ class MainActivity : ComponentActivity() {
                 val last by Recording.lastLecture.collectAsStateWithLifecycle()
                 val working by Recording.working.collectAsStateWithLifecycle(emptyMap())
                 var openAfterStop by remember { mutableStateOf(false) }
+                // The moment just recorded asks "Who was here?" once when it opens (by its id).
+                var askPeopleOf by remember { mutableStateOf<String?>(null) }
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
@@ -102,6 +104,7 @@ class MainActivity : ComponentActivity() {
                     val lecture = last
                     if (openAfterStop && live == null && lecture != null) {
                         openAfterStop = false
+                        askPeopleOf = lecture.id
                         openLecture(lecture.id)
                     }
                 }
@@ -142,6 +145,7 @@ class MainActivity : ComponentActivity() {
                                 pauseOrResume = Recording.session::pauseOrResume,
                                 stop = { openAfterStop = true; RecordingService.stop(this) },
                                 addNote = Recording.session::addNote,
+                                mark = Recording.session::mark,
                                 renameSpeaker = Recording.session::renameSpeaker,
                                 editLine = Recording.session::editLine,
                             ),
@@ -150,12 +154,44 @@ class MainActivity : ComponentActivity() {
                     review != null -> {
                         BackHandler { Recording.review.close() }
                         val r = Recording.review
+                        val library by Recording.library.library.collectAsStateWithLifecycle()
+                        // The open moment isn't touched by the list's own label changes (it saves itself): its
+                        // labels are set through its screen's controller, then the list is read again.
+                        val setLabels = { ids: List<String> ->
+                            r.setLabels(ids, labelNames(ids, Recording.library.library.value.labels))
+                            lifecycleScope.launch(Dispatchers.IO) { Recording.library.reload() }
+                            Unit
+                        }
                         ReviewScreen(
                             review,
-                            ReviewActions(
+                            askPeople = askPeopleOf == review.lecture.id,
+                            allLabels = library.labels,
+                            actions = ReviewActions(
                                 back = r::close, playPause = r::playPause, seek = r::seek, playLine = r::playLine,
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
+                                namePerson = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.namePerson(id, name) } },
+                                mergeSpeakers = { from, into -> lifecycleScope.launch(Dispatchers.IO) { r.mergeSpeakers(from, into) } },
+                                playPerson = r::playPerson,
+                                playOnly = r::playOnly,
+                                shareText = {
+                                    r.text()?.let { text ->
+                                        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).putExtra(Intent.EXTRA_SUBJECT, review.lecture.title), null))
+                                    }
+                                },
+                                rename = { title -> r.rename(title); lifecycleScope.launch(Dispatchers.IO) { Recording.library.reload() } },
+                                setLabels = setLabels,
+                                newLabel = { name -> runBlocking(Dispatchers.IO) { Recording.library.newLabel(name).id } },
+                                renameLabel = { id, name ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        Recording.library.renameLabel(id, name)
+                                        withContext(Dispatchers.Main) { r.lecture?.let { setLabels(it.labels) } }
+                                    }
+                                },
+                                deleteLabel = { id ->
+                                    setLabels(review.lecture.labels - id)
+                                    lifecycleScope.launch(Dispatchers.IO) { Recording.deleteLabel(id) }
+                                },
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
                                 tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
                                 improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
@@ -186,7 +222,7 @@ class MainActivity : ComponentActivity() {
                     else -> Notebooks(
                         recordingNow = state?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
                         working = working,
-                        onRecord = { labels, language -> startLecture(labels, language); showLive = true },
+                        onRecord = { labels, language, liveNow -> startLecture(labels, language, liveNow); showLive = true },
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
@@ -200,7 +236,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
-        onRecord: (labels: List<String>, language: String) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
+        onRecord: (labels: List<String>, language: String, live: Boolean) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
         chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -219,18 +255,23 @@ class MainActivity : ComponentActivity() {
                 value = System.currentTimeMillis()
             }
         }
-        var recordIn by remember { mutableStateOf<Pair<List<String>, String>?>(null) }
+        var recordIn by remember { mutableStateOf<Triple<List<String>, String, Boolean>?>(null) }
         val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-            val (labels, language) = recordIn ?: return@rememberLauncherForActivityResult
-            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language)
+            val (labels, language, liveNow) = recordIn ?: return@rememberLauncherForActivityResult
+            if (granted[Manifest.permission.RECORD_AUDIO] == true) onRecord(labels, language, liveNow)
         }
+        // The Record bar's Live or After, as last picked (After until then).
+        val recordLive = remember { Recording.settings.recordLive }
         val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordLive = recordLive),
             NotebooksActions(
                 openLecture = ::openLecture,
-                record = { labels, language ->
-                    recordIn = labels to language
+                setRecordLive = { liveNow -> io { Recording.settings.recordLive = liveNow } },
+                openLectureAt = { id, at -> openLecture(id, at) },
+                search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
+                record = { labels, language, liveNow ->
+                    recordIn = Triple(labels, language, liveNow)
                     permissions.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS))
                 },
                 backToRecording = onBackToRecording,
@@ -265,16 +306,16 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Opens a recorded moment, under its labels' names. */
-    private fun openLecture(lectureId: String) {
+    private fun openLecture(lectureId: String, atMillis: Long? = null) {
         val library = Recording.library.library.value
         val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-        Recording.review.open(lectureId, labelNames(labels, library.labels))
+        Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
-    private fun startLecture(labels: List<String>, language: String) {
+    private fun startLecture(labels: List<String>, language: String, live: Boolean) {
         val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
-        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title)
+        RecordingService.start(this, labels, labelNames(labels, Recording.library.library.value.labels), language, title, live)
     }
 }
 

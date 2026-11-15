@@ -16,6 +16,45 @@ sentence being played highlighted; edited lines marked ✎. Notes are pills afte
 At the bottom: the overview of the whole moment (a lane per speaker with their turns, the notes as dots, the
 playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2×) and a note-here button.
 
+A moment that was only recorded (`Lecture.pendingTranscript`, no lines) shows a card instead of the document: **Not
+transcribed yet**, that it is transcribed when the phone charges, and **Transcribe now** with the language's improve
+model and about how long it takes (`ReviewActions.improve`); with no model, the one to get. While the pass runs the
+bar says "Transcribing · n%". Its notes are listed under the card, and the recording plays.
+
+## Who was here?
+
+The people button in the top bar opens a sheet with every voice of the moment, the one who talked most first
+(`ReviewState.people`, `peopleOf`). It also opens by itself once, when a moment just recorded opens after Stop with two
+or more voices and one still unnamed (`askPeople`).
+
+- **Play**: the voice's longest line, to hear who it is; again pauses it (`LectureReview.playPerson`).
+- **Name**: a field per voice; while it is empty and focused, the voices the app knows are offered as chips
+  (`ReviewState.knownNames`, those not in this moment first). Kept on Done on the keyboard, on leaving the field and
+  when the sheet closes (`namePerson`), in the moment and in the app's voices with a print, as naming from a chip does.
+- **Merge**: the merge button lists the other voices under "The same person as": the voice's lines become the other's
+  and it is gone (`mergeSpeakers`, `Lecture.mergingSpeakers`); a named voice's print is made again from all its lines.
+  Typing a name someone here already has merges the two as well. A voice with at most 3 lines and under 5% of the
+  talking (`Person.minor`) says it is often a piece of someone else, with Merge beside it.
+- Its share of the talking and its number of lines are under each name.
+
+## As a conversation (Nov 15, 2026)
+
+- **Short turns are compact**: a turn of up to 140 characters is one piece, the speaker's name in their color, its
+  time, then the words (`COMPACT_TURN_CHARS`); tapping the name names the speaker. A longer turn keeps the chip and
+  time above its paragraph, as a lecture reads.
+- **Where the transcript stands**: under the top bar, "Live draft. The better model hasn't written it yet." with
+  **Improve · about n min**, which opens the improve sheet. Shown while the moment has lines, a model to improve with,
+  and hasn't been improved.
+- **One person's turns**: with two or more speakers, a chip per person above the player. Tapping one plays only their
+  turns, skipping the others' and pausing after their last (`LectureReview.playOnly`, `Lecture.onlyOf`,
+  `ReviewState.onlySpeaker`); the others' turns and lanes fade. Tapping it again plays everyone.
+- **Share** opens a menu: **Share as text** (the moment as "Name: what they said", notes in brackets;
+  `transcriptText`, `LectureReview.text`) or **Share as Word**. Holding it still saves the Word file.
+
+- **The title renames the moment** (tap it; `LectureReview.rename`), and the line under it, its labels or "Add
+  labels", opens the labels sheet of the first screen for this moment (`LectureReview.setLabels`): check, make, rename
+  and delete labels without going back to the list.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.
@@ -57,7 +96,7 @@ playhead), the position and length, play/pause, the speed (1×, 1.25×, 1.5×, 2
   `renameSpeaker`, `addNote`, `editNote`, `deleteNote`, `speakerPass`), `review/AudioPlayer.kt`.
 - Android: `review/AndroidAudioPlayer.kt` (MediaPlayer; sharedLogic's androidMain); `Recording.printOf` (a speaker's
   voice print, with `RecordingAudio.range`); `MainActivity.kt` (opening it; the speaker pass's state).
-- Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/review/ReviewCurrentLab.kt`, the screen
+- Lab: `review current-people` (an English conversation of four, the sheet open), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/review/ReviewCurrentLab.kt`, the screen
   with faked playback and passes (`./scripts/ui-lab.sh review current`).
 
 ## Design history

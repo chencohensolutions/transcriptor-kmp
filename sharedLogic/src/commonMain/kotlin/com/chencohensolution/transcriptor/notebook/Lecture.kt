@@ -21,6 +21,14 @@ data class LectureSummary(
     val refined: Boolean,
     val language: String = "en",
     val labels: List<String> = emptyList(),
+    /** Recorded without live transcription and not transcribed yet ([Lecture.pendingTranscript]). */
+    val pendingTranscript: Boolean = false,
+    /** The names of its speakers who have one, the one who talked most first: who was in it. */
+    val people: List<String> = emptyList(),
+    /** How many of its speakers have no name yet. */
+    val unnamedPeople: Int = 0,
+    /** Its first sentence of some length, to tell it from the moments around it; empty before it is transcribed. */
+    val preview: String = "",
 )
 
 /**
@@ -51,6 +59,12 @@ data class Lecture(
     val versions: List<VersionInfo> = emptyList(),
     /** Its labels' ids ([Label]), in the order they were given. */
     val labels: List<String> = emptyList(),
+    /**
+     * Recorded without live transcription ("After" on the Record bar, or no live model for its language) and not
+     * transcribed yet: it has its audio and notes, no lines. The transcribe pass
+     * ([com.chencohensolution.transcriptor.speech.lineTimes], then the improve model) clears it.
+     */
+    val pendingTranscript: Boolean = false,
 )
 
 /**
@@ -119,7 +133,10 @@ data class Note(
     val id: String,
     val atMillis: Long,
     val text: String,
-)
+) {
+    /** A mark: a place flagged with one tap while recording, with no words (yet; editing it gives it some). */
+    val isMark: Boolean get() = text.isEmpty()
+}
 
 /** A voice the refine pass told apart ("Speaker 1"), renamed by the user ("Lecturer"). */
 data class Speaker(

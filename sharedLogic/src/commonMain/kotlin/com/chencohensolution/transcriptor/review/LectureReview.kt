@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * A recorded lecture, opened: playing it ([AudioPlayer]), correcting its lines and their speakers, naming the speakers
@@ -43,6 +44,14 @@ class LectureReview(
         /** The live stretches kept with the lecture (model id, stretches), read once. */
         var live: com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? = null
         var liveRead = false
+        /** The names of the voices the app knows, read once. */
+        var known: List<String>? = null
+    }
+
+    private fun Open.knownNames(): List<String> {
+        val all = known ?: runCatching { voices?.all().orEmpty().map { it.name }.distinct().sorted() }.getOrDefault(emptyList()).also { known = it }
+        val here = lecture.speakers.map { it.name }.toSet()
+        return all.filter { it !in here } + all.filter { it in here }
     }
 
     private fun Open.liveSpeakers(): com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? {
@@ -89,30 +98,81 @@ class LectureReview(
 
     val passes = MutableStateFlow(Passes())
 
+    /** The speaker playback keeps to ([playOnly]); null: everyone. */
+    private val only = MutableStateFlow<String?>(null)
+
     val state: StateFlow<ReviewState?> =
-        combine(open, player.positionMillis, player.playing, passes) { o, position, playing, p ->
+        combine(open, player.positionMillis, player.playing, passes, only) { o, position, playing, p, onlySpeaker ->
             o?.let {
                 ReviewState(
                     labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                     improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
+                    knownNames = it.knownNames(), onlySpeaker = onlySpeaker,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val lecture get() = open.value?.lecture
 
-    /** Opens a lecture; false when it isn't there. */
-    fun open(lectureId: String, labelNames: String): Boolean {
+    init {
+        // Playing only one speaker: when playback leaves their line it jumps to their next, and pauses after their last.
+        scope.launch {
+            player.positionMillis.collect { position ->
+                val speaker = only.value ?: return@collect
+                val l = open.value?.lecture ?: return@collect
+                if (!player.playing.value) return@collect
+                when (val to = l.onlyOf(speaker, position)) {
+                    position -> {}
+                    null -> player.pause()
+                    else -> player.seekTo(to)
+                }
+            }
+        }
+    }
+
+    /**
+     * Keeps playback to one speaker's turns ([speakerId]; null or the same one again: everyone). It starts playing
+     * from their line at or after the playhead, else from their first.
+     */
+    fun playOnly(speakerId: String?) {
+        val l = lecture ?: return
+        val next = speakerId?.takeIf { it != only.value }
+        only.value = next
+        if (next == null) return
+        val to = l.onlyOf(next, player.positionMillis.value) ?: l.onlyOf(next, 0) ?: return
+        player.seekTo(to)
+        player.play()
+    }
+
+    /** The open moment as plain text ([transcriptText]), to share. */
+    fun text(): String? = lecture?.let { com.chencohensolution.transcriptor.notebook.transcriptText(it) }
+
+    /** Opens a lecture, at [atMillis] when given (a search's line); false when it isn't there. */
+    fun open(lectureId: String, labelNames: String, atMillis: Long? = null): Boolean {
         close()
         val lecture = store.load(lectureId) ?: return false
         store.repairAudio(lecture)
         player.load(store.audioPath(lecture))
         open.value = Open(labelNames, lecture, 1f)
+        if (atMillis != null) player.seekTo(atMillis.coerceIn(0, lecture.durationMillis))
         return true
     }
 
+    /** The moment's title, in the user's words; a blank one changes nothing. */
+    fun rename(title: String) {
+        val clean = title.trim()
+        if (clean.isNotEmpty()) change { it.copy(title = clean) }
+    }
+
+    /** The moment's labels (their ids, and [labelNames] for the screen), set from its own screen. */
+    fun setLabels(labels: List<String>, labelNames: String) {
+        change { it.copy(labels = labels) }
+        open.update { o -> o?.let { Open(labelNames, it.lecture, it.speed) } }
+    }
+
     fun close() {
+        only.value = null
         if (open.value == null) return
         player.pause()
         player.release()
@@ -202,6 +262,43 @@ class LectureReview(
         if (voices == null) return
         if (old.isNotEmpty() && old != clean) voices.rename(old, clean)
         printOf(after, id)?.let { voices.save(Voice(clean, it)) }
+    }
+
+    /**
+     * "Who was here?": [name] for a speaker. A name another speaker of this moment already has means the two are one
+     * person, so they are merged ([mergeSpeakers]) instead of there being two of that name. Reads the recording for the
+     * voice print: not on the main thread.
+     */
+    fun namePerson(id: String, name: String) {
+        val clean = name.trim()
+        val l = lecture ?: return
+        if (clean.isEmpty()) return
+        val same = l.speakers.firstOrNull { it.id != id && it.name.isNotEmpty() && it.name.equals(clean, ignoreCase = true) }
+        if (same != null) mergeSpeakers(id, same.id) else renameSpeaker(id, clean)
+    }
+
+    /**
+     * Two speakers were one person: [from]'s lines become [into]'s and [from] is gone. A named [into]'s voice print
+     * is made again from all its lines now, for the next moments. Reads the recording: not on the main thread.
+     */
+    fun mergeSpeakers(from: String, into: String) {
+        val before = lecture ?: return
+        val after = change { it.mergingSpeakers(from, into) } ?: return
+        if (after == before || voices == null) return
+        val name = after.speakers.firstOrNull { it.id == into }?.name.orEmpty()
+        if (name.isNotEmpty()) printOf(after, into)?.let { voices.save(Voice(name, it)) }
+    }
+
+    /** Plays a speaker's sample (their longest line), to hear who it is; pauses when it is what is playing. */
+    fun playPerson(speakerId: String) {
+        val o = open.value ?: return
+        val person = peopleOf(o.lecture).firstOrNull { it.speakerId == speakerId } ?: return
+        val at = player.positionMillis.value
+        if (player.playing.value && at in person.sampleStartMillis until person.sampleEndMillis) player.pause()
+        else {
+            player.seekTo(person.sampleStartMillis)
+            player.play()
+        }
     }
 
     /**

@@ -67,7 +67,7 @@ class LectureSession(
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    /** The app's known voices: speakers the user named, labeled by name in later moments. */
+    /** The app's voices: the speakers the user named are saved here. They are not used to name speakers in later moments. */
     private val voices: VoiceStore? = null,
     /** The speaker pass's models are on the phone (it can run after Stop). */
     private val speakerPassReady: () -> Boolean = { false },
@@ -109,18 +109,22 @@ class LectureSession(
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
                     improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
+                    recordOnly = liveModel == null,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val isRecording get() = recording.value != null
 
-    /** Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. */
-    fun start(labels: List<String>, labelNames: String, language: String, title: String): Lecture {
+    /**
+     * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or
+     * with no live model for the language, it is only recorded ([Lecture.pendingTranscript]) and transcribed after.
+     */
+    fun start(labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         val format = settings.audioFormat
-        val lecture = Lecture(
+        val fresh = Lecture(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
             audioFile = when (format) {
@@ -129,10 +133,12 @@ class LectureSession(
                 else -> AUDIO_WAV
             },
         )
-        store.save(lecture)
         names = emptyMap()
         edits = emptyMap()
-        liveModel = live(language, scope, voices?.load().orEmpty())?.also { model ->
+        // Every moment starts with unnamed speakers: a voice named in another moment isn't guessed here (owner's
+        // decision, Nov 15, 2026: matching voices between moments wasn't accurate enough). The names are still kept
+        // ([VoiceStore]), to be offered when the user names a speaker.
+        liveModel = (if (transcribeLive) live(language, scope, emptyList()) else null)?.also { model ->
             val live = model.liveSpeakers
             recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
             following = scope.launch {
@@ -148,6 +154,9 @@ class LectureSession(
                 }
             }
         }
+        // Saved as waiting for its transcript from the start, so a moment cut short by a crash is still transcribed.
+        val lecture = fresh.copy(pendingTranscript = liveModel == null)
+        store.save(lecture)
         power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
@@ -278,6 +287,23 @@ class LectureSession(
             r.copy(lecture = r.lecture.copy(notes = notes + Note(id, atMillis, text.trim())))
         }
         saveNow()
+    }
+
+    /**
+     * A mark at this second of the recording: a note without words ([Note.isMark]), made with one tap when typing
+     * isn't possible. Returns its time; null when nothing is recording. Words can be added after, on the moment.
+     */
+    fun mark(): Long? {
+        val r = recording.value ?: return null
+        if (r.finishing) return null
+        val at = recorder.positionMillis.value
+        recording.update { rec ->
+            val notes = rec?.lecture?.notes ?: return@update rec
+            val id = "n${(notes.maxOfOrNull { it.id.removePrefix("n").toIntOrNull() ?: 0 } ?: 0) + 1}"
+            rec.copy(lecture = rec.lecture.copy(notes = notes + Note(id, at, "")))
+        }
+        saveNow()
+        return at
     }
 
     /**

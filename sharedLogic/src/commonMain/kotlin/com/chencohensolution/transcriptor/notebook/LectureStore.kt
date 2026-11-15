@@ -239,6 +239,8 @@ private data class LectureFileV1(
     val audio: String,
     val pendingFlac: Boolean = false,
     val pendingAac: Boolean = false,
+    /** Recorded without live transcription, not transcribed yet. */
+    val pendingTranscript: Boolean = false,
     val speakerPass: Boolean = false,
     val refinedWith: String? = null,
     val versions: List<VersionInfoV1> = emptyList(),
@@ -256,7 +258,7 @@ private data class LectureFileV1(
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
         audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, speakerPass = speakerPass, refinedWith = refinedWith,
-        versions = versions.map { it.toInfo() },
+        versions = versions.map { it.toInfo() }, pendingTranscript = pendingTranscript,
     )
 
     companion object {
@@ -265,6 +267,7 @@ private data class LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
             durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac, pendingAac = lecture.pendingAac,
+            pendingTranscript = lecture.pendingTranscript,
             speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
             versions = lecture.versions.map { VersionInfoV1.of(it) },
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },

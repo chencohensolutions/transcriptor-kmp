@@ -6,5 +6,24 @@ package com.chencohensolution.transcriptor.ui
 // pause, fixing a line and renaming a speaker work in memory.
 internal val lectureCurrent = LabOption("current", "One timeline, fix a line in place (the app's)", "LectureScreen with a faked recording and live transcription") {
     val (state, actions) = rememberGrowingLectureLab()
+    LectureScreen(state, actions, startInTranscript = true)
+}
+
+// Fakes: as `current`, as the screen opens: at a glance, with Mark (a note without words, in memory).
+internal val lectureCurrentGlance = LabOption("current-glance", "The app's, at a glance (as it opens)", "LectureScreen's glance view over the faked live recording: clock, who is talking, Mark") {
+    val (state, actions) = rememberGrowingLectureLab()
     LectureScreen(state, actions)
+}
+
+// Fakes: as `current`, recorded with After on the Record bar: no live transcription, so no lines, only the clock, the
+// level and the notes.
+internal val lectureCurrentRecordOnly = LabOption("current-record-only", "The app's, recording only (After)", "LectureScreen with no live transcription: transcribed after Stop") {
+    val (state, actions) = rememberGrowingLectureLab()
+    LectureScreen(
+        state.copy(
+            lecture = state.lecture.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true),
+            partial = null, liveModelName = null, lagMillis = null, voicePrints = null, speakerPassOnStop = false, speakersLive = false, recordOnly = true,
+        ),
+        actions,
+    )
 }

@@ -58,6 +58,23 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   queue, none dropped, and each shows as one line when done. Offered for live only once downloaded (it is got for
   improving), after the line models, so it runs live only when chosen (`ModelChoices.candidates`).
 
+### Record now, transcribe after (owner's request, Nov 15, 2026)
+
+The Record bar has **Live** or **After** (`SettingsStore.recordLive`; After is the default, to spare the battery
+during long conversations). With After, or with no live model for the language, the moment is only recorded: no model
+is loaded, `lecture.json` says `"pendingTranscript": true` from its first save, and notes work as always. Recording
+never waits on a model.
+
+- **The transcribe pass** (`Recording.refine` on such a moment): `lineTimes` reads the whole recording in 30 s pieces
+  and finds its lines at the pauses, as live transcription does (`Utterances`), without text; then the language's
+  improve model writes them as the improve pass does (`RefinePass`: several lines together where the engine times
+  words). Lines the model finds no words in are dropped (`transcribed`). The moment is saved with `refinedWith` and
+  without `pendingTranscript`; its speakers are then found by the speaker pass when its models are on the phone.
+- **When:** at Stop if the phone is charging; else the moment waits in `improvePending` for the charger (as improving
+  on its own does), or for **Transcribe now** on the moment. A recording starting stops the pass; it starts again
+  after.
+- With no improve model for the language the moment waits, and its screen offers the one to get.
+
 ### Audio
 
 - Recorded at **48 kHz, stereo, 16 bit**, written while recording so a crash loses at most the last seconds. The
@@ -95,7 +112,9 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   model's word times), and each part is labeled as a line. On a test recording this split an 18 s TV line into its
   two voices; the user stayed one speaker but for one line. Whisper lines aren't split yet (no word times).
 - Names: tapping a speaker's chip names them; the name and their average print go to the app's
-  `voices.json` (`VoiceStore`), and its next moments start with those voices, labeled by name from their first line.
+  `voices.json` (`VoiceStore`). **Speakers are not guessed between moments** (owner's decision, Nov 15, 2026: it
+  wasn't accurate enough): every moment starts with unnamed speakers, live and in the speaker pass (which knows only
+  the voices named in that same moment, so running it again keeps their names). The saved names are only offered when the user names a speaker.
 - **After the moment, the speaker pass** (`SpeakerPass`, built Nov 2, 2026): pyannote's 3.1 pipeline as sherpa-onnx
   runs it on the phone (`SherpaDiarizer`): segmentation 3.0 (MIT, 6 MB, sherpa-onnx's ONNX export) finds who speaks
   when, overlaps included, then CAM++ prints and clustering (distance 0.85) group the turns. pyannote's own Python

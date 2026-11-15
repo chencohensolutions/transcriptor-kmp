@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +46,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -109,6 +112,8 @@ class LiveLectureActions(
     val editLine: (id: String, text: String) -> Unit = { _, _ -> },
     /** Names a speaker ("Lecturer"); the notebook remembers the voice. */
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
+    /** A mark at this second (a note without words); returns its time, null when it couldn't be made. */
+    val mark: () -> Long? = { null },
 )
 
 /**
@@ -127,7 +132,15 @@ class LiveLectureActions(
  * under the top bar, or a chip at the transcript's top end that opens a sheet (`ProcessorMetersView.kt`).
  */
 @Composable
-fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
+fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInTranscript: Boolean = false) {
+    // It opens at a glance (RecordingGlance): the clock, who is talking, Mark. The transcript is one tap from there,
+    // and Back returns to the glance.
+    var transcript by rememberSaveable { mutableStateOf(startInTranscript) }
+    if (!transcript) {
+        RecordingGlance(state, actions, onTranscript = { transcript = true })
+        return
+    }
+    BackHandler { transcript = false }
     var editingId by remember { mutableStateOf<String?>(null) }
     val colors = LocalTranscriptorColors.current
     val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
@@ -179,7 +192,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
             Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = actions.back) {
+                    IconButton(onClick = { transcript = false }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.lecture_back))
                     }
                     Column(Modifier.weight(1f)) {
@@ -201,11 +214,12 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                             stringResource(if (state.paused) R.string.lecture_resume else R.string.lecture_pause),
                         )
                     }
+                    val stop = rememberArmedStop(actions.stop)
                     FilledIconButton(
-                        onClick = actions.stop,
+                        onClick = stop.tap,
                         enabled = !state.finishing,
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.recording, contentColor = Color.White),
-                    ) { Icon(Icons.Filled.Stop, stringResource(R.string.lecture_stop)) }
+                    ) { Icon(if (stop.armed) Icons.Filled.Check else Icons.Filled.Stop, stringResource(if (stop.armed) R.string.lecture_stop_again else R.string.lecture_stop)) }
                 }
                 HorizontalDivider()
                 val meters = state.meters
@@ -250,7 +264,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions) {
                         val error = state.liveError
                         val status = when {
                             state.finishing -> stringResource(R.string.lecture_finishing)
-                            model == null -> stringResource(R.string.lecture_no_live_model)
+                            state.recordOnly || model == null -> stringResource(R.string.lecture_record_only)
                             error != null -> stringResource(R.string.lecture_live_failed, error)
                             state.liveLoading -> stringResource(R.string.lecture_live_loading, model)
                             else -> stringResource(R.string.lecture_live_model, model, (state.lagMillis ?: 0) / 1000f)
@@ -422,7 +436,7 @@ private fun NoteCard(entry: TimelineEntry.Written) {
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(formatClock(entry.note.atMillis), style = MaterialTheme.typography.labelSmall, color = colors.onNote.copy(alpha = 0.7f))
-                Text(entry.note.text, style = MaterialTheme.typography.bodyMedium.inNotebookDirection(), color = colors.onNote)
+                Text(entry.note.text.ifEmpty { stringResource(R.string.note_mark) }, style = MaterialTheme.typography.bodyMedium.inNotebookDirection(), color = colors.onNote)
             }
         }
     }

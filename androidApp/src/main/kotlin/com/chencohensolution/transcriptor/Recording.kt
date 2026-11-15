@@ -64,6 +64,8 @@ import com.chencohensolution.transcriptor.speech.Voice
 import com.chencohensolution.transcriptor.speech.StreamingTranscriber
 import com.chencohensolution.transcriptor.speech.UtteranceTranscriber
 import com.chencohensolution.transcriptor.speech.UtteranceLimits
+import com.chencohensolution.transcriptor.speech.lineTimes
+import com.chencohensolution.transcriptor.speech.transcribed
 import com.chencohensolution.transcriptor.speech.ModelFiles
 import com.chencohensolution.transcriptor.speech.WhisperEngine
 import kotlinx.coroutines.CoroutineScope
@@ -289,24 +291,15 @@ object Recording {
     fun refine(lecture: Lecture, modelId: String, kept: () -> Unit = {}, progress: (Float) -> Unit = {}, stop: () -> Boolean = { false }): Lecture {
         val model = refineModels(lecture.language).firstOrNull { it.id == modelId } ?: error("$modelId isn't downloaded")
         store.repairAudio(lecture)
+        // Only recorded so far (After on the Record bar): its lines are found and written, nothing to keep or merge.
+        if ((store.load(lecture.id) ?: lecture).let { it.pendingTranscript && it.segments.isEmpty() }) return transcribe(lecture, model, progress, stop)
         val withVersion = store.keepCurrent(store.load(lecture.id) ?: lecture, System.currentTimeMillis())
         store.save(withVersion)
         kept()
         val path = store.audioPath(lecture)
         val audio = { a: Long, b: Long -> RecordingAudio.range({ openAudio(path) }, lecture.audioFile == AUDIO_WAV, a, b) }
         val started = System.currentTimeMillis()
-        val done = when (model.kind) {
-            ModelKind.Whisper, ModelKind.WhisperNpuEncoder -> npuEngine(model) { whisperEngine(model) }.use { engine ->
-                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress, stop)
-            }
-            ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
-                npuGuard.load(model) { engine.load(lecture.language) }
-                RefinePass(engine, lecture.language, audio).run(withVersion, model.id, progress, stop)
-            }
-            else -> npuEngine(model) { SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }) }.use { engine ->
-                RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio).run(withVersion, model.id, progress, stop)
-            }
-        }
+        val done = withRefinePass(model, lecture.language, audio) { it.run(withVersion, model.id, progress, stop) }
         // Its speed on this phone, for the next estimate.
         settings.recordImproveSpeed(model.id, System.currentTimeMillis() - started, lecture.durationMillis)
         // Saved over what is on disk now, with its edits since (the review screen may have changed it meanwhile):
@@ -320,6 +313,49 @@ object Recording {
         store.save(merged)
         return merged
     }
+
+    /** [use]s a [RefinePass] over [audio] with [model] loaded (on the NPU inside [npuGuard]), closing it after. */
+    private fun <T> withRefinePass(model: SpeechModel, language: String, audio: (Long, Long) -> FloatArray, use: (RefinePass) -> T): T = when (model.kind) {
+        ModelKind.Whisper, ModelKind.WhisperNpuEncoder -> npuEngine(model) { whisperEngine(model) }.use { engine -> use(RefinePass(engine, language, audio)) }
+        ModelKind.WhisperNpu -> SherpaNpuWhisperEngine(models.dir(model), nativeLibDir).use { engine ->
+            npuGuard.load(model) { engine.load(language) }
+            use(RefinePass(engine, language, audio))
+        }
+        else -> npuEngine(model) { SherpaStreamingEngine(models.dir(model), nativeLibDir.takeIf { model.kind == ModelKind.StreamingTransducerNpu }) }.use { engine ->
+            use(RefinePass({ samples -> transcribeLineStreaming(engine, samples) }, audio))
+        }
+    }
+
+    /**
+     * Transcribes a moment that was only recorded ([Lecture.pendingTranscript]) with [model] (not on the main thread):
+     * its lines are found at the pauses of the whole recording ([lineTimes], the first tenth of [progress]), then
+     * written by the model as the improve pass writes them, several lines together where it can. Saved over what is on
+     * disk now (notes added since are kept) and returned. [stop] true ends it early ([RefinePass.Stopped]), nothing
+     * written.
+     */
+    private fun transcribe(lecture: Lecture, model: SpeechModel, progress: (Float) -> Unit, stop: () -> Boolean): Lecture {
+        val path = store.audioPath(lecture)
+        val isWav = lecture.audioFile == AUDIO_WAV
+        val length = lecture.durationMillis.coerceAtLeast(1)
+        val lines = RecordingAudio(openAudio(path), isWav).use { audio ->
+            lineTimes(audio, progress = { at -> progress((at.toFloat() / length).coerceAtMost(1f) * LINES_SHARE) }, stop = stop)
+        }
+        if (stop()) throw RefinePass.Stopped()
+        val audio = { a: Long, b: Long -> RecordingAudio.range({ openAudio(path) }, isWav, a, b) }
+        val started = System.currentTimeMillis()
+        val done = transcribed(lecture, lines, model.id) { withLines ->
+            if (withLines.segments.isEmpty()) withLines
+            else withRefinePass(model, lecture.language, audio) { it.run(withLines, model.id, { p -> progress(LINES_SHARE + p * (1 - LINES_SHARE)) }, stop) }
+        }
+        if (lines.isNotEmpty()) settings.recordImproveSpeed(model.id, System.currentTimeMillis() - started, lecture.durationMillis)
+        val now = store.load(lecture.id) ?: lecture
+        val saved = now.copy(segments = done.segments, refinedWith = done.refinedWith, pendingTranscript = false)
+        store.save(saved)
+        return saved
+    }
+
+    /** How much of the transcribe pass's progress finding the lines is; the rest is writing them. */
+    private const val LINES_SHARE = 0.1f
 
     lateinit var voices: VoiceStore
         private set
@@ -377,7 +413,7 @@ object Recording {
 
     /**
      * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
-     * relabeled and split to match, and the speakers named from the app's voices. Saves and returns it.
+     * relabeled and split to match. Speakers keep no names from other moments. Saves and returns it.
      */
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
@@ -387,7 +423,10 @@ object Recording {
         val embedder = voiceEmbedder(model)
         try {
             RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
-                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load()) { at ->
+                // Speakers aren't guessed from other moments (see LectureSession.start): the only known voices are
+                // the ones the user named in this very moment, so running the pass again keeps their names.
+                val here = lecture.speakers.map { it.name }.filter { it.isNotEmpty() }.toSet()
+                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load().filter { it.name in here }) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
                 val done = lecture.withTurns(result.turns, result.speakers)

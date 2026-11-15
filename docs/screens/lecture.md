@@ -7,6 +7,22 @@ Android, in the app: recording, live lines and notes. iOS after Android is finis
 Recording a class: the live transcript grows as the lecturer speaks, and the user writes notes without stopping the
 recording or the transcription.
 
+## At a glance (Nov 15, 2026)
+
+The screen opens at a glance (`RecordingGlance.kt`), for a phone lying on the table in a conversation: the title, a
+large clock, "Recording · transcribing as you talk" or "· transcribed after you stop", the microphone's level, and when
+transcribing live a card with who is talking, how many voices so far and their last words (tapping it opens the
+transcript). The model lines aren't here; only a problem is said (live transcription stopped, a model that didn't fit).
+
+- **Mark**, the large button between Pause and Stop, flags this second with one tap: a note without words
+  (`LectureSession.mark`, `Note.isMark`). "Marked at 12:20" shows for a moment. On the moment after, a mark is a pill
+  with a flag and its time; holding it gives it words. The recording's notification has Mark too.
+- **Stop takes two taps** (`rememberArmedStop`): the first turns the button into a check for 3 s and the screen says
+  "Tap Stop again to end the moment"; the second stops. Here and in the transcript's top bar; the notification's Stop
+  is one tap.
+- **Show the transcript** (or **Write a note** when only recording) opens the timeline below; Back returns to the
+  glance.
+
 ## What it shows
 
 - The moment's title and its labels, the elapsed time, a red dot that breathes while recording, the microphone's
@@ -43,7 +59,10 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
   appears 2.5–5 s after its text, and a line may then split where the speaker changed.
 
 - Speakers: where the speaker changes, a chip in the speaker's color above the line ("המרצה", "דובר 2"); tapping
-  it names the speaker, and the app remembers the voice for the next moments.
+  it names the speaker in this moment. Voices aren't guessed in later moments; the name is offered when naming there.
+
+- **Recording only** (After on the Record bar, or no live model for the language; `LiveLectureState.recordOnly`): no
+  lines and no model lines, only "Recording only. This moment is transcribed after you stop." above the notes.
 
 ## Processor meters
 
@@ -109,7 +128,7 @@ starts afresh. Amber from 70%, red from 90%.
   `MeterProbeReceiver` reads the real files as an ordinary app (`adb shell am broadcast -n
   com.chencohensolution.transcriptor.uilab/com.chencohensolution.transcriptor.ui.MeterProbeReceiver`, then
   `adb logcat -s MeterProbe`).
-- Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
+- Lab: `lecture current-glance` (as it opens), `lecture current-record-only` (recording only), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/lecture/LectureCurrentLab.kt`, the
   screen with a faked recording and live transcription that keeps making lines (`LectureGrowingLab.kt`;
   `./scripts/ui-lab.sh lecture current`).
 

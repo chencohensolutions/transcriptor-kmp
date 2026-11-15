@@ -18,6 +18,8 @@ import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
+import com.chencohensolution.transcriptor.review.mergingSpeakers
+import com.chencohensolution.transcriptor.review.onlyOf
 import kotlinx.coroutines.delay
 
 // Fakes: playback (a clock; no audio), the improve pass and the speaker pass (progress, then made-up results), the
@@ -27,7 +29,7 @@ import kotlinx.coroutines.delay
 // in Downloads/Transcriptor (the lab has no lecture folders). Delete lecture only says so.
 internal val reviewCurrent = LabOption("current", "Document + player below (the app's)", "ReviewScreen with faked playback and passes") {
     val (state, actions) = rememberReviewLab(modelsDownloaded = true)
-    ReviewScreen(state, actions)
+    ReviewScreen(state, actions, allLabels = LabData.labels)
 }
 
 // Fakes: as `current`, with no model to improve Hebrew with downloaded: Improve transcription… offers the one to get.
@@ -36,18 +38,42 @@ internal val reviewCurrentNoModel = LabOption("current-none", "The app's, nothin
     ReviewScreen(state, actions)
 }
 
+// Fakes: as `current`, for a moment that was only recorded (After on the Record bar): no lines until Transcribe now,
+// which takes six seconds and then shows the sample's lines; its notes are there from the start.
+internal val reviewCurrentWaiting = LabOption("current-waiting", "The app's, recorded and not transcribed yet", "A moment recorded with After: Transcribe now, then its lines") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, waiting = true)
+    ReviewScreen(state, actions)
+}
+
+// Fakes: as `current-people` without the sheet: the conversation as it reads, short turns compact, people as playback
+// filters above the player, the live-draft line with Improve.
+internal val reviewCurrentConversation = LabOption("current-conversation", "The app's, a conversation of four", "ReviewScreen on LabData.conversation: compact turns, play one person, share as text") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = LabData.conversation)
+    ReviewScreen(state, actions)
+}
+
+// Fakes: as `current`, with an English conversation of four (LabData.conversation) as it opens after Stop: "Who was
+// here?" comes up by itself. Names, merging and the samples work in memory (a sample moves the playhead; no audio);
+// the known voices offered are made up.
+internal val reviewCurrentPeople = LabOption("current-people", "The app's, a conversation of four: Who was here?", "ReviewScreen on an English conversation, the people sheet open") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = LabData.conversation)
+    ReviewScreen(state, actions, askPeople = true)
+}
+
 /**
  * Fakes for the lab: playback (a clock that runs at the speed), the improve pass (six seconds, then the lines as the
  * large model wrote them, edited lines kept) and the speaker pass (four seconds, then the student's question split
  * off and named speakers kept); edits, notes and renames in memory.
  */
 @Composable
-private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, ReviewActions> {
+private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = false, sample: com.chencohensolution.transcriptor.notebook.Lecture? = null): Pair<ReviewState, ReviewActions> {
     val context = LocalContext.current
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
-    var lecture by remember { mutableStateOf(LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)) }
-    var position by remember { mutableStateOf(65_000L) }
+    val recorded = sample ?: LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)
+    var lecture by remember { mutableStateOf(if (waiting) recorded.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true) else recorded) }
+    var position by remember { mutableStateOf(sample?.segments?.firstOrNull()?.startMillis ?: 65_000L) }
     var playing by remember { mutableStateOf(false) }
+    var only by remember { mutableStateOf<String?>(null) }
     var speed by remember { mutableStateOf(1f) }
     var refine by remember { mutableStateOf<PassState>(PassState.NotRun) }
     var speakers by remember { mutableStateOf<PassState>(PassState.NotRun) }
@@ -56,6 +82,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         while (playing) {
             delay(100)
             position = (position + (100 * speed).toLong()).coerceAtMost(lecture.durationMillis)
+            only?.let { o -> when (val to = lecture.onlyOf(o, position)) { null -> playing = false; else -> position = to } }
             if (position >= lecture.durationMillis) playing = false
         }
     }
@@ -63,6 +90,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         if (refine !is PassState.Running) return@LaunchedEffect
         for (i in 1..60) { delay(100); refine = PassState.Running(i / 60f) }
         val large = LabData.refinedLecture.segments.associateBy { it.id }
+        if (lecture.pendingTranscript) lecture = lecture.copy(segments = recorded.segments, speakers = recorded.speakers, pendingTranscript = false)
         lecture = lecture.copy(segments = lecture.segments.map { s -> if (s.edited) s else s.copy(text = large[s.id]?.text ?: s.text, modelId = large[s.id]?.modelId ?: s.modelId) })
         refine = PassState.Done
     }
@@ -74,7 +102,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
-        labelNames = LabData.labels.first().name, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = if (sample == null) com.chencohensolution.transcriptor.notebook.labelNames(lecture.labels, LabData.labels) else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
@@ -85,7 +113,9 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         improveDefault = ModelCatalog.ivritLargeV3Npu.id.takeIf { modelsDownloaded },
         improveToGet = ModelToGet(ModelCatalog.ivritLargeV3.id, ModelCatalog.ivritLargeV3.name, ModelCatalog.ivritLargeV3.sizeBytes).takeIf { !modelsDownloaded },
     )
+    val labBack = LocalLabBack.current
     val actions = ReviewActions(
+        back = labBack,
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
         seek = { position = it.coerceIn(0, lecture.durationMillis) },
         playLine = { position = it.startMillis; playing = true },
@@ -93,6 +123,16 @@ private fun rememberReviewLab(modelsDownloaded: Boolean): Pair<ReviewState, Revi
         editLine = { id, text -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == id) it.copy(text = text.trim(), edited = true) else it }) },
         setLineSpeaker = { line, speaker -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == line) it.copy(speakerId = speaker) else it }) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it }) },
+        namePerson = { id, name ->
+            val same = lecture.speakers.firstOrNull { it.id != id && it.name.isNotEmpty() && it.name.equals(name.trim(), ignoreCase = true) }
+            lecture = if (same != null) lecture.mergingSpeakers(id, same.id) else lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it })
+        },
+        mergeSpeakers = { from, into -> lecture = lecture.mergingSpeakers(from, into) },
+        playOnly = { id -> only = id.takeIf { it != only }; only?.let { o -> lecture.onlyOf(o, position)?.let { position = it; playing = true } } },
+        shareText = { Toast.makeText(context, com.chencohensolution.transcriptor.notebook.transcriptText(lecture).take(200), Toast.LENGTH_LONG).show() },
+        playPerson = { id -> lecture.segments.filter { it.speakerId == id }.maxByOrNull { it.endMillis - it.startMillis }?.let { position = it.startMillis; playing = true } },
+        rename = { title -> lecture = lecture.copy(title = title.trim()) },
+        setLabels = { ids -> lecture = lecture.copy(labels = ids) },
         improve = { _, first ->
             if (first) { thenImprove = true; speakers = PassState.Running(0f) } else if (refine !is PassState.Running) refine = PassState.Running(0f)
         },

@@ -37,6 +37,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -70,11 +72,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -90,7 +95,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.review.PassState
@@ -111,6 +118,25 @@ class ReviewActions(
     /** Moves a line to another speaker. */
     val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
+    /** "Who was here?": names a speaker; a name someone here already has merges the two. */
+    val namePerson: (id: String, name: String) -> Unit = { _, _ -> },
+    /** Two speakers were one person: [from]'s lines become [into]'s. */
+    val mergeSpeakers: (from: String, into: String) -> Unit = { _, _ -> },
+    /** Plays a speaker's sample, or pauses it. */
+    val playPerson: (id: String) -> Unit = {},
+    /** Keeps playback to one speaker's turns; null, or the same one again: everyone. */
+    val playOnly: (speakerId: String?) -> Unit = {},
+    /** Opens Android's share sheet with the moment as plain text. */
+    val shareText: () -> Unit = {},
+    /** The moment's title, in the user's words. */
+    val rename: (title: String) -> Unit = {},
+    /** The moment's labels (ids), set from its screen. */
+    val setLabels: (labels: List<String>) -> Unit = {},
+    /** Makes a label; returns its id. */
+    val newLabel: (name: String) -> String = { "" },
+    val renameLabel: (labelId: String, name: String) -> Unit = { _, _ -> },
+    /** Deletes a label everywhere: its moments stay, without it. */
+    val deleteLabel: (labelId: String) -> Unit = {},
     /**
      * Improves the lecture with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id), after the
      * speaker pass when [speakersFirst].
@@ -149,7 +175,12 @@ class ReviewActions(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
+fun ReviewScreen(
+    state: ReviewState, actions: ReviewActions,
+    askPeople: Boolean = false,
+    /** Every label there is, to set this moment's from its own screen; empty hides nothing: "Add labels" makes the first. */
+    allLabels: List<Label> = emptyList(),
+) {
     var confirmingDelete by remember { mutableStateOf(false) }
     if (confirmingDelete) AlertDialog(
         onDismissRequest = { confirmingDelete = false },
@@ -173,6 +204,19 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     var noting by remember { mutableStateOf<Long?>(null) }
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
+    // "Who was here?": from its button, and by itself once for a moment just recorded with voices still unnamed.
+    var showingPeople by remember(state.lecture.id) { mutableStateOf(askPeople && state.people.size >= 2 && state.people.any { it.name.isEmpty() }) }
+    if (showingPeople) PeopleSheet(state, actions, onDismiss = { showingPeople = false })
+    var renamingTitle by remember { mutableStateOf(false) }
+    var labeling by remember { mutableStateOf(false) }
+    if (renamingTitle) RenameTitleDialog(state.lecture.title, onDismiss = { renamingTitle = false }) { actions.rename(it); renamingTitle = false }
+    if (labeling) LabelsSheet(
+        labels = allLabels, moments = listOf(state.lecture.summary()), onDismiss = { labeling = false },
+        onSet = { add, remove -> actions.setLabels((state.lecture.labels + add).distinct() - remove) },
+        onNew = { name -> actions.newLabel(name).takeIf { it.isNotEmpty() }?.let { actions.setLabels((state.lecture.labels + it).distinct()) } },
+        onRename = actions.renameLabel, onDelete = actions.deleteLabel,
+    )
     var tuning by remember { mutableStateOf<LectureReview.TuneProposal?>(null) }
     var noTuning by remember { mutableStateOf(false) }
     tuning?.let { p -> TuneDialog(p, onDismiss = { tuning = null }) { actions.applySpeakerTuning(p); tuning = null } }
@@ -181,6 +225,10 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
         text = { Text(stringResource(R.string.review_tune_none)) },
     )
     val turns = remember(state.lecture.segments) { turnsOf(state.lecture.segments) }
+    // Only recorded so far: no lines yet, a card says what it waits for.
+    val waiting = state.lecture.pendingTranscript && state.lecture.segments.isEmpty()
+    // The app's own text goes in the phone's direction, among the moment's content.
+    val appDirection = LocalLayoutDirection.current
 
     renaming?.let { s -> RenameSpeakerDialog(s, onDismiss = { renaming = null }) { actions.renameSpeaker(s.id, it); renaming = null } }
     moving?.let { line -> MoveLineDialog(line, state.lecture.speakers, onDismiss = { moving = null }) { actions.setLineSpeaker(line.id, it); moving = null } }
@@ -194,14 +242,30 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
             Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = actions.back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) }
+                    // The title renames the moment, the line under it sets its labels.
                     Column(Modifier.weight(1f)) {
-                        Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = stringResource(R.string.review_rename)) { renamingTitle = true },
+                        )
+                        Text(
+                            state.labelNames.ifEmpty { stringResource(R.string.review_add_labels) }, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = if (state.labelNames.isEmpty()) MaterialTheme.colorScheme.primary else LocalTranscriptorColors.current.time,
+                            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClickLabel = stringResource(R.string.notebooks_labels)) { labeling = true },
+                        )
                     }
-                    Box(
-                        Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.Share, stringResource(R.string.review_share_word)) }
+                    if (state.people.isNotEmpty()) IconButton(onClick = { showingPeople = true }) { Icon(Icons.Filled.Group, stringResource(R.string.people_title)) }
+                    // Share: as text (to paste in a chat) or as a Word file; holding it saves the Word file beside the recording.
+                    Box {
+                        Box(
+                            Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = { sharing = true }, onLongClick = actions.saveWord),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.Share, stringResource(R.string.review_share)) }
+                        DropdownMenu(expanded = sharing, onDismissRequest = { sharing = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.review_share_text)) }, onClick = { sharing = false; actions.shareText() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.review_share_word)) }, onClick = { sharing = false; actions.shareWord() })
+                        }
+                    }
                     IconButton(onClick = {
                         if (editing) {
                             edits.forEach { (id, text) -> actions.editLine(id, text) }
@@ -247,14 +311,31 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         }
                     }
                 }
-                (state.refine as? PassState.Running)?.let { Banner(stringResource(R.string.review_improving, (it.progress * 100).toInt()), it.progress) }
+                (state.refine as? PassState.Running)?.let {
+                    Banner(stringResource(if (waiting) R.string.review_transcribing else R.string.review_improving, (it.progress * 100).toInt()), it.progress)
+                }
                 (state.speakerPass as? PassState.Running)?.let { Banner(stringResource(R.string.review_finding_speakers, (it.progress * 100).toInt()), it.progress) }
+                // Where the transcript stands, with the next step: a live draft the better model hasn't written yet.
+                if (state.refine == PassState.NotRun && state.lecture.refinedWith == null && state.lecture.segments.isNotEmpty() && state.refineModels.isNotEmpty()) {
+                    val minutes = (state.refineModels.firstOrNull { it.id == state.improveDefault } ?: state.refineModels.first()).minutes
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.review_draft), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { pickingModel = true }) {
+                            Text(if (minutes != null) stringResource(R.string.review_draft_improve_minutes, minutes) else stringResource(R.string.review_draft_improve))
+                        }
+                    }
+                }
                 state.power?.let { PowerLine(it) }
                 HorizontalDivider()
             }
         }
         CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.weight(1f)) {
+            LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.weight(1f)) {
+                if (waiting) {
+                    item(key = "waiting") { CompositionLocalProvider(LocalLayoutDirection provides appDirection) { NotTranscribedYet(state, actions) } }
+                    // Its notes, which have no lines to sit under yet.
+                    items(state.lecture.notes, key = { "note-${it.id}" }) { n -> NotePill(n, onTime = { actions.seek(n.atMillis) }, onHold = { note = n }) }
+                }
                 items(turns, key = { it.first().id }) { turn ->
                     val next = turns.getOrNull(turns.indexOf(turn) + 1)?.first()?.startMillis ?: Long.MAX_VALUE
                     val notes = state.lecture.notes.filter { n -> n.atMillis >= turn.first().startMillis && n.atMillis < next || (turn === turns.first() && n.atMillis < turn.first().startMillis) }
@@ -267,6 +348,18 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
         }
         Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
             Column(Modifier.navigationBarsPadding().padding(top = 8.dp)) {
+                // Tap a person to hear only their turns; again for everyone.
+                val people = state.people
+                if (people.size >= 2) LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(people, key = { it.speakerId }) { p ->
+                        val color = speakerColor(p.speakerId)
+                        FilterChip(
+                            selected = state.onlySpeaker == p.speakerId, onClick = { actions.playOnly(p.speakerId) },
+                            label = { Text(speakerLabel(Speaker(p.speakerId, p.name)), maxLines = 1) },
+                            leadingIcon = { Box(Modifier.size(8.dp).clip(CircleShape).background(color)) },
+                        )
+                    }
+                }
                 Overview(state, actions)
                 Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${formatClock(state.positionMillis)} / ${formatClock(state.lecture.durationMillis)}", style = MaterialTheme.typography.labelMedium,
@@ -284,6 +377,57 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
             }
         }
     }
+}
+
+/**
+ * A moment that was only recorded: what it waits for, and the way to transcribe it now with its language's improve
+ * model, or to get one.
+ */
+@Composable
+private fun NotTranscribedYet(state: ReviewState, actions: ReviewActions) {
+    val running = state.refine is PassState.Running
+    val model = state.refineModels.firstOrNull { it.id == state.improveDefault } ?: state.refineModels.firstOrNull()
+    val toGet = state.improveToGet
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(if (running) R.string.review_waiting_running_title else R.string.review_waiting_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                when {
+                    running -> stringResource(R.string.review_waiting_running)
+                    model != null -> stringResource(R.string.review_waiting_note)
+                    toGet != null -> stringResource(R.string.review_waiting_no_model)
+                    else -> stringResource(R.string.review_waiting_no_model_settings)
+                },
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!running && model != null) {
+                Button(onClick = { actions.improve(model.id, false) }) {
+                    Text(model.minutes?.let { stringResource(R.string.review_transcribe_now_minutes, it) } ?: stringResource(R.string.review_transcribe_now))
+                }
+                Text(isolated(model.name), style = MaterialTheme.typography.labelSmall, color = LocalTranscriptorColors.current.time)
+            } else if (!running && toGet != null) {
+                Button(onClick = { actions.getModel(toGet.id) }) {
+                    Text(stringResource(R.string.review_waiting_get, isolated(toGet.name), android.text.format.Formatter.formatShortFileSize(LocalContext.current, toGet.sizeBytes)))
+                }
+            }
+        }
+    }
+}
+
+/** A turn up to this long is drawn compact: the name and the words together. */
+private const val COMPACT_TURN_CHARS = 140
+
+/** The moment's title, to change. */
+@Composable
+private fun RenameTitleDialog(title: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(title) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.review_rename)) },
+        text = { TextField(value = text, onValueChange = { text = it }, singleLine = true) },
+        confirmButton = { TextButton(onClick = { onSave(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.review_rename_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_delete_cancel)) } },
+    )
 }
 
 /** Lines in a row by one speaker, as one paragraph. */
@@ -348,7 +492,8 @@ private fun Overview(state: ReviewState, actions: ReviewActions) {
                 val y = top + i.coerceAtLeast(0) * (lane + gap)
                 val x0 = line.startMillis.toFloat() / duration * size.width
                 val x1 = (line.endMillis.toFloat() / duration * size.width).coerceAtLeast(x0 + 2f)
-                drawRect(if (i >= 0) laneColors[i] else unknown, Offset(x0, y), Size(x1 - x0, lane))
+                val faded = state.onlySpeaker != null && line.speakerId != state.onlySpeaker
+                drawRect((if (i >= 0) laneColors[i] else unknown).copy(alpha = if (faded) 0.25f else 1f), Offset(x0, y), Size(x1 - x0, lane))
             }
             state.lecture.notes.forEach { n -> drawCircle(noteColor, 3.dp.toPx(), Offset(n.atMillis.toFloat() / duration * size.width, 3.dp.toPx())) }
             val px = state.positionMillis.toFloat() / duration * size.width
@@ -365,8 +510,12 @@ private fun Turn(
     val speaker = state.lecture.speakers.firstOrNull { it.id == turn.first().speakerId }
     val colors = LocalTranscriptorColors.current
     val current = state.currentLine?.id
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // A short turn (most of a conversation) is one piece: the name in its color, then the words, with no row of its
+    // own for the name. A long one keeps the name and time above its paragraph.
+    val compact = !editing && speaker != null && turn.sumOf { it.text.length } <= COMPACT_TURN_CHARS
+    val faded = state.onlySpeaker != null && turn.first().speakerId != state.onlySpeaker
+    Column(Modifier.alpha(if (faded) 0.45f else 1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (!compact) Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             speaker?.let { ReviewSpeakerChip(it) { onSpeaker(it) } }
             Spacer(Modifier.width(8.dp))
             Text(formatClock(turn.first().startMillis), style = MaterialTheme.typography.labelSmall, color = colors.time)
@@ -385,7 +534,13 @@ private fun Turn(
             }
         } else {
             val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            val nameColor = speakerColor(speaker?.id)
+            val name = speaker?.let { speakerLabel(it) }.orEmpty()
             val text = buildAnnotatedString {
+                if (compact && speaker != null) {
+                    withLink(LinkAnnotation.Clickable("speaker", TextLinkStyles(SpanStyle(color = nameColor, fontWeight = FontWeight.SemiBold))) { onSpeaker(speaker) }) { append(isolated(name)) }
+                    withStyle(SpanStyle(color = colors.time, fontSize = 11.sp)) { append("  " + formatClock(turn.first().startMillis) + "  ") }
+                }
                 turn.forEachIndexed { i, line ->
                     if (i > 0) append(" ")
                     withLink(LinkAnnotation.Clickable(line.id, TextLinkStyles(SpanStyle())) { actions.playLine(line) }) {
@@ -410,12 +565,13 @@ private fun NotePill(note: Note, onTime: () -> Unit, onHold: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Icon(Icons.Filled.EditNote, null, tint = colors.onNote, modifier = Modifier.size(16.dp))
+        // A mark (a note without words) shows its flag; holding it gives it words.
+        Icon(if (note.isMark) Icons.Filled.Flag else Icons.Filled.EditNote, null, tint = colors.onNote, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
         Text(formatClock(note.atMillis), style = MaterialTheme.typography.labelSmall, color = colors.onNote, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable(onClick = onTime))
         Spacer(Modifier.width(6.dp))
-        Text(note.text, style = MaterialTheme.typography.bodySmall, color = colors.onNote, maxLines = if (open) 10 else 1, overflow = TextOverflow.Ellipsis)
+        Text(note.text.ifEmpty { stringResource(R.string.note_mark) }, style = MaterialTheme.typography.bodySmall, color = colors.onNote, maxLines = if (open) 10 else 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

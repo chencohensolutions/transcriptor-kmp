@@ -47,7 +47,14 @@ data class ReviewState(
     val speakerCorrections: Int? = null,
     /** How much power recording the lecture took (`power.json`); null when it wasn't measured. */
     val power: com.chencohensolution.transcriptor.recording.PowerReport? = null,
+    /** The names of the voices the app knows, to offer when naming a speaker (those not in this moment yet first). */
+    val knownNames: List<String> = emptyList(),
+    /** Playback keeps to this speaker's turns, skipping the others'; null: everyone. */
+    val onlySpeaker: String? = null,
 ) {
+    /** The moment's speakers for "Who was here?", the one who talked most first. */
+    val people: List<Person> get() = peopleOf(lecture)
+
     /** The line being played (or last played): the one the position is in, else the one before it. */
     val currentLine: Segment? get() = lecture.segments.lastOrNull { it.startMillis <= positionMillis }
 }

@@ -53,7 +53,7 @@ internal fun transcriptDocumentXml(lecture: Lecture, labelNames: String?, utcOff
     fun notesBefore(millis: Long) {
         while (notes.isNotEmpty() && notes.first().atMillis < millis) {
             val note = notes.removeAt(0)
-            paragraph("📝 ${clock(note.atMillis)}  ${note.text.trim()}", italic = true, shade = NOTE, after = 200)
+            paragraph(if (note.isMark) "⚑ ${clock(note.atMillis)}" else "📝 ${clock(note.atMillis)}  ${note.text.trim()}", italic = true, shade = NOTE, after = 200)
         }
     }
     turns.forEachIndexed { i, turn ->

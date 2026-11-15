@@ -147,3 +147,44 @@ anything left to decide. Remove an entry once it is built.
   ADTS, the `AacEncode` for encoding afterwards, a BGProcessingTask with `requiresExternalPower` for "when charging"
   (Android's `EncodeJob`), and Settings' Recording format pages (`ui/RecordingFormat.kt`; strings `rec_format_*`).
   `PowerReport.audio` / `phase` and `power-encode.json` go with the power log above.
+
+## Record now, transcribe after (Nov 15, 2026)
+
+- Shared: `SettingsStore.recordLive`, `LectureSession.start(transcribeLive)`, `LiveLectureState.recordOnly`,
+  `Lecture.pendingTranscript`, `LectureSummary.pendingTranscript`, `NotebooksState.recordLive`, `lineTimes` and
+  `transcribed` (`speech/LineTimes.kt`).
+- Android to mirror: the Live/After chips on the Record bar (`NotebooksScreen.kt`), the status line
+  (`LectureScreen.kt`), the Not transcribed yet card (`NotTranscribedYet` in `ReviewScreen.kt`), and the pass itself
+  (`Recording.transcribe`, queued in `RecordingService`: at Stop on the charger, else when it charges).
+- Strings: `notebooks_record_*`, `notebooks_not_transcribed`, `lecture_record_only`, `transcribing`,
+  `review_transcribing`, `review_waiting_*`, `review_transcribe_now*`.
+
+## Recording at a glance, and Mark (Nov 15, 2026)
+
+- Shared: `LectureSession.mark`, `Note.isMark` (exports show a mark as ⚑ and its time).
+- Android to mirror: `ui/RecordingGlance.kt`, `LectureScreen(startInTranscript)`, the flag on `NotePill`
+  (`ReviewScreen.kt`), the notification's Mark action (`RecordingService`).
+- Strings: `glance_*` (plurals `glance_people`, `glance_notes`), `note_mark`.
+
+## Who was here? (Nov 15, 2026)
+
+- Shared: `review/People.kt` (`Person`, `peopleOf`, `Lecture.mergingSpeakers`), `ReviewState.people` and `knownNames`,
+  `LectureReview.namePerson`, `mergeSpeakers`, `playPerson`.
+- Android to mirror: `ui/PeopleSheet.kt`, the people button and `askPeople` in `ReviewScreen.kt`.
+- Strings: `people_*` (with the plurals `people_summary`, `people_lines`). Lab sample: `LabData.conversation`.
+
+## The moment as a conversation (Nov 15, 2026)
+
+- Shared: `Lecture.onlyOf`, `LectureReview.playOnly`, `ReviewState.onlySpeaker`; `transcriptText`, `LectureReview.text`.
+- Android to mirror in `ReviewScreen.kt`: compact turns in `Turn`, the live-draft line, the people chips above the
+  player and the faded lanes in `Overview`, the share menu.
+- Strings: `review_share`, `review_share_text`, `review_draft*`.
+
+## Finding moments (Nov 15, 2026)
+
+- Shared: `LectureSummary.people`, `unnamedPeople`, `preview` (`Lecture.summary`, `previewOf`); `notebook/Search.kt`
+  (`SearchHit`, `searchMoments`), `NotebooksController.search`; `LectureReview.rename`, `setLabels`, `open(atMillis)`.
+- Android to mirror: the search bar and `SearchResults`, `peopleLine` and the preview in `MomentRow`, the one list by
+  date (`NotebooksScreen.kt`); the title and labels taps, `RenameTitleDialog` (`ReviewScreen.kt`).
+- Strings: `notebooks_search*`, `notebooks_people_more`, `notebooks_add_label_quiet`, `review_rename*`,
+  `review_add_labels`, plurals `notebooks_voices`, `notebooks_search_more`. Lab sample: `LabData.conversations`.
