@@ -206,7 +206,7 @@
     <string name="settings_auto_improve">Improve automatically</string>
     <string name="settings_auto_improve_on">Each moment is transcribed again with its improve model after it stops, while the phone charges. If it isn\'t charging, the moment waits until the app is open on the charger.</string>
     <string name="settings_auto_improve_off">Off: improve any moment from its menu, when you want.</string>
-    <string name="settings_storage">Models and storage</string>
+    <string name="settings_storage">Recordings</string>
     <string name="settings_manage">Manage models</string>
     <string name="settings_manage_note">Download, delete, find on Hugging Face</string>
     <string name="settings_recognition">Speaker recognition</string>
@@ -325,4 +325,8 @@
     <string name="models_delete_text">Its files are deleted from the phone. It stays in the list, to download again.</string>
     <string name="models_removal_chosen">It is chosen now: its default is used instead.</string>
     <string name="models_removal_busy">It may be in use: stop recording or improving first.</string>
+    <string name="settings_advanced_note">Speaker models, the model library, processor meters</string>
+    <string name="settings_library">Models</string>
+    <string name="settings_meters_section">While recording</string>
+    <string name="settings_language_get">No model yet. Tap to get one.</string>
 </resources>
