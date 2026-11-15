@@ -40,6 +40,7 @@ internal fun ModelsLab(
     chip: String?,
     screen: @Composable (ModelsState, ModelsActions, HubSearch) -> Unit = { s, a, h -> ModelsScreen(s, a, h) },
 ) {
+    val labBack = LocalLabBack.current
     var statuses by remember {
         mutableStateOf(
             mapOf(
@@ -115,6 +116,7 @@ internal fun ModelsLab(
             speakerTuning = tuning, segmentationModel = segmentation,
         ),
         ModelsActions(
+            back = labBack,
             download = download,
             cancel = { statuses = statuses - it.id },
             delete = { statuses = statuses - it.id; npu = npu - it.id },

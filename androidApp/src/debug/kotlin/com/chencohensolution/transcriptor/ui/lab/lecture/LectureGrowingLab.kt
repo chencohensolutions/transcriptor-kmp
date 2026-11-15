@@ -74,7 +74,9 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
         voicePrints = ModelInUse("WeSpeaker SimAM-ResNet100", ModelInUse.Runs.Npu),
         speakerPassOnStop = true,
     )
+    val labBack = LocalLabBack.current
     val actions = LiveLectureActions(
+        back = labBack,
         pauseOrResume = { paused = !paused },
         addNote = { at, text -> lecture = lecture.copy(notes = lecture.notes + Note("mine${lecture.notes.size + 1}", at, text)) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name) else it }) },
