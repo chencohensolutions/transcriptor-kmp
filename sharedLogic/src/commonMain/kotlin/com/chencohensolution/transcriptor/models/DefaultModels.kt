@@ -37,11 +37,21 @@ object DefaultModels {
     private val multilingualLive = listOf(ModelCatalog.whisperTurbo)
     private val multilingualImprove = listOf(ModelCatalog.whisperLargeV3)
 
-    fun forLanguage(language: String, chip: String?): Defaults = Defaults(
-        live = (livePicks[language] ?: multilingualLive).firstOrNull { it.runsOn(chip) },
-        improve = (improvePicks[language] ?: multilingualImprove).firstOrNull { it.runsOn(chip) },
+    /**
+     * The defaults for [language] on [chip]. [fails] says a model's NPU build was tried here and doesn't load: the next
+     * pick (the CPU build) takes its place.
+     */
+    fun forLanguage(language: String, chip: String?, fails: (SpeechModel) -> Boolean = { false }): Defaults = Defaults(
+        live = (livePicks[language] ?: multilingualLive).firstOrNull { it.runsOn(chip) && !fails(it) },
+        improve = (improvePicks[language] ?: multilingualImprove).firstOrNull { it.runsOn(chip) && !fails(it) },
         voicePrints = ModelCatalog.voicePrints,
         // The owner uses DiariZen for speaker turns; it is non-commercial, so new installs get pyannote's.
         segmentation = ModelCatalog.speakerSegmentation,
     )
+
+    /**
+     * First run is offered while it isn't [done] and nothing that transcribes is downloaded: a phone that already has
+     * models (it was set up before first run existed) never sees it.
+     */
+    fun offerFirstRun(done: Boolean, anyTranscriberReady: Boolean) = !done && !anyTranscriberReady
 }

@@ -5,6 +5,7 @@ import com.chencohensolution.transcriptor.models.ModelCatalog
 import com.chencohensolution.transcriptor.models.ModelChoices
 import com.chencohensolution.transcriptor.models.ModelJob
 import kotlin.test.Test
+import okio.Path.Companion.toPath
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -50,5 +51,31 @@ class DefaultModelsTest {
     fun firstRunGetsTheSmallestFirst() {
         val sizes = DefaultModels.forLanguage(DefaultModels.FIRST_LANGUAGE, null).toDownload.map { it.sizeBytes }
         assertEquals(sizes.sorted(), sizes)
+    }
+
+    @Test
+    fun anNpuBuildThatDoesNotLoadGivesWayToTheCpuOne() {
+        val d = DefaultModels.forLanguage("he", "SM8750", fails = { it.loadsOnNpu })
+        assertEquals(ModelCatalog.ivritZipformer.id, d.live?.id)
+    }
+
+    @Test
+    fun firstRunIsOfferedOnlyToAPhoneWithNothingToTranscribeWith() {
+        assertTrue(DefaultModels.offerFirstRun(done = false, anyTranscriberReady = false))
+        assertTrue(!DefaultModels.offerFirstRun(done = false, anyTranscriberReady = true))
+        assertTrue(!DefaultModels.offerFirstRun(done = true, anyTranscriberReady = false))
+    }
+
+    @Test
+    fun theDefaultsAreUsedOnlyWhereNothingWasChosen() {
+        val fs = okio.fakefilesystem.FakeFileSystem()
+        val settings = com.chencohensolution.transcriptor.settings.SettingsStore(fs, "/s".toPath())
+        settings.setRefineModel("he", "mine")
+        settings.useDefaults("he", DefaultModels.forLanguage("he", null))
+        assertEquals(ModelCatalog.ivritZipformer.id, settings.liveModel("he"))
+        assertEquals("mine", settings.refineModel("he"))
+        assertTrue(!settings.firstRunDone)
+        settings.firstRunDone = true
+        assertTrue(settings.firstRunDone)
     }
 }

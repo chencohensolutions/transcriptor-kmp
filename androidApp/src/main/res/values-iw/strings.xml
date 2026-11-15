@@ -316,4 +316,17 @@
     <string name="meters_mhz">%1$d מתוך %2$d MHz</string>
     <string name="meters_npu_temperature">טמפרטורת ה־NPU</string>
     <string name="meters_celsius">%1$.1f°C</string>
+    <!-- First run: "Get your models" -->
+    <string name="first_run_title">הורדת המודלים</string>
+    <string name="first_run_body">Audio Logs מתמלל בטלפון, בלי לשלוח דבר לשום מקום. אלה המודלים שהוא משתמש בהם ל%1$s. הם יורדים ב־Wi-Fi.</string>
+    <string name="first_run_live">תמלול חי</string>
+    <string name="first_run_improve">שיפור אחרי ההקלטה</string>
+    <string name="first_run_voices">הבחנה בין קולות</string>
+    <string name="first_run_turns">מי מדבר מתי</string>
+    <string name="first_run_total">סך הכול %1$s</string>
+    <string name="first_run_background">ההורדה ממשיכה גם אם יוצאים מהמסך הזה. אפשר לראות אותה בהגדרות › מודלים.</string>
+    <string name="first_run_download">הורדה</string>
+    <string name="first_run_later">אחר כך</string>
+    <string name="first_run_start">התחלה</string>
+    <string name="first_run_continue">המשך</string>
 </resources>

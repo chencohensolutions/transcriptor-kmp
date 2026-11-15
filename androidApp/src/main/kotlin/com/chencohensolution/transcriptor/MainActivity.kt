@@ -96,6 +96,9 @@ class MainActivity : ComponentActivity() {
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
+                // A new install opens on "Get your models" (FirstRun), until it is answered.
+                var firstRun by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                LaunchedEffect(Unit) { if (firstRun == null) firstRun = withContext(Dispatchers.IO) { offerFirstRun() } }
                 // After Stop, the lecture just recorded opens once its last lines are in.
                 LaunchedEffect(last, live) {
                     val lecture = last
@@ -129,6 +132,7 @@ class MainActivity : ComponentActivity() {
                 val state = live
                 val review = opened
                 when {
+                    firstRun == true && state == null -> FirstRun(onDone = { firstRun = false })
                     state != null && showLive -> {
                         BackHandler { showLive = false }
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
@@ -319,7 +323,7 @@ private fun ReviewPasses() {
             refineModels = models.map {
                 ModelChoice(
                     it.id, it.name, ModelChoices.estimateMinutes(Recording.settings.improveSpeed(it.id), lecture.durationMillis),
-                    npu = it.kind == ModelKind.WhisperNpu,
+                    npu = it.kind.onNpu,
                 )
             },
             improveDefault = default?.id,
