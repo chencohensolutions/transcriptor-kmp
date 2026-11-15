@@ -490,4 +490,8 @@
     <string name="notebooks_record_only_note">מקליט בלבד. אפשר לתמלל מהרגע מתי שרוצים.</string>
     <string name="glance_recording_no_transcript">מקליט · בלי תמלול</string>
     <string name="lecture_record_no_transcript">מקליט בלבד. כדי לתמלל, הקישו \"לתמלל עכשיו\" ברגע מתי שרוצים.</string>
+    <string name="tile_stop_again">הקשה נוספת לעצירה</string>
+    <string name="settings_tile_stop_twice">שתי הקשות לעצירה מההגדרות המהירות</string>
+    <string name="settings_tile_stop_twice_on">פעיל: אריח ההקלטה מבקש הקשה נוספת לפני שהוא עוצר רגע.</string>
+    <string name="settings_tile_stop_twice_off">כבוי: הקשה אחת על אריח ההקלטה עוצרת את הרגע.</string>
 </resources>

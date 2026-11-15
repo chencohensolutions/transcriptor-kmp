@@ -484,4 +484,8 @@
     <string name="notebooks_record_only_note">Records only. Transcribe it from the moment whenever you want.</string>
     <string name="glance_recording_no_transcript">Recording · not transcribed</string>
     <string name="lecture_record_no_transcript">Recording only. Tap Transcribe now on the moment when you want its transcript.</string>
+    <string name="tile_stop_again">Tap again to stop</string>
+    <string name="settings_tile_stop_twice">Two taps to stop from Quick Settings</string>
+    <string name="settings_tile_stop_twice_on">On: the Record tile asks for a second tap before it stops a moment.</string>
+    <string name="settings_tile_stop_twice_off">Off: one tap on the Record tile stops the moment.</string>
 </resources>

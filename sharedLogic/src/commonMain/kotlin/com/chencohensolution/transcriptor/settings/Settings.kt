@@ -120,6 +120,8 @@ private data class SettingsFileV1(
     val recordOnly: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
     val quietRecording: Boolean = false,
+    /** The Quick Settings tile's Stop asks for a second tap; off by default (owner's choice, Nov 15, 2026). */
+    val tileStopTwice: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -203,6 +205,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var quietRecording: Boolean
         get() = read().quietRecording
         set(value) = write(read().copy(quietRecording = value))
+
+    /** The Quick Settings tile's Stop takes two taps, as in the app; off (the default): one (owner's choice, Nov 15, 2026). */
+    var tileStopTwice: Boolean
+        get() = read().tileStopTwice
+        set(value) = write(read().copy(tileStopTwice = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]
