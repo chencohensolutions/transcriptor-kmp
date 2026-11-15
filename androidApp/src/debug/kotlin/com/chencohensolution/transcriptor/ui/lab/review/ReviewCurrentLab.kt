@@ -113,7 +113,9 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         improveDefault = ModelCatalog.ivritLargeV3Npu.id.takeIf { modelsDownloaded },
         improveToGet = ModelToGet(ModelCatalog.ivritLargeV3.id, ModelCatalog.ivritLargeV3.name, ModelCatalog.ivritLargeV3.sizeBytes).takeIf { !modelsDownloaded },
     )
+    val labBack = LocalLabBack.current
     val actions = ReviewActions(
+        back = labBack,
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
         seek = { position = it.coerceIn(0, lecture.durationMillis) },
         playLine = { position = it.startMillis; playing = true },
