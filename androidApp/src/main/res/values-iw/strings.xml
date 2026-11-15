@@ -412,4 +412,22 @@
         <item quantity="other">%1$d סימונים והערות</item>
     </plurals>
     <string name="lecture_stop_again">הקשה נוספת על סיום תסיים את הרגע</string>
+    <string name="people_title">מי היה כאן?</string>
+    <string name="people_none">לא זוהו קולות ברגע הזה.</string>
+    <string name="people_done">סיום</string>
+    <string name="people_play">להשמיע את %1$s</string>
+    <string name="people_merge">מיזוג</string>
+    <string name="people_merge_title">אותו אדם כמו</string>
+    <string name="people_share">%1$d%%</string>
+    <string name="people_minor">רק כמה שורות קצרות. לעיתים קרובות חלק ממישהו אחר.</string>
+    <plurals name="people_summary">
+        <item quantity="one">קול אחד ב־%2$s. אפשר להשמיע כדי לשמוע מי זה.</item>
+        <item quantity="two">%1$d קולות ב־%2$s. אפשר להשמיע אחד כדי לשמוע מי זה.</item>
+        <item quantity="other">%1$d קולות ב־%2$s. אפשר להשמיע אחד כדי לשמוע מי זה.</item>
+    </plurals>
+    <plurals name="people_lines">
+        <item quantity="one">שורה אחת</item>
+        <item quantity="two">%1$d שורות</item>
+        <item quantity="other">%1$d שורות</item>
+    </plurals>
 </resources>

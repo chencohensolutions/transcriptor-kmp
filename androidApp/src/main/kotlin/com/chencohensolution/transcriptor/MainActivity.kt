@@ -94,6 +94,8 @@ class MainActivity : ComponentActivity() {
                 val last by Recording.lastLecture.collectAsStateWithLifecycle()
                 val working by Recording.working.collectAsStateWithLifecycle(emptyMap())
                 var openAfterStop by remember { mutableStateOf(false) }
+                // The moment just recorded asks "Who was here?" once when it opens (by its id).
+                var askPeopleOf by remember { mutableStateOf<String?>(null) }
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
@@ -102,6 +104,7 @@ class MainActivity : ComponentActivity() {
                     val lecture = last
                     if (openAfterStop && live == null && lecture != null) {
                         openAfterStop = false
+                        askPeopleOf = lecture.id
                         openLecture(lecture.id)
                     }
                 }
@@ -153,10 +156,14 @@ class MainActivity : ComponentActivity() {
                         val r = Recording.review
                         ReviewScreen(
                             review,
-                            ReviewActions(
+                            askPeople = askPeopleOf == review.lecture.id,
+                            actions = ReviewActions(
                                 back = r::close, playPause = r::playPause, seek = r::seek, playLine = r::playLine,
                                 cycleSpeed = r::cycleSpeed, editLine = r::editLine, setLineSpeaker = r::setLineSpeaker,
                                 renameSpeaker = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.renameSpeaker(id, name) } },
+                                namePerson = { id, name -> lifecycleScope.launch(Dispatchers.IO) { r.namePerson(id, name) } },
+                                mergeSpeakers = { from, into -> lifecycleScope.launch(Dispatchers.IO) { r.mergeSpeakers(from, into) } },
+                                playPerson = r::playPerson,
                                 findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
                                 tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
                                 improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },

@@ -18,6 +18,7 @@ import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.review.ReviewState
+import com.chencohensolution.transcriptor.review.mergingSpeakers
 import kotlinx.coroutines.delay
 
 // Fakes: playback (a clock; no audio), the improve pass and the speaker pass (progress, then made-up results), the
@@ -43,18 +44,26 @@ internal val reviewCurrentWaiting = LabOption("current-waiting", "The app's, rec
     ReviewScreen(state, actions)
 }
 
+// Fakes: as `current`, with an English conversation of four (LabData.conversation) as it opens after Stop: "Who was
+// here?" comes up by itself. Names, merging and the samples work in memory (a sample moves the playhead; no audio);
+// the known voices offered are made up.
+internal val reviewCurrentPeople = LabOption("current-people", "The app's, a conversation of four: Who was here?", "ReviewScreen on an English conversation, the people sheet open") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = LabData.conversation)
+    ReviewScreen(state, actions, askPeople = true)
+}
+
 /**
  * Fakes for the lab: playback (a clock that runs at the speed), the improve pass (six seconds, then the lines as the
  * large model wrote them, edited lines kept) and the speaker pass (four seconds, then the student's question split
  * off and named speakers kept); edits, notes and renames in memory.
  */
 @Composable
-private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = false): Pair<ReviewState, ReviewActions> {
+private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = false, sample: com.chencohensolution.transcriptor.notebook.Lecture? = null): Pair<ReviewState, ReviewActions> {
     val context = LocalContext.current
     // The sample's ten lines are its first three minutes: the lecture ends there, so the timeline is full.
-    val recorded = LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)
+    val recorded = sample ?: LabData.liveLectureWithSpeakers.copy(notes = LabData.lecture.notes, durationMillis = 195_000)
     var lecture by remember { mutableStateOf(if (waiting) recorded.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true) else recorded) }
-    var position by remember { mutableStateOf(65_000L) }
+    var position by remember { mutableStateOf(sample?.segments?.firstOrNull()?.startMillis ?: 65_000L) }
     var playing by remember { mutableStateOf(false) }
     var speed by remember { mutableStateOf(1f) }
     var refine by remember { mutableStateOf<PassState>(PassState.NotRun) }
@@ -83,7 +92,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
-        labelNames = LabData.labels.first().name, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = if (sample == null) LabData.labels.first().name else "", knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
@@ -102,6 +111,12 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         editLine = { id, text -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == id) it.copy(text = text.trim(), edited = true) else it }) },
         setLineSpeaker = { line, speaker -> lecture = lecture.copy(segments = lecture.segments.map { if (it.id == line) it.copy(speakerId = speaker) else it }) },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it }) },
+        namePerson = { id, name ->
+            val same = lecture.speakers.firstOrNull { it.id != id && it.name.isNotEmpty() && it.name.equals(name.trim(), ignoreCase = true) }
+            lecture = if (same != null) lecture.mergingSpeakers(id, same.id) else lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name.trim()) else it })
+        },
+        mergeSpeakers = { from, into -> lecture = lecture.mergingSpeakers(from, into) },
+        playPerson = { id -> lecture.segments.filter { it.speakerId == id }.maxByOrNull { it.endMillis - it.startMillis }?.let { position = it.startMillis; playing = true } },
         improve = { _, first ->
             if (first) { thenImprove = true; speakers = PassState.Running(0f) } else if (refine !is PassState.Running) refine = PassState.Running(0f)
         },

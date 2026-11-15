@@ -21,6 +21,22 @@ transcribed yet**, that it is transcribed when the phone charges, and **Transcri
 model and about how long it takes (`ReviewActions.improve`); with no model, the one to get. While the pass runs the
 bar says "Transcribing · n%". Its notes are listed under the card, and the recording plays.
 
+## Who was here?
+
+The people button in the top bar opens a sheet with every voice of the moment, the one who talked most first
+(`ReviewState.people`, `peopleOf`). It also opens by itself once, when a moment just recorded opens after Stop with two
+or more voices and one still unnamed (`askPeople`).
+
+- **Play**: the voice's longest line, to hear who it is; again pauses it (`LectureReview.playPerson`).
+- **Name**: a field per voice; while it is empty and focused, the voices the app knows are offered as chips
+  (`ReviewState.knownNames`, those not in this moment first). Kept on Done on the keyboard, on leaving the field and
+  when the sheet closes (`namePerson`), in the moment and in the app's voices with a print, as naming from a chip does.
+- **Merge**: the merge button lists the other voices under "The same person as": the voice's lines become the other's
+  and it is gone (`mergeSpeakers`, `Lecture.mergingSpeakers`); a named voice's print is made again from all its lines.
+  Typing a name someone here already has merges the two as well. A voice with at most 3 lines and under 5% of the
+  talking (`Person.minor`) says it is often a piece of someone else, with Merge beside it.
+- Its share of the talking and its number of lines are under each name.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.
@@ -62,7 +78,7 @@ bar says "Transcribing · n%". Its notes are listed under the card, and the reco
   `renameSpeaker`, `addNote`, `editNote`, `deleteNote`, `speakerPass`), `review/AudioPlayer.kt`.
 - Android: `review/AndroidAudioPlayer.kt` (MediaPlayer; sharedLogic's androidMain); `Recording.printOf` (a speaker's
   voice print, with `RecordingAudio.range`); `MainActivity.kt` (opening it; the speaker pass's state).
-- Lab: `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/review/ReviewCurrentLab.kt`, the screen
+- Lab: `review current-people` (an English conversation of four, the sheet open), and `androidApp/src/debug/kotlin/com/chencohensolution/transcriptor/ui/lab/review/ReviewCurrentLab.kt`, the screen
   with faked playback and passes (`./scripts/ui-lab.sh review current`).
 
 ## Design history

@@ -89,4 +89,39 @@ object LabData {
         summary("lecture-5", "קשב סלקטיבי", 14, 91, 6, listOf("psych")),
         summary("lecture-4", "תפיסה חזותית", 21, 85, 9, listOf("psych")),
     )
+
+    /**
+     * A casual English conversation of four at a table (the app's main use): short turns, one long one, and a sliver
+     * that live speaker turns split off Maya ("Speaker 5"). Hen's voice was known; the others aren't named yet.
+     */
+    val conversation: Lecture = run {
+        val said = listOf(
+            "speaker-2" to "no, the second weekend, the first one they're fully booked",
+            "speaker-3" to "the guy said he'd throw in the boat",
+            "speaker-1" to "wait, what boat",
+            "speaker-3" to "there's a rowing boat. It's on the listing, third photo, under the tarp. I asked him about it when we spoke and he said nobody ever uses it, so it's ours for the weekend if we want it.",
+            "speaker-4" to "I'm not rowing anything",
+            "speaker-2" to "you say that now",
+            "speaker-5" to "every time",
+            "speaker-1" to "okay so who's driving, because my car is still at the garage",
+            "speaker-4" to "I can take three, plus the bags if we pack light",
+            "speaker-3" to "pack light, she says",
+            "speaker-2" to "we leave Friday at four then, before the traffic",
+            "speaker-1" to "four works. I'll bring the grill.",
+        )
+        var at = 724_000L
+        val lines = said.mapIndexed { i, (speaker, text) ->
+            val length = 900L + text.length * 62L
+            Segment("s${i + 1}", at, at + length, text, "whisper-large-v3", speakerId = speaker).also { at += length + 350 }
+        }
+        Lecture(
+            id = "lab-conversation", title = "Sat dinner", language = "en", startedAtMillis = LECTURE_START - 2 * 24 * 60 * MIN,
+            durationMillis = 42 * MIN + 8_000, segments = lines,
+            notes = listOf(Note("n1", lines[3].endMillis, "ask about the boat")),
+            speakers = listOf(Speaker("speaker-1", "Hen"), Speaker("speaker-2", ""), Speaker("speaker-3", ""), Speaker("speaker-4", ""), Speaker("speaker-5", "")),
+        )
+    }
+
+    /** The voices the app would know for [conversation]. */
+    val knownNames = listOf("Dan", "Maya", "Noa", "Hen")
 }

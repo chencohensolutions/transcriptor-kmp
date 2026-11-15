@@ -410,4 +410,20 @@
         <item quantity="other">%1$d marks and notes</item>
     </plurals>
     <string name="lecture_stop_again">Tap Stop again to end the moment</string>
+    <string name="people_title">Who was here?</string>
+    <string name="people_none">No voices were told apart in this moment.</string>
+    <string name="people_done">Done</string>
+    <string name="people_play">Play %1$s</string>
+    <string name="people_merge">Merge</string>
+    <string name="people_merge_title">The same person as</string>
+    <string name="people_share">%1$d%%</string>
+    <string name="people_minor">Only a few short lines. Often a piece of someone else.</string>
+    <plurals name="people_summary">
+        <item quantity="one">%1$d voice in %2$s. Play it to hear who it is.</item>
+        <item quantity="other">%1$d voices in %2$s. Play one to hear who it is.</item>
+    </plurals>
+    <plurals name="people_lines">
+        <item quantity="one">%1$d line</item>
+        <item quantity="other">%1$d lines</item>
+    </plurals>
 </resources>

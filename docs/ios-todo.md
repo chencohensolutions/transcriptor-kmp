@@ -165,3 +165,10 @@ anything left to decide. Remove an entry once it is built.
 - Android to mirror: `ui/RecordingGlance.kt`, `LectureScreen(startInTranscript)`, the flag on `NotePill`
   (`ReviewScreen.kt`), the notification's Mark action (`RecordingService`).
 - Strings: `glance_*` (plurals `glance_people`, `glance_notes`), `note_mark`.
+
+## Who was here? (Nov 15, 2026)
+
+- Shared: `review/People.kt` (`Person`, `peopleOf`, `Lecture.mergingSpeakers`), `ReviewState.people` and `knownNames`,
+  `LectureReview.namePerson`, `mergeSpeakers`, `playPerson`.
+- Android to mirror: `ui/PeopleSheet.kt`, the people button and `askPeople` in `ReviewScreen.kt`.
+- Strings: `people_*` (with the plurals `people_summary`, `people_lines`). Lab sample: `LabData.conversation`.
