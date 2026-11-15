@@ -511,7 +511,6 @@
     <string name="settings_mic_close">סגירה</string>
     <string name="glance_mic">מיקרופון: %1$s</string>
     <string name="glance_mic_missing">%1$s לא מחובר: מקליט מהטלפון</string>
-    <string name="tile_stop_again">הקשה נוספת לעצירה</string>
     <string name="tile_finishing">מסיים…</string>
     <string name="notebooks_record_only">בלי תמלול</string>
     <string name="notebooks_record_only_note">מקליט בלבד. אפשר לתמלל מהרגע מתי שרוצים.</string>
@@ -550,4 +549,8 @@
     <string name="info_samples">מדידות</string>
     <string name="info_whole_phone">החשמל והסוללה הם של כל הטלפון (גם המסך ואפליקציות אחרות); המעבד הוא של האפליקציה בלבד, המספר היציב יותר להשוואה בין פורמטים.</string>
     <string name="info_recorded_as">הוקלט כ־</string>
+    <string name="tile_stop_again">הקשה נוספת לעצירה</string>
+    <string name="settings_tile_stop_twice">שתי הקשות לעצירה מההגדרות המהירות</string>
+    <string name="settings_tile_stop_twice_on">פעיל: אריח ההקלטה מבקש הקשה נוספת לפני שהוא עוצר רגע.</string>
+    <string name="settings_tile_stop_twice_off">כבוי: הקשה אחת על אריח ההקלטה עוצרת את הרגע.</string>
 </resources>

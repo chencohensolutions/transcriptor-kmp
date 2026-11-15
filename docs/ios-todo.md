@@ -216,3 +216,5 @@ anything left to decide. Remove an entry once it is built.
 
 - `LectureReview.info()` (`MomentInfo`: the lecture, `LectureStore.audioBytes`, `loadPower`, `loadEncodePower`);
   `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.
+  language, `SettingsStore.recordLive`) and stops with one tap. iOS: a Control Center control (`ControlWidget`,
+  iOS 18) with an App Intent doing the same. String `tile_finishing`.

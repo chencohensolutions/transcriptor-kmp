@@ -145,6 +145,8 @@ private data class SettingsFileV1(
     val quietRecording: Boolean = false,
     /** The microphone picked to record from ([MicInput]); null: the phone's own. */
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
+    /** The Quick Settings tile's Stop asks for a second tap; off by default (owner's choice, Nov 15, 2026). */
+    val tileStopTwice: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -238,6 +240,10 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var micInput: com.chencohensolution.transcriptor.recording.MicInput?
         get() = read().micInput
         set(value) = write(read().copy(micInput = value))
+    /** The Quick Settings tile's Stop takes two taps, as in the app; off (the default): one (owner's choice, Nov 15, 2026). */
+    var tileStopTwice: Boolean
+        get() = read().tileStopTwice
+        set(value) = write(read().copy(tileStopTwice = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]
