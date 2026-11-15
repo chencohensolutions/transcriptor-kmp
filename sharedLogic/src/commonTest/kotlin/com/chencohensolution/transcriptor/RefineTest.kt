@@ -43,6 +43,42 @@ class RefineTest {
         assertEquals(listOf(1f / 3, 2f / 3, 1f), progress)
         assertEquals("large", refined.refinedWith)
     }
+
+    /** Times its words: "מילה<t>" every second of the stretch, t its second in the stretch, said at t s + 0.5 s. */
+    private class TimedModel : SpeechEngine {
+        override fun transcribe(samples: FloatArray, language: String, prompt: String?) = error("not a line at a time")
+        override val timesWords = true
+        override fun transcribeWords(samples: FloatArray, language: String) =
+            (0 until samples.size / 16_000).map { t -> Piece(t * 1_000L + 400, t * 1_000L + 600, " \u202Bמילה$t") }
+        override fun close() {}
+    }
+
+    @Test
+    fun linesThatFitAreImprovedTogetherAndGetTheirWordsBackByTime() {
+        val lecture = Lecture(
+            "l", "t", "he", 0, 60_000,
+            segments = listOf(
+                Segment("s1", 0, 2_000, "א", "live"),
+                Segment("s2", 2_000, 4_000, "ב", "live"),
+                Segment("s3", 4_000, 5_000, "ידני", "live", edited = true),
+                Segment("s4", 5_000, 20_000, "ג", "live"),
+                Segment("s5", 20_000, 40_000, "ד", "live"),
+            ),
+            notes = emptyList(),
+        )
+        val asked = mutableListOf<Pair<Long, Long>>()
+        val progress = mutableListOf<Float>()
+        val refined = RefinePass(TimedModel(), "he") { a, b -> asked += a to b; FloatArray(((b - a) * 16).toInt()) }
+            .run(lecture, "large", progress::add)
+        // s1 and s2 together (an edited line ends the window), s4 alone (s5 would make it longer than 28 s), s5 alone.
+        assertEquals(listOf(0L to 4_300L, 4_800L to 20_300L, 19_800L to 40_300L), asked)
+        // Words said at 0.5 s and 1.5 s are s1's, 2.5 s and 3.5 s s2's; without Whisper's direction marks.
+        assertEquals("מילה0 מילה1", refined.segments[0].text)
+        assertEquals("מילה2 מילה3", refined.segments[1].text)
+        assertEquals("ידני", refined.segments[2].text)
+        assertEquals("large", refined.segments[3].modelId)
+        assertEquals(listOf(0.2f, 0.4f, 0.6f, 0.8f, 1f), progress)
+    }
 }
 
 class VersionTest {
