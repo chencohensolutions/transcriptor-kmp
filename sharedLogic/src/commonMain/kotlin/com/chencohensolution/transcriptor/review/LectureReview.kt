@@ -43,6 +43,14 @@ class LectureReview(
         /** The live stretches kept with the lecture (model id, stretches), read once. */
         var live: com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? = null
         var liveRead = false
+        /** The names of the voices the app knows, read once. */
+        var known: List<String>? = null
+    }
+
+    private fun Open.knownNames(): List<String> {
+        val all = known ?: runCatching { voices?.all().orEmpty().map { it.name }.distinct().sorted() }.getOrDefault(emptyList()).also { known = it }
+        val here = lecture.speakers.map { it.name }.toSet()
+        return all.filter { it !in here } + all.filter { it in here }
     }
 
     private fun Open.liveSpeakers(): com.chencohensolution.transcriptor.notebook.KeptLiveSpeakers? {
@@ -96,6 +104,7 @@ class LectureReview(
                     labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                     improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
+                    knownNames = it.knownNames(),
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -202,6 +211,43 @@ class LectureReview(
         if (voices == null) return
         if (old.isNotEmpty() && old != clean) voices.rename(old, clean)
         printOf(after, id)?.let { voices.save(Voice(clean, it)) }
+    }
+
+    /**
+     * "Who was here?": [name] for a speaker. A name another speaker of this moment already has means the two are one
+     * person, so they are merged ([mergeSpeakers]) instead of there being two of that name. Reads the recording for the
+     * voice print: not on the main thread.
+     */
+    fun namePerson(id: String, name: String) {
+        val clean = name.trim()
+        val l = lecture ?: return
+        if (clean.isEmpty()) return
+        val same = l.speakers.firstOrNull { it.id != id && it.name.isNotEmpty() && it.name.equals(clean, ignoreCase = true) }
+        if (same != null) mergeSpeakers(id, same.id) else renameSpeaker(id, clean)
+    }
+
+    /**
+     * Two speakers were one person: [from]'s lines become [into]'s and [from] is gone. A named [into]'s voice print
+     * is made again from all its lines now, for the next moments. Reads the recording: not on the main thread.
+     */
+    fun mergeSpeakers(from: String, into: String) {
+        val before = lecture ?: return
+        val after = change { it.mergingSpeakers(from, into) } ?: return
+        if (after == before || voices == null) return
+        val name = after.speakers.firstOrNull { it.id == into }?.name.orEmpty()
+        if (name.isNotEmpty()) printOf(after, into)?.let { voices.save(Voice(name, it)) }
+    }
+
+    /** Plays a speaker's sample (their longest line), to hear who it is; pauses when it is what is playing. */
+    fun playPerson(speakerId: String) {
+        val o = open.value ?: return
+        val person = peopleOf(o.lecture).firstOrNull { it.speakerId == speakerId } ?: return
+        val at = player.positionMillis.value
+        if (player.playing.value && at in person.sampleStartMillis until person.sampleEndMillis) player.pause()
+        else {
+            player.seekTo(person.sampleStartMillis)
+            player.play()
+        }
     }
 
     /**

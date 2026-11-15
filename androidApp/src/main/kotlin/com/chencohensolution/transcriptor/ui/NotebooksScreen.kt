@@ -602,7 +602,7 @@ private fun momentDay(millis: Long, now: Long): String = when (now / DAY - milli
 }
 
 @Composable
-private fun momentLength(millis: Long): String {
+internal fun momentLength(millis: Long): String {
     val minutes = (millis / 60_000).toInt()
     return when {
         minutes < 60 -> stringResource(R.string.notebooks_minutes, minutes)

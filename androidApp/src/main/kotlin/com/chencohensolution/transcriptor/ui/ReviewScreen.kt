@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -111,6 +112,12 @@ class ReviewActions(
     /** Moves a line to another speaker. */
     val setLineSpeaker: (lineId: String, speakerId: String) -> Unit = { _, _ -> },
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
+    /** "Who was here?": names a speaker; a name someone here already has merges the two. */
+    val namePerson: (id: String, name: String) -> Unit = { _, _ -> },
+    /** Two speakers were one person: [from]'s lines become [into]'s. */
+    val mergeSpeakers: (from: String, into: String) -> Unit = { _, _ -> },
+    /** Plays a speaker's sample, or pauses it. */
+    val playPerson: (id: String) -> Unit = {},
     /**
      * Improves the lecture with a model (a [com.chencohensolution.transcriptor.review.ModelChoice]'s id), after the
      * speaker pass when [speakersFirst].
@@ -149,7 +156,7 @@ class ReviewActions(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
+fun ReviewScreen(state: ReviewState, actions: ReviewActions, askPeople: Boolean = false) {
     var confirmingDelete by remember { mutableStateOf(false) }
     if (confirmingDelete) AlertDialog(
         onDismissRequest = { confirmingDelete = false },
@@ -173,6 +180,9 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
     var noting by remember { mutableStateOf<Long?>(null) }
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
+    // "Who was here?": from its button, and by itself once for a moment just recorded with voices still unnamed.
+    var showingPeople by remember(state.lecture.id) { mutableStateOf(askPeople && state.people.size >= 2 && state.people.any { it.name.isEmpty() }) }
+    if (showingPeople) PeopleSheet(state, actions, onDismiss = { showingPeople = false })
     var tuning by remember { mutableStateOf<LectureReview.TuneProposal?>(null) }
     var noTuning by remember { mutableStateOf(false) }
     tuning?.let { p -> TuneDialog(p, onDismiss = { tuning = null }) { actions.applySpeakerTuning(p); tuning = null } }
@@ -198,6 +208,7 @@ fun ReviewScreen(state: ReviewState, actions: ReviewActions) {
                         Text(state.lecture.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = titleDirection(state.lecture.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    if (state.people.isNotEmpty()) IconButton(onClick = { showingPeople = true }) { Icon(Icons.Filled.Group, stringResource(R.string.people_title)) }
                     Box(
                         Modifier.size(48.dp).clip(CircleShape).combinedClickable(onClick = actions.shareWord, onLongClick = actions.saveWord),
                         contentAlignment = Alignment.Center,

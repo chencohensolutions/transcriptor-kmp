@@ -140,3 +140,10 @@ anything left to decide. Remove an entry once it is built.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
   iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.
+
+## Who was here? (Nov 15, 2026)
+
+- Shared: `review/People.kt` (`Person`, `peopleOf`, `Lecture.mergingSpeakers`), `ReviewState.people` and `knownNames`,
+  `LectureReview.namePerson`, `mergeSpeakers`, `playPerson`.
+- Android to mirror: `ui/PeopleSheet.kt`, the people button and `askPeople` in `ReviewScreen.kt`.
+- Strings: `people_*` (with the plurals `people_summary`, `people_lines`). Lab sample: `LabData.conversation`.
