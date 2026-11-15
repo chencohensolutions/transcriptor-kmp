@@ -20,6 +20,26 @@ enum class AudioFormat {
     @SerialName("flac-live") FlacLive,
 }
 
+/** How the lecture screen shows the processors' load while recording (Settings › Advanced). */
+enum class ProcessorMeterStyle(val key: String) {
+    /** No meters, and nothing is read. */
+    Off("off"),
+
+    /** A slim strip of three bars under the top bar: CPU (this app), GPU (the phone), NPU (our use). */
+    Bars("bars"),
+
+    /** A small chip with three tiny bars; tapping it opens a sheet with the bars, the clocks and the NPU's temperature. */
+    Chip("chip"),
+
+    /** The last minute as three small graphs under the top bar; tapping folds them into one line. */
+    Graphs("graphs");
+
+    companion object {
+        /** The style kept as [key]; anything else (a newer app's) is [Off]. */
+        fun of(key: String?) = entries.firstOrNull { it.key == key } ?: Off
+    }
+}
+
 /**
  * FLAC's compression levels: 0 is the fastest, 8 the smallest file. Every level keeps the same sound (FLAC is lossless);
  * from 0 to 8 the file shrinks by a few percent and encoding takes several times longer.
@@ -57,7 +77,7 @@ private data class SettingsFileV1(
     val autoImprove: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
-    /** Lectures to improve on their own once the phone is charging ("notebookId/lectureId"). */
+    /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
     val improvePending: List<String> = emptyList(),
     /** The lectures folder outside the app (Android: a document URI under the picked tree); null before one is picked. */
     val lectureFolder: String? = null,
@@ -69,6 +89,8 @@ private data class SettingsFileV1(
     val speakerTuning: Map<String, Float> = emptyMap(),
     /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
     val segmentationModel: String? = null,
+    /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
+    val processorMeters: String = ProcessorMeterStyle.Off.key,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -110,15 +132,18 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         write(read().let { it.copy(improveSpeeds = it.improveSpeeds + (modelId to workMillis.toDouble() / audioMillis)) })
     }
 
-    /** Lectures waiting to be improved on their own, as (notebook id, lecture id), oldest first. */
-    val improvePending: List<Pair<String, String>>
-        get() = read().improvePending.mapNotNull { it.split('/').takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
+    /**
+     * Moments waiting to be improved on their own, by id, oldest first (kept before labels as "notebook id/lecture
+     * id": read as the lecture id).
+     */
+    val improvePending: List<String>
+        get() = read().improvePending.map { it.substringAfterLast('/') }.distinct()
 
-    fun addImprovePending(notebookId: String, lectureId: String) =
-        write(read().let { it.copy(improvePending = (it.improvePending + "$notebookId/$lectureId").distinct()) })
+    fun addImprovePending(lectureId: String) =
+        write(read().let { it.copy(improvePending = (it.improvePending.map { p -> p.substringAfterLast('/') } + lectureId).distinct()) })
 
-    fun removeImprovePending(notebookId: String, lectureId: String) =
-        write(read().let { it.copy(improvePending = it.improvePending - "$notebookId/$lectureId") })
+    fun removeImprovePending(lectureId: String) =
+        write(read().let { it.copy(improvePending = it.improvePending.filter { p -> p.substringAfterLast('/') != lectureId }) })
 
     /** Where finished lectures are kept, outside the app; null keeps them in the app's storage. */
     var lectureFolder: String?
@@ -141,6 +166,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var segmentationModel: String?
         get() = read().segmentationModel
         set(value) = write(read().copy(segmentationModel = value))
+
+    /** The processor meters on the lecture screen while recording; off by default. */
+    var processorMeters: ProcessorMeterStyle
+        get() = ProcessorMeterStyle.of(read().processorMeters)
+        set(value) = write(read().copy(processorMeters = value.key))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
     fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: 0f

@@ -132,6 +132,20 @@ class HubTest {
         assertNull(npuOf("x/zipformer-qnn-sm8650", listOf("encoder.onnx", "encoder.bin"), emptyList()))
         assertNull(npuOf("x/zipformer-qnn-sm8650", listOf("encoder.bin"), emptyList())?.runtime)
         assertEquals("2.31", npuOf("x/whisper-small", listOf("encoder.bin", "decoder.bin"), listOf("qairt-2.31", "sm8750"))?.runtime)
+        // No measured peak on its card: estimated.
+        assertNull(installed.npuPeakBytes)
+    }
+
+    @Test
+    fun anNpuBuildsCardCanStateItsMeasuredPeakMemory() {
+        val withPeak = npuRepo.replace(""""language":["he"]}""", """"language":["he"],"npu_peak_memory_mb":5000}""")
+        val m = assertNotNull(hubModel(parseSearch("[$npuSearch]").single(), parseRepo(withPeak)))
+        assertEquals(5000L * 1024 * 1024, m.npuPeakBytes)
+        assertEquals(5000L * 1024 * 1024, m.toSpeechModel(m.variants.single()).npuPeakBytes)
+        // A CPU model's card can't set one.
+        val cpu = cppRepo.replace(""""cardData":{""", """"cardData":{"npu_peak_memory_mb":900,""")
+        val c = assertNotNull(hubModel(parseSearch("[$cppSearch]").single(), parseRepo(cpu)))
+        assertNull(c.toSpeechModel(c.variants.first()).npuPeakBytes)
     }
 
     @Test

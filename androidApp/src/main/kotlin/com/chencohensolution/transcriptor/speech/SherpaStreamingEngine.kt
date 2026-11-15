@@ -17,6 +17,7 @@ import java.io.File
  * [PAUSE_AFTER_SPEECH_S] of quiet after words, or [MAX_LINE_S].
  */
 class SherpaStreamingEngine(dir: File, npuLibDir: String? = null) : StreamingEngine {
+    private val onNpu = npuLibDir != null
     private val recognizer = OnlineRecognizer(
         config = OnlineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80, dither = 0f),
@@ -55,7 +56,7 @@ class SherpaStreamingEngine(dir: File, npuLibDir: String? = null) : StreamingEng
 
     override fun accept(samples: FloatArray) {
         stream.acceptWaveform(samples, 16_000)
-        while (recognizer.isReady(stream)) recognizer.decode(stream)
+        while (recognizer.isReady(stream)) if (onNpu) npuBusy.time { recognizer.decode(stream) } else recognizer.decode(stream)
     }
 
     override val text: String get() = recognizer.getResult(stream).text

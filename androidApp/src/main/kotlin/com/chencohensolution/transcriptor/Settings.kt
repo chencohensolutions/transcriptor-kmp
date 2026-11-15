@@ -39,6 +39,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var flacLevel by remember { mutableStateOf(Recording.settings.flacLevel) }
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
+    var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var checking by remember { mutableStateOf(emptySet<String>()) }
@@ -72,12 +73,12 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             }
         }
     }
-    val languages = (library.notebooks.map { it.language } + library.unfiledLanguage + Recording.phoneLanguage() + added).distinct()
+    val languages = (library.moments.map { it.language } + library.lastLanguage + Recording.phoneLanguage() + added).distinct()
     val state = ModelsState(
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder,
+        npu = npu, audioFormat = format, flacLevel = flacLevel, findSpeakersOnStop = speakers, autoImprove = auto, folder = folder, processorMeters = meters,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -111,6 +112,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
+            setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->

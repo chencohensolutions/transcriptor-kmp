@@ -1,10 +1,12 @@
 package com.chencohensolution.transcriptor.recording
 
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 
 /** The lecture screen while recording, as [LectureSession] produces it. */
 data class LiveLectureState(
-    val notebookTitle: String,
+    /** The moment's labels' names ("Psychology, Exam"); empty for none. */
+    val labelNames: String,
     val lecture: Lecture,
     /** The line live transcription is writing now, before its end; null in a pause between lines, or without it. */
     val partial: String?,
@@ -28,6 +30,17 @@ data class LiveLectureState(
     val speakerPassOnStop: Boolean = false,
     /** Speakers are found live with segmentation ([com.chencohensolution.transcriptor.speech.LiveSpeakers]). */
     val speakersLive: Boolean = false,
+    /**
+     * The live model picked, passed over because its NPU load didn't fit in the free memory at the start (its name):
+     * [liveModelName] runs instead, this time only.
+     */
+    val skippedForMemory: String? = null,
+    /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
+    val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
+    /** How hard the processors are working (refreshed about every second); null until the first reading. */
+    val meters: ProcessorMeters? = null,
+    /** The last minute of [meters], oldest first, for [ProcessorMeterStyle.Graphs]. */
+    val meterHistory: List<ProcessorMeters> = emptyList(),
 )
 
 /** A model a recording uses ([name], for the screen) and where it runs: unknown until it loads. */

@@ -1,22 +1,14 @@
 package com.chencohensolution.transcriptor.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,15 +21,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
@@ -55,18 +48,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,40 +74,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.models.Languages
+import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.LectureSummary
-import com.chencohensolution.transcriptor.notebook.Notebook
 import com.chencohensolution.transcriptor.notebook.NotebooksState
 import com.chencohensolution.transcriptor.notebook.RecordingNow
-import com.chencohensolution.transcriptor.notebook.UNFILED
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class NotebooksActions(
-    /** Opens a recorded lecture ([UNFILED] for one not in a notebook). */
-    val openLecture: (notebookId: String, lectureId: String) -> Unit = { _, _ -> },
-    /** Starts a lecture in a notebook, or in none (null) in [language], to file later. */
-    val record: (notebookId: String?, language: String) -> Unit = { _, _ -> },
+    /** Opens a recorded moment. */
+    val openLecture: (lectureId: String) -> Unit = {},
+    /** Starts a moment with these labels (maybe none) in [language]. */
+    val record: (labels: List<String>, language: String) -> Unit = { _, _ -> },
     val backToRecording: () -> Unit = {},
-    val newNotebook: (title: String, language: String) -> Unit = { _, _ -> },
-    /** Files an unfiled lecture into a notebook. */
-    val assign: (lectureId: String, notebookId: String) -> Unit = { _, _ -> },
-    /** Makes a notebook and files an unfiled lecture into it. */
-    val assignToNew: (lectureId: String, title: String, language: String) -> Unit = { _, _, _ -> },
+    /** Makes a label; returns its id. */
+    val newLabel: (name: String) -> String = { "" },
+    /** Adds [add] and removes [remove] on every moment in [lectureIds]. */
+    val setLabels: (lectureIds: List<String>, add: Set<String>, remove: Set<String>) -> Unit = { _, _, _ -> },
+    val renameLabel: (labelId: String, name: String) -> Unit = { _, _ -> },
+    /** Deletes a label: its moments stay, without it. */
+    val deleteLabel: (labelId: String) -> Unit = {},
     val settings: () -> Unit = {},
     /** Opens the system's folder picker for the lectures folder. */
     val chooseFolder: () -> Unit = {},
     /** "Not now" on the question where lectures are kept. */
     val keepInApp: () -> Unit = {},
-    /** Deletes lectures for good (their folders: recording, transcript, notes), once their Undo is gone. */
+    /** Deletes moments for good (their folders: recording, transcript, notes), once their Undo is gone. */
     val delete: (lectureIds: List<String>) -> Unit = {},
 )
 
@@ -121,26 +122,18 @@ sealed interface FolderNotice {
 }
 
 /**
- * The app's first screen, lectures first: every lecture newest first, grouped today / this week / earlier, each with
- * its notebook's color and name; chips narrow the list to a notebook or to the lectures not filed yet. Lectures
- * recorded without a notebook wait on top ("Not in a notebook yet") with the notebook their time suggests, one tap to
- * move them. At the bottom, the Record bar: it records in no notebook unless the lecture history guesses one for this
- * hour ("Usually on Monday at 10:00") or the list is narrowed to a notebook; its chip picks another, none, or a new
- * one, and the language of a lecture in no notebook. A lecture recording now replaces the bar with a way back to it.
- *
- * Holding a lecture selects it (round 2's b): the top bar becomes "2 selected" with ✕ and a trash can, and a tap adds
- * or removes lectures. Delete takes them off the list at once with "2 lectures deleted · Undo"; their files go when
- * the snackbar closes. A lecture a pass is working on can't be selected.
+ * The app's first screen (round 3's a): every moment newest first, grouped today / this week / earlier, each with all
+ * its labels. The chips on top narrow the list to a label (or to
+ * moments without one); moments without labels wait on top with the label their time suggests, one tap to add it. The Record bar has the labels the next moment gets (the
+ * guessed ones, ✦, already on) and its language. Holding moments selects them; the label button sets their labels in
+ * a sheet with a checkbox per label (some selected moments have it: a dash), where labels are also made, renamed and
+ * deleted.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null) {
-    // Deleted lectures leave the list at once; the files go when the snackbar closes, unless Undo brings them back.
     var hidden by remember { mutableStateOf(emptySet<String>()) }
-    val state = all.copy(
-        notebooks = all.notebooks.map { n -> n.copy(lectures = n.lectures.filter { it.id !in hidden }) },
-        unfiled = all.unfiled.filter { it.id !in hidden },
-    )
+    val state = all.copy(moments = all.moments.filter { it.id !in hidden })
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val deletedOne = stringResource(R.string.notebooks_deleted_one)
@@ -161,42 +154,46 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     }
     BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }
 
+    // The list's filter: a label's id, NO_LABEL, or null for every moment.
     var filter by rememberSaveable { mutableStateOf<String?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    var choosing by remember { mutableStateOf(false) }
+    // The next moment's labels once the user changed them; null follows the filter and the guess.
+    var chosen by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var language by rememberSaveable(state.language) { mutableStateOf(state.language) }
+    var labeling by remember { mutableStateOf<List<String>?>(null) }
+    var choosingLabels by remember { mutableStateOf(false) }
     var choosingLanguage by remember { mutableStateOf(false) }
-    // The notebook picked for the next lecture: a notebook's id, NONE for none, null to follow the filter or the guess.
-    var target by rememberSaveable { mutableStateOf<String?>(null) }
-    var language by rememberSaveable(state.unfiledLanguage) { mutableStateOf(state.unfiledLanguage) }
-    var assigning by remember { mutableStateOf<LectureSummary?>(null) }
-    var creatingFor by remember { mutableStateOf<LectureSummary?>(null) }
-    val languages = notebookLanguages(state.notebooks.map { it.language } + state.unfiledLanguage)
-    if (creating) NewNotebookDialog(languages, onDismiss = { creating = false }) { t, l -> actions.newNotebook(t, l); creating = false }
-    creatingFor?.let { lecture ->
-        NewNotebookDialog(languages, onDismiss = { creatingFor = null }) { t, l -> actions.assignToNew(lecture.id, t, l); creatingFor = null; assigning = null }
-    }
-    assigning?.let { lecture ->
-        AssignDialog(lecture, state.notebooks, state.suggested[lecture.id]?.notebookId, onDismiss = { assigning = null }, onNew = { creatingFor = lecture }) {
-            actions.assign(lecture.id, it); assigning = null
+    var creating by remember { mutableStateOf(false) }
+
+    val guessed = state.guess?.labels.orEmpty().filter { id -> state.labels.any { it.id == id } }
+    val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL }?.let { listOf(it) } ?: guessed)
+    val labelsById = state.labels.associateBy { it.id }
+    val unlabeled = state.moments.filter { it.labels.isEmpty() }
+    val shown = when (filter) {
+        null -> state.moments.filter { it.labels.isNotEmpty() }
+        NO_LABEL -> emptyList()
+        else -> state.moments.filter { filter in it.labels }
+    }.groupBy { m ->
+        val days = state.nowMillis / DAY - m.startedAtMillis / DAY
+        when {
+            days == 0L -> R.string.notebooks_today
+            days < 7 -> R.string.notebooks_this_week
+            else -> R.string.notebooks_earlier
         }
-    }
-    if (choosingLanguage) {
-        LanguageDialog(language, languages, onDismiss = { choosingLanguage = false }) { language = it; target = NONE; choosingLanguage = false }
     }
 
-    val recordIn = state.notebooks.firstOrNull { it.id == (target ?: filter?.let { f -> if (f == UNFILED) NONE else f } ?: state.guess?.notebookId) }
-    val guessed = target == null && filter == null && recordIn != null && recordIn.id == state.guess?.notebookId
-    val lectures = if (filter == UNFILED) emptyMap() else state.notebooks.filter { filter == null || it.id == filter }
-        .flatMap { n -> n.lectures.map { n to it } }
-        .sortedByDescending { it.second.startedAtMillis }
-        .groupBy { (_, l) ->
-            val days = state.nowMillis / DAY - l.startedAtMillis / DAY
-            when {
-                days == 0L -> R.string.notebooks_today
-                days < 7 -> R.string.notebooks_this_week
-                else -> R.string.notebooks_earlier
-            }
-        }
+    labeling?.let { ids ->
+        LabelsSheet(
+            labels = state.labels, moments = state.moments.filter { it.id in ids },
+            onDismiss = { labeling = null; selected = emptySet() },
+            onSet = { add, remove -> actions.setLabels(ids, add, remove) },
+            onNew = { name -> actions.newLabel(name).also { actions.setLabels(ids, setOf(it), emptySet()) } },
+            onRename = actions.renameLabel, onDelete = actions.deleteLabel,
+        )
+    }
+    if (creating) NewLabelDialog(onDismiss = { creating = false }) { actions.newLabel(it); creating = false }
+    if (choosingLanguage) {
+        LanguageDialog(language, notebookLanguages(state.moments.map { it.language }), onDismiss = { choosingLanguage = false }) { language = it; choosingLanguage = false }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -211,9 +208,8 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                     navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, stringResource(R.string.notebooks_clear_selection)) } },
                     title = { Text(stringResource(R.string.notebooks_selected, selected.size)) },
                     actions = {
-                        IconButton(onClick = { deleteWithUndo(selected.toList()); selected = emptySet() }) {
-                            Icon(Icons.Filled.Delete, stringResource(R.string.notebooks_delete))
-                        }
+                        IconButton(onClick = { labeling = selected.toList() }) { Icon(Icons.AutoMirrored.Outlined.Label, stringResource(R.string.notebooks_labels)) }
+                        IconButton(onClick = { deleteWithUndo(selected.toList()); selected = emptySet() }) { Icon(Icons.Filled.Delete, stringResource(R.string.notebooks_delete)) }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
                 )
@@ -221,72 +217,74 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
         },
         bottomBar = {
             Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
-                val r = state.recording
                 Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+                    val r = state.recording
                     if (r != null) {
-                        RecordingBanner(r, state.notebooks.firstOrNull { it.id == r.notebookId }, actions.backToRecording)
+                        RecordingBanner(r, r.labels.mapNotNull { labelsById[it] }, actions.backToRecording)
                     } else {
                         Column {
-                            Box {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(R.string.notebooks_records_in), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    AssistChip(
-                                        onClick = { choosing = true },
-                                        label = {
-                                            Text(
-                                                recordIn?.title ?: stringResource(R.string.notebooks_no_notebook_in, languageName(language)),
-                                                style = MaterialTheme.typography.labelLarge.copy(textDirection = recordIn?.let { textDirectionOf(it.language) } ?: TextDirection.Content),
-                                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) {
+                                    LazyRow(verticalAlignment = Alignment.CenterVertically) {
+                                        if (nextLabels.isEmpty()) {
+                                            item {
+                                                AssistChip(
+                                                    onClick = { choosingLabels = true },
+                                                    label = { Text(stringResource(R.string.notebooks_no_labels)) },
+                                                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(16.dp)) },
+                                                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
+                                                )
+                                            }
+                                        }
+                                        items(nextLabels.mapNotNull { labelsById[it] }, key = { it.id }) { l ->
+                                            AssistChip(
+                                                onClick = { choosingLabels = true },
+                                                label = { Text(l.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                                leadingIcon = { LabelDot(l.color) },
+                                                trailingIcon = if (chosen == null && l.id in guessed) ({ Icon(Icons.Filled.AutoAwesome, stringResource(R.string.notebooks_suggested), Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary) }) else null,
+                                                modifier = Modifier.padding(end = 6.dp),
                                             )
-                                        },
-                                        leadingIcon = {
-                                            if (recordIn != null) Box(Modifier.size(8.dp).background(notebookColor(recordIn.color), CircleShape))
-                                            else Icon(Icons.Filled.Inbox, null, Modifier.size(16.dp))
-                                        },
-                                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
-                                        modifier = Modifier.padding(start = 8.dp),
-                                    )
-                                }
-                                DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
-                                    state.notebooks.sortedByDescending { it.id == state.guess?.notebookId }.forEach { n ->
-                                        DropdownMenuItem(
-                                            text = { Text(n.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = textDirectionOf(n.language))) },
-                                            leadingIcon = { Box(Modifier.size(10.dp).background(notebookColor(n.color), CircleShape)) },
-                                            trailingIcon = if (n.id == state.guess?.notebookId) ({ Icon(Icons.Filled.AutoAwesome, stringResource(R.string.notebooks_suggested), tint = MaterialTheme.colorScheme.primary) }) else null,
-                                            onClick = { target = n.id; choosing = false },
-                                        )
+                                        }
+                                        if (nextLabels.isNotEmpty()) {
+                                            item {
+                                                IconButton(onClick = { choosingLabels = true }) { Icon(Icons.Filled.Add, stringResource(R.string.notebooks_labels)) }
+                                            }
+                                        }
                                     }
-                                    if (state.notebooks.isNotEmpty()) HorizontalDivider()
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.notebooks_no_notebook_assign)) },
-                                        leadingIcon = { Icon(Icons.Filled.Inbox, null) },
-                                        onClick = { target = NONE; choosing = false },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.notebooks_no_notebook_language, languageName(language))) },
-                                        leadingIcon = { Icon(Icons.Filled.Language, null) },
-                                        onClick = { choosing = false; choosingLanguage = true },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.notebooks_new_notebook)) },
-                                        leadingIcon = { Icon(Icons.Filled.Add, null) },
-                                        onClick = { choosing = false; creating = true },
+                                    LabelsMenu(
+                                        expanded = choosingLabels, labels = state.labels, checked = nextLabels.toSet(), guessed = guessed.toSet(),
+                                        onDismiss = { choosingLabels = false },
+                                        onToggle = { id -> chosen = if (id in nextLabels) nextLabels - id else nextLabels + id },
+                                        onNew = { choosingLabels = false; creating = true },
                                     )
                                 }
+                                AssistChip(
+                                    onClick = { choosingLanguage = true },
+                                    label = { Text(languageName(language), maxLines = 1) },
+                                    leadingIcon = { Icon(Icons.Filled.Language, null, Modifier.size(16.dp)) },
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
                             val why = when {
-                                guessed -> state.guess?.let { stringResource(R.string.notebooks_usually, weekdayAndTime(it.usualStartMillis)) }
-                                recordIn == null -> stringResource(R.string.notebooks_assign_after)
+                                chosen == null && filter == null && guessed.isNotEmpty() -> state.guess?.let {
+                                    stringResource(R.string.notebooks_usually, isolated(guessed.mapNotNull { id -> labelsById[id]?.name }.joinToString(", ")), weekdayAndTime(it.usualStartMillis))
+                                }
+                                nextLabels.isEmpty() -> stringResource(R.string.notebooks_label_later)
                                 else -> null
                             }
                             Row(Modifier.padding(top = 4.dp, bottom = 8.dp).height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                                 if (why != null) {
-                                    if (guessed) Icon(Icons.Filled.AutoAwesome, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                                    Text(why, style = MaterialTheme.typography.bodySmall, color = if (guessed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+                                    val isGuess = chosen == null && filter == null && guessed.isNotEmpty()
+                                    if (isGuess) Icon(Icons.Filled.AutoAwesome, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        why, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        color = if (isGuess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 4.dp),
+                                    )
                                 }
                             }
                             Button(
-                                onClick = { actions.record(recordIn?.id, recordIn?.language ?: language) }, shape = RoundedCornerShape(16.dp),
+                                onClick = { actions.record(nextLabels, language); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
@@ -303,56 +301,65 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
                     item {
-                        FilterChip(selected = filter == null, onClick = { filter = null; target = null }, label = { Text(stringResource(R.string.notebooks_all)) }, modifier = Modifier.padding(end = 8.dp))
+                        FilterChip(selected = filter == null, onClick = { filter = null; chosen = null }, label = { Text(stringResource(R.string.notebooks_all)) }, modifier = Modifier.padding(end = 8.dp))
                     }
-                    if (state.unfiled.isNotEmpty()) {
+                    if (unlabeled.isNotEmpty()) {
                         item {
                             FilterChip(
-                                selected = filter == UNFILED, onClick = { filter = if (filter == UNFILED) null else UNFILED; target = null },
-                                label = { Text(stringResource(R.string.notebooks_unfiled_chip, state.unfiled.size)) },
-                                leadingIcon = { Icon(Icons.Filled.Inbox, null, Modifier.size(16.dp)) },
+                                selected = filter == NO_LABEL, onClick = { filter = if (filter == NO_LABEL) null else NO_LABEL; chosen = null },
+                                label = { Text(stringResource(R.string.notebooks_no_label_chip, unlabeled.size)) },
                                 modifier = Modifier.padding(end = 8.dp),
                             )
                         }
                     }
-                    items(state.notebooks, key = { it.id }) { n ->
+                    items(state.labels, key = { it.id }) { l ->
                         FilterChip(
-                            selected = filter == n.id, onClick = { filter = if (filter == n.id) null else n.id; target = null },
-                            label = { Text(n.title, style = MaterialTheme.typography.labelLarge.copy(textDirection = textDirectionOf(n.language)), maxLines = 1) },
-                            leadingIcon = { Box(Modifier.size(8.dp).background(notebookColor(n.color), CircleShape)) },
+                            selected = filter == l.id, onClick = { filter = if (filter == l.id) null else l.id; chosen = null },
+                            label = { Text(l.name, maxLines = 1) }, leadingIcon = { LabelDot(l.color) },
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
                     item {
                         OutlinedButton(onClick = { creating = true }, contentPadding = PaddingValues(horizontal = 12.dp)) {
-                            Icon(Icons.Filled.Add, stringResource(R.string.notebooks_new_notebook))
+                            Icon(Icons.Filled.Add, stringResource(R.string.notebooks_new_label))
                         }
                     }
                 }
             }
-            if (state.unfiled.isNotEmpty() && (filter == null || filter == UNFILED)) {
-                item(key = UNFILED) { GroupTitle(stringResource(R.string.notebooks_unfiled)) }
-                items(state.unfiled, key = { "$UNFILED/" + it.id }) { lecture ->
-                    val suggestion = state.suggested[lecture.id]?.let { g -> state.notebooks.firstOrNull { it.id == g.notebookId } }
-                    UnfiledRow(
-                        lecture, state, suggestion,
-                        onOpen = { if (selected.isEmpty()) actions.openLecture(UNFILED, lecture.id) else toggle(lecture.id) },
-                        selected = lecture.id in selected, onLongPress = { toggle(lecture.id) },
-                        onMove = { suggestion?.let { actions.assign(lecture.id, it.id) } },
-                        onAssign = { assigning = lecture },
-                    )
+            if (unlabeled.isNotEmpty() && (filter == null || filter == NO_LABEL)) {
+                item(key = NO_LABEL) { GroupTitle(stringResource(R.string.notebooks_no_label_title)) }
+                items(unlabeled, key = { "$NO_LABEL/" + it.id }) { m ->
+                    val suggestion = state.suggested[m.id]?.takeIf { m.id !in state.working }?.let { labelsById[it] }
+                    MomentRow(
+                        m, emptyList(), state, selected = m.id in selected,
+                        onOpen = { if (selected.isEmpty()) actions.openLecture(m.id) else toggle(m.id) },
+                        onLongPress = { toggle(m.id) },
+                    ) {
+                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (suggestion != null) {
+                                FilledTonalButton(onClick = { actions.setLabels(listOf(m.id), setOf(suggestion.id), emptySet()) }, contentPadding = PaddingValues(horizontal = 12.dp)) {
+                                    LabelDot(suggestion.color)
+                                    Text(
+                                        stringResource(R.string.notebooks_add, isolated(suggestion.name)), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false),
+                                    )
+                                }
+                                TextButton(onClick = { labeling = listOf(m.id) }) { Text(stringResource(R.string.notebooks_labels_more)) }
+                            } else {
+                                OutlinedButton(onClick = { labeling = listOf(m.id) }) { Text(stringResource(R.string.notebooks_add_labels)) }
+                            }
+                        }
+                    }
                 }
             }
-            if (state.notebooks.isEmpty() && state.unfiled.isEmpty()) {
-                item { Empty() }
-            }
-            lectures.forEach { (group, rows) ->
+            if (state.moments.isEmpty()) item { Empty() }
+            shown.forEach { (group, rows) ->
                 item(key = group) { GroupTitle(stringResource(group)) }
-                items(rows, key = { (n, l) -> n.id + "/" + l.id }) { (notebook, lecture) ->
-                    LectureRow(
-                        lecture, notebook, state, showNotebook = filter == null,
-                        onOpen = { if (selected.isEmpty()) actions.openLecture(notebook.id, lecture.id) else toggle(lecture.id) },
-                        selected = lecture.id in selected, onLongPress = { toggle(lecture.id) },
+                items(rows, key = { it.id }) { m ->
+                    MomentRow(
+                        m, m.labels.filter { it != filter }.mapNotNull { labelsById[it] }, state, selected = m.id in selected,
+                        onOpen = { if (selected.isEmpty()) actions.openLecture(m.id) else toggle(m.id) },
+                        onLongPress = { toggle(m.id) },
                     )
                 }
             }
@@ -360,139 +367,202 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     }
 }
 
-private const val NONE = ""
+private const val NO_LABEL = "-"
 private const val DAY = 24 * 60 * 60_000L
 
-/**
- * The languages a notebook, or a lecture in none, can be in, most likely first: the phone's, those in [used], those with
- * models of their own (Hebrew's), then every other language Whisper knows.
- */
 @Composable
-internal fun notebookLanguages(used: List<String> = emptyList()): List<String> {
-    val locales = LocalConfiguration.current.locales
-    return Languages.ordered((0 until locales.size()).map { locales[it].language }, used)
-}
+private fun LabelDot(color: Int) = Box(Modifier.size(8.dp).background(notebookColor(color), CircleShape))
 
-/** A notebook's color, from the palette by its [index]. */
-@Composable
-internal fun notebookColor(index: Int): Color = LocalTranscriptorColors.current.speakers.let { it[index % it.size] }
+/** A moment's labels, in their colors: "● Psychology  ● Exam". */
 
-/** A language's name in the phone's language ("עברית", "English"). */
 @Composable
-internal fun languageName(tag: String): String {
-    val locale = LocalConfiguration.current.locales[0]
-    return Locale.forLanguageTag(tag).getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
-}
-
-/** "Monday at 10:00", in the phone's time zone. */
-@Composable
-private fun weekdayAndTime(millis: Long): String = stringResource(
-    R.string.notebooks_slot,
-    SimpleDateFormat("EEEE", LocalConfiguration.current.locales[0]).format(Date(millis)),
-    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis)),
-)
-
-/** "Today", "Yesterday", or the date. */
-@Composable
-private fun lectureDay(millis: Long, now: Long): String = when (now / DAY - millis / DAY) {
-    0L -> stringResource(R.string.notebooks_today)
-    1L -> stringResource(R.string.notebooks_yesterday)
-    else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
-}
-
-/** "47 min", "1 h", "1 h 28 min". */
-@Composable
-private fun lectureLength(millis: Long): String {
-    val minutes = (millis / 60_000).toInt()
-    return when {
-        minutes < 60 -> stringResource(R.string.notebooks_minutes, minutes)
-        minutes % 60 == 0 -> stringResource(R.string.notebooks_hours, minutes / 60)
-        else -> stringResource(R.string.notebooks_hours_minutes, minutes / 60, minutes % 60)
+private fun LabelPills(labels: List<Label>) {
+    if (labels.isEmpty()) return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        labels.forEach { l ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LabelDot(l.color)
+                Text(l.name, style = MaterialTheme.typography.labelMedium, color = notebookColor(l.color), maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+            }
+        }
     }
 }
 
 @Composable
 private fun GroupTitle(text: String) {
-    Text(
-        text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp),
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp))
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MomentRow(
+    m: LectureSummary, labels: List<Label>, state: NotebooksState, selected: Boolean,
+    onOpen: () -> Unit, onLongPress: () -> Unit, extra: @Composable () -> Unit = {},
+) {
+    val l = m
+    Column(
+        Modifier.fillMaxWidth().background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onOpen, onLongClick = onLongPress).padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        LabelPills(labels)
+        Text(l.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            listOfNotNull(
+                if (m.labels.isEmpty()) weekdayAndTime(l.startedAtMillis) else momentDay(l.startedAtMillis, state.nowMillis),
+                momentLength(l.durationMillis),
+                if (l.noteCount > 0) stringResource(R.string.notebooks_notes, l.noteCount) else null,
+                if (l.refined) stringResource(R.string.notebooks_refined) else null,
+            ).joinToString(" · "),
+            style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
+        )
+        state.working[l.id]?.let { p ->
+            Text(stringResource(R.string.notebooks_improving, (p * 100).toInt()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+        }
+        extra()
+    }
+}
+
+/** The labels for the next moment, as a menu of checkboxes: the guessed ones marked ✦, then New label. */
+@Composable
+private fun LabelsMenu(
+    expanded: Boolean, labels: List<Label>, checked: Set<String>, guessed: Set<String>,
+    onDismiss: () -> Unit, onToggle: (String) -> Unit, onNew: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        labels.sortedByDescending { it.id in guessed }.forEach { l ->
+            DropdownMenuItem(
+                text = { Text(l.name) },
+                leadingIcon = { TriStateCheckbox(state = if (l.id in checked) ToggleableState.On else ToggleableState.Off, onClick = null) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (l.id in guessed) Icon(Icons.Filled.AutoAwesome, stringResource(R.string.notebooks_suggested), Modifier.padding(end = 8.dp).size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        LabelDot(l.color)
+                    }
+                },
+                onClick = { onToggle(l.id) },
+            )
+        }
+        if (labels.isNotEmpty()) HorizontalDivider()
+        DropdownMenuItem(text = { Text(stringResource(R.string.notebooks_new_label)) }, leadingIcon = { Icon(Icons.Filled.Add, null) }, onClick = onNew)
+    }
+}
+
+/**
+ * The labels of [moments]: a checkbox per label, a dash when only some of them have it; a tap sets it on all of them.
+ * New label makes one and puts it on them; the pencil renames a label or deletes it (its moments stay).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LabelsSheet(
+    labels: List<Label>, moments: List<LectureSummary>, onDismiss: () -> Unit,
+    onSet: (add: Set<String>, remove: Set<String>) -> Unit, onNew: (String) -> Unit,
+    onRename: (String, String) -> Unit, onDelete: (String) -> Unit,
+) {
+    var creating by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<Label?>(null) }
+    if (creating) NewLabelDialog(onDismiss = { creating = false }) { onNew(it); creating = false }
+    editing?.let { l -> EditLabelDialog(l, onDismiss = { editing = null }, onRename = { onRename(l.id, it); editing = null }, onDelete = { onDelete(l.id); editing = null }) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+            Text(
+                if (moments.size == 1) stringResource(R.string.notebooks_labels_of, isolated(moments.single().title)) else stringResource(R.string.notebooks_labels_of_many, moments.size),
+                style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(labels, key = { it.id }) { l ->
+                    val count = moments.count { l.id in it.labels }
+                    val toggle = when (count) {
+                        0 -> ToggleableState.Off
+                        moments.size -> ToggleableState.On
+                        else -> ToggleableState.Indeterminate
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().clickable { if (toggle == ToggleableState.On) onSet(emptySet(), setOf(l.id)) else onSet(setOf(l.id), emptySet()) }
+                            .padding(start = 12.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TriStateCheckbox(state = toggle, onClick = null, modifier = Modifier.padding(12.dp))
+                        LabelDot(l.color)
+                        Text(l.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 10.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconButton(onClick = { editing = l }) { Icon(Icons.Filled.Edit, stringResource(R.string.notebooks_edit_label), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+            HorizontalDivider()
+            Row(Modifier.fillMaxWidth().clickable { creating = true }.padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Add, null)
+                Text(stringResource(R.string.notebooks_new_label), Modifier.padding(start = 16.dp))
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(end = 16.dp)) { Text(stringResource(R.string.notebooks_done)) }
+        }
+    }
+}
+
+@Composable
+private fun NewLabelDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.notebooks_new_label)) },
+        text = {
+            OutlinedTextField(
+                value = name, onValueChange = { name = it }, singleLine = true,
+                label = { Text(stringResource(R.string.notebooks_new_name)) }, placeholder = { Text(stringResource(R.string.notebooks_new_name_hint)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.notebooks_create)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
     )
 }
 
-/** The pass running on a lecture, if one is: its progress. */
 @Composable
-private fun Working(progress: Float?) {
-    if (progress == null) return
-    Text(stringResource(R.string.notebooks_improving, (progress * 100).toInt()), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
-}
-
-/** A lecture in a list: its notebook (when the list mixes them), its title in the notebook's direction, its facts. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun LectureRow(lecture: LectureSummary, notebook: Notebook, state: NotebooksState, onOpen: () -> Unit, showNotebook: Boolean, selected: Boolean, onLongPress: () -> Unit) {
-    val color = notebookColor(notebook.color)
-    Column(Modifier.fillMaxWidth().background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).combinedClickable(onClick = onOpen, onLongClick = onLongPress).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (showNotebook) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.padding(end = 6.dp).size(8.dp).background(color, CircleShape))
-                Text(
-                    notebook.title, style = MaterialTheme.typography.labelMedium.copy(textDirection = textDirectionOf(notebook.language)),
-                    color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+private fun EditLabelDialog(label: Label, onDismiss: () -> Unit, onRename: (String) -> Unit, onDelete: () -> Unit) {
+    var name by remember { mutableStateOf(label.name) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.notebooks_edit_label)) },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.notebooks_new_name)) }, modifier = Modifier.fillMaxWidth())
+                TextButton(onClick = onDelete, modifier = Modifier.padding(top = 8.dp)) {
+                    Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.notebooks_delete_label), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))
+                }
+                Text(stringResource(R.string.notebooks_delete_label_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }
-        Text(
-            lecture.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(notebook.language)),
-            maxLines = 2, overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            listOfNotNull(
-                lectureDay(lecture.startedAtMillis, state.nowMillis), lectureLength(lecture.durationMillis),
-                if (lecture.noteCount > 0) stringResource(R.string.notebooks_notes, lecture.noteCount) else null,
-                if (lecture.refined) stringResource(R.string.notebooks_refined) else null,
-            ).joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
-        )
-        Working(state.working[lecture.id])
-    }
+        },
+        confirmButton = { TextButton(onClick = { onRename(name.trim()) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.notebooks_done)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
+    )
 }
 
-/** A lecture not in a notebook: its weekday and time, and Move to the suggested notebook (or Put in a notebook). */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UnfiledRow(lecture: LectureSummary, state: NotebooksState, suggestion: Notebook?, onOpen: () -> Unit, onMove: () -> Unit, onAssign: () -> Unit, selected: Boolean, onLongPress: () -> Unit) {
-    Column(Modifier.fillMaxWidth().background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent).combinedClickable(onClick = onOpen, onLongClick = onLongPress).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(lecture.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        // Its title is its date: the weekday and time say more, and are what the suggestion goes by.
-        Text(
-            listOfNotNull(
-                weekdayAndTime(lecture.startedAtMillis), lectureLength(lecture.durationMillis),
-                if (lecture.noteCount > 0) stringResource(R.string.notebooks_notes, lecture.noteCount) else null,
-            ).joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
-        )
-        Working(state.working[lecture.id])
-        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (suggestion != null) {
-                FilledTonalButton(onClick = onMove, contentPadding = PaddingValues(horizontal = 12.dp)) {
-                    Box(Modifier.padding(end = 6.dp).size(8.dp).background(notebookColor(suggestion.color), CircleShape))
+private fun LanguageDialog(language: String, languages: List<String>, onDismiss: () -> Unit, onChoose: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.notebooks_language_title)) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                items(languages) { tag ->
                     Text(
-                        stringResource(R.string.notebooks_move_to, isolated(suggestion.title)), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        languageName(tag), fontWeight = if (tag == language) FontWeight.SemiBold else null,
+                        color = if (tag == language) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                        modifier = Modifier.fillMaxWidth().clickable { onChoose(tag) }.padding(vertical = 12.dp),
                     )
                 }
-                TextButton(onClick = onAssign) { Text(stringResource(R.string.notebooks_other)) }
-            } else {
-                OutlinedButton(onClick = onAssign) { Text(stringResource(R.string.notebooks_assign)) }
             }
-        }
-    }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
+    )
 }
 
-/** A lecture is recording: its notebook (or none yet), its clock, and the way back to it. */
 @Composable
-private fun RecordingBanner(recording: RecordingNow, notebook: Notebook?, onBack: () -> Unit) {
+private fun RecordingBanner(recording: RecordingNow, labels: List<Label>, onBack: () -> Unit) {
     val red = LocalTranscriptorColors.current.recording
     Surface(color = red.copy(alpha = 0.12f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onBack)) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -500,19 +570,15 @@ private fun RecordingBanner(recording: RecordingNow, notebook: Notebook?, onBack
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(stringResource(R.string.notebooks_recording, formatClock(recording.elapsedMillis)), fontWeight = FontWeight.SemiBold, color = red)
                 Text(
-                    notebook?.title ?: stringResource(R.string.notebooks_no_notebook_assign),
-                    style = MaterialTheme.typography.bodySmall.copy(textDirection = notebook?.let { textDirectionOf(it.language) } ?: TextDirection.Content),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    labels.joinToString(", ") { it.name }.ifEmpty { stringResource(R.string.notebooks_no_labels) },
+                    style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)) {
-                Text(stringResource(R.string.notebooks_back_to_lecture))
-            }
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)) { Text(stringResource(R.string.notebooks_back_to_lecture)) }
         }
     }
 }
 
-/** No notebooks or lectures yet: what a notebook is. Record works without one. */
 @Composable
 private fun Empty() {
     Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -521,104 +587,49 @@ private fun Empty() {
     }
 }
 
-/** Which notebook an unfiled lecture goes in: the suggested one first, or a new one. */
 @Composable
-private fun AssignDialog(
-    lecture: LectureSummary, notebooks: List<Notebook>, suggested: String?,
-    onDismiss: () -> Unit, onNew: () -> Unit, onAssign: (String) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notebooks_assign_title, isolated(lecture.title))) },
-        text = {
-            Column {
-                notebooks.sortedByDescending { it.id == suggested }.forEach { n ->
-                    Row(Modifier.fillMaxWidth().clickable { onAssign(n.id) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.padding(end = 12.dp).size(10.dp).background(notebookColor(n.color), CircleShape))
-                        Text(
-                            n.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = textDirectionOf(n.language)),
-                            modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                        if (n.id == suggested) Text(stringResource(R.string.notebooks_suggested), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 16.dp))
-                    }
-                }
-                if (notebooks.isNotEmpty()) HorizontalDivider()
-                Row(Modifier.fillMaxWidth().clickable(onClick = onNew).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Add, null)
-                    Text(stringResource(R.string.notebooks_new_notebook), Modifier.padding(start = 12.dp))
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
-    )
+private fun weekdayAndTime(millis: Long): String = stringResource(
+    R.string.notebooks_slot,
+    SimpleDateFormat("EEEE", LocalConfiguration.current.locales[0]).format(Date(millis)),
+    DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(millis)),
+)
+
+@Composable
+private fun momentDay(millis: Long, now: Long): String = when (now / DAY - millis / DAY) {
+    0L -> stringResource(R.string.notebooks_today)
+    1L -> stringResource(R.string.notebooks_yesterday)
+    else -> DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(millis))
 }
 
-/** The languages, as radio buttons. */
 @Composable
-private fun LanguageChoices(language: String, languages: List<String>, onChoose: (String) -> Unit) {
-    // A hundred languages: a list that scrolls in the dialog.
-    LazyColumn(Modifier.selectableGroup().heightIn(max = 360.dp)) {
-        items(languages) { tag ->
-            Row(
-                Modifier.fillMaxWidth().selectable(selected = language == tag, role = Role.RadioButton) { onChoose(tag) }.padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = language == tag, onClick = null)
-                Text(languageName(tag), Modifier.padding(start = 12.dp))
-            }
-        }
+private fun momentLength(millis: Long): String {
+    val minutes = (millis / 60_000).toInt()
+    return when {
+        minutes < 60 -> stringResource(R.string.notebooks_minutes, minutes)
+        minutes % 60 == 0 -> stringResource(R.string.notebooks_hours, minutes / 60)
+        else -> stringResource(R.string.notebooks_hours_minutes, minutes / 60, minutes % 60)
     }
 }
 
-/** The language of a lecture recorded in no notebook (it picks the live model). */
+/**
+ * The languages a moment can be in, most likely first: the phone's, those in [used], those with
+ * models of their own (Hebrew's), then every other language Whisper knows.
+ */
 @Composable
-private fun LanguageDialog(language: String, languages: List<String>, onDismiss: () -> Unit, onChoose: (String) -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notebooks_language_title)) },
-        text = { LanguageChoices(language, languages, onChoose) },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
-    )
+internal fun notebookLanguages(used: List<String> = emptyList()): List<String> {
+    val locales = LocalConfiguration.current.locales
+    return Languages.ordered((0 until locales.size()).map { locales[it].language }, used)
 }
 
-/** A new notebook: its name and language (which picks the speech models). */
+/** A label's color, from the palette by its [index]. */
 @Composable
-private fun NewNotebookDialog(languages: List<String>, onDismiss: () -> Unit, onCreate: (title: String, language: String) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf(languages.first()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.notebooks_new_notebook)) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = title, onValueChange = { title = it }, singleLine = true,
-                    label = { Text(stringResource(R.string.notebooks_new_name)) },
-                    placeholder = { Text(stringResource(R.string.notebooks_new_name_hint)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(stringResource(R.string.notebooks_new_language), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-                Text(stringResource(R.string.notebooks_new_language_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                // A menu, not radio buttons: the dialog stays short enough for Create to show above the keyboard.
-                var open by remember { mutableStateOf(false) }
-                Box(Modifier.padding(top = 8.dp)) {
-                    OutlinedButton(onClick = { open = true }) {
-                        Text(languageName(language))
-                        Icon(Icons.Filled.ArrowDropDown, null)
-                    }
-                    DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.heightIn(max = 360.dp)) {
-                        languages.forEach { tag ->
-                            DropdownMenuItem(text = { Text(languageName(tag)) }, onClick = { language = tag; open = false })
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { onCreate(title, language) }, enabled = title.isNotBlank()) { Text(stringResource(R.string.notebooks_create)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.model_cancel)) } },
-    )
+internal fun notebookColor(index: Int): Color = LocalTranscriptorColors.current.speakers.let { it[index % it.size] }
+
+/** A language's name in the phone's language ("עברית", "English"). */
+@Composable
+internal fun languageName(tag: String): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return Locale.forLanguageTag(tag).getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) }
 }
 
 /** The lectures folder: the question where to keep lectures, the move into the folder, or the folder lost. */

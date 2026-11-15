@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Audio Logs</string>
-    <string name="main_coming_soon">המחברות יחליפו את המסך הזה אחרי שהעיצוב שלהן ייבחר במעבדת הממשק.</string>
     <string name="lecture_back">חזרה</string>
     <string name="lecture_pause">השהיה</string>
     <string name="lecture_resume">המשך</string>
@@ -26,7 +25,6 @@
     <string name="flac_effort_note_after">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, והדחיסה אחרי הרגע לוקחת יותר זמן.</string>
     <string name="flac_effort_note_live">הצליל זהה בכל רמה. רמה גבוהה יותר מקטינה את הקובץ בכמה אחוזים, ומעמיסה יותר על הטלפון בזמן ההקלטה (וגם על הסוללה).</string>
     <string name="start_lecture">התחלת רגע</string>
-    <string name="start_default_notebook">המחברת שלי</string>
     <string name="start_last">הרגע האחרון: %1$s · %2$s · %3$d הערות · %4$s</string>
     <string name="lecture_no_live_model">אין עדיין מודל חי לשפת המחברת: אפשר להוריד אחד בהגדרות. ההקלטה וההערות עובדות.</string>
     <string name="lecture_live_loading">טוען את %1$s…</string>
@@ -35,6 +33,7 @@
     <string name="lecture_model_first_line">נטען עם השורה הראשונה</string>
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
+    <string name="lecture_model_skipped_memory">אין מספיק זיכרון פנוי כרגע עבור %1$s; משתמש ב־%2$s. סגור אפליקציות אחרות ונסה שוב.</string>
     <string name="lecture_model_npu_failed">CPU (בניית ה־NPU נכשלה)</string>
     <string name="lecture_speaker_pass_on_stop">אחרי עצירה: זיהוי דוברים, pyannote + %1$s</string>
     <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
@@ -86,24 +85,12 @@
     <string name="review_version_refined">שופר · %1$s</string>
     <!-- Notebooks -->
     <string name="notebooks_settings">הגדרות</string>
-    <string name="notebooks_records_in">מקליט ב:</string>
     <string name="notebooks_record">הקלטה</string>
-    <string name="notebooks_no_notebook_in">בלי מחברת · %1$s</string>
-    <string name="notebooks_no_notebook_assign">בלי מחברת, לשייך אחר כך</string>
-    <string name="notebooks_no_notebook_language">שפה בלי מחברת: %1$s</string>
-    <string name="notebooks_language_title">שפת רגע בלי מחברת</string>
+    <string name="notebooks_language_title">שפת הרגע</string>
     <string name="notebooks_suggested">מוצעת</string>
-    <string name="notebooks_usually">בדרך כלל ב%1$s</string>
+    <string name="notebooks_usually">בדרך כלל %1$s ב%2$s</string>
     <string name="notebooks_slot">%1$s ב־%2$s</string>
-    <string name="notebooks_assign_after">אפשר לבחור מחברת אחר כך</string>
     <string name="notebooks_all">הכול</string>
-    <string name="notebooks_unfiled_chip">לא שויכו (%1$d)</string>
-    <string name="notebooks_unfiled">עוד לא במחברת</string>
-    <string name="notebooks_unfiled_title">לא במחברת</string>
-    <string name="notebooks_move_to">העברה ל%1$s</string>
-    <string name="notebooks_other">אחרת…</string>
-    <string name="notebooks_assign">שיוך למחברת</string>
-    <string name="notebooks_assign_title">מחברת עבור %1$s</string>
     <string name="notebooks_today">היום</string>
     <string name="notebooks_yesterday">אתמול</string>
     <string name="notebooks_this_week">השבוע</string>
@@ -116,13 +103,10 @@
     <string name="notebooks_improving">משפר את התמלול · %1$d%%</string>
     <string name="notebooks_recording">מקליט · %1$s</string>
     <string name="notebooks_back_to_lecture">חזרה לרגע</string>
-    <string name="notebooks_empty_title">מחברת לכל קבוצה</string>
-    <string name="notebooks_empty_note">אפשר להקליט עכשיו ולשייך אחר כך, או ליצור מחברת לקבוצה: הרגעים שלה מתומללים בטלפון, בשפה שלה, עם ההערות שלך עליהם.</string>
-    <string name="notebooks_new_notebook">מחברת חדשה</string>
+    <string name="notebooks_empty_title">הקלטת רגע</string>
+    <string name="notebooks_empty_note">הוא מתומלל בטלפון, עם ההערות שלך. אפשר לתת לו תוויות (קורס, אדם, פרויקט) כדי למצוא אותו אחר כך.</string>
     <string name="notebooks_new_name">שם</string>
     <string name="notebooks_new_name_hint">מבוא לפסיכולוגיה</string>
-    <string name="notebooks_new_language">שפת הרגעים</string>
-    <string name="notebooks_new_language_note">קובעת את מודלי הדיבור ואת כיוון הכתיבה של השורות.</string>
     <string name="notebooks_create">יצירה</string>
     <!-- Lectures folder -->
     <string name="folder_title">תיקיית הרגעים</string>
@@ -270,6 +254,21 @@
     <string name="review_power_charging">צריכה: לא נמדדה (בטעינה)</string>
     <string name="models_npu_retry">לנסות שוב</string>
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
+    <string name="notebooks_labels">תוויות</string>
+    <string name="notebooks_labels_more">תוויות…</string>
+    <string name="notebooks_add_labels">הוספת תוויות</string>
+    <string name="notebooks_add">הוספת %1$s</string>
+    <string name="notebooks_no_labels">בלי תוויות</string>
+    <string name="notebooks_no_label_chip">בלי תווית (%1$d)</string>
+    <string name="notebooks_no_label_title">עוד בלי תוויות</string>
+    <string name="notebooks_new_label">תווית חדשה</string>
+    <string name="notebooks_edit_label">עריכת תווית</string>
+    <string name="notebooks_delete_label">מחיקת התווית</string>
+    <string name="notebooks_delete_label_note">הרגעים שלה נשארים, בלי התווית הזו.</string>
+    <string name="notebooks_done">סיום</string>
+    <string name="notebooks_labels_of">התוויות של %1$s</string>
+    <string name="notebooks_labels_of_many">התוויות של %1$d רגעים</string>
+    <string name="notebooks_label_later">אפשר להוסיף תוויות אחר כך</string>
     <string name="notebooks_deleted_one">הרגע נמחק</string>
     <string name="notebooks_deleted_many">%1$d רגעים נמחקו</string>
     <string name="notebooks_undo">ביטול</string>
@@ -287,4 +286,34 @@
     <string name="review_delete_text">ההקלטה, התמלול וההערות יימחקו מתיקיית הרגעים. אי אפשר לבטל את זה.</string>
     <string name="review_delete_lecture_confirm">מחיקה</string>
     <string name="review_delete_cancel">ביטול</string>
+
+    <!-- מדי מעבדים בזמן הקלטה (הגדרות › מתקדם) -->
+    <string name="settings_advanced">מתקדם</string>
+    <string name="settings_meters">מדי מעבדים בזמן הקלטה</string>
+    <string name="settings_meters_note">כמה הטלפון עובד בזמן שהוא מקליט ומתמלל. CPU סופר רק את האפליקציה, GPU את כל הטלפון, NPU רק את המודלים של האפליקציה (הטלפון לא מראה את הסך הכול).</string>
+    <string name="settings_meters_off">כבוי</string>
+    <string name="settings_meters_bars">שלושה פסים מתחת לסרגל העליון</string>
+    <string name="settings_meters_chip">תווית קטנה, הקשה לפרטים</string>
+    <string name="settings_meters_graphs">הדקה האחרונה כגרפים</string>
+    <string name="meters_cpu">CPU · אפליקציה</string>
+    <string name="meters_gpu">GPU · טלפון</string>
+    <string name="meters_npu_ours">NPU · השימוש שלנו</string>
+    <string name="meters_short_cpu">CPU</string>
+    <string name="meters_short_gpu">GPU</string>
+    <string name="meters_short_npu">NPU</string>
+    <string name="meters_last_minute">הדקה האחרונה · הקשה לקיפול</string>
+    <string name="meters_title">מעבדים</string>
+    <string name="meters_cpu_long">CPU · האפליקציה</string>
+    <string name="meters_cpu_note">%1$.1f מתוך %2$d ליבות עסוקות באפליקציה. אפליקציות אחרות לא נספרות.</string>
+    <string name="meters_gpu_long">GPU · כל הטלפון</string>
+    <string name="meters_gpu_note">כל האפליקציות, כולל המסך.</string>
+    <string name="meters_npu_long">NPU · השימוש שלנו</string>
+    <string name="meters_npu_note">הזמן שהמודלים של האפליקציה מעסיקים את ה־NPU. הטלפון לא מראה את העומס הכולל על ה־NPU.</string>
+    <string name="meters_clocks">שעונים</string>
+    <string name="meters_cores">ליבות %1$s</string>
+    <string name="meters_gpu_clock">GPU</string>
+    <string name="meters_ghz">%1$.2f מתוך %2$.2f GHz</string>
+    <string name="meters_mhz">%1$d מתוך %2$d MHz</string>
+    <string name="meters_npu_temperature">טמפרטורת ה־NPU</string>
+    <string name="meters_celsius">%1$.1f°C</string>
 </resources>

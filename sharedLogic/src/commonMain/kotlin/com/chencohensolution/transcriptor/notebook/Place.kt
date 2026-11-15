@@ -7,12 +7,16 @@ import okio.use
 
 /**
  * Where the app's files are: the app's own storage, or the lectures folder the user picked outside it (the library).
- * Each holds `notebooks.json` and `notebooks/<notebook id>/` (`voices.json` and a folder per lecture) under [root].
+ * Each holds `labels.json`, `voices.json` and `moments/` with a folder per moment under [root] (before labels:
+ * `notebooks.json` and `notebooks/<notebook id>/<lecture id>/`, which [migrateToLabels] moves).
  */
 data class Place(val fileSystem: FileSystem, val root: Path) {
+    val moments: Path get() = root / "moments"
+
+    /** Where moments were before labels: `notebooks/<notebook id>/<lecture id>/`. */
     val notebooks: Path get() = root / "notebooks"
 
-    fun folder(notebookId: String, lectureId: String): Path = notebooks / notebookId / lectureId
+    fun folder(lectureId: String): Path = moments / lectureId
 
     /** The folders in [dir]; none when it is missing or can't be read (a library whose access was revoked). */
     fun folders(dir: Path): List<Path> =

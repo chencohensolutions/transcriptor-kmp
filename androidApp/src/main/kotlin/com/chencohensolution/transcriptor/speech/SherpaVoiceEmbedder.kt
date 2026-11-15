@@ -44,7 +44,7 @@ class SherpaVoiceEmbedder(files: VoicePrintFiles, libDir: String? = null) : Voic
         try {
             stream.acceptWaveform(samples, 16_000)
             stream.inputFinished()
-            return extractor.compute(stream)
+            return if (onNpu) npuBusy.time { extractor.compute(stream) } else extractor.compute(stream)
         } finally {
             stream.release()
         }

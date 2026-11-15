@@ -10,7 +10,9 @@ import okio.Path
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
-import com.chencohensolution.transcriptor.notebook.NotebookStore
+import com.chencohensolution.transcriptor.notebook.LabelStore
+import com.chencohensolution.transcriptor.notebook.NOTEBOOKS_FILE
+import com.chencohensolution.transcriptor.notebook.migrateToLabels
 import com.chencohensolution.transcriptor.notebook.Place
 import com.chencohensolution.transcriptor.notebook.adoptLibrary
 import com.chencohensolution.transcriptor.notebook.archiveFinished
@@ -107,10 +109,10 @@ object Recording {
     /** The passes running, by lecture: what the Notebooks screen shows under a lecture. */
     val working = combine(compressing, findingSpeakers, refining) { c, f, r -> listOfNotNull(c, f, r).toMap() }
 
-    lateinit var notebooks: NotebookStore
+    lateinit var labels: LabelStore
         private set
 
-    /** The notebooks and their lectures, for the Notebooks screen. */
+    /** The labels and the moments, for the first screen. */
     lateinit var library: NotebooksController
         private set
 
@@ -120,7 +122,7 @@ object Recording {
         return Languages.default((0 until locales.size()).map { locales[it].language })
     }
 
-    /** The phone's offset from UTC at a time: weekdays and hours for the notebook guess and the transcript's date. */
+    /** The phone's offset from UTC at a time: weekdays and hours for the label guess and the transcript's date. */
     val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
 
 
@@ -201,9 +203,11 @@ object Recording {
                 }
                 else -> Unit
             }
-        }.fold({ NpuResult(runs = true) }, { NpuResult(runs = false, reason = it.message ?: it.toString()) })
-        installedModels.setNpu(model.id, result)
-        return result
+        }
+        val npu = result.fold({ NpuResult(runs = true) }, { NpuResult(runs = false, reason = it.message ?: it.toString()) })
+        // Refused for want of free memory now: not a verdict on the model, so not kept.
+        if ((result.exceptionOrNull() as? NpuLoadGuard.Refused)?.now != true) installedModels.setNpu(model.id, npu)
+        return npu
     }
 
     /**
@@ -214,7 +218,7 @@ object Recording {
     fun refine(lecture: Lecture, modelId: String, kept: () -> Unit = {}, progress: (Float) -> Unit = {}): Lecture {
         val model = refineModels(lecture.language).firstOrNull { it.id == modelId } ?: error("$modelId isn't downloaded")
         store.repairAudio(lecture)
-        val withVersion = store.keepCurrent(store.load(lecture.notebookId, lecture.id) ?: lecture, System.currentTimeMillis())
+        val withVersion = store.keepCurrent(store.load(lecture.id) ?: lecture, System.currentTimeMillis())
         store.save(withVersion)
         kept()
         val path = store.audioPath(lecture)
@@ -236,7 +240,7 @@ object Recording {
         settings.recordImproveSpeed(model.id, System.currentTimeMillis() - started, lecture.durationMillis)
         // Saved over what is on disk now, with its edits since (the review screen may have changed it meanwhile):
         // only the lines' texts the pass wrote are taken.
-        val now = store.load(lecture.notebookId, lecture.id) ?: withVersion
+        val now = store.load(lecture.id) ?: withVersion
         val refined = done.segments.associateBy { it.id }
         val merged = now.copy(
             segments = now.segments.map { s -> refined[s.id]?.takeIf { !s.edited && it.modelId == model.id }?.let { s.copy(text = it.text, modelId = it.modelId, words = emptyList()) } ?: s },
@@ -302,7 +306,7 @@ object Recording {
 
     /**
      * Runs the speaker pass on [lecture] (seconds to minutes; not on the main thread): who spoke when, the lines
-     * relabeled and split to match, and the speakers named from the notebook's voices. Saves and returns it.
+     * relabeled and split to match, and the speakers named from the app's voices. Saves and returns it.
      */
     fun findSpeakers(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         store.repairAudio(lecture)
@@ -312,7 +316,7 @@ object Recording {
         val embedder = voiceEmbedder(model)
         try {
             RecordingAudio(openAudio(store.audioPath(lecture)), lecture.audioFile == AUDIO_WAV).use { audio ->
-                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load(lecture.notebookId)) { at ->
+                val result = SpeakerPass(diarizer, embedder, model.id, thresholds.sameSpeaker).run(audio, voices.load()) { at ->
                     progress((at.toFloat() / lecture.durationMillis.coerceAtLeast(1)).coerceAtMost(1f))
                 }
                 val done = lecture.withTurns(result.turns, result.speakers)
@@ -325,21 +329,25 @@ object Recording {
         }
     }
 
-    /**
-     * Files an unfiled lecture into a notebook (files: not on the main thread), and gives the notebook the voices of
-     * the speakers named in it, so its next lectures label them by name.
-     */
     /** Deletes lectures for good (files: not on the main thread), except those recording, open or worked on now. */
     fun delete(lectureIds: List<String>) {
         val busy = busy()
         library.delete(lectureIds) { it in busy }
     }
 
-    fun file(lectureId: String, notebookId: String) {
-        val lecture = library.assign(lectureId, notebookId) ?: return
-        for (speaker in lecture.speakers.filter { it.name.isNotBlank() }) {
-            runCatching { printOf(lecture, speaker.id) }.getOrNull()?.let { voices.save(notebookId, Voice(speaker.name, it)) }
-        }
+    /**
+     * Adds and removes labels on moments (files: not on the main thread), except those recording or worked on now
+     * (an open one can't be on the list's screen).
+     */
+    fun setLabels(lectureIds: List<String>, add: Set<String>, remove: Set<String>) {
+        val busy = busy()
+        library.setLabels(lectureIds, add, remove) { it in busy }
+    }
+
+    /** Deletes a label; its moments stay, without it. Files: not on the main thread. */
+    fun deleteLabel(labelId: String) {
+        val busy = busy()
+        library.deleteLabel(labelId) { it in busy }
     }
 
     private lateinit var resolver: ContentResolver
@@ -384,14 +392,14 @@ object Recording {
     /**
      * Makes the folder the user picked ([tree], from the system's folder picker) the lectures folder (files: not on the
      * main thread): a `Transcriptor` folder in it unless it is one already (by name, or a library from before), an
-     * empty `.nomedia` so music and gallery apps skip the recordings, then the notebooks, voices and finished lectures
+     * empty `.nomedia` so music and gallery apps skip the recordings, then the labels, voices and finished moments
      * move in ([adoptLibrary]), from the app or from the folder used before, whose permission is then given back.
      */
     fun chooseFolder(tree: Uri) {
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         resolver.takePersistableUriPermission(tree, flags)
         val treeFs = SafFileSystem(resolver, tree)
-        val isLibrary = treeFs.name == LIBRARY_FOLDER || treeFs.exists(LIBRARY_ROOT / "notebooks.json")
+        val isLibrary = treeFs.name == LIBRARY_FOLDER || treeFs.exists(LIBRARY_ROOT / LabelStore.FILE) || treeFs.exists(LIBRARY_ROOT / NOTEBOOKS_FILE)
         val folderUri = if (isLibrary) {
             DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         } else {
@@ -404,7 +412,7 @@ object Recording {
         val target = Place(fs, LIBRARY_ROOT)
         folder.value = Folder.Moving(fs.name, 0f)
         try {
-            adoptLibrary(store, notebooks, target, busy()) { folder.value = Folder.Moving(fs.name, it) }
+            adoptLibrary(store, labels, target, busy(), System.currentTimeMillis(), utcOffset) { folder.value = Folder.Moving(fs.name, it) }
             settings.lectureFolder = folderUri.toString()
             folder.value = Folder.Ready(fs.name)
             before?.takeIf { it != folderUri.toString() }?.let { old ->
@@ -427,6 +435,19 @@ object Recording {
     private fun busy(): Set<String> = setOfNotNull(session.state.value?.lecture?.id, review.lecture?.id) +
         listOfNotNull(compressing.value, findingSpeakers.value, refining.value).map { it.first }
 
+    /**
+     * The lectures folder from before labels moves to labels ([migrateToLabels]), once per start; before the first
+     * list. Files: not on the main thread.
+     */
+    fun migrateLibrary() {
+        if (libraryMigrated) return
+        libraryMigrated = true
+        val library = store.library ?: return
+        runCatching { migrateToLabels(library, System.currentTimeMillis(), utcOffset) }.onFailure { android.util.Log.e("Recording", "label migration in the lectures folder failed", it) }
+    }
+
+    @Volatile private var libraryMigrated = false
+
     /** The finished lectures still in the app move to the lectures folder (files: not on the main thread). */
     fun archive() {
         if (folder.value !is Folder.Ready) return
@@ -446,12 +467,13 @@ object Recording {
         // An NPU model whose load got the app killed last time: disabled for this phone, the pick falls back.
         npuGuard.recover()?.let { android.util.Log.w("Transcriptor", "NPU model $it disabled: the app was killed loading it") }
         modelLibrary = ModelLibrary(installedModels)
-        notebooks = NotebookStore { store.library ?: store.local }
+        labels = LabelStore { store.library ?: store.local }
         resolver = app.contentResolver
         connectLibrary()
-        // Before notebooks, every lecture was in "default": they become unfiled, once.
-        runCatching { notebooks.migrate(store) }.onFailure { android.util.Log.e("Recording", "notebook migration failed", it) }
-        library = NotebooksController(notebooks, store, System::currentTimeMillis, ::phoneLanguage)
+        // Notebooks became labels: the app's own storage moves now (quick: one folder rename per moment); the
+        // lectures folder with the first list ([migrateLibrary]), off the main thread.
+        runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
+        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage)
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
@@ -479,12 +501,16 @@ fun liveModelFor(language: String): SpeechModel? {
     return ready.firstOrNull { it.id == Recording.settings.liveModel(language) } ?: ready.firstOrNull()
 }
 
+/** [liveModelFor]'s model, or the next ready one when its NPU load doesn't fit in the free memory now. */
+fun liveModelPick(language: String) = Recording.npuGuard.pick(liveModelFor(language), readyLiveModels(language))
+
 /**
  * Live transcription for [language] with [liveModelFor]'s model, and speaker labels when the voice-print model is
- * downloaded, starting from the voices the notebook [known]; null when no live model is downloaded.
+ * downloaded, starting from the voices the app [known]; null when no live model is downloaded.
  */
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
-    val model = liveModelFor(language) ?: return null
+    val pick = liveModelPick(language)
+    val model = pick.model ?: return null
     val prints = Recording.voiceModel
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
     val segmentation = Recording.segmentationModel
@@ -544,7 +570,9 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         }
         ModelKind.SpeakerEmbedding, ModelKind.SpeakerSegmentation -> error("Not a speech model: ${model.id}")
     }
-    return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation })
+    return LiveModel(model.name, transcriber, tracker, inUse, live, segmentation?.id?.takeIf { live != null && segmentation != ModelCatalog.speakerSegmentation },
+        skipped = pick.skipped?.name,
+    )
 }
 
 class TranscriptorApp : Application() {
