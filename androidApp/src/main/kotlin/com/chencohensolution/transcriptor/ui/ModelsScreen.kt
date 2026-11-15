@@ -133,6 +133,8 @@ data class ModelsState(
     val aac: AacSettings = AacSettings(),
     /** When "Record as WAV, encode afterwards" encodes. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
+    /** When moments recorded with "After" are transcribed. */
+    val transcribeWhen: EncodeAfter = EncodeAfter.Charging,
     /** The phone's AAC encoders, hardware first ([com.chencohensolution.transcriptor.recording.AacEncoders.all]). */
     val aacEncoders: List<AacEncoderInfo> = emptyList(),
     /** What "automatic" runs for [aac]: the first of [com.chencohensolution.transcriptor.recording.AacEncoders.candidates]. */
@@ -236,6 +238,7 @@ class ModelsActions(
     val setFlacLevel: (Int) -> Unit = {},
     val setAac: (AacSettings) -> Unit = {},
     val setEncodeAfter: (EncodeAfter) -> Unit = {},
+    val setTranscribeWhen: (EncodeAfter) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val setQuietRecording: (Boolean) -> Unit = {},
@@ -383,6 +386,23 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_after))
+            Column(Modifier.selectableGroup()) {
+                Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
+                PageNote(stringResource(R.string.settings_transcribe_when_note))
+                listOf(
+                    EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
+                    EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
+                ).forEach { (option, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = state.transcribeWhen == option, onClick = null)
+                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
             SwitchRow(
                 stringResource(R.string.settings_auto_improve),
                 stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),

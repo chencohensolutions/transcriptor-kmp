@@ -488,4 +488,8 @@
     <string name="settings_stop_twice">Two taps to stop</string>
     <string name="settings_stop_twice_on">On: Stop asks for a second tap before it ends a moment, in the app and on the Record tile in Quick Settings.</string>
     <string name="settings_stop_twice_off">Off: one tap on Stop ends the moment, in the app and on the Record tile.</string>
+    <string name="settings_transcribe_when">Transcribe moments recorded with After</string>
+    <string name="settings_transcribe_when_note">“After” on the Record bar records without transcribing; the transcript is made then, with the language’s improve model.</string>
+    <string name="settings_transcribe_when_stop">Right after the moment ends</string>
+    <string name="settings_transcribe_when_charging">When charging, with 30% battery or more</string>
 </resources>

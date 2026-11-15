@@ -42,6 +42,14 @@ A new install starts as the owner's S25 was set that day (read from its `setting
   CAM++ -0.2, ERes2NetV2 -0.3); a slider put back to the middle stays there.
 - **Processor meters**: the last minute as graphs.
 
+## Transcribe moments recorded with After (Nov 16, 2026)
+
+hen's ask: Settings › After a moment › **Transcribe moments recorded with After** (`SettingsStore.transcribeWhen`, an
+`EncodeAfter`): **Right after the moment ends**, or **When charging, with 30% battery or more** (the default). A moment
+recorded with After on the Record bar is transcribed at Stop when that allows it (`RecordingService.transcribeAllowed`),
+else it waits in `improvePending` and starts when the phone charges with enough battery and the app is opened or
+plugged in while open, or after the next pass ends. "No transcript" moments are never transcribed on their own.
+
 ## Hide the recording notification (Nov 15, 2026)
 
 Settings › Recordings has **Hide the recording notification** (`SettingsStore.quietRecording`, off by default). On,
