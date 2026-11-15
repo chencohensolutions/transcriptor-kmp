@@ -141,6 +141,8 @@ private data class SettingsFileV1(
     val recordLive: Boolean = true,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
     val quietRecording: Boolean = false,
+    /** The microphone picked to record from ([MicInput]); null: the phone's own. */
+    val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -221,6 +223,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var quietRecording: Boolean
         get() = read().quietRecording
         set(value) = write(read().copy(quietRecording = value))
+
+    /**
+     * The microphone to record from; null: the phone's own (stereo). When it isn't connected as a moment starts, the
+     * phone's own records it and the screen says so.
+     */
+    var micInput: com.chencohensolution.transcriptor.recording.MicInput?
+        get() = read().micInput
+        set(value) = write(read().copy(micInput = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]

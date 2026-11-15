@@ -45,6 +45,10 @@ data class LiveLectureState(
     val recordOnly: Boolean = false,
     /** Both channels' levels, their last seconds and (for a frequency [levelMeter]) the bands; silent when paused. */
     val stereoMeter: StereoMeterState = StereoMeterState(),
+    /** The microphone recording it when it isn't the phone's own (a headset, earbuds, a USB microphone). */
+    val input: InputInUse? = null,
+    /** The microphone picked in Settings ([MicInput.name]) when the recording isn't coming from it (not connected, or it disconnected). */
+    val inputMissing: String? = null,
     /** How the sound level is drawn (Settings › While recording). */
     val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */

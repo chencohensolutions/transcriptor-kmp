@@ -492,4 +492,17 @@
     <string name="settings_level_meter_strip">The last 8 seconds, L above and R below</string>
     <string name="settings_level_meter_spectrum">Voice spectrum now</string>
     <string name="settings_level_meter_spectrogram">Spectrogram of the last 8 seconds</string>
+    <string name="settings_mic">Microphone</string>
+    <string name="settings_mic_phone">The phone\'s microphones</string>
+    <string name="settings_mic_phone_note">Stereo, 48 kHz</string>
+    <string name="settings_mic_away">%1$s (not connected: records from the phone)</string>
+    <string name="settings_mic_not_connected">Not connected now. While it\'s away, the phone records.</string>
+    <string name="settings_mic_bluetooth">Bluetooth: mono, phone-call quality</string>
+    <string name="settings_mic_bluetooth_le">Bluetooth LE Audio: mono</string>
+    <string name="settings_mic_wired">Wired headset</string>
+    <string name="settings_mic_usb">USB microphone</string>
+    <string name="settings_mic_none">No other microphone is connected now. Connect Bluetooth or wired headphones, or a USB microphone, and it shows here.</string>
+    <string name="settings_mic_close">Close</string>
+    <string name="glance_mic">Microphone: %1$s</string>
+    <string name="glance_mic_missing">%1$s isn\'t connected: recording from the phone</string>
 </resources>

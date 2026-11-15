@@ -199,3 +199,10 @@ anything left to decide. Remove an entry once it is built.
 - `SettingsStore.levelMeter` (`LevelMeterStyle`), shown as `LiveLectureState.levelMeter`; set `LectureSession.meterBands`
   while the screen shows a style with `needsBands`. Views to mirror: `ui/LevelMeters.kt`. Strings `lecture_meter_*`,
   `settings_level_meter*`.
+
+## Microphone (Nov 15, 2026)
+
+- `SettingsStore.micInput` (`MicInput`: key, name, kind); `AudioRecorder.start(..., input)` and `inputInUse`;
+  `LiveLectureState.input` / `inputMissing`. iOS: list `AVAudioSession.availableInputs` (Bluetooth HFP, wired, USB),
+  `setPreferredInput`, the `.allowBluetooth` category option, and follow `routeChangeNotification` for `inputInUse`.
+  Strings `settings_mic*`, `glance_mic*`. Android: `AndroidAudioInputs.kt`, `MicrophoneRow` in `ModelsScreen.kt`.

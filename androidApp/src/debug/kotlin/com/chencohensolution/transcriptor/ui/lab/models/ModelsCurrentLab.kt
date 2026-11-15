@@ -106,6 +106,12 @@ internal fun ModelsLab(
         asked = null
     }
     val download = { m: SpeechModel -> statuses = statuses + (m.id to ModelStatus.Downloading(0f)) }
+    // Fakes: the microphones connected besides the phone's own, and the picks (in memory).
+    var micInput by remember { mutableStateOf<com.chencohensolution.transcriptor.recording.MicInput?>(null) }
+    var levelMeter by remember { mutableStateOf(com.chencohensolution.transcriptor.settings.LevelMeterStyle.Bars) }
+    val micInputs = remember {
+        listOf(com.chencohensolution.transcriptor.recording.MicInput("bluetooth:AA:Galaxy Buds3 Pro", "Galaxy Buds3 Pro", com.chencohensolution.transcriptor.recording.MicInput.Kind.Bluetooth), com.chencohensolution.transcriptor.recording.MicInput("usb::RØDE Wireless GO II", "RØDE Wireless GO II", com.chencohensolution.transcriptor.recording.MicInput.Kind.Usb))
+    }
     screen(
         ModelsState(
             languages = languages, chip = chip, models = models, statuses = statuses, live = live, refine = refine, npu = npu,
@@ -114,6 +120,7 @@ internal fun ModelsLab(
             autoAacEncoder = com.chencohensolution.transcriptor.recording.AacEncoders.candidates(aac.copy(encoder = null)).first(), findSpeakersOnStop = speakers, autoImprove = auto,
             voiceModel = voiceModel, npuVoiceModels = if (chip == "SM8750") setOf(ModelCatalog.voicePrintsResNet293.id) else emptySet(),
             speakerTuning = tuning, segmentationModel = segmentation,
+            micInput = micInput, micInputs = micInputs, levelMeter = levelMeter,
         ),
         ModelsActions(
             back = labBack,
@@ -126,6 +133,8 @@ internal fun ModelsLab(
             setFlacLevel = { flacLevel = it },
             setAac = { aac = it.valid() },
             setEncodeAfter = { encodeAfter = it },
+            setMicInput = { micInput = it },
+            setLevelMeter = { levelMeter = it },
             setFindSpeakersOnStop = { speakers = it },
             useVoicePrints = { voiceModel = it.id },
             setSpeakerTuning = { m, v -> tuning = tuning + (m.id to v) },

@@ -92,6 +92,9 @@ object Recording {
     lateinit var settings: SettingsStore
         private set
     lateinit var session: LectureSession
+
+    /** The microphones besides the phone's own, for Settings' Microphone and the recorder. */
+    lateinit var audioInputs: com.chencohensolution.transcriptor.recording.AndroidAudioInputs
         private set
     lateinit var compression: AudioCompression
         private set
@@ -615,7 +618,7 @@ object Recording {
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
-            AndroidRecorder(), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            AndroidRecorder(inputs = com.chencohensolution.transcriptor.recording.AndroidAudioInputs(app).also { audioInputs = it }), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
             voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
             speakerPassReady = { canFindSpeakers },

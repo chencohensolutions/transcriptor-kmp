@@ -36,6 +36,8 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override val positionMillis = MutableStateFlow(0L)
     override val meter = MutableStateFlow(com.chencohensolution.transcriptor.recording.StereoMeterState())
     override var wantBands = false
+    override val inputInUse = MutableStateFlow<com.chencohensolution.transcriptor.recording.InputInUse?>(null)
+    var input: com.chencohensolution.transcriptor.recording.MicInput? = null
     override var onPcm: ((ByteArray, Int) -> Unit)? = null
     var file: Path? = null
     var format: AudioFileFormat? = null
@@ -45,7 +47,8 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?) {
+        this.input = input
         this.file = file
         this.format = format
         this.flacLevel = flacLevel
@@ -188,6 +191,33 @@ class RecordingTest {
         assertEquals(3_000, notes[0].atMillis)
         assertEquals("פסיבי ↔ אקטיבי", notes[0].text)
         assertEquals(1, session.state.value?.lecture?.notes?.size)
+    }
+
+    @Test
+    fun thePickedMicrophoneRecordsAndIsSaidWhenAway() = runTest {
+        val buds = com.chencohensolution.transcriptor.recording.MicInput("bluetooth:AA:BB:Buds", "Buds", com.chencohensolution.transcriptor.recording.MicInput.Kind.Bluetooth)
+        settings.micInput = buds
+        assertEquals(buds, SettingsStore(fs, root).micInput)
+        val session = session()
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        runCurrent()
+        assertEquals(buds, recorder.input)
+        // Not connected: the phone records, and the screen names the one picked.
+        assertEquals("Buds", session.state.value?.inputMissing)
+        recorder.inputInUse.value = com.chencohensolution.transcriptor.recording.InputInUse("Buds", buds.kind)
+        runCurrent()
+        assertEquals(null, session.state.value?.inputMissing)
+        assertEquals("Buds", session.state.value?.input?.name)
+    }
+
+    @Test
+    fun thePhonesOwnMicrophoneByDefault() = runTest {
+        val session = session()
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        runCurrent()
+        assertEquals(null, recorder.input)
+        assertEquals(null, session.state.value?.inputMissing)
+        assertEquals(null, session.state.value?.input)
     }
 
     @Test

@@ -42,6 +42,18 @@ A new install starts as the owner's S25 was set that day (read from its `setting
   CAM++ -0.2, ERes2NetV2 -0.3); a slider put back to the middle stays there.
 - **Processor meters**: the last minute as graphs.
 
+## Microphone (Nov 15, 2026)
+
+hen's ask: pick the microphone, Bluetooth too. Settings › Recordings › **Microphone** (`SettingsStore.micInput`, a
+`MicInput`; null, the default: the phone's own microphones, stereo 48 kHz) opens a list: the phone's own, then every
+input connected now besides it (`AndroidAudioInputs`, refreshed as devices come and go): Bluetooth headsets (hands-free,
+mono, phone-call quality), Bluetooth LE Audio earbuds, wired headsets, USB microphones. The one picked stays picked
+while it is away ("not connected: records from the phone"). Recording from Bluetooth sets it as the communication device
+and records as a call's voice (`VOICE_COMMUNICATION`), the only way a hands-free headset's microphone opens; wired and
+USB are just the preferred device. The file is 48 kHz stereo either way (the phone converts), so a mono headset's meter
+shows one set. The recording screen says "Microphone: <name>", or in red "<name> isn't connected: recording from the
+phone" (also when it disconnects mid-moment: `AudioRecorder.inputInUse` follows the phone's routing).
+
 ## Hide the recording notification (Nov 15, 2026)
 
 Settings › Recordings has **Hide the recording notification** (`SettingsStore.quietRecording`, off by default). On,

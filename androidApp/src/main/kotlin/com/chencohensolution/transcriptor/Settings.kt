@@ -46,6 +46,12 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
+    var micInput by remember { mutableStateOf(Recording.settings.micInput) }
+    var micInputs by remember { mutableStateOf(Recording.audioInputs.connected()) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val stop = Recording.audioInputs.watch { micInputs = it }
+        onDispose { stop() }
+    }
     var added by remember { mutableStateOf(Recording.settings.modelLanguages) }
     var hub by remember { mutableStateOf(HubSearch()) }
     var checking by remember { mutableStateOf(emptySet<String>()) }
@@ -87,7 +93,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, folder = folder, processorMeters = meters, levelMeter = levelMeter,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, quietRecording = quiet, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -133,6 +139,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             },
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
+            setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->

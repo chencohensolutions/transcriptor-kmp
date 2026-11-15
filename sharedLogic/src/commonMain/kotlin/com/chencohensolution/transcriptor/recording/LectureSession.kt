@@ -89,6 +89,7 @@ class LectureSession(
     private val recording = MutableStateFlow<Recording?>(null)
     private val liveOutput = MutableStateFlow<LiveOutput?>(null)
     private var liveModel: LiveModel? = null
+    private var wantedInput: MicInput? = null
     private var saving: Job? = null
     private var following: Job? = null
 
@@ -96,13 +97,14 @@ class LectureSession(
     private var edits: Map<String, String> = emptyMap()
 
     val state: StateFlow<LiveLectureState?> =
-        combine(recording, recorder.positionMillis, recorder.meter, liveOutput) { r, position, meter, out ->
+        combine(recording, recorder.positionMillis, recorder.meter, liveOutput, recorder.inputInUse) { r, position, meter, out, input ->
             r?.let {
                 LiveLectureState(
                     labelNames = it.labelNames,
                     lecture = it.lecture.copy(durationMillis = if (it.finishing) it.lecture.durationMillis else position),
                     partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else meter.now.level,
                     stereoMeter = if (it.paused) meter.silenced() else meter,
+                    input = input, inputMissing = wantedInput?.takeIf { w -> input?.name != w.name }?.name,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
                     voicePrints = liveModel?.voicePrints?.value,
@@ -176,7 +178,9 @@ class LectureSession(
             },
             settings.flacLevel,
             settings.aac,
+            settings.micInput,
         )
+        wantedInput = settings.micInput
         recording.value = Recording(labelNames, lecture, paused = false)
         saving = scope.launch {
             while (isActive) {

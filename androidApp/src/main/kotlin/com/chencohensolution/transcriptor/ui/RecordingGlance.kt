@@ -103,6 +103,17 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                 )
             }
             LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))
+            // Which microphone, when it isn't the phone's own; the one picked in Settings when it isn't recording.
+            val input = state.input
+            val mic = when {
+                state.inputMissing != null -> stringResource(R.string.glance_mic_missing, isolated(state.inputMissing.orEmpty()))
+                input != null -> stringResource(R.string.glance_mic, isolated(input.name))
+                else -> null
+            }
+            if (mic != null) Text(
+                mic, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
+                color = if (state.inputMissing != null) MaterialTheme.colorScheme.error else colors.time,
+            )
             // A problem is said; while things work, the models aren't.
             val problem = when {
                 state.liveError != null -> stringResource(R.string.glance_live_stopped)

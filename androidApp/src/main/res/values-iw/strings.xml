@@ -498,4 +498,17 @@
     <string name="settings_level_meter_strip">8 השניות האחרונות, L למעלה ו-R למטה</string>
     <string name="settings_level_meter_spectrum">ספקטרום הקול עכשיו</string>
     <string name="settings_level_meter_spectrogram">ספקטרוגרמה של 8 השניות האחרונות</string>
+    <string name="settings_mic">מיקרופון</string>
+    <string name="settings_mic_phone">המיקרופונים של הטלפון</string>
+    <string name="settings_mic_phone_note">סטריאו, 48 kHz</string>
+    <string name="settings_mic_away">%1$s (לא מחובר: מקליט מהטלפון)</string>
+    <string name="settings_mic_not_connected">לא מחובר עכשיו. כשהוא לא מחובר, הטלפון מקליט.</string>
+    <string name="settings_mic_bluetooth">Bluetooth: מונו, באיכות של שיחת טלפון</string>
+    <string name="settings_mic_bluetooth_le">Bluetooth LE Audio: מונו</string>
+    <string name="settings_mic_wired">אוזניות חוטיות</string>
+    <string name="settings_mic_usb">מיקרופון USB</string>
+    <string name="settings_mic_none">אין עכשיו מיקרופון אחר מחובר. חברו אוזניות Bluetooth או חוטיות, או מיקרופון USB, והוא יופיע כאן.</string>
+    <string name="settings_mic_close">סגירה</string>
+    <string name="glance_mic">מיקרופון: %1$s</string>
+    <string name="glance_mic_missing">%1$s לא מחובר: מקליט מהטלפון</string>
 </resources>

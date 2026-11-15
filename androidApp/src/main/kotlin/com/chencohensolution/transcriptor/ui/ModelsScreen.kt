@@ -100,6 +100,7 @@ import com.chencohensolution.transcriptor.models.ModelRemoval
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.recording.MicInput
 import com.chencohensolution.transcriptor.settings.LevelMeterStyle
 import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
@@ -156,6 +157,10 @@ data class ModelsState(
     /** The processor meters on the lecture screen while recording (Advanced). */
     val processorMeters: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
+    /** The microphone picked to record from; null: the phone's own. */
+    val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
+    /** The microphones connected now besides the phone's own. */
+    val micInputs: List<com.chencohensolution.transcriptor.recording.MicInput> = emptyList(),
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
@@ -243,6 +248,7 @@ class ModelsActions(
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
     val setLevelMeter: (LevelMeterStyle) -> Unit = {},
+    val setMicInput: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
     val chooseFolder: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
@@ -393,6 +399,7 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
             LecturesFolder(state.folder, actions.chooseFolder)
             NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
+            MicrophoneRow(state, actions.setMicInput)
             SwitchRow(
                 stringResource(R.string.settings_quiet), stringResource(if (state.quietRecording) R.string.settings_quiet_on else R.string.settings_quiet_off),
                 state.quietRecording, actions.setQuietRecording,
@@ -1274,4 +1281,70 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
             Text(stringResource(R.string.models_speaker_tuning_more), style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
         }
     }
+}
+
+/**
+ * Settings › Microphone: the phone's own (the default: stereo), or a headset, earbuds or USB microphone connected now.
+ * The one picked stays picked while it is away ("not connected"): the phone's own records until it is back.
+ */
+@Composable
+private fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val picked = state.micInput
+    val connected = picked == null || state.micInputs.any { it.key == picked.key }
+    NavRow(
+        stringResource(R.string.settings_mic),
+        when {
+            picked == null -> stringResource(R.string.settings_mic_phone)
+            connected -> isolated(picked.name)
+            else -> stringResource(R.string.settings_mic_away, isolated(picked.name))
+        },
+    ) { open = true }
+    if (!open) return
+    val choices = buildList {
+        add(null)
+        if (picked != null && !connected) add(picked)
+        addAll(state.micInputs)
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text(stringResource(R.string.settings_mic)) },
+        text = {
+            Column(Modifier.selectableGroup()) {
+                choices.forEach { input ->
+                    val selected = input?.key == picked?.key
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton) { set(input); open = false }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Column(Modifier.padding(start = 16.dp)) {
+                            Text(if (input == null) stringResource(R.string.settings_mic_phone) else isolated(input.name), style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                when {
+                                    input == null -> stringResource(R.string.settings_mic_phone_note)
+                                    state.micInputs.none { it.key == input.key } -> stringResource(R.string.settings_mic_not_connected)
+                                    else -> stringResource(micKind(input.kind))
+                                },
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (state.micInputs.isEmpty()) Text(
+                    stringResource(R.string.settings_mic_none), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.settings_mic_close)) } },
+    )
+}
+
+/** What kind of microphone [kind] is, and what to expect from it. */
+private fun micKind(kind: MicInput.Kind) = when (kind) {
+    MicInput.Kind.Bluetooth -> R.string.settings_mic_bluetooth
+    MicInput.Kind.BluetoothLe -> R.string.settings_mic_bluetooth_le
+    MicInput.Kind.Wired -> R.string.settings_mic_wired
+    MicInput.Kind.Usb -> R.string.settings_mic_usb
 }

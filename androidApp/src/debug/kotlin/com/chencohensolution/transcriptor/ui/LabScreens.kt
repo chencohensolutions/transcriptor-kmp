@@ -26,6 +26,8 @@ internal val labScreens: List<LabScreen> = listOf(
         lectureCurrentMeterStrip,
         lectureCurrentMeterSpectrum,
         lectureCurrentMeterSpectrogram,
+        lectureCurrentMic,
+        lectureCurrentMicMissing,
     )),
     LabScreen("review", "Lecture, after", listOf(
         reviewCurrent,

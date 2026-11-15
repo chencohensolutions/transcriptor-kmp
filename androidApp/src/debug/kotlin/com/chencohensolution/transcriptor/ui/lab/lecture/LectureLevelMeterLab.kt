@@ -99,3 +99,32 @@ private fun bump(f: Float, centre: Float, width: Float): Float {
     val d = ln(f / centre) / width
     return exp(-d * d)
 }
+
+// Fakes: as `current-meter-bars`, recording from Bluetooth earbuds picked in Settings: mono, so one set of bars.
+internal val lectureCurrentMic = LabOption("current-mic", "Recording from Bluetooth earbuds (the app's)", "The glance names the microphone when it isn't the phone's own") {
+    val (state, actions) = rememberGrowingLectureLab()
+    val stereo = rememberFakeStereo(state.paused).let { it.copy(stereo = false, now = it.now.copy(right = it.now.left, rightPeak = it.now.leftPeak)) }
+    LectureScreen(
+        state.copy(
+            lecture = state.lecture.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true),
+            partial = null, liveModelName = null, lagMillis = null, voicePrints = null, speakerPassOnStop = false, speakersLive = false, recordOnly = true,
+            level = stereo.now.level, stereoMeter = stereo,
+            input = com.chencohensolution.transcriptor.recording.InputInUse("Galaxy Buds3 Pro", com.chencohensolution.transcriptor.recording.MicInput.Kind.Bluetooth),
+        ),
+        actions,
+    )
+}
+
+// Fakes: as `current-meter-bars`, with earbuds picked in Settings that aren't connected: the phone records.
+internal val lectureCurrentMicMissing = LabOption("current-mic-missing", "The picked earbuds aren't connected (the app's)", "The phone records, and the glance says so") {
+    val (state, actions) = rememberGrowingLectureLab()
+    val stereo = rememberFakeStereo(state.paused)
+    LectureScreen(
+        state.copy(
+            lecture = state.lecture.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true),
+            partial = null, liveModelName = null, lagMillis = null, voicePrints = null, speakerPassOnStop = false, speakersLive = false, recordOnly = true,
+            level = stereo.now.level, stereoMeter = stereo, inputMissing = "Galaxy Buds3 Pro",
+        ),
+        actions,
+    )
+}
