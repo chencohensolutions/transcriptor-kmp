@@ -64,6 +64,29 @@ enum class ProcessorMeterStyle(val key: String) {
     }
 }
 
+/** How the recording screen draws the sound level (Settings › While recording). */
+enum class LevelMeterStyle(val key: String, val needsBands: Boolean = false) {
+    /** Five small bars that follow the level, as before; a set per channel when the recording is stereo. */
+    Bars("bars"),
+
+    /** A level bar per channel, with a peak that holds; red near the top, where it would clip. */
+    Lines("lines"),
+
+    /** The last 8 seconds as a scrolling strip, the left channel above the middle line and the right one below. */
+    Strip("strip"),
+
+    /** The voice range now, 80 Hz to 8 kHz in bands, with both channels' levels as thin lines. */
+    Spectrum("spectrum", needsBands = true),
+
+    /** The last 8 seconds of the voice range as a spectrogram, with both channels' levels beside it. */
+    Spectrogram("spectrogram", needsBands = true);
+
+    companion object {
+        /** The style kept as [key]; anything else (a newer app's) is [Bars]. */
+        fun of(key: String?) = entries.firstOrNull { it.key == key } ?: Bars
+    }
+}
+
 /**
  * FLAC's compression levels: 0 is the fastest, 8 the smallest file. Every level keeps the same sound (FLAC is lossless);
  * from 0 to 8 the file shrinks by a few percent and encoding takes several times longer.
@@ -134,6 +157,8 @@ private data class SettingsFileV1(
     val segmentationModel: String? = null,
     /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
     val processorMeters: String = ProcessorMeterStyle.Graphs.key,
+    /** [LevelMeterStyle.key]; kept as text so a style this version doesn't know reads as the bars. */
+    val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
 )
@@ -245,6 +270,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var processorMeters: ProcessorMeterStyle
         get() = ProcessorMeterStyle.of(read().processorMeters)
         set(value) = write(read().copy(processorMeters = value.key))
+
+    /** How the recording screen draws the sound level; [LevelMeterStyle.Bars] by default. */
+    var levelMeter: LevelMeterStyle
+        get() = LevelMeterStyle.of(read().levelMeter)
+        set(value) = write(read().copy(levelMeter = value.key))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
     fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: DEFAULT_SPEAKER_TUNING[modelId] ?: 0f

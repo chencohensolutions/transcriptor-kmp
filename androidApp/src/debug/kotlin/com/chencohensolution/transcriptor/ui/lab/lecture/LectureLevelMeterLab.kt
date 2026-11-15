@@ -6,6 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.chencohensolution.transcriptor.recording.METER_BANDS
+import com.chencohensolution.transcriptor.recording.METER_HISTORY
+import com.chencohensolution.transcriptor.recording.StereoLevel
+import com.chencohensolution.transcriptor.recording.StereoMeterState
+import com.chencohensolution.transcriptor.recording.bandCenter
+import com.chencohensolution.transcriptor.settings.LevelMeterStyle
 import kotlinx.coroutines.delay
 import kotlin.math.exp
 import kotlin.math.ln
@@ -20,7 +26,7 @@ import kotlin.random.Random
 @Composable
 internal fun rememberFakeStereo(paused: Boolean): StereoMeterState {
     val silent = StereoLevel(0f, 0f)
-    var state by remember { mutableStateOf(StereoMeterState(silent, List(METER_HISTORY) { silent }, List(METER_BANDS) { 0f }, List(METER_HISTORY) { List(METER_BANDS) { 0f } })) }
+    var state by remember { mutableStateOf(StereoMeterState(silent, List(METER_HISTORY) { silent }, List(METER_BANDS) { 0f }, List(METER_HISTORY) { List(METER_BANDS) { 0f } }, stereo = true)) }
     LaunchedEffect(paused) {
         if (paused) {
             state = state.copy(now = silent, bands = List(METER_BANDS) { 0f })
@@ -59,29 +65,37 @@ internal fun rememberFakeStereo(paused: Boolean): StereoMeterState {
                 val shape = bump(f, pitch, 0.25f) * 0.9f + bump(f, f1, 0.35f) + bump(f, f2, 0.3f) * 0.75f + (if (hush) bump(f, 6000f, 0.25f) * 0.8f else 0f)
                 (0.06f + 0.04f * random.nextFloat() + (voice * shape).coerceAtMost(1f) * 0.9f).coerceIn(0f, 1f)
             }
-            state = StereoMeterState(now, (state.history + now).takeLast(METER_HISTORY), bands, (state.bandHistory + listOf(bands)).takeLast(METER_HISTORY))
+            state = StereoMeterState(now, (state.history + now).takeLast(METER_HISTORY), bands, (state.bandHistory + listOf(bands)).takeLast(METER_HISTORY), stereo = true)
         }
     }
     return state
 }
 
-/** The centre of band [i] of [METER_BANDS], 80 Hz .. 8 kHz on a log scale. */
-internal fun bandCenter(i: Int): Float = 80f * exp(ln(100f) * i / (METER_BANDS - 1))
+
+/**
+ * The app's glance with the sound meter in [style] (Settings › While recording), fed the fake voice; recording only
+ * (After), as hen saw it when asking for two meters.
+ */
+private fun meterOption(style: LevelMeterStyle, title: String) = LabOption("current-meter-${style.key}", title, "LectureScreen's glance, recording only, with a faked stereo microphone") {
+    val (state, actions) = rememberGrowingLectureLab()
+    val stereo = rememberFakeStereo(state.paused)
+    LectureScreen(
+        state.copy(
+            lecture = state.lecture.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true),
+            partial = null, liveModelName = null, lagMillis = null, voicePrints = null, speakerPassOnStop = false, speakersLive = false, recordOnly = true,
+            level = stereo.now.level, stereoMeter = stereo, levelMeter = style,
+        ),
+        actions,
+    )
+}
+
+internal val lectureCurrentMeterBars = meterOption(LevelMeterStyle.Bars, "Sound meter: five bars per channel (the app's default)")
+internal val lectureCurrentMeterLines = meterOption(LevelMeterStyle.Lines, "Sound meter: a bar per channel with a peak (the app's)")
+internal val lectureCurrentMeterStrip = meterOption(LevelMeterStyle.Strip, "Sound meter: the last 8 seconds, L above R below (the app's)")
+internal val lectureCurrentMeterSpectrum = meterOption(LevelMeterStyle.Spectrum, "Sound meter: voice spectrum (the app's)")
+internal val lectureCurrentMeterSpectrogram = meterOption(LevelMeterStyle.Spectrogram, "Sound meter: spectrogram (the app's)")
 
 private fun bump(f: Float, centre: Float, width: Float): Float {
     val d = ln(f / centre) / width
     return exp(-d * d)
-}
-
-/** A meter option shown in the glance as hen saw it: recording only (After), the fake voice in [meter]. */
-internal fun meterOption(id: String, title: String, note: String, meter: @Composable (StereoMeterState) -> Unit) = LabOption(id, title, note) {
-    val (state, actions) = rememberGrowingLectureLab()
-    val stereo = rememberFakeStereo(state.paused)
-    MeterGlanceLab(
-        state.copy(
-            lecture = state.lecture.copy(segments = emptyList(), speakers = emptyList(), pendingTranscript = true),
-            partial = null, liveModelName = null, lagMillis = null, voicePrints = null, speakerPassOnStop = false, speakersLive = false, recordOnly = true,
-        ),
-        actions, onTranscript = {},
-    ) { meter(stereo) }
 }

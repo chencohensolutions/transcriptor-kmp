@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -142,8 +143,14 @@ class MainActivity : ComponentActivity() {
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
                         val meterStyle = remember { Recording.settings.processorMeters }
                         val meters = rememberProcessorMeters(meterStyle)
+                        val levelMeter = remember { Recording.settings.levelMeter }
+                        // The frequency bands cost a small FFT: worked out only while this screen shows them.
+                        DisposableEffect(levelMeter) {
+                            Recording.session.meterBands = levelMeter.needsBands
+                            onDispose { Recording.session.meterBands = false }
+                        }
                         LectureScreen(
-                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history),
+                            state.copy(meterStyle = meterStyle, meters = meters.now, meterHistory = meters.history, levelMeter = levelMeter),
                             LiveLectureActions(
                                 back = { showLive = false },
                                 pauseOrResume = Recording.session::pauseOrResume,

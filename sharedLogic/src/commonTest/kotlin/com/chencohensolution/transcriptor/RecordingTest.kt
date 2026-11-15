@@ -34,7 +34,8 @@ import kotlin.test.assertTrue
 /** Writes a WAV of silence as it "records": [advance] moves the position by writing that much audio. */
 class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override val positionMillis = MutableStateFlow(0L)
-    override val level = MutableStateFlow(0f)
+    override val meter = MutableStateFlow(com.chencohensolution.transcriptor.recording.StereoMeterState())
+    override var wantBands = false
     override var onPcm: ((ByteArray, Int) -> Unit)? = null
     var file: Path? = null
     var format: AudioFileFormat? = null
@@ -50,7 +51,7 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
         this.flacLevel = flacLevel
         this.aac = aac
         if (format == AudioFileFormat.Wav) wav = WavWriter(fileSystem, file) else fileSystem.write(file) {}
-        level.value = 0.5f
+        meter.value = com.chencohensolution.transcriptor.recording.StereoMeterState(com.chencohensolution.transcriptor.recording.StereoLevel(0.5f, 0.4f), stereo = true)
     }
 
     /** [millis] of silence, or of what [pcm] gives (48 kHz stereo 16 bit). */
@@ -63,7 +64,7 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     override fun pause() { paused = true }
     override fun resume() { paused = false }
     override fun checkpoint() { checkpoints++; wav?.checkpoint() }
-    override fun stop() { wav?.close(); level.value = 0f }
+    override fun stop() { wav?.close(); meter.value = com.chencohensolution.transcriptor.recording.StereoMeterState() }
 }
 
 class RecordingTest {
@@ -198,6 +199,7 @@ class RecordingTest {
         assertTrue(recorder.paused)
         assertEquals(true, session.state.value?.paused)
         assertEquals(0f, session.state.value?.level)
+        assertEquals(0f, session.state.value?.stereoMeter?.now?.left)
         session.pauseOrResume()
         runCurrent()
         assertFalse(recorder.paused)

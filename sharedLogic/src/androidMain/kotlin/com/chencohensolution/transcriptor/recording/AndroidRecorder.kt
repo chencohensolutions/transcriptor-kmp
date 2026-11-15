@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import okio.FileSystem
 import okio.Path
-import kotlin.math.sqrt
 
 /**
  * The phone's microphone, 48 kHz stereo 16 bit, read on its own thread into a [WavWriter], a [FlacEncoder] or an [AacEncoder].
@@ -17,9 +16,13 @@ import kotlin.math.sqrt
  */
 class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : AudioRecorder {
     private val position = MutableStateFlow(0L)
-    private val meter = MutableStateFlow(0f)
+    private val analyzer = MeterAnalyzer(RATE)
+    private val meterFlow = MutableStateFlow(StereoMeterState())
     override val positionMillis: StateFlow<Long> = position
-    override val level: StateFlow<Float> = meter
+    override val meter: StateFlow<StereoMeterState> = meterFlow
+    override var wantBands: Boolean
+        get() = analyzer.wantBands
+        set(value) { analyzer.wantBands = value }
     @Volatile override var onPcm: ((pcm: ByteArray, size: Int) -> Unit)? = null
 
     private val lock = Any()
@@ -56,13 +59,15 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
         )
         frames = 0
         position.value = 0
+        analyzer.reset()
+        meterFlow.value = analyzer.state
         resume()
     }
 
     override fun pause() {
         stopReading()
         record?.stop()
-        meter.value = 0f
+        meterFlow.value = analyzer.silence()
     }
 
     override fun resume() {
@@ -83,7 +88,7 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
         record = null
         synchronized(lock) { sink?.close() }
         sink = null
-        meter.value = 0f
+        meterFlow.value = analyzer.silence()
     }
 
     private fun stopReading() {
@@ -100,30 +105,17 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
             if (read <= 0) continue
             synchronized(lock) { sink?.write(buffer, read) }
             onPcm?.invoke(buffer, read)
+            analyzer.feed(buffer, read)
             frames += read / BYTES_PER_FRAME
             // The clock and the meter at 10 Hz: every buffer (50 Hz) would redraw the screen for nothing.
             if (++reads % 5 == 0) {
                 position.value = frames * 1000 / RATE
-                meter.value = levelOf(buffer, read)
+                meterFlow.value = analyzer.read(buffer, read)
             }
         }
         position.value = frames * 1000 / RATE
     }
 
-    /** RMS of the buffer on a rough dB scale, 0..1 (silence about 0, a voice near the phone 0.5–0.9). */
-    private fun levelOf(pcm: ByteArray, size: Int): Float {
-        var sum = 0.0
-        var i = 0
-        while (i + 1 < size) {
-            val sample = (pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)
-            sum += sample.toDouble() * sample
-            i += 2
-        }
-        val rms = sqrt(sum / (size / 2)) / Short.MAX_VALUE
-        if (rms <= 0) return 0f
-        val db = 20 * kotlin.math.log10(rms)
-        return ((db + 60) / 60).toFloat().coerceIn(0f, 1f)
-    }
 
     private companion object {
         const val RATE = WavWriter.SAMPLE_RATE

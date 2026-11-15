@@ -96,12 +96,13 @@ class LectureSession(
     private var edits: Map<String, String> = emptyMap()
 
     val state: StateFlow<LiveLectureState?> =
-        combine(recording, recorder.positionMillis, recorder.level, liveOutput) { r, position, level, out ->
+        combine(recording, recorder.positionMillis, recorder.meter, liveOutput) { r, position, meter, out ->
             r?.let {
                 LiveLectureState(
                     labelNames = it.labelNames,
                     lecture = it.lecture.copy(durationMillis = if (it.finishing) it.lecture.durationMillis else position),
-                    partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else level,
+                    partial = out?.partial, elapsedMillis = position, level = if (it.paused) 0f else meter.now.level,
+                    stereoMeter = if (it.paused) meter.silenced() else meter,
                     paused = it.paused, liveModelName = liveModel?.name, lagMillis = out?.lagMillis,
                     liveLoading = out?.loading == true, liveError = out?.error, finishing = it.finishing,
                     voicePrints = liveModel?.voicePrints?.value,
@@ -115,6 +116,14 @@ class LectureSession(
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
     val isRecording get() = recording.value != null
+
+    /**
+     * The sound meter also works out the frequency bands ([StereoMeterState.bands]): set while the recording screen
+     * shows a frequency style, so the small FFT runs only then.
+     */
+    var meterBands: Boolean
+        get() = recorder.wantBands
+        set(value) { recorder.wantBands = value }
 
     /**
      * Starts a moment with these [labels] (ids; [labelNames] for the screen) in [language]. Without [transcribeLive], or

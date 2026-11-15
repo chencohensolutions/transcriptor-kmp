@@ -100,6 +100,7 @@ import com.chencohensolution.transcriptor.models.ModelRemoval
 import com.chencohensolution.transcriptor.models.SpeechModel
 import com.chencohensolution.transcriptor.models.fromHub
 import com.chencohensolution.transcriptor.settings.AudioFormat
+import com.chencohensolution.transcriptor.settings.LevelMeterStyle
 import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
@@ -154,6 +155,7 @@ data class ModelsState(
     val segmentationModel: String? = null,
     /** The processor meters on the lecture screen while recording (Advanced). */
     val processorMeters: ProcessorMeterStyle = ProcessorMeterStyle.Off,
+    val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
@@ -240,6 +242,7 @@ class ModelsActions(
     /** Opens the phone's notification settings for the app, where its notifications can be turned off altogether. */
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
+    val setLevelMeter: (LevelMeterStyle) -> Unit = {},
     val chooseFolder: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
@@ -436,6 +439,26 @@ private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeaker
             NavRow(stringResource(R.string.settings_manage), stringResource(R.string.settings_manage_note), openCatalog)
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_meters_section))
+            Column(Modifier.selectableGroup()) {
+                Text(stringResource(R.string.settings_level_meter), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
+                PageNote(stringResource(R.string.settings_level_meter_note))
+                listOf(
+                    LevelMeterStyle.Bars to R.string.settings_level_meter_bars,
+                    LevelMeterStyle.Lines to R.string.settings_level_meter_lines,
+                    LevelMeterStyle.Strip to R.string.settings_level_meter_strip,
+                    LevelMeterStyle.Spectrum to R.string.settings_level_meter_spectrum,
+                    LevelMeterStyle.Spectrogram to R.string.settings_level_meter_spectrogram,
+                ).forEach { (option, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(selected = state.levelMeter == option, role = Role.RadioButton) { actions.setLevelMeter(option) }
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = state.levelMeter == option, onClick = null)
+                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
             Column(Modifier.selectableGroup()) {
                 Text(stringResource(R.string.settings_meters), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
                 PageNote(stringResource(R.string.settings_meters_note))

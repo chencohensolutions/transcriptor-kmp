@@ -191,3 +191,11 @@ anything left to decide. Remove an entry once it is built.
 - First run, "Get your models" (Nov 15, 2026): `DefaultModels.forLanguage`/`offerFirstRun`, `SettingsStore.firstRunDone`
   and `useDefaults`; the screen in `FirstRunScreen.kt` fed by `FirstRun.kt` (downloads, the NPU check and its CPU
   fallback); strings `first_run_*`. iOS has no NPU builds: it gets the CPU picks.
+
+## Sound level meter (Nov 15, 2026)
+
+- `AudioRecorder.meter` (`StereoMeterState`) and `wantBands`: iOS's recorder feeds a shared `MeterAnalyzer` (`feed`
+  every buffer, `read` about 10 times a second, `silence` on pause, `reset` on start), as `AndroidRecorder` does.
+- `SettingsStore.levelMeter` (`LevelMeterStyle`), shown as `LiveLectureState.levelMeter`; set `LectureSession.meterBands`
+  while the screen shows a style with `needsBands`. Views to mirror: `ui/LevelMeters.kt`. Strings `lecture_meter_*`,
+  `settings_level_meter*`.

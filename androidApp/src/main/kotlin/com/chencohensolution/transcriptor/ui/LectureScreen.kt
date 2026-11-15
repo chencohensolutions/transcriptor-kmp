@@ -207,7 +207,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.width(8.dp))
-                    LevelBars(state.level)
+                    StereoLevelBars(state.stereoMeter)
                     IconButton(onClick = actions.pauseOrResume, enabled = !state.finishing) {
                         Icon(
                             if (state.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,

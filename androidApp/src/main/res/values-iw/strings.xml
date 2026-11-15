@@ -485,4 +485,17 @@
     <string name="settings_quiet_off">כבוי: ההתראה מציגה את השעון, עם השהיה, סימון וסיום.</string>
     <string name="settings_quiet_on">פעיל: היא מציגה רק את שם האפליקציה, בלי צליל, בלי מסך הנעילה ובלי כפתורים. אנדרואיד משאיר שורה אחת לאפליקציה שמקליטה; כדי להסיר אותה לגמרי צריך לכבות את ההתראות של האפליקציה.</string>
     <string name="settings_quiet_system">לפתוח את הגדרות ההתראות של הטלפון</string>
+    <string name="lecture_meter_left">L</string>
+    <string name="lecture_meter_right">R</string>
+    <string name="lecture_meter_left_right">L  R</string>
+    <string name="lecture_meter_100">100</string>
+    <string name="lecture_meter_1k">1k</string>
+    <string name="lecture_meter_8k">8k Hz</string>
+    <string name="settings_level_meter">מד עוצמת הקול</string>
+    <string name="settings_level_meter_note">איך מסך ההקלטה מראה את הקול. ספקטרום וספקטרוגרמה מחשבים גם את התדרים (מעט יותר סוללה), רק כשהמסך דולק.</string>
+    <string name="settings_level_meter_bars">עמודות, סט לכל מיקרופון בסטריאו</string>
+    <string name="settings_level_meter_lines">פס לכל ערוץ, L ו-R, עם שיא</string>
+    <string name="settings_level_meter_strip">8 השניות האחרונות, L למעלה ו-R למטה</string>
+    <string name="settings_level_meter_spectrum">ספקטרום הקול עכשיו</string>
+    <string name="settings_level_meter_spectrogram">ספקטרוגרמה של 8 השניות האחרונות</string>
 </resources>

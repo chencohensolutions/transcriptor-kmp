@@ -102,7 +102,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
                 )
             }
-            LevelBars(state.level, Modifier.padding(top = 14.dp), height = 30)
+            LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))
             // A problem is said; while things work, the models aren't.
             val problem = when {
                 state.liveError != null -> stringResource(R.string.glance_live_stopped)

@@ -1,6 +1,7 @@
 package com.chencohensolution.transcriptor.recording
 
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.settings.LevelMeterStyle
 import com.chencohensolution.transcriptor.settings.ProcessorMeterStyle
 
 /** The lecture screen while recording, as [LectureSession] produces it. */
@@ -12,7 +13,7 @@ data class LiveLectureState(
     val partial: String?,
     /** The position in the audio: what a note typed now is pinned to. */
     val elapsedMillis: Long,
-    /** The microphone's level, 0..1, for the meter. */
+    /** The microphone's level, 0..1 (the louder channel of [stereoMeter]). */
     val level: Float,
     val paused: Boolean,
     /** The live model; null when none is downloaded for the lecture's language. */
@@ -42,6 +43,10 @@ data class LiveLectureState(
      * ([Lecture.pendingTranscript]); "After" was picked, or no live model is downloaded for its language.
      */
     val recordOnly: Boolean = false,
+    /** Both channels' levels, their last seconds and (for a frequency [levelMeter]) the bands; silent when paused. */
+    val stereoMeter: StereoMeterState = StereoMeterState(),
+    /** How the sound level is drawn (Settings › While recording). */
+    val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
     /** How the processors' load is shown (Settings › Advanced); [ProcessorMeterStyle.Off] hides it. */
     val meterStyle: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     /** How hard the processors are working (refreshed about every second); null until the first reading. */

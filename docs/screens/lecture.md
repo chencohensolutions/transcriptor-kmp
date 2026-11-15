@@ -64,6 +64,23 @@ Under it, the other models the recording uses (owner's request, Nov 6, 2026), in
 - **Recording only** (After on the Record bar, or no live model for the language; `LiveLectureState.recordOnly`): no
   lines and no model lines, only "Recording only. This moment is transcribed after you stop." above the notes.
 
+## Sound level meter
+
+hen's ask, Nov 15, 2026: two meters when recording stereo, and other ways to see the sound. Settings › Advanced › While
+recording picks a style (`SettingsStore.levelMeter`, `LevelMeterStyle`, `LiveLectureState.levelMeter`); the glance
+draws it under the clock (`LevelMeter`), the transcript's top bar always the small bars (`StereoLevelBars`):
+- **Bars** (default): the five small bars as before, a set for L and one for R when the recording is stereo.
+- **Lines**: a bar per channel, L and R, with a peak that holds; red near the top, where it would clip.
+- **Strip**: the last 8 seconds scrolling left, L above the middle line, R below.
+- **Spectrum**: the voice range now, 24 bands from 80 Hz to 8 kHz, both channels' levels as thin lines under it.
+- **Spectrogram**: the last 8 seconds of those bands, L/R bars beside it.
+
+The recorder works it out on its thread (`MeterAnalyzer`, shared): each channel's RMS 10 times a second, a peak that
+falls 2.5% a reading, the last 80 readings. The bands are a 2048-point FFT of the last ~43 ms (Hann window), only
+while Spectrum or Spectrogram is on screen (`LectureSession.meterBands`, set by `MainActivity`). A phone that copies
+one microphone into both channels reads as mono (`StereoMeterState.stereo` false) and shows one channel. Meters are
+laid out left to right in Hebrew too: the channels are the file's. Lab: `lecture current-meter-<style>`.
+
 ## Processor meters
 
 Owner's request, Nov 7, 2026: how hard the phone works while it records and transcribes. Off by default; Settings ›
@@ -112,7 +129,8 @@ starts afresh. Amber from 70%, red from 90%.
 ## Code
 
 - Screen: `androidApp/src/main/kotlin/com/chencohensolution/transcriptor/ui/LectureScreen.kt` (`LectureScreen`,
-  `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`).
+  `LiveLectureActions`); `RecordingIndicators.kt` (`RecordingDot`, `LevelBars`); `LevelMeters.kt` (`LevelMeter`, `StereoLevelBars`); shared
+  `recording/LevelMeter.kt` (`MeterAnalyzer`, `StereoMeterState`).
 - State and controller (shared): `recording/LiveLectureState.kt`, `recording/LectureSession.kt` (`start`,
   `pauseOrResume`, `addNote`, `editLine`, `stop`), `notebook/Timeline.kt` (`timelineOf`), `notebook/LectureStore.kt`,
   `recording/WavWriter.kt`, `recording/AudioCompression.kt`, `settings/Settings.kt` (`AudioFormat`).
@@ -133,6 +151,8 @@ starts afresh. Amber from 70%, red from 90%.
   `./scripts/ui-lab.sh lecture current`).
 
 ## Design history
+
+- [2026-11-15: stereo sound meters](../ux-history/lecture/2026-11-15-stereo-meters.md)
 
 - [Round 1 (Nov 2, 2026)](../ux-history/lecture/2026-11-02-while-recording.md): a — one timeline (picked), b — two panes, c — document + recorder.
 - [Round 2 (Nov 6, 2026)](../ux-history/lecture/2026-11-06-fix-while-recording.md): fixing a line while recording, and motion: a2 — in place, above the keyboard, lines glide up, words fade in (picked); a, b — in a sheet, c — words fade in, d — letter by letter.

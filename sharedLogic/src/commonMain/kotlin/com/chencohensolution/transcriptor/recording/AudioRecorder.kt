@@ -15,8 +15,11 @@ interface AudioRecorder {
     /** The position in the audio, from the samples written: pauses don't count, so every time points into the file. */
     val positionMillis: StateFlow<Long>
 
-    /** The microphone's level, 0..1; 0 when paused or stopped. */
-    val level: StateFlow<Float>
+    /** The sound level meter, both channels, about 10 times a second; silent when paused or stopped. */
+    val meter: StateFlow<StereoMeterState>
+
+    /** The meter also works out the frequency bands: only while a frequency style is on screen (it costs a small FFT). */
+    var wantBands: Boolean
 
     /** Gets every buffer written (48 kHz stereo 16 bit), on the recorder's thread: live transcription. */
     var onPcm: ((pcm: ByteArray, size: Int) -> Unit)?

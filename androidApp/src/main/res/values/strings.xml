@@ -479,4 +479,17 @@
     <string name="settings_quiet_off">Off: the notification shows the clock, with Pause, Mark and Stop.</string>
     <string name="settings_quiet_on">On: it shows only the app\'s name, makes no sound, stays off the lock screen and has no buttons. Android keeps one entry for an app that records; to remove it altogether, turn off the app\'s notifications.</string>
     <string name="settings_quiet_system">Open the phone\'s notification settings</string>
+    <string name="lecture_meter_left">L</string>
+    <string name="lecture_meter_right">R</string>
+    <string name="lecture_meter_left_right">L  R</string>
+    <string name="lecture_meter_100">100</string>
+    <string name="lecture_meter_1k">1k</string>
+    <string name="lecture_meter_8k">8k Hz</string>
+    <string name="settings_level_meter">Sound level meter</string>
+    <string name="settings_level_meter_note">How the recording screen shows the sound. Spectrum and spectrogram also work out the frequencies (a little more battery), only while the screen is on.</string>
+    <string name="settings_level_meter_bars">Bars, a set per microphone in stereo</string>
+    <string name="settings_level_meter_lines">A bar per channel, L and R, with a peak</string>
+    <string name="settings_level_meter_strip">The last 8 seconds, L above and R below</string>
+    <string name="settings_level_meter_spectrum">Voice spectrum now</string>
+    <string name="settings_level_meter_spectrogram">Spectrogram of the last 8 seconds</string>
 </resources>
