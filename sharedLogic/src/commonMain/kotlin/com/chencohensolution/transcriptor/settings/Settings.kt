@@ -21,7 +21,27 @@ enum class AudioFormat {
 
     /** AAC as it records ([AacSettings]), on the phone's hardware encoder when it has one: lossy, about 30 MB an hour at 64 kbps. */
     @SerialName("aac-live") AacLive,
+
+    /** WAV while recording, encoded to AAC ([AacSettings]) after the moment, as [EncodeAfter] says; then the WAV is deleted. */
+    @SerialName("wav-then-aac") WavThenAac,
 }
+
+/** When a WAV recorded for "WAV, then FLAC" or "WAV, then AAC" is encoded. */
+@Serializable
+enum class EncodeAfter {
+    /** As soon as the moment stops (and its passes are done). */
+    @SerialName("stop") Stop,
+
+    /** Once the phone is on the charger with at least [ENCODE_MIN_BATTERY]% battery. */
+    @SerialName("charging") Charging,
+}
+
+/** The battery, in percent, "encode when charging" waits for besides the charger. */
+const val ENCODE_MIN_BATTERY = 30
+
+/** Encoding may start now: right after Stop for [EncodeAfter.Stop], else on the charger with enough battery. */
+fun EncodeAfter.allows(charging: Boolean, batteryPercent: Int) =
+    this == EncodeAfter.Stop || (charging && batteryPercent >= ENCODE_MIN_BATTERY)
 
 /** How the lecture screen shows the processors' load while recording (Settings › Advanced). */
 enum class ProcessorMeterStyle(val key: String) {
@@ -58,8 +78,10 @@ private data class SettingsFileV1(
     val audioFormat: AudioFormat = AudioFormat.Wav,
     /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
-    /** How "AAC live" records. */
+    /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
     val aac: AacSettings = AacSettings(),
+    /** When "WAV, then FLAC" and "WAV, then AAC" encode. */
+    val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** The live model chosen per language (BCP-47 tag to model id). */
     val liveModels: Map<String, String> = emptyMap(),
     /** The refine model chosen per language; a language without one refines with its first ready large model. */
@@ -111,6 +133,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var flacLevel: Int
         get() = read().flacLevel.coerceIn(FLAC_LEVELS)
         set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
+
+    /** When a WAV waiting for FLAC or AAC is encoded: after Stop, or on the charger above [ENCODE_MIN_BATTERY]%. */
+    var encodeAfter: EncodeAfter
+        get() = read().encodeAfter
+        set(value) = write(read().copy(encodeAfter = value))
 
     /** How "AAC live" records: profile, sample rate, channels, bitrate and encoder ([AacSettings.valid] on the way in and out). */
     var aac: AacSettings

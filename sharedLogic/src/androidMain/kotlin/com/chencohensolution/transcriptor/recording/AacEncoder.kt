@@ -181,3 +181,26 @@ class AacEncoder(file: File, settings: AacSettings) : PcmSink {
         const val INPUT_SIZE = 16 * 1024
     }
 }
+
+/** [AacEncode] with [AacEncoder]: the WAV's PCM (48 kHz stereo) in 64 KB pieces; returns the WAV frames taken in. */
+val androidAacEncode = AacEncode { wav, aac, settings, progress ->
+    val encoder = AacEncoder(aac.toFile(), settings)
+    var frames = 0L
+    java.io.RandomAccessFile(wav.toFile(), "r").use { input ->
+        val total = input.length() - WavWriter.HEADER_SIZE
+        input.seek(WavWriter.HEADER_SIZE)
+        val buffer = ByteArray(64 * 1024)
+        var done = 0L
+        while (done < total) {
+            val n = input.read(buffer, 0, minOf(buffer.size.toLong(), total - done).toInt())
+            if (n <= 0) break
+            val whole = n - n % (WavWriter.CHANNELS * 2)
+            encoder.write(buffer, whole)
+            frames += whole / (WavWriter.CHANNELS * 2)
+            done += n
+            progress(done.toFloat() / total)
+        }
+    }
+    encoder.close()
+    frames
+}

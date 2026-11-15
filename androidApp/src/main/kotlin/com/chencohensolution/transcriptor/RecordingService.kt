@@ -202,26 +202,17 @@ class RecordingService : Service() {
         return false
     }
 
+    /** Encodes the lectures waiting for FLAC or AAC, unless the setting waits for the charger ([Recording.encodePending]). */
     private fun compressPending() {
         if (compressing) return
-        val pending = Recording.compression.pending()
-        if (pending.isEmpty()) { finish(); return }
         compressing = true
         startForeground(ID, progressNotification(R.string.compressing_flac, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
         scope.launch(Dispatchers.IO) {
-            for (lecture in pending) {
-                runCatching {
-                    var shown = -1
-                    Recording.compression.compress(lecture) { p ->
-                        Recording.compressing.value = lecture.id to p
-                        val percent = (p * 100).toInt()
-                        if (percent != shown) { shown = percent; notify(progressNotification(R.string.compressing_flac, p)) }
-                    }
-                }.onSuccess { done ->
-                    if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
-                }
+            var shown = -1
+            Recording.encodePending(this@RecordingService) { lecture, p ->
+                val percent = (p * 100).toInt()
+                if (percent != shown) { shown = percent; notify(progressNotification(if (lecture.pendingAac) R.string.compressing_aac else R.string.compressing_flac, p)) }
             }
-            Recording.compressing.value = null
             compressing = false
             launch(Dispatchers.Main) { finish() }
         }

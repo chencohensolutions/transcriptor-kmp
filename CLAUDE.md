@@ -20,7 +20,7 @@ update those docs whenever a screen changes.
   `notebook/NotebooksController.kt` and `LabelGuess.kt`: the first screen's state and the labels guessed from when
   moments are. `notebook/Place.kt` and `LibraryFolder.kt`: the lectures folder outside the app (finished lectures
   move there; `LectureStore.library`). `recording/`: `LectureSession` (the controller while recording), `AudioRecorder` (per platform;
-  Android's in androidMain with `FlacEncoder`), `WavWriter`, `FlacCompression`. `settings/`:
+  Android's in androidMain with `FlacEncoder`), `WavWriter`, `AudioCompression`. `settings/`:
   `SettingsStore`, `AudioFormat`. `speech/`: `LiveTranscriber` (live lines) with `UtteranceTranscriber`
   (Whisper, a line at a time: `SpeechEngine`, `Utterances` splitting at pauses) and `StreamingTranscriber`
   (Zipformer: `StreamingEngine`), `Downsampler`, `Speakers.kt` (`SpeakerTracker`, `SpeakerLabeler`:

@@ -95,7 +95,7 @@ fun ModelsScreenA(state: ModelsOptionAState, actions: ModelsOptionAActions) {
             when (state.format) {
                 AudioFormat.AacLive -> AacSettingsA(state, actions)
                 AudioFormat.FlacLive, AudioFormat.WavThenFlac -> FlacEffortA(state.flacLevel, state.format, actions.setFlacLevel)
-                AudioFormat.Wav -> {}
+                AudioFormat.Wav, AudioFormat.WavThenAac -> {}
             }
         }
     }

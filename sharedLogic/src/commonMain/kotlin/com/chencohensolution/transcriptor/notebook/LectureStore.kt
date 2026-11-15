@@ -232,6 +232,7 @@ private data class LectureFileV1(
     val durationMs: Long,
     val audio: String,
     val pendingFlac: Boolean = false,
+    val pendingAac: Boolean = false,
     val speakerPass: Boolean = false,
     val refinedWith: String? = null,
     val versions: List<VersionInfoV1> = emptyList(),
@@ -248,7 +249,7 @@ private data class LectureFileV1(
         segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
-        audioFile = audio, pendingFlac = pendingFlac, speakerPass = speakerPass, refinedWith = refinedWith,
+        audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, speakerPass = speakerPass, refinedWith = refinedWith,
         versions = versions.map { it.toInfo() },
     )
 
@@ -257,7 +258,7 @@ private data class LectureFileV1(
         fun of(lecture: Lecture) = LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
-            durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac,
+            durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac, pendingAac = lecture.pendingAac,
             speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
             versions = lecture.versions.map { VersionInfoV1.of(it) },
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },

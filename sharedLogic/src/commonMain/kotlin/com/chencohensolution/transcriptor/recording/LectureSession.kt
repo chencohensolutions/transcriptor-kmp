@@ -263,8 +263,8 @@ class LectureSession(
 
     /**
      * Ends the lecture: the recording stops at once, then live transcription finishes the lines still waiting
-     * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" it is saved as [Lecture.pendingFlac] for
-     * [FlacCompression].
+     * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" or "WAV, then AAC" it is saved as [Lecture.pendingFlac] or [Lecture.pendingAac] for
+     * [AudioCompression].
      */
     suspend fun stop(): Lecture? {
         val r = recording.value ?: return null
@@ -306,6 +306,7 @@ class LectureSession(
         val lecture = recording.value!!.lecture.copy(
             durationMillis = duration,
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenFlac,
+            pendingAac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenAac,
         )
         save(lecture)
         recording.value = null

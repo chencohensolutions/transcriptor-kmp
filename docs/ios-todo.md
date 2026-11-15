@@ -83,7 +83,7 @@ anything left to decide. Remove an entry once it is built.
   `MainActivity.kt` (keeping it recording, and the temporary start screen); `docs/screens/lecture.md`.
 - Shared, to call from SwiftUI: `LectureSession` (`state`, `start(labels, labelNames, language, title)`, `pauseOrResume()`,
   `addNote(atMillis, text)`, `stop()`), `timelineOf(lecture)`, `SettingsStore.audioFormat`, `SettingsStore.flacLevel` (0–8,
-  passed to `AudioRecorder.start` and to `FlacEncode`), `FlacCompression` (`pending()`, `compress(lecture, progress)`).
+  passed to `AudioRecorder.start` and to `FlacEncode`), `AudioCompression` (`pending()`, `compress(lecture, progress)`).
 - To write in `sharedLogic/src/iosMain`: an `AudioRecorder` on `AVAudioEngine` at 48 kHz stereo 16 bit, writing with
   `AVAudioFile` (`kAudioFormatLinearPCM` for WAV, `kAudioFormatFLAC` for FLAC live), and a `FlacEncode` that converts
   the WAV with `AVAudioFile`. The app needs the background audio mode and the microphone usage description.

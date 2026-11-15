@@ -83,7 +83,7 @@ private fun summaryB(state: ModelsOptionBState): String = when (state.format) {
     }
     AudioFormat.FlacLive -> stringResource(R.string.models_b_summary_flac_live, state.flacLevel, FLAC_LEVELS.last)
     AudioFormat.WavThenFlac -> stringResource(R.string.models_b_summary_flac_after, state.flacLevel, FLAC_LEVELS.last)
-    AudioFormat.Wav -> stringResource(R.string.models_b_summary_wav)
+    AudioFormat.Wav, AudioFormat.WavThenAac -> stringResource(R.string.models_b_summary_wav)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,7 +172,7 @@ private fun FormatPageB(state: ModelsOptionBState, actions: ModelsOptionBActions
                     }
                     FlacEffortB(state.flacLevel, state.format, actions.setFlacLevel)
                 }
-                AudioFormat.Wav -> {}
+                AudioFormat.Wav, AudioFormat.WavThenAac -> {}
             }
         }
     }

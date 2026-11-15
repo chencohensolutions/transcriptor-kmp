@@ -41,6 +41,8 @@ data class Lecture(
     val audioFile: String = AUDIO_WAV,
     /** Recorded as WAV with the "WAV, then FLAC" setting, and not compressed yet. */
     val pendingFlac: Boolean = false,
+    /** Recorded as WAV with "WAV, then AAC", and not encoded yet. */
+    val pendingAac: Boolean = false,
     /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
     val speakerPass: Boolean = false,
     /** The model the refine pass transcribed it with again; null before it. */
@@ -83,6 +85,9 @@ fun Lecture.asVersion(now: Long) = Version(
     VersionInfo("v$now", refinedWith ?: modelOfText.orEmpty(), now, segments.size, segments.count { it.edited }, refinedWith != null),
     segments, speakers, speakerPass, refinedWith,
 )
+
+/** Its WAV waits to be encoded (to FLAC or AAC) by [com.chencohensolution.transcriptor.recording.AudioCompression]. */
+val Lecture.pendingEncode get() = pendingFlac || pendingAac
 
 const val AUDIO_WAV = "audio.wav"
 const val AUDIO_FLAC = "audio.flac"

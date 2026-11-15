@@ -20,8 +20,10 @@ import com.chencohensolution.transcriptor.storage.LIBRARY_ROOT
 import com.chencohensolution.transcriptor.storage.SafFileSystem
 import com.chencohensolution.transcriptor.notebook.NotebooksController
 import com.chencohensolution.transcriptor.recording.AndroidRecorder
-import com.chencohensolution.transcriptor.recording.FlacCompression
+import com.chencohensolution.transcriptor.recording.AudioCompression
+import com.chencohensolution.transcriptor.settings.allows
 import com.chencohensolution.transcriptor.recording.LectureSession
+import com.chencohensolution.transcriptor.recording.androidAacEncode
 import com.chencohensolution.transcriptor.recording.androidFlacEncode
 import com.chencohensolution.transcriptor.models.HubClient
 import com.chencohensolution.transcriptor.models.InstalledModels
@@ -85,7 +87,7 @@ object Recording {
         private set
     lateinit var session: LectureSession
         private set
-    lateinit var compression: FlacCompression
+    lateinit var compression: AudioCompression
         private set
     lateinit var models: ModelFiles
         private set
@@ -100,8 +102,42 @@ object Recording {
     /** The refine pass: the lecture it runs on and 0..1; null when not running. */
     val refining = MutableStateFlow<Pair<String, Float>?>(null)
 
-    /** Compressing to FLAC: the lecture and 0..1, null when not. */
+    /** Encoding a WAV to FLAC or AAC: the lecture and 0..1, null when not. */
     val compressing = MutableStateFlow<Pair<String, Float>?>(null)
+
+    /** Held while lectures are encoded (by [RecordingService] or [EncodeJob]), so only one runs. */
+    val encoding = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** The battery, 0..100, and whether the phone is on the charger. */
+    fun battery(context: android.content.Context): Pair<Int, Boolean> {
+        val manager = context.getSystemService(android.os.BatteryManager::class.java)
+        return manager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) to manager.isCharging
+    }
+
+    /**
+     * Encodes the lectures waiting for FLAC or AAC, one after another, when the setting allows it now (right after Stop,
+     * or on the charger above 30%); [progress] gets each one's string and 0..1. False when none ran (none waiting, one
+     * already running, or the setting waits for the charger, which then gets an [EncodeJob]).
+     */
+    fun encodePending(context: android.content.Context, progress: (Lecture, Float) -> Unit = { _, _ -> }): Boolean {
+        val pending = compression.pending()
+        if (pending.isEmpty()) return false
+        val (percent, charging) = battery(context)
+        if (!settings.encodeAfter.allows(charging, percent)) { EncodeJob.schedule(context); return false }
+        if (!encoding.compareAndSet(false, true)) return false
+        try {
+            for (lecture in pending) {
+                if (session.isRecording) { EncodeJob.schedule(context); break }
+                runCatching { compression.compress(lecture) { p -> compressing.value = lecture.id to p; progress(lecture, p) } }
+                    .onSuccess { done -> if (lastLecture.value?.id == done.id) lastLecture.value = done }
+                    .onFailure { android.util.Log.e("Recording", "encoding ${lecture.id} failed", it) }
+            }
+        } finally {
+            compressing.value = null
+            encoding.set(false)
+        }
+        return true
+    }
 
     /** The speaker pass: the lecture it runs on and 0..1, null when not running. */
     val findingSpeakers = MutableStateFlow<Pair<String, Float>?>(null)
@@ -487,7 +523,7 @@ object Recording {
             speakerPassReady = { canFindSpeakers },
             power = PowerMeter(AndroidPowerProbe(app)),
         )
-        compression = FlacCompression(FileSystem.SYSTEM, store, androidFlacEncode) { settings.flacLevel }
+        compression = AudioCompression(FileSystem.SYSTEM, store, androidFlacEncode, { settings.flacLevel }, androidAacEncode, { settings.aac })
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

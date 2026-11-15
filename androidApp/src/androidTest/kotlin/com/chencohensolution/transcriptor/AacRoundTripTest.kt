@@ -79,6 +79,29 @@ class AacRoundTripTest {
     }
 
     @Test
+    fun aWavIsEncodedToAacAfterwards() {
+        val wav = File(dir, "after.wav")
+        val writer = com.chencohensolution.transcriptor.recording.WavWriter(okio.FileSystem.SYSTEM, okio.Path.Companion.run { wav.path.toPath() })
+        val chunk = ByteArray(48_000 / 50 * 4)
+        var frame = 0L
+        repeat(10 * 50) {
+            for (f in 0 until chunk.size / 4) {
+                val v = (sin(2 * PI * 440 * frame++ / 48_000) * 12_000).roundToInt()
+                for (c in 0..1) { chunk[f * 4 + c * 2] = v.toByte(); chunk[f * 4 + c * 2 + 1] = (v shr 8).toByte() }
+            }
+            writer.write(chunk, chunk.size)
+        }
+        writer.close()
+        val aac = File(dir, "after.aac")
+        val frames = com.chencohensolution.transcriptor.recording.androidAacEncode.encode(
+            okio.Path.Companion.run { wav.path.toPath() }, okio.Path.Companion.run { aac.path.toPath() }, AacSettings(), {},
+        )
+        assertEquals(480_000L, frames)
+        val all = RecordingAudio(aac).use { audio -> var n = 0; while (true) n += (audio.read(16_000) ?: break).size; n }
+        assertTrue("$all samples", abs(all - 160_000) < 3_200)
+    }
+
+    @Test
     fun everyEncoderTheDeviceHas() {
         for (encoder in AacEncoders.all) {
             check(AacSettings(encoder = encoder.name))
