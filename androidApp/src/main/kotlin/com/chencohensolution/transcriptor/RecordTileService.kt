@@ -152,3 +152,19 @@ class RecordFromTileActivity : ComponentActivity() {
         }
     }
 }
+
+/**
+ * A long press on the tile (Android opens the tile's preferences activity): the app, on the moment recording now if one
+ * is, else on the moments.
+ */
+class TileLongPressActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainActivity.EXTRA_SHOW_RECORDING, true),
+        )
+        finish()
+    }
+}

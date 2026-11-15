@@ -59,7 +59,8 @@ picked, and the recording format and hide-notification settings. It records in t
 the shade stays (while System UI is bound to the tile the app shares its microphone access; if Android refuses anyway,
 an invisible activity starts it from the foreground). On a locked phone it asks to unlock
 first. While recording the tile is on, labeled Stop with Recording or Paused under it; Stop takes one tap, or two within 4 seconds ("Tap again to stop") with Settings › Two taps to stop; while the last lines finish it is greyed out. Without the microphone
-permission the tap opens the app, whose Record asks for it.
+permission the tap opens the app, whose Record asks for it. A long press opens the app on the recording screen (on the moments when nothing records;
+`TileLongPressActivity`, the tile's preferences activity).
 
 ## Code
 
