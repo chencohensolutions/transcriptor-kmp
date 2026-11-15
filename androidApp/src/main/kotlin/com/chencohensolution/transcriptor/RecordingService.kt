@@ -59,7 +59,21 @@ class RecordingService : Service() {
         when (intent?.action) {
             ACTION_START -> if (!session.isRecording) {
                 quiet = Recording.settings.quietRecording
-                startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                try {
+                    startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                } catch (e: RuntimeException) {
+                    // From the tile, Android didn't count it as in use (SecurityException, or the start not allowed):
+                    // started again from the foreground instead.
+                    if (!intent.getBooleanExtra(EXTRA_FROM_TILE, false)) throw e
+                    android.util.Log.w("RecordingService", "microphone refused from the tile, through an activity", e)
+                    startActivity(Intent(this, RecordFromTileActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    // Started as a foreground service: it must be one before stopping (media processing needs no "in use").
+                    if (!compressing) {
+                        runCatching { startForeground(ID, progressNotification(R.string.recording_now, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING) }
+                        finish()
+                    }
+                    return START_NOT_STICKY
+                }
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
@@ -324,6 +338,7 @@ class RecordingService : Service() {
         private const val EXTRA_LANGUAGE = "language"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_LIVE = "live"
+        private const val EXTRA_FROM_TILE = "fromTile"
         private const val EXTRA_LECTURE = "lecture"
         private const val EXTRA_MODEL = "model"
         private const val EXTRA_SPEAKERS_FIRST = "speakersFirst"
@@ -331,12 +346,13 @@ class RecordingService : Service() {
 
         /**
          * Records a moment with these [labels] (ids; [labelNames] for its screen) in [language], transcribed as it
-         * records when [live], else after it stops.
+         * records when [live], else after it stops. [fromTile]: from the Quick Settings tile, in the background.
          */
-        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String, live: Boolean) = context.startForegroundService(
+        fun start(context: Context, labels: List<String>, labelNames: String, language: String, title: String, live: Boolean, fromTile: Boolean = false) = context.startForegroundService(
             Intent(context, RecordingService::class.java).setAction(ACTION_START)
                 .putExtra(EXTRA_LABELS, labels.toTypedArray()).putExtra(EXTRA_LABEL_NAMES, labelNames)
-                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_LIVE, live),
+                .putExtra(EXTRA_LANGUAGE, language).putExtra(EXTRA_TITLE, title).putExtra(EXTRA_LIVE, live)
+                .putExtra(EXTRA_FROM_TILE, fromTile),
         )
 
         fun stop(context: Context) =

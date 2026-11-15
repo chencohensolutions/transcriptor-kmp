@@ -27,11 +27,11 @@ import java.util.Date
 
 /**
  * The Quick Settings tile: Record, and Stop while a moment records (the tile on). Stop asks for a second tap, as in the
- * app. Recording starts through [RecordFromTileActivity]: Android lets an app start the microphone only from the
- * foreground, and a tile's tap alone doesn't count.
+ * app. Record starts the recording service in the background; nothing opens.
  */
 class RecordTileService : TileService() {
     private var scope: CoroutineScope? = null
+    private val clicks = MainScope()
 
     /** Stop was tapped once: a second tap within [ARM_MILLIS] stops. */
     private var armed: Job? = null
@@ -50,13 +50,13 @@ class RecordTileService : TileService() {
     override fun onClick() {
         val state = Recording.session.state.value
         when {
-            state == null -> {
-                val start = PendingIntent.getActivity(
-                    this, 0, Intent(this, RecordFromTileActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                )
+            state == null -> when {
+                // Mic not allowed yet: the app's Record asks for it.
+                checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
+                    startActivityAndCollapse(activity(MainActivity::class.java))
                 // Locked: the phone is unlocked first, so nobody records on a phone that isn't theirs.
-                if (isLocked) unlockAndRun { startActivityAndCollapse(start) } else startActivityAndCollapse(start)
+                isLocked -> unlockAndRun { record() }
+                else -> record()
             }
             state.finishing -> Unit
             armed?.isActive == true -> { armed?.cancel(); armed = null; RecordingService.stop(this) }
@@ -66,6 +66,26 @@ class RecordTileService : TileService() {
             }
         }
     }
+
+    /**
+     * Records in the background, the shade left open: while System UI is bound to the tile, the app shares its
+     * microphone access. If Android refuses anyway, [RecordFromTileActivity] starts it from the foreground.
+     */
+    private fun record() {
+        clicks.launch {
+            val next = withContext(Dispatchers.IO) { nextFromRecordBar() }
+            if (Recording.session.isRecording) return@launch
+            runCatching { next.start(this@RecordTileService, fromTile = true) }.onFailure {
+                android.util.Log.w("RecordTileService", "recording from the tile refused, through an activity", it)
+                startActivityAndCollapse(activity(RecordFromTileActivity::class.java))
+            }
+        }
+    }
+
+    private fun activity(c: Class<*>) = PendingIntent.getActivity(
+        this, c.name.hashCode(), Intent(this, c).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     private fun show(state: LiveLectureState?) {
         val tile = qsTile ?: return
@@ -91,6 +111,7 @@ class RecordTileService : TileService() {
 
     override fun onDestroy() {
         scope?.cancel()
+        clicks.cancel()
         super.onDestroy()
     }
 
@@ -99,32 +120,34 @@ class RecordTileService : TileService() {
     }
 }
 
+/** The moment the Record bar would start now: its guessed labels and language, its Live or After. */
+class NextMoment(val labels: List<String>, val labelNames: String, val language: String, val live: Boolean) {
+    fun start(context: android.content.Context, fromTile: Boolean = false) = RecordingService.start(
+        context, labels, labelNames, language, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date()), live, fromTile,
+    )
+}
+
+/** [NextMoment] from the moments on disk and the settings. Files: not on the main thread. */
+fun nextFromRecordBar(): NextMoment {
+    // A fresh process (the app not opened since): the moments aren't read yet, and the guess needs them.
+    if (Recording.library.library.value == Library()) Recording.library.reload()
+    val library = Recording.library.library.value
+    val next = notebooksState(library, System.currentTimeMillis(), Recording.utcOffset)
+    val labels = next.guess?.labels.orEmpty().filter { id -> library.labels.any { it.id == id } }
+    return NextMoment(labels, labelNames(labels, library.labels), next.language, Recording.settings.recordLive)
+}
+
 /**
- * Starts a moment from the tile, as the Record bar would now: its guessed labels and language, its Live or After, and
- * the recording format and notification settings. Shows nothing and finishes; it exists so the microphone is started
- * from the foreground. Without the microphone permission it opens the app instead, whose Record asks for it.
+ * The tile's fallback when Android won't let the microphone start from the background: starts [NextMoment] from the
+ * foreground, shows nothing and finishes.
  */
 class RecordFromTileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Recording.session.isRecording) { finish(); return }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            finish()
-            return
-        }
         lifecycleScope.launch {
-            val (library, live) = withContext(Dispatchers.IO) {
-                // A fresh process (the app not opened since): the moments aren't read yet, and the guess needs them.
-                if (Recording.library.library.value == Library()) Recording.library.reload()
-                Recording.library.library.value to Recording.settings.recordLive
-            }
-            val next = notebooksState(library, System.currentTimeMillis(), Recording.utcOffset)
-            val labels = next.guess?.labels.orEmpty().filter { id -> library.labels.any { it.id == id } }
-            if (!Recording.session.isRecording) {
-                val title = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date())
-                RecordingService.start(this@RecordFromTileActivity, labels, labelNames(labels, library.labels), next.language, title, live)
-            }
+            val next = withContext(Dispatchers.IO) { nextFromRecordBar() }
+            if (!Recording.session.isRecording) next.start(this@RecordFromTileActivity)
             finish()
         }
     }
