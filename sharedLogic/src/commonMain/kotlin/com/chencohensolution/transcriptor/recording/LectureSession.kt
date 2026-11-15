@@ -328,6 +328,7 @@ class LectureSession(
         val r = recording.value ?: return null
         if (r.finishing) return null
         saving?.cancel()
+        val input = recorder.inputInUse.value?.name
         recorder.stop()
         recorder.onPcm = null
         val duration = recorder.positionMillis.value
@@ -349,7 +350,7 @@ class LectureSession(
         // How much power it took: power.json beside the audio, a row in power-log.csv.
         power?.let { meter ->
             runCatching {
-                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile))
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile).copy(input = input))
                 store.savePower(r.lecture, report)
                 store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.labels.joinToString("+"), r.lecture.startedAtMillis, report))
             }

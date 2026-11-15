@@ -53,6 +53,9 @@ class PowerTest {
         val r = PowerReport.of(listOf(sample(0, -300_000), sample(60_000, -300_000)), 60_000, listOf(PowerModel("speakers", "ResNet293", "NPU")))
         store.savePower(lecture, r)
         assertEquals(r, store.loadPower(lecture))
+        assertEquals(null, store.audioBytes(lecture))
+        fs.write(store.audioPath(lecture)) { write(ByteArray(1234)) }
+        assertEquals(1234L, store.audioBytes(lecture))
         store.appendPowerLog(PowerLogCsv.row("l1", "nb", 5, r))
         store.appendPowerLog(PowerLogCsv.row("l2", "nb", 6, r))
         val csv = fs.read("/d/power-log.csv".toPath()) { readUtf8() }.trim().lines()
@@ -80,6 +83,8 @@ class PowerTest {
         store.savePower(lecture, e)
         assertEquals(r, store.loadPower(lecture))
         assertTrue(fs.exists(store.folder("l1") / "power-encode.json"))
+        assertEquals(e, store.loadEncodePower(lecture))
+        assertEquals(null, store.loadEncodePower(lecture.copy(id = "other")))
         store.appendPowerLog(PowerLogCsv.row("l1", "nb", 5, r))
         store.appendPowerLog(PowerLogCsv.row("l1", "nb", 5, e))
         val csv = fs.read("/d/power-log.csv".toPath()) { readUtf8() }.trim().lines()

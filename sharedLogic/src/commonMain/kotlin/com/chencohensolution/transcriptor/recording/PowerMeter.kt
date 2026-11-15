@@ -47,6 +47,8 @@ data class PowerAudio(
     val encoder: String? = null,
     val hardware: Boolean = false,
     val details: String = "",
+    /** The microphone it was recorded from when it wasn't the phone's own (a headset's name); null: the phone's. */
+    val input: String? = null,
 )
 
 /**

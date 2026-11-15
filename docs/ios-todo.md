@@ -206,3 +206,8 @@ anything left to decide. Remove an entry once it is built.
   `LiveLectureState.input` / `inputMissing`. iOS: list `AVAudioSession.availableInputs` (Bluetooth HFP, wired, USB),
   `setPreferredInput`, the `.allowBluetooth` category option, and follow `routeChangeNotification` for `inputInUse`.
   Strings `settings_mic*`, `glance_mic*`. Android: `AndroidAudioInputs.kt`, `MicrophoneRow` in `ModelsScreen.kt`.
+
+## Moment info (Nov 16, 2026)
+
+- `LectureReview.info()` (`MomentInfo`: the lecture, `LectureStore.audioBytes`, `loadPower`, `loadEncodePower`);
+  `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.
