@@ -110,7 +110,9 @@ val DEFAULT_SPEAKER_TUNING = mapOf(
 private data class SettingsFileV1(
     val v: Int = 1,
     /** A new install records as the owner does (Nov 15, 2026): AAC as it records, [AacSettings]' defaults. */
-    val audioFormat: AudioFormat = AudioFormat.AacLive,
+    // The owner's settings on their S25 (read from the phone, Nov 16, 2026): WAV while recording, AAC (256 kbps
+    // stereo) right after the moment, a quiet notification, no processor meters.
+    val audioFormat: AudioFormat = AudioFormat.WavThenAac,
     /** The FLAC compression level ([FLAC_LEVELS]), for both FLAC formats. */
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
@@ -144,7 +146,7 @@ private data class SettingsFileV1(
     /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
     val recordOnly: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
-    val quietRecording: Boolean = false,
+    val quietRecording: Boolean = true,
     /** The microphone picked to record from ([MicInput]); null: the phone's own. */
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** Stop asks for a second tap, in the recording screens and on the Quick Settings tile; off by default (owner's choice, Nov 15, 2026). */
@@ -164,7 +166,7 @@ private data class SettingsFileV1(
     /** The segmentation model picked for live speaker turns (its id); null: pyannote's. */
     val segmentationModel: String? = null,
     /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
-    val processorMeters: String = ProcessorMeterStyle.Graphs.key,
+    val processorMeters: String = ProcessorMeterStyle.Off.key,
     /** [LevelMeterStyle.key]; kept as text so a style this version doesn't know reads as the bars. */
     val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */

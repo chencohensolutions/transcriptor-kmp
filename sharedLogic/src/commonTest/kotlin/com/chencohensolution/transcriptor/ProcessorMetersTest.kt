@@ -136,11 +136,11 @@ class ProcessorMetersTest {
     }
 
     @Test
-    fun theMeterStyleIsASettingGraphsByDefault() {
+    fun theMeterStyleIsASettingOffByDefault() {
         val fs = FakeFileSystem()
         val root = "/files".toPath()
-        // The owner's setting (Nov 15, 2026).
-        assertEquals(ProcessorMeterStyle.Graphs, SettingsStore(fs, root).processorMeters)
+        // The owner's setting (Nov 16, 2026).
+        assertEquals(ProcessorMeterStyle.Off, SettingsStore(fs, root).processorMeters)
         SettingsStore(fs, root).processorMeters = ProcessorMeterStyle.Chip
         assertEquals(ProcessorMeterStyle.Chip, SettingsStore(fs, root).processorMeters)
         assert("\"processorMeters\": \"chip\"" in fs.read(root / "settings.json") { readUtf8() })

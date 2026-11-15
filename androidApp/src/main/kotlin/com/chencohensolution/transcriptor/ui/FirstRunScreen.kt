@@ -33,13 +33,14 @@ import com.chencohensolution.transcriptor.speech.ModelStatus
 /** What a model on first run is for, shown under its name. */
 enum class FirstRunJob { Live, Improve, Voices, Turns, Pass }
 
-data class FirstRunModel(val model: SpeechModel, val job: FirstRunJob, val status: ModelStatus)
+/** A model first run gets, for [job]; [language] names the language it transcribes when first run gets two. */
+data class FirstRunModel(val model: SpeechModel, val job: FirstRunJob, val status: ModelStatus, val language: String? = null)
 
 /**
  * First run's "Get your models": the defaults for [language] on this phone ([models]), their total size, and
  * whether their download was [started].
  */
-data class FirstRunState(val language: String, val models: List<FirstRunModel>, val started: Boolean) {
+data class FirstRunState(val languages: List<String>, val models: List<FirstRunModel>, val started: Boolean) {
     val totalBytes get() = models.sumOf { it.model.sizeBytes }
     val allReady get() = models.all { it.status == ModelStatus.Ready }
 }
@@ -59,7 +60,11 @@ fun FirstRunScreen(state: FirstRunState, actions: FirstRunActions) {
                 Text(stringResource(R.string.first_run_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    stringResource(R.string.first_run_body, languageName(state.language)),
+                    stringResource(
+                        R.string.first_run_body,
+                        if (state.languages.size > 1) stringResource(R.string.first_run_two_languages, languageName(state.languages[0]), languageName(state.languages[1]))
+                        else languageName(state.languages.first()),
+                    ),
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(24.dp))
@@ -102,7 +107,7 @@ private fun ModelRow(item: FirstRunModel, actions: FirstRunActions) {
                         FirstRunJob.Turns -> R.string.first_run_turns
                         FirstRunJob.Pass -> R.string.first_run_pass
                     },
-                ),
+                ) + (item.language?.let { " · " + languageName(it) } ?: ""),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(

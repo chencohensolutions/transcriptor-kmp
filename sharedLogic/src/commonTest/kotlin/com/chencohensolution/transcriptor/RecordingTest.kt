@@ -84,9 +84,12 @@ class RecordingTest {
     private fun TestScope.session() = LectureSession(recorder, store, settings, backgroundScope, now = { 1_793_600_000_000 })
 
     @Test
-    fun theDefaultIsAacAsItRecordsStereoAt256() {
-        // A new install records as the owner does: AAC live, LC, 48 kHz, stereo, 256 kbps, FLAC effort 8.
-        assertEquals(AudioFormat.AacLive, settings.audioFormat)
+    fun theDefaultIsWavThenAacStereoAt256() {
+        // A new install records as the owner does (Nov 16, 2026): WAV, then AAC LC 48 kHz stereo 256 kbps right after
+        // the moment, FLAC effort 8, a quiet notification.
+        assertEquals(AudioFormat.WavThenAac, settings.audioFormat)
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
+        assertTrue(settings.quietRecording)
         assertEquals(com.chencohensolution.transcriptor.settings.AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.Lc, 48_000, 2, 256, null), settings.aac)
         assertEquals(8, settings.flacLevel)
         settings.audioFormat = AudioFormat.FlacLive
@@ -105,7 +108,7 @@ class RecordingTest {
         settings.autoImprove = true
         assertEquals(true, SettingsStore(fs, root).findSpeakersOnStop)
         assertEquals(true, SettingsStore(fs, root).autoImprove)
-        assertEquals(AudioFormat.AacLive, SettingsStore(fs, root).audioFormat)
+        assertEquals(AudioFormat.WavThenAac, SettingsStore(fs, root).audioFormat)
     }
 
     @Test

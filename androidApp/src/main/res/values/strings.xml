@@ -551,4 +551,5 @@
     <string name="settings_transcribe_when_note">“After” on the Record bar records without transcribing; the transcript is made then, with the language’s improve model.</string>
     <string name="settings_transcribe_when_stop">Right after the moment ends</string>
     <string name="settings_transcribe_when_charging">When charging, with 30% battery or more</string>
+    <string name="first_run_two_languages">%1$s and %2$s</string>
 </resources>

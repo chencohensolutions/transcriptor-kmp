@@ -28,7 +28,9 @@ object DefaultModels {
     const val FIRST_LANGUAGE = "en"
 
     private val livePicks = mapOf(
-        "en" to listOf(ModelCatalog.whisperTurbo),
+        // No English live model (the owner: "turbo is no good", Nov 15, 2026): English moments are recorded and
+        // transcribed after with large-v3, as on the owner's phone. An English streaming model goes here once it's ready.
+        "en" to emptyList(),
         // The owner's picks on the S25 (Nov 15, 2026).
         "he" to listOf(ModelCatalog.ivritZipformerNpu, ModelCatalog.ivritZipformer),
     )
