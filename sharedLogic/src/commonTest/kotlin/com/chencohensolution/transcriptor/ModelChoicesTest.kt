@@ -7,6 +7,7 @@ import com.chencohensolution.transcriptor.models.SpeechModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ModelChoicesTest {
     private val hebrew = ModelCatalog.forLanguage("he", "SM8750")
@@ -41,6 +42,20 @@ class ModelChoicesTest {
         assertEquals(ModelCatalog.ivritTurbo, ModelChoices.running(live, null, ready))
         assertEquals(ModelCatalog.ivritLargeV3, ModelChoices.running(live, ModelCatalog.ivritLargeV3.id, ready))
         assertEquals(false, ModelCatalog.whisperLargeV3.id in ModelChoices.candidates(hebrew, ModelJob.Live, ready()).map { it.id })
+    }
+
+    @Test
+    fun theNpuEncoderLargeV3RunsLiveInWindowsOnceReady() {
+        val m = ModelCatalog.ivritLargeV3NpuEncoder
+        assertEquals(30, m.liveWindowSeconds)
+        assertTrue(m.runsLive)
+        assertTrue(m in hebrew)
+        // Got for improving; once ready it can be picked for live, after the line models.
+        val live = ModelChoices.candidates(hebrew, ModelJob.Live, ready(ModelCatalog.ivritTurboNpu, m))
+        assertEquals(listOf(ModelCatalog.ivritTurboNpu, m), live.take(2))
+        assertEquals(m, ModelChoices.running(live, m.id, ready(ModelCatalog.ivritTurboNpu, m)))
+        // Its whisper.cpp file is already 8-bit, without the encoder: nothing to quantize on the phone.
+        assertNull(m.quantizeTo)
     }
 
     @Test

@@ -171,7 +171,9 @@ object ModelCatalog {
     // whisper.cpp decoding (ModelKind.WhisperNpuEncoder): the decoder's 32 layers are slow on the NPU, one call per
     // token, and broke when quantized; the encoder is one big computation per window. The encoder: 8-bit weights,
     // 16-bit activations (w8a16), calibrated on public FLEURS Hebrew only, QAIRT 2.40.0.251030 (docs/npu-build.md).
-    // model.bin is ivritLargeV3's ggml file; whisper.cpp leaves its encoder's weights unloaded.
+    // model.bin is ivritLargeV3's ggml file in q8_0 without its encoder's tensors (scripts/npu/whisper_ggml_decoder_only.py:
+    // 0.97 GB to download instead of the 3.1 GB f16 file quantized on the phone); whisper.cpp loads it with skip_encoder.
+    private const val LARGE_DECODER_SM8750 = "https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750/resolve/3bc85b6027f540649fc32bbb548d708a5aa97b36"
     private const val LARGE_ENCODER_SM8750 = "https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750/resolve/9d90128591ad4b367aea783e0f8daf44cd494f4e"
     val ivritLargeV3NpuEncoder = SpeechModel(
         id = "ivrit-whisper-large-v3-npu-encoder-sm8750",
@@ -185,10 +187,9 @@ object ModelCatalog {
         source = "https://huggingface.co/ivrit-ai/whisper-large-v3",
         kind = ModelKind.WhisperNpuEncoder,
         files = listOf(
-            ivritLargeV3.files.single(),
+            ModelFile("model.bin", "$LARGE_DECODER_SM8750/decoder-q8_0.bin", "23daadbbe8a52712a99141f3cc7cbc71a0b07c022c6828e8c67261ad79fa8c48", 967_567_427),
             ModelFile("encoder.bin", "$LARGE_ENCODER_SM8750/encoder.bin", "3966ecc80cb7893fe1547fa0b5e9b055b94410f13cc656d7b3025749984525ad", 932_503_552),
         ),
-        quantizeTo = "q8_0",
         chips = listOf("SM8750"),
         // Not measured on a phone yet: whisper.cpp without its encoder 1.36 GB at the peak (on the Mac) and the
         // encoder's load with its file mapped about 1.2 GB (it took 2.4 GB and more when sherpa-onnx read it into

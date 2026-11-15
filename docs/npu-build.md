@@ -10,7 +10,7 @@ What gets built, per chip (SM8750 = Snapdragon 8 Elite, Hexagon v79, the only ch
 |---|---|---|---|
 | ivrit.ai Whisper large-v3 turbo | encoder, decoder | `ivrit-ai/whisper-large-v3-turbo` safetensors, commit f33172a8 | `ivritTurboNpu` |
 | ivrit.ai Whisper large-v3 (refine only) | encoder, decoder | `ivrit-ai/whisper-large-v3` safetensors (sharded), commit 766847c9; converted with `--no_simplification --float_bitwidth 16` (too large for the S25's memory in the app: the memory guard keeps it from loading) | `ivritLargeV3Npu` |
-| ivrit.ai Whisper large-v3, encoder only (whisper.cpp decodes) | encoder | the same; w8a16, calibrated on FLEURS Hebrew (section 3); with whisper.cpp's ggml model through `third_party/whisper.cpp-external-encoder.patch` | `ivritLargeV3NpuEncoder` |
+| ivrit.ai Whisper large-v3, encoder only (whisper.cpp decodes) | encoder | the same; w8a16, calibrated on FLEURS Hebrew (section 3); with whisper.cpp's ggml model in q8_0 without its encoder (`scripts/npu/whisper_ggml_decoder_only.py`, 0.97 GB) through `third_party/whisper.cpp-external-encoder.patch` | `ivritLargeV3NpuEncoder` |
 | ivrit.ai Zipformer2 66M streaming | encoder, decoder, joiner | `ivrit-ai/zipformer2-66m-streaming-he` `model.pt`, commit ee769a2a | `ivritZipformerNpu` |
 | WeSpeaker SimAM-ResNet100 (VoxBlink2 + VoxCeleb2; non-commercial) | t150, t300, t600 | WeSpeaker's runtime ONNX `voxblink2_samresnet100_ft` `avg_model.onnx`, sha256 0d92ee34 | none: copied by hand (`voicePrintsSimAmResNet100`) |
 | WeSpeaker ResNet293-LM (VoxCeleb) | t150, t300, t600 | sherpa-onnx's `wespeaker_en_voxceleb_resnet293_LM.onnx` | none: copied by hand (`voicePrintsResNet293`) |
