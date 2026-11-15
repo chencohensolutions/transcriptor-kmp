@@ -312,6 +312,10 @@ class HubTest {
         // "large" is a Whisper size (1.55B), not this model's: its size isn't guessed.
         assertEquals("?", v.parameters)
         assertEquals(ModelKind.SpeakerSegmentation, m.toSpeechModel(v).kind)
+        // One added before, saved with the guessed 1.55B, reads back with no size.
+        val fs = FakeFileSystem()
+        InstalledModels(fs, "/files".toPath()).add(InstalledModel(m.toSpeechModel(v).copy(parameters = "1.55B"), m.repo, m.use))
+        assertEquals("?", InstalledModels(fs, "/files".toPath()).all().single().model.parameters)
     }
 
     @Test
