@@ -252,11 +252,9 @@
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
     <string name="notebooks_labels">תוויות</string>
     <string name="notebooks_labels_more">תוויות…</string>
-    <string name="notebooks_add_labels">הוספת תוויות</string>
     <string name="notebooks_add">הוספת %1$s</string>
     <string name="notebooks_no_labels">בלי תוויות</string>
     <string name="notebooks_no_label_chip">בלי תווית (%1$d)</string>
-    <string name="notebooks_no_label_title">עוד בלי תוויות</string>
     <string name="notebooks_new_label">תווית חדשה</string>
     <string name="notebooks_edit_label">עריכת תווית</string>
     <string name="notebooks_delete_label">מחיקת התווית</string>
@@ -435,4 +433,29 @@
     <string name="review_draft">טיוטה חיה. המודל הטוב יותר עוד לא כתב אותה.</string>
     <string name="review_draft_improve">שיפור</string>
     <string name="review_draft_improve_minutes">שיפור · כ־%1$d דק׳</string>
+    <string name="notebooks_search">חיפוש</string>
+    <string name="notebooks_search_close">לסגור את החיפוש</string>
+    <string name="notebooks_search_clear">לנקות</string>
+    <string name="notebooks_search_hint">חיפוש במה שנאמר, באנשים ובתוויות</string>
+    <string name="notebooks_search_start">אפשר להקליד מילה שמישהו אמר, שם, כותרת או תווית.</string>
+    <string name="notebooks_search_none">לא נמצא דבר עבור %1$s.</string>
+    <string name="notebooks_search_note">הערה:</string>
+    <string name="notebooks_search_person">עם</string>
+    <string name="notebooks_search_label">תווית:</string>
+    <string name="notebooks_search_at">ב־%1$s</string>
+    <string name="notebooks_people_more">%1$s ועוד %2$d</string>
+    <string name="review_rename">שינוי שם הרגע</string>
+    <string name="review_rename_save">שמירה</string>
+    <string name="review_add_labels">הוספת תוויות</string>
+    <plurals name="notebooks_voices">
+        <item quantity="one">קול אחד</item>
+        <item quantity="two">%1$d קולות</item>
+        <item quantity="other">%1$d קולות</item>
+    </plurals>
+    <plurals name="notebooks_search_more">
+        <item quantity="one">עוד מקום אחד</item>
+        <item quantity="two">עוד %1$d מקומות</item>
+        <item quantity="other">עוד %1$d מקומות</item>
+    </plurals>
+    <string name="notebooks_add_label_quiet">+ תווית</string>
 </resources>

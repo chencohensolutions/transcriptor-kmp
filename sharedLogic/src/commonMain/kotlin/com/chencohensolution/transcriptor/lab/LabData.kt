@@ -124,4 +124,50 @@ object LabData {
 
     /** The voices the app would know for [conversation]. */
     val knownNames = listOf("Dan", "Maya", "Noa", "Hen")
+
+    /** Labels for [conversations]. */
+    val conversationLabels = listOf(Label("lab-friends", "Friends", 2), Label("lab-home", "Home", 4), Label("lab-trips", "Trips", 1))
+
+    /**
+     * English conversations for the first screen and its search (the app's main use): a dinner of four with one voice
+     * still unnamed, a trip being planned, and a short call. Titles are as the app gives them (the date) except one
+     * the user renamed.
+     */
+    val conversations: List<Lecture> = run {
+        fun moment(id: String, title: String, daysAgo: Int, minutes: Int, speakers: List<Speaker>, labels: List<String>, notes: List<Note>, vararg said: Pair<Int, String>): Lecture {
+            var at = 4_000L
+            val lines = said.mapIndexed { i, (who, text) ->
+                val length = 900L + text.length * 62L
+                Segment("s${i + 1}", at, at + length, text, "whisper-large-v3", speakerId = "speaker-$who").also { at += length + 350 }
+            }
+            return Lecture(id, title, "en", LECTURE_START - daysAgo * 24 * 60 * MIN + 9 * 60 * MIN, minutes * MIN, lines, notes, speakers, labels = labels, refinedWith = "whisper-large-v3")
+        }
+        listOf(
+            moment(
+                "lab-dinner", "Nov 14, 2026", 1, 42,
+                listOf(Speaker("speaker-1", "Hen"), Speaker("speaker-2", "Maya"), Speaker("speaker-3", "Dan"), Speaker("speaker-4", "")),
+                listOf("lab-friends"), listOf(Note("n1", 30_000, "ask about the boat")),
+                2 to "okay", 2 to "no, the second weekend, the first one they're fully booked",
+                3 to "the guy said he'd throw in the boat", 1 to "wait, what boat",
+                3 to "there's a rowing boat. It's on the listing, third photo, under the tarp.",
+                4 to "I'm not rowing anything", 1 to "Dan, tell them about the cabin guy and what he said about the stove",
+            ),
+            moment(
+                "lab-trip", "Trip planning", 4, 72,
+                listOf(Speaker("speaker-1", "Hen"), Speaker("speaker-2", "Maya"), Speaker("speaker-3", "Dan"), Speaker("speaker-4", "Noa")),
+                listOf("lab-friends", "lab-trips"), emptyList(),
+                1 to "so we booked the cabin for the second weekend, and it's two nights",
+                4 to "who's bringing the grill", 3 to "Hen is, he said so at dinner", 2 to "we leave Friday at four then, before the traffic",
+                1 to "the cabin has a stove but bring the grill anyway",
+            ),
+            moment(
+                "lab-landlord", "Nov 9, 2026", 6, 9,
+                listOf(Speaker("speaker-1", "Hen"), Speaker("speaker-2", "")),
+                listOf("lab-home"), emptyList(),
+                2 to "hello", 1 to "hi, it's about the boiler again, it stopped on Sunday night",
+                2 to "I'll send someone on Tuesday morning, between eight and ten",
+            ),
+            moment("lab-memo", "Nov 8, 2026", 7, 3, emptyList(), emptyList(), emptyList()).copy(refinedWith = null),
+        )
+    }
 }

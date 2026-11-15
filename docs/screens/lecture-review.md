@@ -51,6 +51,10 @@ or more voices and one still unnamed (`askPeople`).
 - **Share** opens a menu: **Share as text** (the moment as "Name: what they said", notes in brackets;
   `transcriptText`, `LectureReview.text`) or **Share as Word**. Holding it still saves the Word file.
 
+- **The title renames the moment** (tap it; `LectureReview.rename`), and the line under it, its labels or "Add
+  labels", opens the labels sheet of the first screen for this moment (`LectureReview.setLabels`): check, make, rename
+  and delete labels without going back to the list.
+
 ## Behavior
 
 - Tap a sentence: play from its start (seek to the millisecond). Tap the overview: jump there.

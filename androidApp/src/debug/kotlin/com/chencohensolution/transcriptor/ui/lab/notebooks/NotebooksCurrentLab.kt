@@ -12,6 +12,8 @@ import com.chencohensolution.transcriptor.lab.LabData
 import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Library
 import com.chencohensolution.transcriptor.notebook.LectureSummary
+import com.chencohensolution.transcriptor.notebook.searchMoments
+import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.NotebooksState
 import com.chencohensolution.transcriptor.notebook.RecordingNow
 import com.chencohensolution.transcriptor.notebook.notebooksState
@@ -36,6 +38,13 @@ internal val notebooksCurrentNoGuess = LabOption("current-no-guess", "Labels: no
     NotebooksScreen(state, actions)
 }
 
+// Fakes: as `current`, with English conversations (LabData.conversations): rows with who was there and a first
+// sentence, and a search over what they said (the app reads every moment's file). Opening a result only says where.
+internal val notebooksCurrentConversations = LabOption("current-conversations", "The app's, English conversations and search", "NotebooksScreen with LabData.conversations: people and a first line on each row, search") {
+    val (state, actions) = rememberNotebooksLab(MONDAY_BEFORE_CLASS, english = true)
+    NotebooksScreen(state, actions)
+}
+
 private const val MIN = 60_000L
 private const val DAY = 24 * 60 * MIN
 private val LATEST = LabData.moments.first().startedAtMillis
@@ -43,16 +52,16 @@ private val MONDAY_BEFORE_CLASS = LATEST + 7 * DAY - 10 * MIN
 private val TUESDAY_EVENING = LATEST + 8 * DAY + 8 * 60 * MIN
 
 @Composable
-private fun rememberNotebooksLab(now: Long): Pair<NotebooksState, NotebooksActions> {
+private fun rememberNotebooksLab(now: Long, english: Boolean = false): Pair<NotebooksState, NotebooksActions> {
     val context = LocalContext.current
     fun title(at: Long) = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(at))
-    var labels by remember { mutableStateOf(LabData.labels) }
+    var labels by remember { mutableStateOf(if (english) LabData.conversationLabels else LabData.labels) }
     var moments by remember {
         val unlabeled = listOf(
             LectureSummary("unlabeled-sat", title(LATEST + 5 * DAY + 5 * MIN), LATEST + 5 * DAY + 5 * MIN, 88 * MIN, 4, refined = true, language = "he"),
             LectureSummary("unlabeled-thu", title(LATEST + 3 * DAY + 510 * MIN), LATEST + 3 * DAY + 510 * MIN, 52 * MIN, 0, refined = true, language = "he"),
         )
-        mutableStateOf((LabData.moments + unlabeled).sortedByDescending { it.startedAtMillis })
+        mutableStateOf(if (english) LabData.conversations.map { it.summary() }.sortedByDescending { it.startedAtMillis } else (LabData.moments + unlabeled).sortedByDescending { it.startedAtMillis })
     }
     var recording by remember { mutableStateOf<RecordingNow?>(null) }
     var recordingLanguage by remember { mutableStateOf("he") }
@@ -71,9 +80,11 @@ private fun rememberNotebooksLab(now: Long): Pair<NotebooksState, NotebooksActio
     }
     fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     val zone = TimeZone.getDefault()
-    val state = notebooksState(Library(labels, moments, "he"), now, { zone.getOffset(it).toLong() }, recording, working)
+    val state = notebooksState(Library(labels, moments, if (english) "en" else "he"), now, { zone.getOffset(it).toLong() }, recording, working)
     val actions = NotebooksActions(
         openLecture = { toast("Lab: the moment would open ($it)") },
+        openLectureAt = { id, at -> toast("Lab: the moment would open ($id)" + (at?.let { " at ${it / 1000} s" } ?: "")) },
+        search = { query -> delay(300); searchMoments(if (english) LabData.conversations else listOf(LabData.refinedLecture), labels, query) },
         record = { ids, language, _ ->
             if (recording == null) {
                 recording = RecordingNow(ids, title(now), 0)

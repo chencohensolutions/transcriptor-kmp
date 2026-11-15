@@ -33,7 +33,24 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
+import com.chencohensolution.transcriptor.notebook.MIN_QUERY
+import com.chencohensolution.transcriptor.notebook.SearchHit
+import kotlinx.coroutines.delay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -71,6 +88,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -93,6 +111,10 @@ import java.util.Locale
 class NotebooksActions(
     /** Opens a recorded moment. */
     val openLecture: (lectureId: String) -> Unit = {},
+    /** Opens a moment a search found, at the line or note it found ([atMillis]; null: from where it was). */
+    val openLectureAt: (lectureId: String, atMillis: Long?) -> Unit = { _, _ -> },
+    /** The moments a query is found in (titles, people, labels, notes, what was said); reads files off the main thread. */
+    val search: suspend (query: String) -> List<SearchHit> = { emptyList() },
     /** Starts a moment with these labels (maybe none) in [language], transcribed as it records ([live]) or after. */
     val record: (labels: List<String>, language: String, live: Boolean) -> Unit = { _, _, _ -> },
     /** Keeps the Record bar's Live or After for next time. */
@@ -165,6 +187,18 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     var choosingLabels by remember { mutableStateOf(false) }
     var choosingLanguage by remember { mutableStateOf(false) }
     var recordLive by rememberSaveable { mutableStateOf(state.recordLive) }
+    // Search: the query while the search bar is open (null: closed), and what it found (null: still looking).
+    var query by rememberSaveable { mutableStateOf<String?>(null) }
+    var hits by remember { mutableStateOf<List<SearchHit>?>(emptyList()) }
+    LaunchedEffect(query) {
+        val q = query?.trim().orEmpty()
+        if (q.length < MIN_QUERY) { hits = emptyList(); return@LaunchedEffect }
+        hits = null
+        // Not on every letter of a word being typed.
+        delay(250)
+        hits = actions.search(q)
+    }
+    BackHandler(enabled = query != null) { query = null }
     var creating by remember { mutableStateOf(false) }
 
     val guessed = state.guess?.labels.orEmpty().filter { id -> state.labels.any { it.id == id } }
@@ -172,8 +206,8 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     val labelsById = state.labels.associateBy { it.id }
     val unlabeled = state.moments.filter { it.labels.isEmpty() }
     val shown = when (filter) {
-        null -> state.moments.filter { it.labels.isNotEmpty() }
-        NO_LABEL -> emptyList()
+        null -> state.moments
+        NO_LABEL -> unlabeled
         else -> state.moments.filter { filter in it.labels }
     }.groupBy { m ->
         val days = state.nowMillis / DAY - m.startedAtMillis / DAY
@@ -201,10 +235,36 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            if (selected.isEmpty()) {
+            val searching = query
+            if (searching != null) {
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                TopAppBar(
+                    navigationIcon = { IconButton(onClick = { query = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.notebooks_search_close)) } },
+                    title = {
+                        TextField(
+                            value = searching, onValueChange = { query = it }, singleLine = true,
+                            placeholder = { Text(stringResource(R.string.notebooks_search_hint)) },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                            ),
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                        )
+                    },
+                    actions = {
+                        if (searching.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, stringResource(R.string.notebooks_search_clear)) }
+                    },
+                )
+            } else if (selected.isEmpty()) {
                 TopAppBar(
                     title = { Text(stringResource(R.string.app_name)) },
-                    actions = { IconButton(onClick = actions.settings) { Icon(Icons.Filled.Settings, stringResource(R.string.notebooks_settings)) } },
+                    actions = {
+                        if (state.moments.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Search, stringResource(R.string.notebooks_search)) }
+                        IconButton(onClick = actions.settings) { Icon(Icons.Filled.Settings, stringResource(R.string.notebooks_settings)) }
+                    },
                 )
             } else {
                 TopAppBar(
@@ -299,6 +359,11 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
             }
         },
     ) { padding ->
+        val searching = query
+        if (searching != null) {
+            SearchResults(searching, hits, labelsById, state, padding) { hit -> actions.openLectureAt(hit.moment.id, hit.atMillis) }
+            return@Scaffold
+        }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
             folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
             item {
@@ -329,41 +394,38 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                     }
                 }
             }
-            if (unlabeled.isNotEmpty() && (filter == null || filter == NO_LABEL)) {
-                item(key = NO_LABEL) { GroupTitle(stringResource(R.string.notebooks_no_label_title)) }
-                items(unlabeled, key = { "$NO_LABEL/" + it.id }) { m ->
-                    val suggestion = state.suggested[m.id]?.takeIf { m.id !in state.working }?.let { labelsById[it] }
-                    MomentRow(
-                        m, emptyList(), state, selected = m.id in selected,
-                        onOpen = { if (selected.isEmpty()) actions.openLecture(m.id) else toggle(m.id) },
-                        onLongPress = { toggle(m.id) },
-                    ) {
-                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (suggestion != null) {
-                                FilledTonalButton(onClick = { actions.setLabels(listOf(m.id), setOf(suggestion.id), emptySet()) }, contentPadding = PaddingValues(horizontal = 12.dp)) {
-                                    LabelDot(suggestion.color)
-                                    Text(
-                                        stringResource(R.string.notebooks_add, isolated(suggestion.name)), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(start = 6.dp).weight(1f, fill = false),
-                                    )
-                                }
-                                TextButton(onClick = { labeling = listOf(m.id) }) { Text(stringResource(R.string.notebooks_labels_more)) }
-                            } else {
-                                OutlinedButton(onClick = { labeling = listOf(m.id) }) { Text(stringResource(R.string.notebooks_add_labels)) }
-                            }
-                        }
-                    }
-                }
-            }
             if (state.moments.isEmpty()) item { Empty() }
+            // One list by date: a moment without labels is a row like the others, with a quiet way to give it one
+            // (the label its time suggests, else the labels sheet).
             shown.forEach { (group, rows) ->
                 item(key = group) { GroupTitle(stringResource(group)) }
                 items(rows, key = { it.id }) { m ->
+                    val suggestion = state.suggested[m.id]?.takeIf { m.labels.isEmpty() && m.id !in state.working }?.let { labelsById[it] }
                     MomentRow(
                         m, m.labels.filter { it != filter }.mapNotNull { labelsById[it] }, state, selected = m.id in selected,
                         onOpen = { if (selected.isEmpty()) actions.openLecture(m.id) else toggle(m.id) },
                         onLongPress = { toggle(m.id) },
-                    )
+                    ) {
+                        if (m.labels.isEmpty() && selected.isEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (suggestion != null) {
+                                Row(
+                                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { actions.setLabels(listOf(m.id), setOf(suggestion.id), emptySet()) }.padding(vertical = 6.dp).padding(end = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    LabelDot(suggestion.color)
+                                    Text(
+                                        stringResource(R.string.notebooks_add, isolated(suggestion.name)), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp),
+                                    )
+                                }
+                            }
+                            Text(
+                                stringResource(if (suggestion != null) R.string.notebooks_labels_more else R.string.notebooks_add_label_quiet),
+                                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { labeling = listOf(m.id) }.padding(vertical = 6.dp).padding(end = 12.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -410,6 +472,12 @@ private fun MomentRow(
     ) {
         LabelPills(labels)
         Text(l.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Who was in it, and how it started: what tells one dated moment from the next.
+        peopleLine(m)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        if (m.preview.isNotEmpty()) Text(
+            "“" + isolated(m.preview) + "”", maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodySmall.copy(textDirection = textDirectionOf(m.language)), color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             listOfNotNull(
                 if (m.labels.isEmpty()) weekdayAndTime(l.startedAtMillis) else momentDay(l.startedAtMillis, state.nowMillis),
@@ -429,6 +497,77 @@ private fun MomentRow(
         }
         extra()
     }
+}
+
+/** "Hen, Maya and 1 more": the named speakers, the one who talked most first, and how many have no name; null for none. */
+@Composable
+private fun peopleLine(m: LectureSummary): String? {
+    val names = m.people.take(4).joinToString(", ") { isolated(it) }
+    val others = m.unnamedPeople + (m.people.size - 4).coerceAtLeast(0)
+    return when {
+        names.isEmpty() && others < 2 -> null
+        names.isEmpty() -> pluralStringResource(R.plurals.notebooks_voices, others, others)
+        others == 0 -> names
+        else -> stringResource(R.string.notebooks_people_more, names, others)
+    }
+}
+
+/**
+ * What a search found: a row per moment with its title, where the query is (who said it, or a note, a person, a
+ * label), the text around it with the match in bold, and how many more places in that moment. Tapping opens the
+ * moment at that line.
+ */
+@Composable
+private fun SearchResults(
+    query: String, hits: List<SearchHit>?, labelsById: Map<String, Label>, state: NotebooksState,
+    padding: PaddingValues, onOpen: (SearchHit) -> Unit,
+) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
+        when {
+            query.trim().length < MIN_QUERY -> item { SearchNote(stringResource(R.string.notebooks_search_start)) }
+            hits == null -> item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) }
+            hits.isEmpty() -> item { SearchNote(stringResource(R.string.notebooks_search_none, isolated(query.trim()))) }
+            else -> items(hits, key = { it.moment.id }) { hit ->
+                val m = hit.moment
+                Column(
+                    Modifier.fillMaxWidth().clickable { onOpen(hit) }.padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    LabelPills(m.labels.mapNotNull { labelsById[it] })
+                    Text(m.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val lead = when (hit.where) {
+                        SearchHit.Where.Line -> hit.speaker.takeIf { it.isNotEmpty() }?.let { isolated(it) + ": " }.orEmpty()
+                        SearchHit.Where.Note -> stringResource(R.string.notebooks_search_note) + " "
+                        SearchHit.Where.Person -> stringResource(R.string.notebooks_search_person) + " "
+                        SearchHit.Where.Label -> stringResource(R.string.notebooks_search_label) + " "
+                        SearchHit.Where.Title -> ""
+                    }
+                    if (hit.where != SearchHit.Where.Title) Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(lead) }
+                            append(hit.snippet.substring(0, hit.matchStart))
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) { append(hit.snippet.substring(hit.matchStart, hit.matchEnd)) }
+                            append(hit.snippet.substring(hit.matchEnd))
+                        },
+                        style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        listOfNotNull(
+                            momentDay(m.startedAtMillis, state.nowMillis), momentLength(m.durationMillis),
+                            hit.atMillis?.takeIf { hit.where == SearchHit.Where.Line || hit.where == SearchHit.Where.Note }?.let { stringResource(R.string.notebooks_search_at, formatClock(it)) },
+                            hit.more.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.notebooks_search_more, it, it) },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchNote(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
 }
 
 /** The labels for the next moment, as a menu of checkboxes: the guessed ones marked ✦, then New label. */
@@ -462,7 +601,7 @@ private fun LabelsMenu(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LabelsSheet(
+internal fun LabelsSheet(
     labels: List<Label>, moments: List<LectureSummary>, onDismiss: () -> Unit,
     onSet: (add: Set<String>, remove: Set<String>) -> Unit, onNew: (String) -> Unit,
     onRename: (String, String) -> Unit, onDelete: (String) -> Unit,

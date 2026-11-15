@@ -29,7 +29,7 @@ import kotlinx.coroutines.delay
 // in Downloads/Transcriptor (the lab has no lecture folders). Delete lecture only says so.
 internal val reviewCurrent = LabOption("current", "Document + player below (the app's)", "ReviewScreen with faked playback and passes") {
     val (state, actions) = rememberReviewLab(modelsDownloaded = true)
-    ReviewScreen(state, actions)
+    ReviewScreen(state, actions, allLabels = LabData.labels)
 }
 
 // Fakes: as `current`, with no model to improve Hebrew with downloaded: Improve transcription… offers the one to get.
@@ -102,7 +102,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
     val state = ReviewState(
-        labelNames = if (sample == null) LabData.labels.first().name else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = if (sample == null) com.chencohensolution.transcriptor.notebook.labelNames(lecture.labels, LabData.labels) else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
@@ -129,6 +129,8 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         playOnly = { id -> only = id.takeIf { it != only }; only?.let { o -> lecture.onlyOf(o, position)?.let { position = it; playing = true } } },
         shareText = { Toast.makeText(context, com.chencohensolution.transcriptor.notebook.transcriptText(lecture).take(200), Toast.LENGTH_LONG).show() },
         playPerson = { id -> lecture.segments.filter { it.speakerId == id }.maxByOrNull { it.endMillis - it.startMillis }?.let { position = it.startMillis; playing = true } },
+        rename = { title -> lecture = lecture.copy(title = title.trim()) },
+        setLabels = { ids -> lecture = lecture.copy(labels = ids) },
         improve = { _, first ->
             if (first) { thenImprove = true; speakers = PassState.Running(0f) } else if (refine !is PassState.Running) refine = PassState.Running(0f)
         },

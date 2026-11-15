@@ -124,4 +124,20 @@ class ReviewTest {
         runCurrent()
         assertEquals(true, review.state.value?.lecture?.speakerPass)
     }
+
+    @Test
+    fun theMomentIsRenamedLabeledAndOpenedAtALine() = runTest {
+        val review = review()
+        review.rename("  זיכרון, שיעור 3 ")
+        review.rename("   ")
+        review.setLabels(listOf("exam"), "מבחן")
+        runCurrent()
+        assertEquals("זיכרון, שיעור 3", store.load(lecture.id)?.title)
+        assertEquals(listOf("exam"), store.load(lecture.id)?.labels)
+        assertEquals("מבחן", review.state.value?.labelNames)
+        assertEquals("זיכרון, שיעור 3", review.state.value?.lecture?.title)
+        // A search's hit opens the moment at its line.
+        assertTrue(review.open(lecture.id, "", atMillis = 52_000))
+        assertEquals(52_000, player.positionMillis.value)
+    }
 }

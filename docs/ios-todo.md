@@ -179,3 +179,12 @@ anything left to decide. Remove an entry once it is built.
 - Android to mirror in `ReviewScreen.kt`: compact turns in `Turn`, the live-draft line, the people chips above the
   player and the faded lanes in `Overview`, the share menu.
 - Strings: `review_share`, `review_share_text`, `review_draft*`.
+
+## Finding moments (Nov 15, 2026)
+
+- Shared: `LectureSummary.people`, `unnamedPeople`, `preview` (`Lecture.summary`, `previewOf`); `notebook/Search.kt`
+  (`SearchHit`, `searchMoments`), `NotebooksController.search`; `LectureReview.rename`, `setLabels`, `open(atMillis)`.
+- Android to mirror: the search bar and `SearchResults`, `peopleLine` and the preview in `MomentRow`, the one list by
+  date (`NotebooksScreen.kt`); the title and labels taps, `RenameTitleDialog` (`ReviewScreen.kt`).
+- Strings: `notebooks_search*`, `notebooks_people_more`, `notebooks_add_label_quiet`, `review_rename*`,
+  `review_add_labels`, plurals `notebooks_voices`, `notebooks_search_more`. Lab sample: `LabData.conversations`.

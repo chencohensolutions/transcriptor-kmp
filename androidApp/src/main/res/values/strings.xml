@@ -252,11 +252,9 @@
     <string name="models_others">Also found, not usable here (%1$d)</string>
     <string name="notebooks_labels">Labels</string>
     <string name="notebooks_labels_more">Labels…</string>
-    <string name="notebooks_add_labels">Add labels</string>
     <string name="notebooks_add">Add %1$s</string>
     <string name="notebooks_no_labels">No labels</string>
     <string name="notebooks_no_label_chip">No label (%1$d)</string>
-    <string name="notebooks_no_label_title">No labels yet</string>
     <string name="notebooks_new_label">New label</string>
     <string name="notebooks_edit_label">Edit label</string>
     <string name="notebooks_delete_label">Delete label</string>
@@ -431,4 +429,27 @@
     <string name="review_draft">Live draft. The better model hasn\'t written it yet.</string>
     <string name="review_draft_improve">Improve</string>
     <string name="review_draft_improve_minutes">Improve · about %1$d min</string>
+    <string name="notebooks_search">Search</string>
+    <string name="notebooks_search_close">Close search</string>
+    <string name="notebooks_search_clear">Clear</string>
+    <string name="notebooks_search_hint">Search what was said, people, labels</string>
+    <string name="notebooks_search_start">Type a word someone said, a name, a title or a label.</string>
+    <string name="notebooks_search_none">Nothing found for %1$s.</string>
+    <string name="notebooks_search_note">Note:</string>
+    <string name="notebooks_search_person">With</string>
+    <string name="notebooks_search_label">Label:</string>
+    <string name="notebooks_search_at">at %1$s</string>
+    <string name="notebooks_people_more">%1$s and %2$d more</string>
+    <string name="review_rename">Rename the moment</string>
+    <string name="review_rename_save">Save</string>
+    <string name="review_add_labels">Add labels</string>
+    <plurals name="notebooks_voices">
+        <item quantity="one">%1$d voice</item>
+        <item quantity="other">%1$d voices</item>
+    </plurals>
+    <plurals name="notebooks_search_more">
+        <item quantity="one">%1$d more place</item>
+        <item quantity="other">%1$d more places</item>
+    </plurals>
+    <string name="notebooks_add_label_quiet">+ label</string>
 </resources>
