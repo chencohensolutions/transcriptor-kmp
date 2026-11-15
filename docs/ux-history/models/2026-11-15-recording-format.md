@@ -14,7 +14,7 @@ setting of the codec in Settings.
   FLAC open pages of their own, each starting with "Record as WAV, encode afterwards" (when the moment ends, or when
   charging with 30% battery or more). *Turned down*: the owner wanted that setting once, on the Recording format page.
 - **b3 — b2, with "Record as WAV" on the Recording format page**: one checkbox under the three codecs, for AAC and
-  FLAC alike; the AAC and FLAC pages hold only their settings. *Picked*, promoted in the commit after the tag.
+  FLAC alike; the AAC and FLAC pages hold only their settings. *Picked*, promoted in b87d4dd.
 - **c — Ready-made choices, then Custom AAC**: Balanced, Smallest, Stereo and the lossless ways as cards with their
   size an hour, and Custom AAC for every setting. *Turned down*.
 
