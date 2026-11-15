@@ -29,8 +29,8 @@ fun pinned(name: String, url: String, sha256: String): File = file("libs/$name")
 // with the QNN backend: sherpa-onnx's own AAR project, from build/qnn/sherpa-onnx (docs/npu-plan.md).
 val sherpaOnnx = pinned(
     "sherpa-onnx-2.0.1-qnn.aar",
-    "https://huggingface.co/hencohen83/sherpa-onnx-qnn-android/resolve/be1e2340eecad955f3d53d247e94acac450b3a18/sherpa-onnx-2.0.1-qnn.aar",
-    "9ce1320e2c3cc12dbbc8e3c572f375efbc9a653a5ca873d4da86991de23a2d62",
+    "https://huggingface.co/hencohen83/sherpa-onnx-qnn-android/resolve/47599a37012cc5457796e059e79909ce547b8095/sherpa-onnx-2.0.1-qnn.aar",
+    "8b44fa790a8640cfd4f76ebfcac1dd86fdbaa3bb8922b420ef328bfcb4d347f5",
 )
 
 // Qualcomm's runtime for the NPU models, as sherpa-onnx publishes it for QAIRT 2.40 (the version the models are

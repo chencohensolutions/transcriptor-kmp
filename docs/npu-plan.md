@@ -160,6 +160,25 @@ on public Hebrew only (FLEURS he_il, the owner's rule: not the owner's recording
   phone keeps buffers between steps); or the w8a16 encoder on the NPU with the decoder on the CPU (about 5 + 11 s
   a window). Nothing is published or in the catalog.
 
+### Large-v3: the encoder on the NPU, whisper.cpp decoding (Nov 7–15, 2026)
+
+Since the w8a16 decoder breaks on the phone and would be slow anyway (32 layers, one NPU call per token), only the
+w8a16 encoder runs on the NPU, and whisper.cpp decodes from its cross-attention K/V (`ModelKind.WhisperNpuEncoder`,
+`ModelCatalog.ivritLargeV3NpuEncoder`, live in 30 s windows and for Improve):
+- **whisper.cpp:** `third_party/whisper.cpp-external-encoder.patch` (the app's CMake applies it to a copy of the pinned
+  submodule): `whisper_set_external_encoder` hands the mel out and takes each layer's K/V (whisper.cpp scales K and
+  writes its cross cache in either layout); `skip_encoder` leaves the encoder's weights unloaded (q8_0 large-v3:
+  1,656 to 967 MB; peak memory on the Mac 2.16 to 1.36 GB).
+- **sherpa-onnx (our patch):** a C API around `QnnModel` for the encoder, exported from `libsherpa-onnx-jni.so`;
+  the whisper JNI finds it with `dlsym` (no copies of the ~245 MB of K/V through the JVM). Context binaries are now
+  mapped instead of read and copied: that copy made a load's peak about 2.5 times the file (for every QNN model).
+- **Checked on the Mac:** K/V given through the hook decode to the same text as whisper.cpp's own encoder; the mel it
+  hands out equals OpenAI's exactly; the w8a16 encoder's outputs (simulator) decode to the same text as the float
+  encoder's.
+- **On the phone:** one load test before the mmap change ran out of memory (the encoder's load took 2.4 GB and more on
+  top of whisper.cpp's 1.6 GB); not measured since. `npuPeakBytes` is an estimate (2.8 GB) until it is. Speed and
+  battery against CPU q8_0: to measure.
+
 ### In the app: the crash and its fix (Nov 4, 2026)
 
 The NPU didn't open inside the app (`deviceCreate` 14001) although it did from `adb shell`: Qualcomm's stub library
@@ -186,9 +205,10 @@ credit, what was changed, the sha256 of every file); Qualcomm's runtime librarie
 
 | Repo | Commit | License | In the app |
 |---|---|---|---|
-| [sherpa-onnx-qnn-android](https://huggingface.co/hencohen83/sherpa-onnx-qnn-android) (the AAR and our patch) | be1e2340 | Apache-2.0 | `build.gradle.kts` downloads it |
+| [sherpa-onnx-qnn-android](https://huggingface.co/hencohen83/sherpa-onnx-qnn-android) (the AAR and our patch) | 47599a37 | Apache-2.0 | `build.gradle.kts` downloads it |
 | [ivrit-whisper-large-v3-turbo-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-turbo-qnn-sm8750) | d5997a96 | Apache-2.0 | `ivritTurboNpu` |
 | [ivrit-whisper-large-v3-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-qnn-sm8750) (16-bit) | a5c541a9 | Apache-2.0 | `ivritLargeV3Npu` |
+| [ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750](https://huggingface.co/hencohen83/ivrit-whisper-large-v3-w8a16-encoder-qnn-sm8750) (Nov 15, encoder only, FLEURS-calibrated) | 9d901285 | Apache-2.0 | `ivritLargeV3NpuEncoder` |
 | [wespeaker-resnet293-lm-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-resnet293-lm-qnn-sm8750) | 75258f7a | CC-BY-4.0 | `voicePrintsResNet293`, downloadable |
 | [wespeaker-samresnet100-voxblink2-qnn-sm8750](https://huggingface.co/hencohen83/wespeaker-samresnet100-voxblink2-qnn-sm8750) | 337cffaa | CC-BY-NC-SA-4.0 | copied by hand (non-commercial) |
 | [diarizen-wavlm-base-s80-qnn-sm8750](https://huggingface.co/hencohen83/diarizen-wavlm-base-s80-qnn-sm8750) | 4e87d479 | CC-BY-NC-4.0 | copied by hand |

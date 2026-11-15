@@ -54,7 +54,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         }
     }
     val npu = remember(statuses, checking, changed) {
-        models.filter { it.kind == ModelKind.WhisperNpu || it.kind == ModelKind.StreamingTransducerNpu }.mapNotNull { m ->
+        models.filter { it.kind.onNpu }.mapNotNull { m ->
             when {
                 m.id in checking -> m.id to NpuCheck.Checking
                 else -> Recording.modelLibrary.npu(m.id)?.let { m.id to if (it.runs) NpuCheck.Runs else NpuCheck.Fails(it.reason ?: "") }
@@ -63,7 +63,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     }
     // An NPU model is tried on the NPU once, after its download.
     LaunchedEffect(statuses) {
-        for (m in models.filter { (it.kind == ModelKind.WhisperNpu || it.kind == ModelKind.StreamingTransducerNpu) && it.runsOn(chip) }) {
+        for (m in models.filter { it.kind.onNpu && it.runsOn(chip) }) {
             if (statuses[m.id] != ModelStatus.Ready || m.id in checking || Recording.modelLibrary.npu(m.id) != null) continue
             checking = checking + m.id
             scope.launch {
