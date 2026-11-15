@@ -14,10 +14,17 @@ Settings.
   `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a moment**: Find the
   speakers again after Stop
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
-  Manage models, the moments folder (Choose a folder / Change), the audio format, and under the two FLAC formats a
-  slider for the FLAC compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`;
-  hidden for WAV). Its note says the sound is the same at every level, and what a higher level costs: time after the
-  moment, or the phone while recording. **Advanced**: Processor meters while recording, one of Off (the default),
+  Manage models, the moments folder (Choose a folder / Change), and a **Recording format** row whose line sums up the
+  choice ("AAC · LC · 64 kbps · Mono · 48 kHz · hardware · while recording"). It opens the Recording format page:
+  **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
+  under them **Record as WAV, encode afterwards** (greyed out for WAV) with **When the moment ends** or **When charging,
+  with 30% battery or more** (`SettingsStore.audioFormat`: `wav`, `aac-live`, `wav-then-aac`, `flac-live`,
+  `wav-then-flac`; `SettingsStore.encodeAfter`). The **AAC** page: AAC profile (LC, HE, HE v2), sample rate (16, 24,
+  48 kHz; HE needs 24 or 48), channels (mono, stereo; HE v2 is stereo only), bitrate as chips from 16 to 320 kbps with
+  the size an hour (a note above 64 kbps for HE), and the encoder: Automatic (hardware first) or any of the phone's AAC
+  encoders, with the one that runs and whether it is hardware (`SettingsStore.aac`, `AacSettings`, `AacEncoders`).
+  The **FLAC** page: the compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`).
+  Both pages say when they encode, when it is afterwards. **Advanced**: Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).
@@ -82,5 +89,7 @@ Settings.
   Transcription section with a row per language and job.
 - [Round 3 (Nov 6, 2026)](../ux-history/models/2026-11-06-speakers-in-view.md): d2 — a section per speaker job, picked on
   its own page with a Hugging Face search (picked); a, b, c, d, d3 — the speaker models in other places on Settings.
+- [Recording format (Nov 15, 2026)](../ux-history/models/2026-11-15-recording-format.md): b3 — WAV, AAC, FLAC on a
+  page of their own, "Record as WAV, encode afterwards" under them, AAC and FLAC pages (picked); a, b, b2, c.
 - [Processor meters (Nov 7, 2026)](../ux-history/lecture/2026-11-07-processor-meters.md): the moment screen's round;
   all three styles were promoted, picked under Advanced.
