@@ -152,4 +152,26 @@ class TranscribeAfterTest {
         assertEquals(false, store.load(lecture.id)?.pendingTranscript)
         assertFalse(assertNotNull(session.stop()).pendingTranscript)
     }
+
+    @Test
+    fun aMarkIsANoteWithoutWordsAtThisSecond() = runTest {
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 4L })
+        assertNull(session.mark())
+        val lecture = session.start(emptyList(), "", "en", "t", transcribeLive = false)
+        recorder.advance(7_000, tone(7_000))
+        assertEquals(7_000L, session.mark())
+        session.addNote(8_000, "the boat")
+        recorder.advance(2_000, tone(2_000))
+        assertEquals(9_000L, session.mark())
+        runCurrent()
+        val notes = assertNotNull(store.load(lecture.id)).notes
+        assertEquals(listOf("n1" to true, "n2" to false, "n3" to true), notes.map { it.id to it.isMark })
+        assertEquals(listOf(7_000L, 8_000L, 9_000L), notes.map { it.atMillis })
+        val stopped = assertNotNull(session.stop())
+        assertEquals(3, stopped.notes.size)
+        // The transcript beside the audio shows a mark by its time alone.
+        val text = com.chencohensolution.transcriptor.notebook.transcriptMarkdown(stopped)
+        assertTrue("⚑ 0:07" in text, text)
+        assertTrue("0:08 — the boat" in text, text)
+    }
 }

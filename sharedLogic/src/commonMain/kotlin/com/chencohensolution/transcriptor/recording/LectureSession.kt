@@ -287,6 +287,23 @@ class LectureSession(
     }
 
     /**
+     * A mark at this second of the recording: a note without words ([Note.isMark]), made with one tap when typing
+     * isn't possible. Returns its time; null when nothing is recording. Words can be added after, on the moment.
+     */
+    fun mark(): Long? {
+        val r = recording.value ?: return null
+        if (r.finishing) return null
+        val at = recorder.positionMillis.value
+        recording.update { rec ->
+            val notes = rec?.lecture?.notes ?: return@update rec
+            val id = "n${(notes.maxOfOrNull { it.id.removePrefix("n").toIntOrNull() ?: 0 } ?: 0) + 1}"
+            rec.copy(lecture = rec.lecture.copy(notes = notes + Note(id, at, "")))
+        }
+        saveNow()
+        return at
+    }
+
+    /**
      * Ends the lecture: the recording stops at once, then live transcription finishes the lines still waiting
      * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" or "WAV, then AAC" it is saved as [Lecture.pendingFlac] or [Lecture.pendingAac] for
      * [AudioCompression].

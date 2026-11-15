@@ -142,6 +142,7 @@ class MainActivity : ComponentActivity() {
                                 pauseOrResume = Recording.session::pauseOrResume,
                                 stop = { openAfterStop = true; RecordingService.stop(this) },
                                 addNote = Recording.session::addNote,
+                                mark = Recording.session::mark,
                                 renameSpeaker = Recording.session::renameSpeaker,
                                 editLine = Recording.session::editLine,
                             ),

@@ -24,7 +24,7 @@ import kotlin.random.Random
 private fun lectureWithMeters(id: String, title: String, style: ProcessorMeterStyle) = LabOption(id, title, "LectureScreen with faked processor readings") {
     val (state, actions) = rememberGrowingLectureLab()
     val (now, history) = rememberFakeMeters(state.paused)
-    LectureScreen(state.copy(meterStyle = style, meters = now, meterHistory = history), actions)
+    LectureScreen(state.copy(meterStyle = style, meters = now, meterHistory = history), actions, startInTranscript = true)
 }
 
 internal val lectureCurrentBars = lectureWithMeters("current-bars", "Processor meters: three bars (the app's)", ProcessorMeterStyle.Bars)
