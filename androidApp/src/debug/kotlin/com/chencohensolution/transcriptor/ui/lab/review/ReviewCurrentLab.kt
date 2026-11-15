@@ -163,3 +163,17 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
     )
     return state to actions
 }
+
+// Fakes: as `current-conversation`, paused twice while recording: 12 minutes after its third turn, and 40 seconds
+// later on. The clock times are made up from the moment's start.
+internal val reviewCurrentPaused = LabOption("current-paused", "The app's, a conversation paused twice", "Pause dividers between the turns, and in Info") {
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = LabData.conversation)
+    val l = state.lecture
+    val third = l.segments.getOrNull(2)?.endMillis ?: 20_000
+    val later = l.segments.getOrNull(6)?.endMillis ?: 60_000
+    val pauses = listOf(
+        com.chencohensolution.transcriptor.notebook.Pause(third, l.startedAtMillis + third, l.startedAtMillis + third + 12 * 60_000),
+        com.chencohensolution.transcriptor.notebook.Pause(later, l.startedAtMillis + later + 12 * 60_000, l.startedAtMillis + later + 12 * 60_000 + 40_000),
+    )
+    ReviewScreen(state.copy(lecture = l.copy(pauses = pauses)), actions)
+}

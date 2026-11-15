@@ -114,6 +114,8 @@ class LiveLectureActions(
     val renameSpeaker: (id: String, name: String) -> Unit = { _, _ -> },
     /** A mark at this second (a note without words); returns its time, null when it couldn't be made. */
     val mark: () -> Long? = { null },
+    /** Switches live transcription off or on while recording. */
+    val setTranscribing: (Boolean) -> Unit = {},
 )
 
 /**
@@ -143,7 +145,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
     BackHandler { transcript = false }
     var editingId by remember { mutableStateOf<String?>(null) }
     val colors = LocalTranscriptorColors.current
-    val entries = remember(state.lecture.segments, state.lecture.notes) { timelineOf(state.lecture) }
+    val entries = remember(state.lecture.segments, state.lecture.notes, state.lecture.pauses, state.lecture.liveOff) { timelineOf(state.lecture) }
     // A line shows its speaker where the speaker changes: line id to speaker id.
     val speakerChanges = remember(state.lecture.segments) {
         var previous: String? = null
@@ -243,7 +245,14 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                             }
                         } }
                     }
-                    items(entries.asReversed(), key = { if (it is TimelineEntry.Speech) it.segment.id else (it as TimelineEntry.Written).note.id }) { entry ->
+                    items(entries.asReversed(), key = {
+                        when (it) {
+                            is TimelineEntry.Speech -> it.segment.id
+                            is TimelineEntry.Written -> it.note.id
+                            is TimelineEntry.Paused -> "pause-${it.pause.pausedAtMillis}"
+                            is TimelineEntry.TranscriptOff -> "off-${it.off.offAtMillis}"
+                        }
+                    }) { entry ->
                         when (entry) {
                             is TimelineEntry.Speech -> SpeechRow(
                                 entry, fresh = entry.segment.id !in shownAtOpen,
@@ -256,6 +265,8 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                                 onSave = { actions.editLine(entry.segment.id, it); editingId = null },
                             )
                             is TimelineEntry.Written -> NoteCard(entry)
+                            is TimelineEntry.Paused -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(entry.pause, Modifier.padding(horizontal = 16.dp)) }
+                            is TimelineEntry.TranscriptOff -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { TranscriptOffDivider(entry.off, Modifier.padding(horizontal = 16.dp)) }
                         }
                     }
                     // The app's text, in the app's direction, among the notebook's content.

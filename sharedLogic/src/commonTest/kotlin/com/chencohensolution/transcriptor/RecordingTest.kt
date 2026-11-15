@@ -231,6 +231,26 @@ class RecordingTest {
     }
 
     @Test
+    fun pausesAreKeptWithTheirClockTimes() = runTest {
+        var clock = 1_793_600_000_000
+        val session = LectureSession(recorder, store, settings, backgroundScope, now = { clock })
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        recorder.advance(5_000)
+        clock += 5_000
+        session.pauseOrResume()
+        clock += 600_000
+        session.pauseOrResume()
+        recorder.advance(2_000)
+        session.pauseOrResume()
+        runCurrent()
+        val saved = store.load(lecture.id)!!.pauses
+        assertEquals(2, saved.size)
+        assertEquals(com.chencohensolution.transcriptor.notebook.Pause(5_000, 1_793_600_005_000, 1_793_600_605_000), saved[0])
+        assertEquals(7_000, saved[1].atMillis)
+        assertNull(saved[1].resumedAtMillis)
+    }
+
+    @Test
     fun pauseAndResumeMoveTheState() = runTest {
         val session = session()
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
@@ -397,6 +417,82 @@ class LiveRecordingTest {
         assertEquals(listOf("line 1", "line 2"), stopped.segments.map { it.text })
         assertEquals(listOf("line 1", "line 2"), store.load(lecture.id)?.segments?.map { it.text })
         assertTrue(engine.closed)
+    }
+
+    @Test
+    fun transcriptionSwitchedOffAndOnKeepsLinesInPlaceAndTheStretch() = runTest {
+        val engine = FakeEngine()
+        var clock = 1_000L
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { clock }) { language, scope, _ ->
+            com.chencohensolution.transcriptor.recording.LiveModel(
+                "fake",
+                com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
+            )
+        }
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        recorder.advance(500, silence(500))
+        recorder.advance(3_500, tone(3_500))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        assertEquals(true, session.state.value?.transcribing)
+        clock = 5_000
+        session.setTranscribing(false)
+        runCurrent()
+        assertEquals(true, session.state.value?.recordOnly)
+        recorder.advance(10_000, tone(10_000))
+        clock = 15_000
+        session.setTranscribing(true)
+        recorder.advance(500, silence(500))
+        recorder.advance(3_500, tone(3_500))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        val stopped = assertNotNull(session.stop())
+        // The second line is where it was said in the audio, after the 10 s that weren't heard.
+        assertEquals(2, stopped.segments.size)
+        assertTrue(stopped.segments[1].startMillis >= 15_000, "${stopped.segments[1]}")
+        assertEquals(listOf(com.chencohensolution.transcriptor.notebook.LiveOff(5_000, 15_000, 5_000, 15_000)), store.load(lecture.id)?.liveOff)
+    }
+
+    @Test
+    fun transcriptionSwitchedOnInAMomentRecordedWithoutIt() = runTest {
+        val engine = FakeEngine()
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 7L }, liveAvailable = { true }) { language, scope, _ ->
+            com.chencohensolution.transcriptor.recording.LiveModel(
+                "fake",
+                com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { engine },
+            )
+        }
+        val lecture = session.start(listOf("psych"), "פסיכולוגיה", "he", "t", transcribeLive = false)
+        recorder.advance(8_000, tone(8_000))
+        runCurrent()
+        assertEquals(true, session.state.value?.canTranscribe)
+        assertEquals(true, session.state.value?.recordOnly)
+        session.setTranscribing(true)
+        recorder.advance(500, silence(500))
+        recorder.advance(3_500, tone(3_500))
+        recorder.advance(1_000, silence(1_000))
+        runCurrent()
+        val stopped = assertNotNull(session.stop())
+        assertEquals(1, stopped.segments.size)
+        assertTrue(stopped.segments[0].startMillis >= 8_000, "${stopped.segments[0]}")
+        assertFalse(stopped.pendingTranscript)
+        assertEquals(listOf(com.chencohensolution.transcriptor.notebook.LiveOff(0, 8_000, 7, 7)), store.load(lecture.id)?.liveOff)
+    }
+
+    @Test
+    fun transcriptionOffAtStopIsOffToTheEnd() = runTest {
+        val session = LectureSession(recorder, store, SettingsStore(fs, root), backgroundScope, now = { 3L }) { language, scope, _ ->
+            com.chencohensolution.transcriptor.recording.LiveModel(
+                "fake",
+                com.chencohensolution.transcriptor.speech.UtteranceTranscriber(language, "m", scope, kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)) { FakeEngine() },
+            )
+        }
+        session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
+        recorder.advance(2_000, silence(2_000))
+        session.setTranscribing(false)
+        recorder.advance(4_000, silence(4_000))
+        val stopped = assertNotNull(session.stop())
+        assertEquals(listOf(com.chencohensolution.transcriptor.notebook.LiveOff(2_000, 6_000, 3, null)), stopped.liveOff)
     }
 
     @Test

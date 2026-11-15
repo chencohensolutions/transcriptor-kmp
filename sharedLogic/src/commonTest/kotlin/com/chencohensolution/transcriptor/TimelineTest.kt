@@ -2,6 +2,7 @@ package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.Pause
 import com.chencohensolution.transcriptor.notebook.Segment
 import com.chencohensolution.transcriptor.notebook.TimelineEntry
 import com.chencohensolution.transcriptor.notebook.timelineOf
@@ -18,6 +19,8 @@ class TimelineTest {
         when (it) {
             is TimelineEntry.Speech -> it.segment.id
             is TimelineEntry.Written -> it.note.id
+            is TimelineEntry.Paused -> "p${it.pause.atMillis}"
+            is TimelineEntry.TranscriptOff -> "o${it.off.fromMillis}"
         }
     }
 
@@ -40,5 +43,23 @@ class TimelineTest {
     fun notesWithoutLinesAreInTimeOrder() {
         val lecture = lecture(emptyList(), listOf(Note("n2", 9_000, "b"), Note("n1", 3_000, "a")))
         assertEquals(listOf("n1", "n2"), ids(lecture))
+    }
+
+    @Test
+    fun aPauseComesAfterTheLineItCutIntoAndBeforeALineStartingThere() {
+        val lecture = lecture(
+            listOf(line("s1", 0, 10_000), line("s2", 10_000, 20_000), line("s3", 20_000, 30_000)),
+            listOf(Note("n1", 12_000, "x")),
+        ).copy(pauses = listOf(Pause(15_000, 1_000_000, 1_600_000), Pause(20_000, 2_000_000, null), Pause(0, 10, 20)))
+        assertEquals(listOf("p0", "s1", "s2", "n1", "p15000", "p20000", "s3"), ids(lecture))
+        assertEquals(600_000L, lecture.pauses[0].lengthMillis)
+        assertEquals(null, lecture.pauses[1].lengthMillis)
+    }
+
+    @Test
+    fun liveTranscriptOffComesAfterTheLineItCutInto() {
+        val lecture = lecture(listOf(line("s1", 0, 10_000), line("s2", 30_000, 40_000)), emptyList())
+            .copy(liveOff = listOf(com.chencohensolution.transcriptor.notebook.LiveOff(12_000, 28_000, 1, 2)))
+        assertEquals(listOf("s1", "o12000", "s2"), ids(lecture))
     }
 }

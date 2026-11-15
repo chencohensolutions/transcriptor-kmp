@@ -29,6 +29,8 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
     var lecture by remember { mutableStateOf(source.copy(segments = source.segments.take(4), notes = source.notes.filter { it.atMillis < start })) }
     var elapsed by remember { mutableStateOf(start) }
     var paused by remember { mutableStateOf(false) }
+    // Live transcription switched off and on (in memory): no words come while it is off.
+    var transcribing by remember { mutableStateOf(true) }
     var level by remember { mutableStateOf(0.4f) }
     var saying by remember { mutableStateOf(0) }
     var round by remember { mutableStateOf(0) }
@@ -43,7 +45,7 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
             level = (0.25f + 0.6f * abs(sin(tick * 0.7f) * sin(tick * 0.23f))).coerceIn(0f, 1f)
             source.notes.firstOrNull { it.atMillis <= elapsed && lecture.notes.none { n -> n.id == it.id } && round == 0 }
                 ?.let { lecture = lecture.copy(notes = lecture.notes + it) }
-            if (--nextWordIn > 0) continue
+            if (!transcribing || --nextWordIn > 0) continue
             val line = toSay[saying]
             val all = line.text.split(" ")
             if (words < all.size) {
@@ -65,7 +67,8 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
     val state = LiveLectureState(
         labelNames = LabData.labels.first().name,
         lecture = lecture,
-        partial = if (paused) null else partial,
+        partial = if (paused || !transcribing) null else partial,
+        transcribing = transcribing, canTranscribe = true, recordOnly = !transcribing,
         elapsedMillis = elapsed,
         level = if (paused) 0f else level,
         paused = paused,
@@ -78,6 +81,12 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
     val actions = LiveLectureActions(
         back = labBack,
         pauseOrResume = { paused = !paused },
+        setTranscribing = { on ->
+            val clock = System.currentTimeMillis()
+            lecture = if (on) lecture.copy(liveOff = lecture.liveOff.dropLast(1) + listOfNotNull(lecture.liveOff.lastOrNull()?.copy(toMillis = elapsed, onAtMillis = clock)))
+                else lecture.copy(liveOff = lecture.liveOff + com.chencohensolution.transcriptor.notebook.LiveOff(elapsed, null, clock))
+            transcribing = on
+        },
         addNote = { at, text -> lecture = lecture.copy(notes = lecture.notes + Note("mine${lecture.notes.size + 1}", at, text)) },
         mark = { elapsed.also { at -> lecture = lecture.copy(notes = lecture.notes + Note("mark${lecture.notes.size + 1}", at, "")) } },
         renameSpeaker = { id, name -> lecture = lecture.copy(speakers = lecture.speakers.map { if (it.id == id) it.copy(name = name) else it }) },

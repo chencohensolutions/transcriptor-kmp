@@ -558,4 +558,18 @@
     <string name="settings_transcribe_when_stop">מיד כשהרגע נגמר</string>
     <string name="settings_transcribe_when_charging">בזמן טעינה, עם 30% סוללה ומעלה</string>
     <string name="first_run_two_languages">%1$s ול%2$s</string>
+    <string name="pause_divider">הושהה %1$s · חודש ב־%2$s</string>
+    <string name="pause_divider_open">הושהה ב־%1$s</string>
+    <string name="pause_seconds">%1$d שנ׳</string>
+    <string name="pause_minutes">%1$d דק׳</string>
+    <string name="pause_hours">%1$d שע׳ %2$d דק׳</string>
+    <string name="info_pauses">השהיות</string>
+    <string name="info_pause_row">%1$s ← %2$s (%3$s)</string>
+    <string name="info_pause_open">%1$s ← נעצר</string>
+    <string name="transcript_off_divider">תמלול חי כבוי %1$s · חזר ב־%2$s</string>
+    <string name="transcript_off_open">תמלול חי כבוי מ־%1$s</string>
+    <string name="transcript_off_to_end">תמלול חי כבוי מ־%1$s עד הסוף</string>
+    <string name="glance_live_on">מתמלל בזמן אמת</string>
+    <string name="glance_live_off">תמלול חי כבוי</string>
+    <string name="info_live_off">תמלול חי כבוי</string>
 </resources>

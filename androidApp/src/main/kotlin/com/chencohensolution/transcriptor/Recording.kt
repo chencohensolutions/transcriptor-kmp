@@ -621,6 +621,7 @@ object Recording {
             AndroidRecorder(inputs = com.chencohensolution.transcriptor.recording.AndroidAudioInputs(app).also { audioInputs = it }), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),
             voices = VoiceStore({ voiceModel?.id ?: VoiceStore.DEFAULT_MODEL }) { store.library ?: store.local }.also { voices = it },
             live = ::liveModel,
+            liveAvailable = { liveModelFor(it) != null },
             speakerPassReady = { canFindSpeakers },
             power = PowerMeter(AndroidPowerProbe(app).also { powerProbe = it }),
         )

@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
                                 stop = { openAfterStop = true; RecordingService.stop(this) },
                                 addNote = Recording.session::addNote,
                                 mark = Recording.session::mark,
+                                setTranscribing = { on -> lifecycleScope.launch(Dispatchers.Default) { Recording.session.setTranscribing(on) } },
                                 renameSpeaker = Recording.session::renameSpeaker,
                                 editLine = Recording.session::editLine,
                             ),

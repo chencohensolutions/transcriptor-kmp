@@ -552,4 +552,18 @@
     <string name="settings_transcribe_when_stop">Right after the moment ends</string>
     <string name="settings_transcribe_when_charging">When charging, with 30% battery or more</string>
     <string name="first_run_two_languages">%1$s and %2$s</string>
+    <string name="pause_divider">Paused %1$s · resumed %2$s</string>
+    <string name="pause_divider_open">Paused at %1$s</string>
+    <string name="pause_seconds">%1$d s</string>
+    <string name="pause_minutes">%1$d min</string>
+    <string name="pause_hours">%1$d h %2$d min</string>
+    <string name="info_pauses">Pauses</string>
+    <string name="info_pause_row">%1$s → %2$s (%3$s)</string>
+    <string name="info_pause_open">%1$s → stopped</string>
+    <string name="transcript_off_divider">Live transcript off %1$s · on again %2$s</string>
+    <string name="transcript_off_open">Live transcript off since %1$s</string>
+    <string name="transcript_off_to_end">Live transcript off from %1$s to the end</string>
+    <string name="glance_live_on">Transcribing live</string>
+    <string name="glance_live_off">Live transcript off</string>
+    <string name="info_live_off">Live transcript off</string>
 </resources>
