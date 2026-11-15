@@ -132,3 +132,6 @@ anything left to decide. Remove an entry once it is built.
 - Word export: `transcriptDocx`/`docxName` (shared), `LectureStore.word`/`saveWord`, `LectureReview.word`/`saveWord`;
   iOS shares with `UIActivityViewController` from a temporary file. Delete moment… on the moment; strings
   `review_share_word`, `review_save_word`, `review_word_saved`, `review_delete_*`.
+- First run, "Get your models" (Nov 15, 2026): `DefaultModels.forLanguage`/`offerFirstRun`, `SettingsStore.firstRunDone`
+  and `useDefaults`; the screen in `FirstRunScreen.kt` fed by `FirstRun.kt` (downloads, the NPU check and its CPU
+  fallback); strings `first_run_*`. iOS has no NPU builds: it gets the CPU picks.

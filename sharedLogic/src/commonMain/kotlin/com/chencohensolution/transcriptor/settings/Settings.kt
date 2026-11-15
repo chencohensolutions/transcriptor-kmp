@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.settings
 
+import com.chencohensolution.transcriptor.models.DefaultModels
 import com.chencohensolution.transcriptor.models.ModelChoices
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -91,6 +92,8 @@ private data class SettingsFileV1(
     val segmentationModel: String? = null,
     /** [ProcessorMeterStyle.key]; kept as text so a style this version doesn't know reads as off. */
     val processorMeters: String = ProcessorMeterStyle.Off.key,
+    /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
+    val firstRunDone: Boolean = false,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -177,6 +180,22 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     fun setSpeakerTuning(modelId: String, more: Float) = write(read().let {
         it.copy(speakerTuning = if (more == 0f) it.speakerTuning - modelId else it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
+    })
+
+    /** First run's "Get your models" was answered: it isn't offered again ([DefaultModels.offerFirstRun]). */
+    var firstRunDone: Boolean
+        get() = read().firstRunDone
+        set(value) = write(read().copy(firstRunDone = value))
+
+    /**
+     * Makes [defaults] the models [language] uses, for the jobs nothing was chosen for yet: a choice the user made in
+     * Settings stays.
+     */
+    fun useDefaults(language: String, defaults: DefaultModels.Defaults) = write(read().let { s ->
+        s.copy(
+            liveModels = defaults.live?.takeIf { language !in s.liveModels }?.let { s.liveModels + (language to it.id) } ?: s.liveModels,
+            refineModels = defaults.improve?.takeIf { language !in s.refineModels }?.let { s.refineModels + (language to it.id) } ?: s.refineModels,
+        )
     })
 
     /** The live model chosen for [language]; null when none was chosen (the first ready one in the catalog runs). */
