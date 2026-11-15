@@ -297,12 +297,13 @@ internal fun hubModel(s: HubSummary, d: HubDetail): HubModel? {
             }
         }
         // A speaker model per ONNX file (a repo may hold several models, or fp32 and int8), installed as model.onnx.
-        // With its NPU build when the repo has one (the app uses it on that chip, the ONNX elsewhere). Its size isn't
-        // guessed: Whisper's size names would make a "large" one 1.55B.
+        // With its NPU build when the repo has one (the app uses it on that chip, the ONNX elsewhere). Its size from
+        // speakerParameters, not Whisper's size names (they made DiariZen's "large" 1.55B).
         kind.speakers -> {
             val npuFiles = speakerNpuFiles(s.id, names, tags).map { file(it) }
             names.filter { it.endsWith(".onnx") }.map { n ->
-                HubVariant(n.removeSuffix(".onnx") + if (npuFiles.isEmpty()) "" else " + NPU", listOf(file(n, "model.onnx")) + npuFiles, "?", fitsLive = true)
+                val onnx = file(n, "model.onnx")
+                HubVariant(n.removeSuffix(".onnx") + if (npuFiles.isEmpty()) "" else " + NPU", listOf(onnx) + npuFiles, speakerParameters(s.id, onnx), fitsLive = true)
             }.sortedBy { it.sizeBytes }
         }
         // Not run by the app yet: listed with their ONNX files.
@@ -412,6 +413,35 @@ internal fun languagesOf(id: String, kind: HubKind, tags: List<String>): List<St
     val fromName = id.substringAfter('/').lowercase().split('-', '_', '.').filter { it in known && it.length == 2 }.distinct()
     if (fromName.isNotEmpty()) return fromName
     return if (kind == HubKind.Whisper) listOf(SpeechModel.MULTILINGUAL) else emptyList()
+}
+
+/** The catalog's speaker models by a name their Hugging Face repos share ("hencohen83/diarizen-wavlm-large-s80-qnn-sm8750"). */
+private val KNOWN_SPEAKER_MODELS get() = listOf(
+    "diarizen-wavlm-large" to ModelCatalog.diarizenLargeS80,
+    "diarizen-wavlm-base" to ModelCatalog.diarizenBaseS80,
+    "diarizen-meeting-base" to ModelCatalog.diarizenMeetingBase,
+    "pyannote-segmentation-3" to ModelCatalog.speakerSegmentation,
+    "campplus" to ModelCatalog.voicePrints,
+    "eres2netv2" to ModelCatalog.voicePrintsEres2NetV2,
+    "resnet293" to ModelCatalog.voicePrintsResNet293,
+    "samresnet100" to ModelCatalog.voicePrintsSimAmResNet100,
+)
+
+/**
+ * A speaker model's size ("70M"): the catalog's for a model it knows by [repo]'s name, else counted from its ONNX
+ * file [onnx] (4 bytes a weight, 1 for an int8 file, named so in its url); "?" without either.
+ */
+internal fun speakerParameters(repo: String, onnx: ModelFile?): String {
+    val name = repo.lowercase().replace('.', '-').replace('_', '-')
+    KNOWN_SPEAKER_MODELS.firstOrNull { (key, _) -> key in name }?.let { return it.second.parameters }
+    if (onnx == null || onnx.sizeBytes <= 0) return "?"
+    val weights = onnx.sizeBytes / if ("int8" in onnx.url.substringAfterLast('/').lowercase()) 1.0 else 4.0
+    val m = weights / 1e6
+    return when {
+        m >= 1000 -> "${(m / 10).toInt() / 100.0}B"
+        m >= 10 -> "${m.toInt()}M"
+        else -> "${(m * 10).toInt() / 10.0}M"
+    }
 }
 
 /** "244M" for a Whisper "small", from the size names in [text]; "?" when it says none. */
