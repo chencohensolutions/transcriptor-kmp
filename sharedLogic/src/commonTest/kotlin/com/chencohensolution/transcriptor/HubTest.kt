@@ -1,6 +1,8 @@
 package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.models.speakerNpuFiles
+import com.chencohensolution.transcriptor.models.speakerParameters
+import com.chencohensolution.transcriptor.models.ModelFile
 import com.chencohensolution.transcriptor.models.HubClient
 import com.chencohensolution.transcriptor.models.HubKind
 import com.chencohensolution.transcriptor.models.InstalledModel
@@ -284,6 +286,7 @@ class HubTest {
         assertEquals(HubKind.SpeakerTurns, seg.kind)
         assertEquals(LicenseUse.Commercial, seg.use)
         assertEquals(listOf("model.int8", "model"), seg.variants.map { it.label })
+        assertTrue(seg.variants.all { it.parameters == "1.5M" })
         val model = seg.toSpeechModel(seg.variants.last())
         assertEquals(ModelKind.SpeakerSegmentation, model.kind)
         assertEquals(listOf(SpeechModel.MULTILINGUAL), model.languages)
@@ -309,13 +312,17 @@ class HubTest {
         assertEquals(HubKind.SpeakerTurns, m.kind)
         val v = m.variants.single()
         assertEquals(listOf("model.onnx", "window.bin"), v.files.map { it.name })
-        // "large" is a Whisper size (1.55B), not this model's: its size isn't guessed.
-        assertEquals("?", v.parameters)
+        // "large" is a Whisper size (1.55B), not this model's: the catalog's DiariZen Large size.
+        assertEquals("70M", v.parameters)
         assertEquals(ModelKind.SpeakerSegmentation, m.toSpeechModel(v).kind)
-        // One added before, saved with the guessed 1.55B, reads back with no size.
+        // One added before, saved with the guessed 1.55B, reads back with its size.
         val fs = FakeFileSystem()
         InstalledModels(fs, "/files".toPath()).add(InstalledModel(m.toSpeechModel(v).copy(parameters = "1.55B"), m.repo, m.use))
-        assertEquals("?", InstalledModels(fs, "/files".toPath()).all().single().model.parameters)
+        assertEquals("70M", InstalledModels(fs, "/files".toPath()).all().single().model.parameters)
+        // One the catalog doesn't know: counted from its ONNX file.
+        assertEquals("6.6M", speakerParameters("someone/sherpa-onnx-other-speaker", ModelFile("model.onnx", "https://x/model.onnx", "", 26_500_000)))
+        assertEquals("26M", speakerParameters("someone/sherpa-onnx-other-speaker", ModelFile("model.onnx", "https://x/model.int8.onnx", "", 26_500_000)))
+        assertEquals("?", speakerParameters("someone/sherpa-onnx-other-speaker", null))
     }
 
     @Test
