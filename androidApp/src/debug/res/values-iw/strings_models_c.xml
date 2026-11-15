@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_c_aac">AAC בזמן ההקלטה</string>
+    <string name="models_c_aac_note">הכי קטן והכי חסכוני בסוללה, במקודד החומרה של הטלפון כשיש לו. מאבד מעט מהצליל.</string>
+    <string name="models_c_flac_live_note">בלי אובדן, בערך \u2066350–450 MB\u2069 לשעה, מקודד במעבד תוך כדי הקלטה</string>
+    <string name="models_c_wav_then_flac_note">בלי אובדן; שום דבר לא מקודד בזמן ההקלטה, הדחיסה רצה אחרי עצירה</string>
+    <string name="models_c_profile">פרופיל AAC</string>
+    <string name="models_c_profile_lc">LC</string>
+    <string name="models_c_profile_he">HE</string>
+    <string name="models_c_profile_he2">HE v2</string>
+    <string name="models_c_profile_lc_note">הפשוט ביותר: הכי זול לקידוד ולהשמעה, והצליל הטוב ביותר מ־64 kbps ומעלה.</string>
+    <string name="models_c_profile_he_note">בונה מחדש את הצלילים הגבוהים ממעט מידע: נשמע טוב מ־LC מתחת לבערך 48 kbps.</string>
+    <string name="models_c_profile_he2_note">HE עם סטריאו מקופל לזרם מונו: הסטריאו הקטן ביותר. סטריאו בלבד.</string>
+    <string name="models_c_rate">קצב דגימה</string>
+    <string name="models_c_khz">\u2066%1$d kHz\u2069</string>
+    <string name="models_c_rate_note">מודלי הדיבור מאזינים ב־16 kHz. גבוה יותר שומר יותר מהחדר להאזנה חוזרת. HE צריך 24 או 48.</string>
+    <string name="models_c_channels">ערוצים</string>
+    <string name="models_c_mono">מונו</string>
+    <string name="models_c_stereo">סטריאו</string>
+    <string name="models_c_channels_note">במונו יש חצי קידוד באותו קצב; התמלול שומע מונו בכל מקרה.</string>
+    <string name="models_c_bitrate">קצב סיביות</string>
+    <string name="models_c_kbps">\u2066%1$d kbps\u2069</string>
+    <string name="models_c_bitrate_small">קובץ קטן יותר</string>
+    <string name="models_c_bitrate_clear">צליל צלול יותר</string>
+    <string name="models_c_encoder">מקודד</string>
+    <string name="models_c_encoder_auto">אוטומטי (חומרה קודם)</string>
+    <string name="models_c_encoder_hardware">רץ על %1$s, חומרת השמע של הטלפון</string>
+    <string name="models_c_encoder_software">רץ על %1$s, בתוכנה על המעבד</string>
+    <string name="models_c_encoder_kind_hardware">חומרה</string>
+    <string name="models_c_encoder_kind_software">תוכנה (מעבד)</string>
+    <string name="models_c_encoder_no_profile">לא תומך בפרופיל הזה</string>
+    <string name="models_c_encoder_none_hardware">לטלפון הזה אין מקודד AAC בחומרה: רץ המקודד של Android בתוכנה, חלק קטן מליבת מעבד אחת.</string>
+    <string name="models_c_size">בערך \u2066%1$d MB\u2069 לשעה</string>
+    <string name="models_c_balanced">מאוזן</string>
+    <string name="models_c_recommended">%1$s · מומלץ</string>
+    <string name="models_c_smallest">הכי קטן</string>
+    <string name="models_c_preset_stereo">סטריאו, צלול יותר</string>
+    <string name="models_c_aac_line">\u2066AAC %1$s\u2069 · \u2066%2$d kbps\u2069 · %3$s · בערך \u2066%4$d MB\u2069 לשעה</string>
+    <string name="models_c_lossless">בלי אובדן</string>
+    <string name="models_c_lossless_short">FLAC בזמן ההקלטה · בערך \u2066350–450 MB\u2069 לשעה</string>
+    <string name="models_c_lossless_after">בלי אובדן, בלי קידוד בזמן ההקלטה</string>
+    <string name="models_c_lossless_after_short">WAV, ואז FLAC אחרי עצירה</string>
+    <string name="models_c_wav">בלי דחיסה</string>
+    <string name="models_c_wav_short">WAV · בערך \u2066690 MB\u2069 לשעה</string>
+    <string name="models_c_custom">AAC מותאם</string>
+    <string name="models_c_custom_short">בחירת פרופיל, קצב דגימה, ערוצים וקצב סיביות</string>
+</resources>

@@ -72,6 +72,14 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
     default; Nov 6, 2026). Every level is lossless; higher ones make the file a few percent smaller and take longer.
     The encoder is Android's MediaCodec FLAC, which runs on the CPU: the NPU and GPU have no FLAC encoder.
   - FLAC is about 350–450 MB per hour (stereo from one phone microphone compresses better, as the channels are alike).
+  - **AAC live** (`AudioFormat.AacLive`): `audio.aac` as it records, lossy and small (about 28 MB an hour at the
+    default AAC-LC, 64 kbps, mono, 48 kHz). `AacSettings` holds the profile (LC, HE, HE v2), sample rate (48, 24 or 16
+    kHz, whole fractions of the microphone's 48, brought down by `PcmReducer`), channels, bitrate and encoder.
+    `AacEncoder` runs on MediaCodec and picks a hardware AAC encoder first, then the phone maker's, then Android's
+    software `c2.android.aac.encoder`; xHE-AAC's encoder is left out. The file is ADTS (each frame with its own
+    header, `Adts`), so a recording cut off by a crash plays up to its last whole frame; HE is signalled implicitly.
+    The microphone is still read at 48 kHz stereo, so live transcription is the same. Reading back (`RecordingAudio`,
+    `Downsampler`) follows the decoder's rate and channels; `AacRoundTripTest` (androidTest) checks each profile.
 - `lecture.json`'s `"audio"` names the file, and `"pendingFlac"` marks a WAV waiting to be compressed.
 - The models get a copy downmixed to mono and resampled to 16 kHz, in memory.
 - Recording goes on with the screen off: a foreground service with the microphone type on Android, the background

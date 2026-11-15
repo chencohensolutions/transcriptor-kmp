@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="models_a_aac">AAC while recording</string>
+    <string name="models_a_aac_note">Smallest and lightest on the battery, on the phone\'s hardware encoder when it has one. Lossy: a little of the sound is let go.</string>
+    <string name="models_a_flac_live_note">Lossless, about 350–450 MB an hour, encoded on the CPU as it records</string>
+    <string name="models_a_wav_then_flac_note">Lossless; nothing is encoded while recording, the compressing runs after Stop</string>
+    <string name="models_a_profile">AAC profile</string>
+    <string name="models_a_profile_lc">LC</string>
+    <string name="models_a_profile_he">HE</string>
+    <string name="models_a_profile_he2">HE v2</string>
+    <string name="models_a_profile_lc_note">The plainest: cheapest to encode and to play back, and the best sound at 64 kbps and up.</string>
+    <string name="models_a_profile_he_note">Rebuilds the high notes from a little data: sounds better than LC below about 48 kbps.</string>
+    <string name="models_a_profile_he2_note">HE with stereo folded into a mono stream: the smallest stereo. Stereo only.</string>
+    <string name="models_a_rate">Sample rate</string>
+    <string name="models_a_khz">%1$d kHz</string>
+    <string name="models_a_rate_note">Speech models listen at 16 kHz. Higher keeps more of the room for listening back. HE needs 24 or 48.</string>
+    <string name="models_a_channels">Channels</string>
+    <string name="models_a_mono">Mono</string>
+    <string name="models_a_stereo">Stereo</string>
+    <string name="models_a_channels_note">Mono is half the encoding for the same bitrate; transcription hears mono either way.</string>
+    <string name="models_a_bitrate">Bitrate</string>
+    <string name="models_a_kbps">%1$d kbps</string>
+    <string name="models_a_bitrate_small">Smaller file</string>
+    <string name="models_a_bitrate_clear">Clearer sound</string>
+    <string name="models_a_encoder">Encoder</string>
+    <string name="models_a_encoder_auto">Automatic (hardware first)</string>
+    <string name="models_a_encoder_hardware">Runs on %1$s, the phone\'s audio hardware</string>
+    <string name="models_a_encoder_software">Runs on %1$s, in software on the CPU</string>
+    <string name="models_a_encoder_kind_hardware">Hardware</string>
+    <string name="models_a_encoder_kind_software">Software (CPU)</string>
+    <string name="models_a_encoder_no_profile">Doesn\'t take this profile</string>
+    <string name="models_a_encoder_none_hardware">This phone has no hardware AAC encoder: Android\'s software one runs, a small share of one CPU core.</string>
+    <string name="models_a_size">About %1$d MB an hour</string>
+</resources>
