@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lecture_meters_left">L</string>
+    <string name="lecture_meters_right">R</string>
+    <string name="lecture_meters_left_right">L  R</string>
+    <string name="lecture_meters_8k">8k Hz</string>
+</resources>
