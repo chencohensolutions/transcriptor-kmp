@@ -201,7 +201,7 @@
     <string name="settings_auto_improve">שיפור אוטומטי</string>
     <string name="settings_auto_improve_on">כל רגע מתומלל שוב עם מודל השיפור שלו אחרי שהוא נעצר, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, הרגע מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
     <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל רגע מהתפריט שלו, מתי שרוצים.</string>
-    <string name="settings_storage">מודלים ואחסון</string>
+    <string name="settings_storage">הקלטות</string>
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
     <string name="settings_recognition">זיהוי דוברים</string>
@@ -458,4 +458,8 @@
         <item quantity="other">עוד %1$d מקומות</item>
     </plurals>
     <string name="notebooks_add_label_quiet">+ תווית</string>
+    <string name="settings_advanced_note">מודלים לדוברים, ספריית המודלים, מדי מעבד</string>
+    <string name="settings_library">מודלים</string>
+    <string name="settings_meters_section">בזמן הקלטה</string>
+    <string name="settings_language_get">עדיין אין מודל. הקשה כדי להוריד.</string>
 </resources>

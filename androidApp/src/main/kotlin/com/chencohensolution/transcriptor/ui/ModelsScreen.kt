@@ -263,6 +263,8 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
     var speakerHub by rememberSaveable { mutableStateOf(false) }
     /** Recording format, or the AAC or FLAC page it opened; null when none is open. */
     var formatPage by rememberSaveable { mutableStateOf<FormatPage?>(null) }
+    /** Settings › Advanced is open (the speaker pages and the model library open from it, and return to it). */
+    var advanced by rememberSaveable { mutableStateOf(false) }
     val openCatalog = { l: String? -> if (l != null) shown = l; page = 1 }
     when {
         page == 2 -> {
@@ -292,10 +294,11 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
             BackHandler { speakerJob = null }
             SpeakerPage(state, actions, speakerJob!!, onFindMore = { speakerHub = true }) { speakerJob = null }
         }
-        else -> SettingsPage(
-            state, actions, openLanguage = { language = it }, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) },
-            openFormat = { formatPage = FormatPage.Format },
-        )
+        advanced -> {
+            BackHandler { advanced = false }
+            AdvancedPage(state, actions, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) }) { advanced = false }
+        }
+        else -> SettingsPage(state, actions, openLanguage = { language = it }, openAdvanced = { advanced = true }, openFormat = { formatPage = FormatPage.Format })
     }
 }
 
@@ -306,10 +309,7 @@ const val APP_QNN = "2.40"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsPage(
-    state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit,
-    openFormat: () -> Unit,
-) {
+private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguage: (String) -> Unit, openAdvanced: () -> Unit, openFormat: () -> Unit) {
     var picking by remember { mutableStateOf(false) }
     if (picking) LanguagePicker(exclude = state.languages, onDismiss = { picking = false }) { actions.addLanguage(it); picking = false; openLanguage(it) }
     Scaffold(
@@ -328,12 +328,14 @@ private fun SettingsPage(
                 Row(Modifier.fillMaxWidth().clickable { openLanguage(l) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(languageName(l), style = MaterialTheme.typography.bodyLarge)
-                        Text(
+                        // Nothing downloaded for it yet: one calm line that says what to do, not two red ones.
+                        if (live == null && improve == null) Text(stringResource(R.string.settings_language_get), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        else Text(
                             if (live != null) stringResource(R.string.settings_live_is, isolated(live.name)) else stringResource(R.string.settings_live_none),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (live != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                         )
-                        Text(
+                        if (live != null || improve != null) Text(
                             if (improve != null) stringResource(R.string.settings_improve_is, isolated(improve.name)) else stringResource(R.string.settings_improve_none),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (improve != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
@@ -347,6 +349,41 @@ private fun SettingsPage(
                 Text(stringResource(R.string.models_add_language), Modifier.padding(start = 8.dp))
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_after))
+            SwitchRow(
+                stringResource(R.string.settings_auto_improve),
+                stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),
+                state.autoImprove, actions.setAutoImprove,
+            )
+            HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_storage))
+            Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
+            LecturesFolder(state.folder, actions.chooseFolder)
+            NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
+            HorizontalDivider(Modifier.padding(top = 16.dp))
+            NavRow(stringResource(R.string.settings_advanced), stringResource(R.string.settings_advanced_note), openAdvanced)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * Settings › Advanced: what most people never change. The speaker models (voice prints with the "fewer ↔ more
+ * speakers" slider, speaker turns), finding the speakers again after Stop, the model library, and the processor
+ * meters. The first page keeps the plain choices: the languages, improving on its own, the folder and the audio.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit, onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
+                title = { Text(stringResource(R.string.settings_advanced)) },
+            )
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             SectionTitle(stringResource(R.string.settings_recognition))
             PageNote(stringResource(R.string.settings_recognition_note))
             val voice = state.voice
@@ -356,22 +393,12 @@ private fun SettingsPage(
             SectionTitle(stringResource(R.string.settings_turns))
             PageNote(stringResource(R.string.settings_turns_note))
             SummaryRow(stringResource(R.string.settings_turn_model), speakerLine(state.turns, state)) { openSpeakers(HubKind.SpeakerTurns) }
-            HorizontalDivider(Modifier.padding(top = 8.dp))
-            SectionTitle(stringResource(R.string.settings_after))
             SwitchRow(stringResource(R.string.settings_find_speakers), stringResource(R.string.settings_find_speakers_note), state.findSpeakersOnStop, actions.setFindSpeakersOnStop)
-            SwitchRow(
-                stringResource(R.string.settings_auto_improve),
-                stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),
-                state.autoImprove, actions.setAutoImprove,
-            )
             HorizontalDivider(Modifier.padding(top = 8.dp))
-            SectionTitle(stringResource(R.string.settings_storage))
+            SectionTitle(stringResource(R.string.settings_library))
             NavRow(stringResource(R.string.settings_manage), stringResource(R.string.settings_manage_note), openCatalog)
-            Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
-            LecturesFolder(state.folder, actions.chooseFolder)
-            NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
-            HorizontalDivider(Modifier.padding(top = 16.dp))
-            SectionTitle(stringResource(R.string.settings_advanced))
+            HorizontalDivider(Modifier.padding(top = 8.dp))
+            SectionTitle(stringResource(R.string.settings_meters_section))
             Column(Modifier.selectableGroup()) {
                 Text(stringResource(R.string.settings_meters), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
                 PageNote(stringResource(R.string.settings_meters_note))

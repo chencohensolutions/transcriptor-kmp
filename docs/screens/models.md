@@ -4,6 +4,15 @@ In the app: Settings is round 2's b (a page per language) with round 3's d2 (the
 models round 1's b4. The gear on Notebooks opens
 Settings.
 
+## Two pages (Nov 15, 2026)
+
+Settings opens on the plain choices: **Languages** (a language with nothing downloaded says "No model yet. Tap to get
+one." in one calm line), **After a moment** (Improve automatically), and **Recordings** (the moments folder, the
+audio format and FLAC effort), then an **Advanced** row. **Settings › Advanced** (`AdvancedPage`) holds what most
+people never change: Speaker recognition with its slider, Speaker turns, Find the speakers again after Stop, Manage
+models, and the processor meters. The speaker pages and the model library open from Advanced and return to it. What
+each section does is as described below.
+
 ## What it shows
 
 - **Settings**: **Languages**, one row per language in use (the moments', the phone's, those
