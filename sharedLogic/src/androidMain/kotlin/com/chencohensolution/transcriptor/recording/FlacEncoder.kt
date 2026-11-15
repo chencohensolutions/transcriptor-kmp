@@ -31,6 +31,8 @@ class FlacEncoder(
         )
         start()
     }
+    /** MediaCodec's name for the encoder ("c2.android.flac.encoder": Android's, on the CPU). */
+    val encoderName: String = codec.name
     private val info = MediaCodec.BufferInfo()
     private val header = java.io.ByteArrayOutputStream()
     private var headerWritten = false

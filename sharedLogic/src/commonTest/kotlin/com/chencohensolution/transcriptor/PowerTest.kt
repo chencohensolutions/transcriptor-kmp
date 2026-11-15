@@ -2,6 +2,7 @@ package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
+import com.chencohensolution.transcriptor.recording.PowerAudio
 import com.chencohensolution.transcriptor.recording.PowerLogCsv
 import com.chencohensolution.transcriptor.recording.PowerMeter
 import com.chencohensolution.transcriptor.recording.PowerModel
@@ -58,7 +59,34 @@ class PowerTest {
         assertEquals(PowerLogCsv.HEADER, csv[0])
         assertEquals(3, csv.size)
         assertTrue(csv[1].startsWith("l1,nb,5,60,1200.0,"), csv[1])
-        assertTrue(csv[1].endsWith("\"speakers: ResNet293 (NPU)\""), csv[1])
+        assertTrue(csv[1].endsWith("\"speakers: ResNet293 (NPU)\",record,,,,,\"\",0,0.0"), csv[1])
+    }
+
+    @Test
+    fun theAudioAndTheEncodingAfterwardsAreLogged() = runTest {
+        val fs = FakeFileSystem()
+        val store = LectureStore(fs, "/d".toPath())
+        val lecture = Lecture(id = "l1", title = "t", language = "he", startedAtMillis = 5, durationMillis = 3_600_000, segments = emptyList(), notes = emptyList())
+        store.save(lecture)
+        // An older log, before the audio columns: kept aside, a new one started.
+        fs.write("/d/power-log.csv".toPath()) { writeUtf8("lecture,notebook\nold,x\n") }
+        val samples = listOf(sample(0, -300_000).copy(levelPercent = 80), sample(1_800_000, -300_000).copy(levelPercent = 77))
+        val audio = PowerAudio("AacLive", "aac", "c2.vendor.aac.hw.encoder", hardware = true, details = "Lc · 64 kbps · mono · 48 kHz")
+        val r = PowerReport.of(samples, 1_800_000, emptyList(), audio)
+        assertEquals(3, r.batteryPercentUsed)
+        assertEquals(6.0, r.batteryPercentPerHour)
+        val e = PowerReport.of(samples, 60_000, emptyList(), audio.copy(format = "WavThenAac"), PowerReport.PHASE_ENCODE)
+        store.savePower(lecture, r)
+        store.savePower(lecture, e)
+        assertEquals(r, store.loadPower(lecture))
+        assertTrue(fs.exists(store.folder("l1") / "power-encode.json"))
+        store.appendPowerLog(PowerLogCsv.row("l1", "nb", 5, r))
+        store.appendPowerLog(PowerLogCsv.row("l1", "nb", 5, e))
+        val csv = fs.read("/d/power-log.csv".toPath()) { readUtf8() }.trim().lines()
+        assertEquals(PowerLogCsv.HEADER, csv[0])
+        assertTrue(csv[1].endsWith(",record,AacLive,aac,c2.vendor.aac.hw.encoder,hardware,\"Lc · 64 kbps · mono · 48 kHz\",3,6.0"), csv[1])
+        assertTrue(",encode,WavThenAac," in csv[2], csv[2])
+        assertTrue(fs.exists("/d/power-log-before-2-columns.csv".toPath()))
     }
 
     @Test

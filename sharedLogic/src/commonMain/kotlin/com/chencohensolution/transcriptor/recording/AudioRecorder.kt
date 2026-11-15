@@ -29,6 +29,12 @@ interface AudioRecorder {
     /** Makes what is written so far readable after a crash (a WAV's header sizes). */
     fun checkpoint()
     fun stop()
+
+    /** The encoder the recording runs on (MediaCodec's name); null for WAV, or before [start]. */
+    val encoderName: String? get() = null
+
+    /** [encoderName] runs on dedicated hardware rather than the CPU. */
+    val encoderHardware: Boolean get() = false
 }
 
 /** Where the recorder's PCM (16 bit, interleaved) goes: a WAV file, or a FLAC encoder. */

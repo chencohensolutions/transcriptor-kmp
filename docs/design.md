@@ -187,7 +187,16 @@ Android is built first, then iOS (SwiftUI) on the same shared logic (owner's dec
   - duration, average mW, mWh in all, mWh and J per minute;
   - battery % and °C at the start and end;
   - the app's CPU seconds per minute, and the screen-on share;
-  - the models used and where (NPU or CPU).
+  - the models used and where (NPU or CPU);
+  - the audio (`audio`): the format setting, the codec written, the MediaCodec encoder, hardware or software, and its
+    settings in words;
+  - battery % used, and per hour.
+
+  Encoding a WAV afterwards (WAV, then FLAC or AAC) is metered the same way, every 5 seconds: `power-encode.json`
+  beside the audio and a row with `phase` = `encode` in `power-log.csv` (the recording's rows say `record`). The
+  recording's row plus the encoding's is what WAV-then-encode costs, against one row for encoding live. Encoded on the
+  charger, its power figures are null, as above. `power-log.csv` gained these columns in Nov 2026: a log with the old
+  header is kept as `power-log-before-16-columns.csv` and a new one starts.
 
   The battery's power is the whole phone's (screen and other apps included). The app's own share shows in its CPU
   time. On the charger the current isn't the phone's use, so the power figures are null and `charging` is true.

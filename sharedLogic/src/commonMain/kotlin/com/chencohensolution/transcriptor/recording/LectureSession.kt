@@ -201,6 +201,25 @@ class LectureSession(
     }
 
     /** The models this lecture used and where, for its power report. */
+    /** The audio's format and encoder for the power report, from the setting it was recorded with and the recorder. */
+    private fun audioInUse(file: String): PowerAudio {
+        val format = settings.audioFormat
+        val codec = file.substringAfterLast('.')
+        val aac = settings.aac
+        val details = when (codec) {
+            "aac" -> "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
+            "flac" -> "level ${settings.flacLevel}"
+            else -> when (format) {
+                AudioFormat.WavThenAac -> "then AAC ${aac.profile.name} · ${aac.bitrateKbps} kbps, ${settings.encodeAfter.name.lowercase()}"
+                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel}, ${settings.encodeAfter.name.lowercase()}"
+                else -> ""
+            }
+        }
+        return PowerAudio(
+            format = format.name, codec = codec, encoder = recorder.encoderName, hardware = recorder.encoderHardware, details = details,
+        )
+    }
+
     private fun modelsInUse(): List<PowerModel> {
         val m = liveModel ?: return emptyList()
         val out = mutableListOf(PowerModel("live", m.name, if ("NPU" in m.name) "NPU" else "CPU"))
@@ -291,7 +310,7 @@ class LectureSession(
         // How much power it took: power.json beside the audio, a row in power-log.csv.
         power?.let { meter ->
             runCatching {
-                val report = PowerReport.of(meter.stop(), duration, modelsInUse())
+                val report = PowerReport.of(meter.stop(), duration, modelsInUse(), audioInUse(r.lecture.audioFile))
                 store.savePower(r.lecture, report)
                 store.appendPowerLog(PowerLogCsv.row(r.lecture.id, r.lecture.labels.joinToString("+"), r.lecture.startedAtMillis, report))
             }

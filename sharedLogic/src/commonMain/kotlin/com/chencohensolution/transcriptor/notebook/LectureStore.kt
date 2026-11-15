@@ -170,9 +170,10 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val place = placeOf(lecture.id)
         val folder = place.folder(lecture.id)
         place.fileSystem.createDirectories(folder)
-        val temp = folder / "$POWER.tmp"
+        val name = if (report.phase == PowerReport.PHASE_ENCODE) "power-encode.json" else POWER
+        val temp = folder / "$name.tmp"
         place.fileSystem.write(temp) { writeUtf8(json.encodeToString(report)) }
-        place.fileSystem.atomicMove(temp, folder / POWER)
+        place.fileSystem.atomicMove(temp, folder / name)
     }
 
     /** [savePower]'s report; null for a lecture recorded before it existed. */
@@ -187,7 +188,12 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     fun appendPowerLog(row: String) {
         val file = local.root / POWER_LOG
         val fs = local.fileSystem
-        val before = if (fs.exists(file)) fs.read(file) { readUtf8() } else PowerLogCsv.HEADER + "\n"
+        var before = if (fs.exists(file)) fs.read(file) { readUtf8() } else PowerLogCsv.HEADER + "\n"
+        // Columns were added (Nov 2026): the old file is kept beside it as it was, and a new one starts.
+        if (before.substringBefore('\n') != PowerLogCsv.HEADER) {
+            fs.atomicMove(file, local.root / "power-log-before-${before.substringBefore('\n').split(',').size}-columns.csv")
+            before = PowerLogCsv.HEADER + "\n"
+        }
         val temp = local.root / "$POWER_LOG.tmp"
         fs.createDirectories(local.root)
         fs.write(temp) { writeUtf8(before + row + "\n") }

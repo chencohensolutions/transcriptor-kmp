@@ -29,6 +29,11 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
     @Volatile private var reading = false
     private var frames = 0L
     private var reads = 0
+    // Kept after stop, for the power report.
+    @Volatile override var encoderName: String? = null
+        private set
+    @Volatile override var encoderHardware: Boolean = false
+        private set
 
     @SuppressLint("MissingPermission")
     override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings) {
@@ -38,6 +43,12 @@ class AndroidRecorder(private val fileSystem: FileSystem = FileSystem.SYSTEM) : 
             AudioFileFormat.Flac -> FlacEncoder(file.toFile(), flacLevel)
             AudioFileFormat.Aac -> AacEncoder(file.toFile(), aac)
         }
+        encoderName = when (val s = sink) {
+            is FlacEncoder -> s.encoderName
+            is AacEncoder -> s.encoderName
+            else -> null
+        }
+        encoderHardware = AacEncoders.all.any { it.name == encoderName && it.hardware }
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT)
         record = AudioRecord(
             MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT,
