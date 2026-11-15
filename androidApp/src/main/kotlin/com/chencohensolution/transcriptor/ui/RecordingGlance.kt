@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -101,6 +103,15 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                         },
                     ),
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+                )
+            }
+            // Live transcription off and on while recording, when a live model is on the phone for the language.
+            if (state.canTranscribe && !state.finishing) {
+                androidx.compose.material3.FilterChip(
+                    selected = state.transcribing, onClick = { actions.setTranscribing(!state.transcribing) },
+                    label = { Text(stringResource(if (state.transcribing) R.string.glance_live_on else R.string.glance_live_off)) },
+                    leadingIcon = { Icon(if (state.transcribing) Icons.Filled.Subtitles else Icons.Filled.SubtitlesOff, null, Modifier.size(18.dp)) },
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))

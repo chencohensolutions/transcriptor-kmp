@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.transcriptor.notebook.LiveOff
 import com.chencohensolution.transcriptor.notebook.Pause
 import java.text.DateFormat
 import java.util.Date
@@ -26,6 +27,26 @@ fun PauseDivider(pause: Pause, modifier: Modifier = Modifier) {
     val resumed = pause.resumedAtMillis
     val text = if (resumed == null) stringResource(R.string.pause_divider_open, clockTime(pause.pausedAtMillis))
         else stringResource(R.string.pause_divider, pauseLength(resumed - pause.pausedAtMillis), clockTime(resumed))
+    Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(Modifier.weight(1f), color = color.copy(alpha = 0.4f))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(horizontal = 12.dp))
+        HorizontalDivider(Modifier.weight(1f), color = color.copy(alpha = 0.4f))
+    }
+}
+
+/**
+ * Where live transcription was switched off while recording: "Live transcript off 12 min · on again 14:32", "off since
+ * 14:20" while it still is, or "off from 14:20 to the end". Those lines come from the pass after the moment.
+ */
+@Composable
+fun TranscriptOffDivider(off: LiveOff, modifier: Modifier = Modifier) {
+    val color = LocalTranscriptorColors.current.time
+    val on = off.onAtMillis
+    val text = when {
+        on != null -> stringResource(R.string.transcript_off_divider, pauseLength(on - off.offAtMillis), clockTime(on))
+        off.toMillis == null -> stringResource(R.string.transcript_off_open, clockTime(off.offAtMillis))
+        else -> stringResource(R.string.transcript_off_to_end, clockTime(off.offAtMillis))
+    }
     Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         HorizontalDivider(Modifier.weight(1f), color = color.copy(alpha = 0.4f))
         Text(text, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(horizontal = 12.dp))

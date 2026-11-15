@@ -97,7 +97,11 @@ class RecordingService : Service() {
                 val model = lecture?.let { Recording.improveModelFor(it.language) }
                 // Only record: nothing runs on it but the encoding; "Transcribe now" on the moment when wanted.
                 if (onlyRecord && lecture != null && lecture.pendingTranscript) { if (!improveNextPending()) compressPending(); return@launch }
-                val after = ImproveAfterStop.of(lecture?.segments?.isNotEmpty() == true, model != null, skipped, Recording.settings.autoImprove, charging())
+                // Live transcription was off for part of it: those stretches are transcribed after, as an After moment
+                // is (Settings' "Transcribe After moments": now, or on the charger with enough battery).
+                val gaps = lecture?.liveOff?.isNotEmpty() == true && !onlyRecord && model != null
+                val after = if (gaps) { if (transcribeAllowed()) ImproveAfterStop.Now else ImproveAfterStop.WhenCharging }
+                    else ImproveAfterStop.of(lecture?.segments?.isNotEmpty() == true, model != null, skipped, Recording.settings.autoImprove, charging())
                 if (lecture != null && after == ImproveAfterStop.WhenCharging) Recording.settings.addImprovePending(lecture.id)
                 val then = model?.takeIf { after == ImproveAfterStop.Now }?.let { m -> { done: Lecture -> refine(done, m.id) } }
                 when {
@@ -257,7 +261,7 @@ class RecordingService : Service() {
             val model = lecture?.let { Recording.improveModelFor(it.language) }
             if (lecture == null || model == null || lecture.refinedWith != null) { Recording.settings.removeImprovePending(lectureId); continue }
             // A moment waiting for its transcript follows Settings' "Transcribe After moments"; improving waits for the charger.
-            val transcribing = lecture.pendingTranscript && lecture.segments.isEmpty()
+            val transcribing = (lecture.pendingTranscript && lecture.segments.isEmpty()) || lecture.liveOff.isNotEmpty()
             if (if (transcribing) !transcribeAllowed() else !charging) continue
             refine(lecture, model.id)
             return true

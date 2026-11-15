@@ -111,6 +111,14 @@ starts afresh. Amber from 70%, red from 90%.
 
 ## Behavior
 
+- **Live transcription off and on** (hen's ask, Nov 16, 2026): a chip under the glance's status, "Transcribing live" /
+  "Live transcript off", when a live model is on the phone for the language (`LiveLectureState.canTranscribe`,
+  `LectureSession.setTranscribing`). Off ends the line being said and stops feeding the model (it stays loaded, so on is
+  quick); the status reads as recording only. On in a moment started with After or No transcript loads the live model
+  then. The transcriber only hears the on stretches, so its times are shifted to the audio's (`toAudio`). Each off
+  stretch is kept (`Lecture.liveOff`: the audio's from/to, the clock's off/on) and shown in the transcript, "Live
+  transcript off 12 min · on again 14:32" (`TranscriptOffDivider`), and in Info. After Stop the moment is transcribed
+  again as an After moment is (Settings › Transcribe After moments), which fills the off stretches; not for No transcript.
 - Pause keeps its clock time with the moment (`Lecture.pauses`); the transcript shows "Paused at 14:20" while paused,
   then "Paused 12 min · resumed 14:32" (`PauseDivider`), in the timeline after the line it cut into (`timelineOf`).
 

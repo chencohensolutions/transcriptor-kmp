@@ -12,6 +12,11 @@ sealed interface TimelineEntry {
         override val atMillis get() = note.atMillis
     }
 
+    /** Live transcription was switched off here. */
+    data class TranscriptOff(val off: LiveOff) : TimelineEntry {
+        override val atMillis get() = off.fromMillis
+    }
+
     /** The recording was paused here. */
     data class Paused(val pause: Pause) : TimelineEntry {
         override val atMillis get() = pause.atMillis
@@ -26,6 +31,13 @@ fun timelineOf(lecture: Lecture): List<TimelineEntry> {
     fun lineStartAt(at: Long) = lecture.segments.lastOrNull { it.startMillis <= at }?.startMillis ?: 0L
     // A pause right at a line's start belongs before that line.
     fun pauseAt(at: Long) = lecture.segments.lastOrNull { it.startMillis < at }?.startMillis ?: -1L
-    return (lecture.segments.map { TimelineEntry.Speech(it) } + lecture.notes.map { TimelineEntry.Written(it) } + lecture.pauses.map { TimelineEntry.Paused(it) })
-        .sortedWith(compareBy({ if (it is TimelineEntry.Paused) pauseAt(it.atMillis) else lineStartAt(it.atMillis) }, { it !is TimelineEntry.Speech }, { it.atMillis }))
+    return (
+        lecture.segments.map { TimelineEntry.Speech(it) } + lecture.notes.map { TimelineEntry.Written(it) } +
+            lecture.pauses.map { TimelineEntry.Paused(it) } + lecture.liveOff.map { TimelineEntry.TranscriptOff(it) }
+        ).sortedWith(
+            compareBy(
+                { if (it is TimelineEntry.Paused || it is TimelineEntry.TranscriptOff) pauseAt(it.atMillis) else lineStartAt(it.atMillis) },
+                { it !is TimelineEntry.Speech }, { it.atMillis },
+            ),
+        )
 }

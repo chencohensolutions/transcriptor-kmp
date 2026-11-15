@@ -20,6 +20,7 @@ class TimelineTest {
             is TimelineEntry.Speech -> it.segment.id
             is TimelineEntry.Written -> it.note.id
             is TimelineEntry.Paused -> "p${it.pause.atMillis}"
+            is TimelineEntry.TranscriptOff -> "o${it.off.fromMillis}"
         }
     }
 
@@ -53,5 +54,12 @@ class TimelineTest {
         assertEquals(listOf("p0", "s1", "s2", "n1", "p15000", "p20000", "s3"), ids(lecture))
         assertEquals(600_000L, lecture.pauses[0].lengthMillis)
         assertEquals(null, lecture.pauses[1].lengthMillis)
+    }
+
+    @Test
+    fun liveTranscriptOffComesAfterTheLineItCutInto() {
+        val lecture = lecture(listOf(line("s1", 0, 10_000), line("s2", 30_000, 40_000)), emptyList())
+            .copy(liveOff = listOf(com.chencohensolution.transcriptor.notebook.LiveOff(12_000, 28_000, 1, 2)))
+        assertEquals(listOf("s1", "o12000", "s2"), ids(lecture))
     }
 }

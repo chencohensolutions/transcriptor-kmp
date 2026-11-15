@@ -351,11 +351,15 @@ fun ReviewScreen(
                     // Its notes, which have no lines to sit under yet.
                     items(state.lecture.notes, key = { "note-${it.id}" }) { n -> NotePill(n, onTime = { actions.seek(n.atMillis) }, onHold = { note = n }) }
                     items(state.lecture.pauses, key = { "pause-${it.pausedAtMillis}" }) { p -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) } }
+                    items(state.lecture.liveOff, key = { "off-${it.offAtMillis}" }) { o -> CompositionLocalProvider(LocalLayoutDirection provides appDirection) { TranscriptOffDivider(o) } }
                 }
                 // Pauses before the first turn; the others come after the turn they cut into.
                 val firstStart = turns.firstOrNull()?.first()?.startMillis ?: Long.MAX_VALUE
                 if (!waiting) items(state.lecture.pauses.filter { it.atMillis <= firstStart }, key = { "pause-${it.pausedAtMillis}" }) { p ->
                     CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) }
+                }
+                if (!waiting) items(state.lecture.liveOff.filter { it.fromMillis <= firstStart }, key = { "off-${it.offAtMillis}" }) { o ->
+                    CompositionLocalProvider(LocalLayoutDirection provides appDirection) { TranscriptOffDivider(o) }
                 }
                 items(turns, key = { it.first().id }) { turn ->
                     val next = turns.getOrNull(turns.indexOf(turn) + 1)?.first()?.startMillis ?: Long.MAX_VALUE
@@ -367,6 +371,9 @@ fun ReviewScreen(
                         )
                         state.lecture.pauses.filter { it.atMillis > turn.first().startMillis && it.atMillis <= next }.forEach { p ->
                             CompositionLocalProvider(LocalLayoutDirection provides appDirection) { PauseDivider(p) }
+                        }
+                        state.lecture.liveOff.filter { it.fromMillis > turn.first().startMillis && it.fromMillis <= next }.forEach { o ->
+                            CompositionLocalProvider(LocalLayoutDirection provides appDirection) { TranscriptOffDivider(o) }
                         }
                     }
                 }

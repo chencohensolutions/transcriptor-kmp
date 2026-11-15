@@ -62,6 +62,16 @@ fun MomentInfoSheet(info: MomentInfo, onDismiss: () -> Unit) {
             info.audioBytes?.let { Item(stringResource(R.string.info_size), stringResource(R.string.info_megabytes, it / 1_048_576.0)) }
             if (r != null) Item(stringResource(R.string.info_mic), audio?.input?.let(::isolated) ?: stringResource(R.string.settings_mic_phone))
             r?.models?.forEach { m -> Item(m.role.replaceFirstChar { it.titlecase() }, "${isolated(m.name)} · ${m.runsOn}") }
+            // Where live transcription was off: the audio's stretch, and the clock times.
+            l.liveOff.forEachIndexed { i, o ->
+                val on = o.onAtMillis
+                Item(
+                    if (i == 0) stringResource(R.string.info_live_off) else "",
+                    "${formatClock(o.fromMillis)}–${formatClock(o.toMillis ?: l.durationMillis)} · " +
+                        if (on == null) stringResource(R.string.info_pause_open, clockTime(o.offAtMillis))
+                        else stringResource(R.string.info_pause_row, clockTime(o.offAtMillis), clockTime(on), pauseLength(on - o.offAtMillis)),
+                )
+            }
             // Where it was paused: the clock times, with the audio's position (it has no gap there).
             l.pauses.forEachIndexed { i, p ->
                 val resumed = p.resumedAtMillis

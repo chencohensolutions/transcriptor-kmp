@@ -39,10 +39,14 @@ data class LiveLectureState(
     /** With [skippedForMemory]: the moment is improved when it stops, so the screen says that instead of a warning. */
     val improveOnStop: Boolean = false,
     /**
-     * No live transcription: the moment is only recorded and is transcribed after it stops
+     * No live transcription now (never started, or switched off while recording): the moment is only recorded and is transcribed after it stops
      * ([Lecture.pendingTranscript]); "After" was picked, or no live model is downloaded for its language.
      */
     val recordOnly: Boolean = false,
+    /** Live transcription is on now; false when it was switched off while recording, or never ran. */
+    val transcribing: Boolean = false,
+    /** Live transcription can be switched on: a live model is on the phone for the moment's language. */
+    val canTranscribe: Boolean = false,
     /** Both channels' levels, their last seconds and (for a frequency [levelMeter]) the bands; silent when paused. */
     val stereoMeter: StereoMeterState = StereoMeterState(),
     /** The microphone recording it when it isn't the phone's own (a headset, earbuds, a USB microphone). */

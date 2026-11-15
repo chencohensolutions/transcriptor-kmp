@@ -560,4 +560,10 @@
     <string name="info_pauses">Pauses</string>
     <string name="info_pause_row">%1$s → %2$s (%3$s)</string>
     <string name="info_pause_open">%1$s → stopped</string>
+    <string name="transcript_off_divider">Live transcript off %1$s · on again %2$s</string>
+    <string name="transcript_off_open">Live transcript off since %1$s</string>
+    <string name="transcript_off_to_end">Live transcript off from %1$s to the end</string>
+    <string name="glance_live_on">Transcribing live</string>
+    <string name="glance_live_off">Live transcript off</string>
+    <string name="info_live_off">Live transcript off</string>
 </resources>

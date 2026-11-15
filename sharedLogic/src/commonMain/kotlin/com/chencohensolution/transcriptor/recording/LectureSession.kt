@@ -6,6 +6,7 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.LiveOff
 import com.chencohensolution.transcriptor.notebook.Pause
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.SettingsStore
@@ -74,6 +75,8 @@ class LectureSession(
     private val speakerPassReady: () -> Boolean = { false },
     /** Samples the battery while a lecture records, for its `power.json` and `power-log.csv`; null: not measured. */
     private val power: PowerMeter? = null,
+    /** A live model is on the phone for the language (live transcription can be switched on); doesn't load it. */
+    private val liveAvailable: (language: String) -> Boolean = { false },
     /**
      * Starts live transcription for a language, with the voices the app knows; null when no live model is
      * downloaded for it.
@@ -86,6 +89,10 @@ class LectureSession(
         val paused: Boolean,
         val finishing: Boolean = false,
         val transcribeAfter: Boolean = true,
+        /** Live transcription is on now (switched off while recording: false). */
+        val transcribing: Boolean = false,
+        /** A live model is on the phone for its language: transcription can be switched on (read once, at the start). */
+        val canTranscribe: Boolean = false,
     )
 
     private val recording = MutableStateFlow<Recording?>(null)
@@ -94,6 +101,86 @@ class LectureSession(
     private var wantedInput: MicInput? = null
     private var saving: Job? = null
     private var following: Job? = null
+
+    // Live transcription switched off and on while recording: the transcriber only hears the audio while it is on,
+    // so its times are in "heard" time. Each time it is switched on, the audio's position minus the heard time is
+    // added from there on ([toAudio]), so every line keeps its place in the audio.
+    @kotlin.concurrent.Volatile private var feeding = false
+    @kotlin.concurrent.Volatile private var heardFrames = 0L
+    private var shifts: List<Pair<Long, Long>> = listOf(0L to 0L)
+
+    /**
+     * Loads live transcription for [language] and feeds it the recorder's audio while [feeding]; null when no live
+     * model is on the phone. Its lines follow into the recording as they come.
+     */
+    private fun startLive(language: String): LiveModel? = live(language, scope, emptyList())?.also { model ->
+        val live = model.liveSpeakers
+        recorder.onPcm = { pcm, size ->
+            if (feeding) {
+                model.transcriber.feed(pcm, size)
+                live?.feed(pcm, size)
+                heardFrames += size / 4
+            }
+        }
+        following = scope.launch {
+            val speakers = live?.state ?: MutableStateFlow(LiveSpeakers.State())
+            combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
+                liveOutput.value = out
+                val r = recording.value ?: return@collect
+                val (lines, who) = shown(model, out, found)
+                if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
+                    recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
+                    if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
+                }
+            }
+        }
+    }
+
+    /**
+     * Switches live transcription off or on while recording. Off: the line being said ends and the model hears nothing
+     * (it stays loaded, so on is quick); the stretch is kept with its clock times ([Lecture.liveOff]) and transcribed
+     * after. On in a moment recorded without it (After, or No transcript): the language's live model loads now, and the
+     * moment so far is a stretch that was off. Nothing when no live model is on the phone for the language.
+     */
+    fun setTranscribing(on: Boolean) {
+        val r = recording.value ?: return
+        if (r.finishing || r.transcribing == on) return
+        val at = recorder.positionMillis.value
+        val clock = now()
+        if (on) {
+            val model = liveModel ?: startLive(r.lecture.language)?.also { liveModel = it } ?: return
+            val heard = heardFrames * 1000 / WavWriter.SAMPLE_RATE
+            shifts = shifts + (heard to at - heard)
+            feeding = true
+            model.transcriber.pause()
+            recording.update { rec ->
+                rec ?: return@update null
+                val offs = rec.lecture.liveOff
+                val open = offs.lastOrNull()?.takeIf { it.toMillis == null }
+                val next = if (open != null) offs.dropLast(1) + open.copy(toMillis = at, onAtMillis = clock)
+                    else offs + LiveOff(0, at, rec.lecture.startedAtMillis, clock)
+                rec.copy(transcribing = true, lecture = rec.lecture.copy(liveOff = next, pendingTranscript = false))
+            }
+        } else {
+            feeding = false
+            liveModel?.transcriber?.pause()
+            recording.update { rec ->
+                rec ?: return@update null
+                rec.copy(transcribing = false, lecture = rec.lecture.copy(liveOff = rec.lecture.liveOff + LiveOff(at, null, clock)))
+            }
+        }
+        saveNow()
+    }
+
+    /** Live lines (heard time) at their place in the audio: shifted by what wasn't heard before them. */
+    private fun toAudio(lines: List<Segment>): List<Segment> {
+        if (shifts.size == 1) return lines
+        return lines.map { line ->
+            val add = shifts.last { it.first <= line.startMillis }.second
+            if (add == 0L) line
+            else line.copy(startMillis = line.startMillis + add, endMillis = line.endMillis + add, words = line.words.map { it.copy(atMillis = it.atMillis + add) })
+        }
+    }
 
     /** The lines the user fixed while recording, by line id: laid over live transcription's lines ([shown]). */
     private var edits: Map<String, String> = emptyMap()
@@ -114,7 +201,8 @@ class LectureSession(
                     speakersLive = liveModel?.liveSpeakers != null,
                     skippedForMemory = liveModel?.skipped,
                     improveOnStop = liveModel?.skipped != null && liveModel?.improveOnStop == true,
-                    recordOnly = liveModel == null, transcribeAfter = it.transcribeAfter,
+                    recordOnly = liveModel == null || !it.transcribing, transcribeAfter = it.transcribeAfter,
+                    transcribing = it.transcribing, canTranscribe = it.canTranscribe,
                 )
             }
         }.stateIn(scope, SharingStarted.Eagerly, null)
@@ -155,22 +243,10 @@ class LectureSession(
         // Every moment starts with unnamed speakers: a voice named in another moment isn't guessed here (owner's
         // decision, Nov 15, 2026: matching voices between moments wasn't accurate enough). The names are still kept
         // ([VoiceStore]), to be offered when the user names a speaker.
-        liveModel = (if (transcribeLive) live(language, scope, emptyList()) else null)?.also { model ->
-            val live = model.liveSpeakers
-            recorder.onPcm = if (live == null) model.transcriber::feed else { pcm, size -> model.transcriber.feed(pcm, size); live.feed(pcm, size) }
-            following = scope.launch {
-                val speakers = live?.state ?: MutableStateFlow(LiveSpeakers.State())
-                combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
-                    liveOutput.value = out
-                    val r = recording.value ?: return@collect
-                    val (lines, who) = shown(model, out, found)
-                    if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
-                        recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
-                        if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
-                    }
-                }
-            }
-        }
+        shifts = listOf(0L to 0L)
+        heardFrames = 0
+        liveModel = if (transcribeLive) startLive(language) else null
+        feeding = liveModel != null
         // Saved as waiting for its transcript from the start, so a moment cut short by a crash is still transcribed.
         val lecture = fresh.copy(pendingTranscript = liveModel == null)
         store.save(lecture)
@@ -187,7 +263,7 @@ class LectureSession(
             settings.micInput,
         )
         wantedInput = settings.micInput
-        recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter)
+        recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter, transcribing = liveModel != null, canTranscribe = liveModel != null || liveAvailable(language))
         saving = scope.launch {
             while (isActive) {
                 delay(SAVE_EVERY_MILLIS)
@@ -286,7 +362,7 @@ class LectureSession(
      */
     private fun shown(model: LiveModel, out: LiveOutput, found: LiveSpeakers.State): Pair<List<Segment>, List<Speaker>> {
         val (lines, who) = labeled(model, out.copy(segments = withEdits(out.segments)), found)
-        return withEdits(lines) to who
+        return toAudio(withEdits(lines)) to who
     }
 
     private fun withEdits(lines: List<Segment>): List<Segment> =
@@ -373,11 +449,15 @@ class LectureSession(
         // What live speaker turns decided, for regrouping or tuning on this lecture later.
         liveModel?.let { m ->
             val found = m.liveSpeakers?.state?.value
-            if (found != null && found.stretches.isNotEmpty()) {
+            // Kept only when it heard the whole moment: its stretches are in heard time.
+            if (found != null && found.stretches.isNotEmpty() && r.lecture.liveOff.isEmpty() && recording.value?.lecture?.liveOff.isNullOrEmpty()) {
                 runCatching { store.saveLiveSpeakers(r.lecture, m.speakers?.model.orEmpty(), found.stretches, m.turns) }
             }
         }
-        val lecture = recording.value!!.lecture.copy(
+        val lecture = recording.value!!.lecture.let { l ->
+            // Still off at Stop: off to the end.
+            l.copy(liveOff = l.liveOff.map { if (it.toMillis == null) it.copy(toMillis = duration) else it })
+        }.copy(
             durationMillis = duration,
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenFlac,
             pendingAac = r.lecture.audioFile == AUDIO_WAV && settings.audioFormat == AudioFormat.WavThenAac,
@@ -386,6 +466,7 @@ class LectureSession(
         recording.value = null
         liveOutput.value = null
         liveModel = null
+        feeding = false
         return lecture
     }
 
