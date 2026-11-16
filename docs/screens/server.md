@@ -19,13 +19,14 @@ without a server.
   (always left to right), the phone's name on the server (the phone's model by default), **Check** (asks the server
   who the code is for without using it: "For hen on home.example:56398") and **Pair**. Errors in plain words: not an
   enrollment link, a wrong, expired or used code, too many tries, the server didn't answer.
-- **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands ("3 moments waiting · 120 MB left ·
-  12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"), counting the calls
-  waiting too ("2 moments and 64 calls waiting · …", "Every finished moment is on the server (917). 64 calls waiting ·
-  …"; before Nov 16, 2026 it said every moment was there while calls waited); "Sending now…" with a bar while a send
+- **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands: "n moments on the phone · m uploaded" (the moments recorded in Audio Logs that are on
+  the phone now, and how many of them went up; hen, Nov 17, 2026: the old "Every finished moment is on the server
+  (917)" counted every moment ever handed over, deleted ones and server recordings opened here included), then
+  "Waiting to upload: 2 moments · 64 calls · 279 MB left" while something waits; "Sending now…" with a bar while a send
   runs; the server didn't answer (trying again later) or no longer accepts this phone; moments the server refused, by
-  title; **Back up now**, or **Upload now** while something waits (also **Upload calls now** under Calls backup while
-  calls wait): it sends the queue in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
+  title; **Back up now**, or **Upload now** while something waits (one button for moments and calls, hen's call): from
+  the tap it says "Sending now…", sends what already waits first, then hands over new moments and calls and sends
+  those, in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
   the background work, which may be waiting out a retry or for Wi‑Fi; with Wi‑Fi only on and the phone on mobile data
   it asks first, with how much would go;
   **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a

@@ -88,6 +88,9 @@ data class ServerState(
     /** Call recordings handed over, and those of them still waiting to be sent. */
     val callsHanded: Int = 0,
     val callsWaiting: Int = 0,
+    /** Moments recorded in Audio Logs that are on the phone now, and how many of them are uploaded. */
+    val onPhone: Int = 0,
+    val uploaded: Int = 0,
     /** Bytes of the waiting calls not sent yet. */
     val callsBytesLeft: Long = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
@@ -689,13 +692,7 @@ class ServerBackup(
 
     /** One pass of shed's queue, from the app's background work. */
     suspend fun runUploads(): RunResult {
-        uploading = true
-        refresh()
-        val result = try {
-            shed.runUploads()
-        } finally {
-            uploading = false
-        }
+        val result = shed.runUploads()
         refresh(lastRun = result)
         if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
         return result
@@ -733,6 +730,12 @@ class ServerBackup(
     @kotlin.concurrent.Volatile
     private var uploading = false
 
+    /** Upload now is running in the app (from the tap until it ends): the screen says so at once. */
+    fun markUploading(on: Boolean) {
+        uploading = on
+        refresh()
+    }
+
     fun refresh(lastRun: RunResult? = _state.value.lastRun) {
         if (!::shed.isInitialized) return
         val paired = journal.state.value as? JournalState.Paired
@@ -740,6 +743,10 @@ class ServerBackup(
             momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == h.sha256 })
         }
         val waiting = byMoment.values.filterIsInstance<MomentBackup.Waiting>()
+        // What the screen counts (hen, Nov 17, 2026): the moments recorded here that are on the phone, and how many of
+        // them went up; not every moment ever handed over (deleted ones and the server's own recordings opened here
+        // were counted too).
+        val here = runCatching { store.index().filter { it.source == null } }.getOrDefault(emptyList())
         val mine = kept.moments.values.map { it.sha256 }.toSet()
         momentShas = mine
         val others = if (paired == null) emptyList() else serverMoments.window.value.files.filter { it.sha256 !in mine && it.sha256 !in kept.dismissed }
@@ -760,6 +767,8 @@ class ServerBackup(
             callsReadable = callsAt != null,
             callsHanded = kept.calls.size,
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
+            onPhone = here.size,
+            uploaded = here.count { byMoment[it.id] == MomentBackup.BackedUp },
             callsBytesLeft = shed.uploads.value.filter { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING }.sumOf { it.size - it.sent },
             uploading = uploading,
             showServer = kept.showServer,

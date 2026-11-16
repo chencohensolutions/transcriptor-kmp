@@ -716,12 +716,20 @@
     <string name="review_compare_close">סגירה</string>
     <string name="notebooks_versions">%1$d גרסאות</string>
     <!-- Backup: calls counted in the status, Upload now (Nov 16, 2026). -->
-    <string name="server_waiting_with_calls">%1$d רגעים ו־%2$d שיחות ממתינים · נשארו %3$s · %4$d רגעים בשרת</string>
-    <string name="server_calls_only_waiting">כל הרגעים שהסתיימו נמצאים בשרת (%3$d). %1$d שיחות ממתינות · נשארו %2$s.</string>
     <string name="server_uploading">שולח עכשיו…</string>
     <string name="server_upload_now">להעלות עכשיו</string>
-    <string name="server_calls_upload_now">להעלות שיחות עכשיו</string>
     <string name="server_mobile_title">להעלות דרך חבילת הגלישה?</string>
     <string name="server_mobile_note">הטלפון לא מחובר ל־Wi-Fi. כ־%1$s יישלחו עכשיו דרך חבילת הגלישה. ״רק ב־Wi-Fi״ נשאר דלוק להעלאות ברקע.</string>
     <string name="server_mobile_send">להעלות עכשיו</string>
+    <!-- Backup: moments on the phone and uploaded (Nov 17, 2026). -->
+    <string name="server_phone_counts">%1$d רגעים בטלפון · %2$d הועלו</string>
+    <string name="server_waiting_line">ממתינים להעלאה: %1$s · נשארו %2$s</string>
+    <plurals name="server_n_moments">
+        <item quantity="one">רגע אחד</item>
+        <item quantity="other">%d רגעים</item>
+    </plurals>
+    <plurals name="server_n_calls">
+        <item quantity="one">שיחה אחת</item>
+        <item quantity="other">%d שיחות</item>
+    </plurals>
 </resources>
