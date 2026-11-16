@@ -62,6 +62,31 @@ class ServerBackupTest {
     }
 
     @Test
+    fun anUploadIsRecordedAndShedForgetsIt() = runTest {
+        moment("a")
+        val backup = backup(paired = true)
+        backup.backUpFinished(emptySet())
+        backup.runUploads()
+        assertEquals(MomentBackup.BackedUp, backup.stateOf("a"))
+        // Recorded in backup.json: shed no longer lists it, and it still counts as uploaded.
+        assertEquals(emptyList(), backup.shedUploadsForTest())
+        assertEquals(MomentBackup.BackedUp, backup(paired = true).stateOf("a"))
+    }
+
+    @Test
+    fun oneHandedOverButNotOnTheServerIsHandedOverAgainAfterAsking() = runTest {
+        moment("a")
+        backup(paired = true).backUpFinished(emptySet())
+        // shed's list lost (as the week's pruning did): the app only knows it handed it over.
+        fs.delete(root / "shed" / "uploads.json")
+        val backup = backup(paired = true)
+        assertEquals(MomentBackup.Unconfirmed, backup.stateOf("a"))
+        backup.confirmWithServer()
+        assertEquals(MomentBackup.None, backup.stateOf("a"))
+        assertEquals(1, backup.backUpFinished(emptySet()))
+    }
+
+    @Test
     fun withoutAServerNothingIsHandedOver() = runTest {
         moment("a")
         val backup = backup(paired = false)
