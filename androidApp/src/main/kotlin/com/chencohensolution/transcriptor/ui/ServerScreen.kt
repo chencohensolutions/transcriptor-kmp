@@ -303,8 +303,10 @@ private fun FreeUpSection(state: ServerState, actions: ServerActions) {
     }
     result?.let { r ->
         Text(
-            if (r.stopped == null) stringResource(R.string.server_free_done, r.freed, modelsSize(r.bytes))
-            else stringResource(R.string.server_free_stopped, r.freed, r.stopped),
+            r.stopped.let { stopped ->
+                if (stopped == null) stringResource(R.string.server_free_done, r.freed, modelsSize(r.bytes))
+                else stringResource(R.string.server_free_stopped, r.freed, stopped)
+            },
             style = MaterialTheme.typography.bodySmall,
         )
     }
