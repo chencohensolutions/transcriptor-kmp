@@ -78,6 +78,10 @@ fun ServerSettings(onBack: () -> Unit) {
         )
     }
     var locks by remember { mutableStateOf(Recording.locks()) }
+    // The phone's call recordings folder, read only (Samsung keeps it out of the media store with a .nomedia).
+    val pickCalls = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        if (tree != null) scope.launch(Dispatchers.IO) { runCatching { Recording.chooseCallsFolder(context, tree) } }
+    }
     ServerScreen(
         state, pairing, Recording.shed.defaultDeviceName,
         ServerActions(
@@ -124,6 +128,8 @@ fun ServerSettings(onBack: () -> Unit) {
             setCacheLimit = { bytes -> scope.launch(Dispatchers.IO) { Recording.backup.setCacheLimit(bytes) } },
             planFreeUp = { rule -> withContext(Dispatchers.IO) { Recording.freeUpPlan(rule) } },
             freeUp = { ids, progress -> withContext(Dispatchers.IO) { Recording.freeUp(ids, progress) } },
+            chooseCallsFolder = { pickCalls.launch(null) },
+            stopCalls = { scope.launch(Dispatchers.IO) { Recording.stopCalls() } },
             unpair = {
                 scope.launch(Dispatchers.IO) {
                     com.chencohensolution.shed.android.ShedUploads.cancel(context)

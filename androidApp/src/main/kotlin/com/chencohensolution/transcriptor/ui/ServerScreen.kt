@@ -90,6 +90,10 @@ class ServerActions(
     val planFreeUp: suspend (FreeUpRule) -> FreeUpPlan = { FreeUpPlan(emptyList(), 0) },
     /** Removes the audio of these moments from the phone, once the server checked it holds it. */
     val freeUp: suspend (ids: List<String>, progress: (Int, Int) -> Unit) -> FreeUpResult = { _, _ -> FreeUpResult(0, 0) },
+    /** Opens the system's folder picker for the phone's call recordings folder. */
+    val chooseCallsFolder: () -> Unit = {},
+    /** Stops backing up calls (what was sent stays on the server). */
+    val stopCalls: () -> Unit = {},
 )
 
 /**
@@ -205,6 +209,8 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         Text(stringResource(R.string.server_show_private_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     HorizontalDivider()
+    CallsSection(state, actions)
+    HorizontalDivider()
     // Calls and voice messages behind the phone's lock, in the moments list and search (owner's request, Nov 16, 2026).
     Text(stringResource(R.string.server_lock), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
     ShowSwitch(R.string.server_lock_calls, R.string.server_lock_calls_note, locks.calls) { actions.setLocks(locks.copy(calls = it)) }
@@ -233,6 +239,30 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         confirmButton = { TextButton(onClick = { unpairing = false; actions.unpair() }) { Text(stringResource(R.string.server_unpair)) } },
         dismissButton = { TextButton(onClick = { unpairing = false }) { Text(stringResource(R.string.server_cancel)) } },
     )
+}
+
+/** Backing up the phone's call recordings: the folder picked, how many were handed over, or a button to pick one. */
+@Composable
+private fun CallsSection(state: ServerState, actions: ServerActions) {
+    Text(stringResource(R.string.server_calls), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    val folder = state.callsFolder
+    if (folder == null) {
+        Text(stringResource(R.string.server_calls_off), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FilledTonalButton(onClick = actions.chooseCallsFolder) { Text(stringResource(R.string.server_calls_choose)) }
+        return
+    }
+    Text(
+        when {
+            state.callsWaiting > 0 -> stringResource(R.string.server_calls_waiting, isolated(folder), state.callsWaiting)
+            else -> stringResource(R.string.server_calls_on, isolated(folder), state.callsHanded)
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = actions.chooseCallsFolder) { Text(stringResource(R.string.server_calls_change)) }
+        TextButton(onClick = actions.stopCalls) { Text(stringResource(R.string.server_calls_stop)) }
+    }
 }
 
 /** One switch of what Audio Logs shows from the server, with what it means. */

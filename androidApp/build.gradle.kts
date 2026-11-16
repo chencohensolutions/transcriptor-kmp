@@ -78,6 +78,8 @@ dependencies {
     // shed on Android: the device key in the Keystore, uploads with WorkManager.
     implementation("com.chencohensolution.shed:android:0.1.0")
     implementation(files(sherpaOnnx))
+    // The calls folder looked at now and then for new calls (CallsWorker).
+    implementation(libs.androidx.work.runtime)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

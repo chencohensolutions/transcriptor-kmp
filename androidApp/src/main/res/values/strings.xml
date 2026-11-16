@@ -630,6 +630,14 @@
         <item quantity="other">%1$d moments made private and removed from this phone</item>
     </plurals>
     <string name="server_show">What Audio Logs shows from the server</string>
+    <string name="server_calls">Back up calls</string>
+    <string name="server_calls_off">Send the phone\'s call recordings to the server. Pick the folder your phone records calls into (on Samsung: Recordings › Call).</string>
+    <string name="server_calls_choose">Choose the calls folder</string>
+    <string name="server_calls_on">From %1$s: %2$d calls backed up.</string>
+    <string name="server_calls_waiting">From %1$s: %2$d calls waiting to be sent.</string>
+    <string name="server_calls_note">New calls are sent as they come, whether or not this app shows calls. Nothing is deleted from the phone.</string>
+    <string name="server_calls_change">Change folder</string>
+    <string name="server_calls_stop">Stop</string>
     <string name="server_show_calls">Calls</string>
     <string name="server_show_calls_note">Recorded phone calls. Off: the server doesn\'t send them to this app.</string>
     <string name="server_show_voice">Voice messages</string>

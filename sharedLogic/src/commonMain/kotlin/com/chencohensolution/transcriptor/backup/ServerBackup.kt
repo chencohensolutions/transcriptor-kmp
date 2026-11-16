@@ -81,6 +81,11 @@ data class ServerState(
     /** Most bytes shed's cache keeps, and what it keeps now (as of [ServerBackup.refreshCache]). */
     val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
     val cacheBytes: Long = 0,
+    /** The folder of call recordings backed up, by its name; null when calls aren't backed up. */
+    val callsFolder: String? = null,
+    /** Call recordings handed over, and those of them still waiting to be sent. */
+    val callsHanded: Int = 0,
+    val callsWaiting: Int = 0,
 )
 
 /** How marking a moment private ended ([ServerBackup.makePrivate]). */
@@ -120,7 +125,17 @@ private data class BackupFileV1(
     val repaired: Boolean = false,
     /** The labels as they were at the last sync with the server's ([syncLabels]); null before the first. */
     val labelsBase: List<ServerLabel>? = null,
+    /** The phone's folder of call recordings backed up (Android: the picked tree's URI); null when calls aren't backed up. */
+    val callsFolder: String? = null,
+    /** That folder's name, as the phone shows it ("Call"). */
+    val callsFolderName: String? = null,
+    /** Call recordings handed to shed, by their path in that folder. */
+    val calls: Map<String, HandedCall> = emptyMap(),
 )
+
+/** A call recording handed to shed ([ServerBackup.backUpCalls]): its size and time then, and its sha256. */
+@Serializable
+private data class HandedCall(val size: Long, val modified: Long, val sha256: String)
 
 @Serializable
 private data class HandedOver(
@@ -175,6 +190,10 @@ class ServerBackup(
 
     /** Finds a handed-over moment's audio wherever the moment is now: shed asks when it sends it. */
     val locator = FileLocator { id ->
+        if (id.startsWith(CALL_REF)) {
+            val (fs, folder) = callsAt ?: return@FileLocator null
+            return@FileLocator Located(fs, folder / id.removePrefix(CALL_REF))
+        }
         val lecture = store.load(id) ?: return@FileLocator null
         Located(store.fileSystemOf(id), store.audioPath(lecture))
     }
@@ -235,7 +254,7 @@ class ServerBackup(
         shown = null
         shed.forgetRemote()
         serverMoments.clear()
-        save(kept.copy(moments = emptyMap(), dismissed = emptySet(), labelsBase = null))
+        save(kept.copy(moments = emptyMap(), dismissed = emptySet(), labelsBase = null, calls = emptyMap()))
         refresh()
     }
 
@@ -707,6 +726,92 @@ class ServerBackup(
             tuckedOnServer = others.count { it.tucked },
             cacheLimitBytes = kept.cacheLimitBytes,
             cacheBytes = cacheBytes,
+            callsFolder = kept.callsFolderName.takeIf { kept.callsFolder != null },
+            callsHanded = kept.calls.size,
+            callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
+        )
+    }
+
+    // Calls
+
+    /** The calls folder as the app reads it now ([useCallsFolder]): its file system and its root there. */
+    @kotlin.concurrent.Volatile
+    private var callsAt: Pair<FileSystem, Path>? = null
+
+    /** The calls folder kept ([chooseCallsFolder]), in the platform's words; null when calls aren't backed up. */
+    val callsFolder: String? get() = kept.callsFolder
+
+    /** The app reads the calls folder through [fileSystem] at [root] (null: it can't now, the access was taken back). */
+    fun useCallsFolder(fileSystem: FileSystem?, root: Path) {
+        callsAt = fileSystem?.let { it to root }
+    }
+
+    /**
+     * Backs up the call recordings in the folder the user picked ([folder] in the platform's words, [name] as the phone
+     * shows it); null stops (what was sent stays on the server). Calls are sent whether or not Audio Logs shows them.
+     */
+    fun chooseCallsFolder(folder: String?, name: String?) {
+        if (folder != kept.callsFolder) save(kept.copy(callsFolder = folder, callsFolderName = name.takeIf { folder != null }, calls = emptyMap()))
+        if (folder == null) callsAt = null
+        refresh()
+    }
+
+    /**
+     * Hands shed the call recordings in the calls folder not handed over yet, or changed since, to send as calls (files:
+     * not on the main thread). The server reads who each was with and when from its name. Nothing in the folder is
+     * changed or deleted. Returns how many were handed over.
+     */
+    suspend fun backUpCalls(): Int {
+        if (journal.state.value !is JournalState.Paired || kept.callsFolder == null) return 0
+        val (fs, root) = callsAt ?: return 0
+        val name = kept.callsFolderName ?: "Call"
+        val found = mutableMapOf<String, HandedCall>()
+        var handed = 0
+        val files = runCatching { fs.listRecursively(root).toList() }.getOrElse { return 0 }
+        for (path in files) {
+            if (path.name.startsWith(".") || path.name.substringAfterLast('.', "").lowercase() !in CALL_EXTENSIONS) continue
+            val meta = runCatching { fs.metadataOrNull(path) }.getOrNull() ?: continue
+            if (!meta.isRegularFile) continue
+            val size = meta.size ?: continue
+            if (size == 0L) continue
+            val modified = meta.lastModifiedAtMillis ?: 0L
+            val relative = path.relativeTo(root).toString()
+            val before = kept.calls[relative]
+            if (before != null && before.size == size && before.modified == modified) {
+                found[relative] = before
+                continue
+            }
+            val sha = runCatching { shed.put(path, aboutOfCall(path.name, modified, name), ref = CALL_REF + relative, from = fs) }.getOrNull() ?: continue
+            found[relative] = HandedCall(size, modified, sha)
+            handed++
+            // Kept as it goes: a run cut short doesn't hash these again.
+            if (handed % 25 == 0) mutex.withLock { save(kept.copy(calls = kept.calls + found)) }
+        }
+        mutex.withLock { if (kept.callsFolder != null) save(kept.copy(calls = found)) }
+        refresh()
+        return handed
+    }
+
+    /** What the server is told about a call recording; [modified] stands in for when it was until the server reads its name. */
+    private fun aboutOfCall(fileName: String, modified: Long, folder: String): FileAbout {
+        val mime = when (fileName.substringAfterLast('.').lowercase()) {
+            "m4a", "mp4" -> "audio/mp4"
+            "mp3" -> "audio/mpeg"
+            "amr" -> "audio/amr"
+            "3gp" -> "audio/3gpp"
+            "aac" -> "audio/aac"
+            "wav" -> "audio/wav"
+            "ogg", "opus" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            else -> "audio/mp4"
+        }
+        return FileAbout(
+            fileName = fileName,
+            mimeType = mime,
+            kind = FileKind.AUDIO,
+            takenAt = modified.takeIf { it > 0 }?.let { rfc3339(it, utcOffset(it)) },
+            source = "call",
+            folder = folder,
         )
     }
 
@@ -789,3 +894,9 @@ private const val TAIL = 256L * 1024
 
 /** The name of the labels in Audio Logs' own data on the server. */
 private const val LABELS = "labels"
+
+/** shed's ref for a call recording: this, then its path in the calls folder ([ServerBackup.locator]). */
+internal const val CALL_REF = "call:"
+
+/** The endings of sound files a phone's call recorder writes. */
+private val CALL_EXTENSIONS = setOf("m4a", "mp4", "mp3", "amr", "3gp", "aac", "wav", "ogg", "opus", "flac")

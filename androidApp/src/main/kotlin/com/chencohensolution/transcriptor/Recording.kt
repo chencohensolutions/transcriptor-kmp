@@ -645,6 +645,8 @@ object Recording {
     suspend fun backUp(context: android.content.Context) {
         runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
         if (backup.waiting() > 0) scheduleUploads(context)
+        // The calls folder, in the app's own scope: the first time it hashes every call there.
+        if (backup.callsFolder != null) syncScope.launch { backUpCalls(context) }
         // The newest page of the server's recordings, the labels, and the moments' words to the server: at most once a minute.
         val now = System.currentTimeMillis()
         // In the app's own scope: leaving a screen must not cut a sync off halfway (notes half sent, a delete half done).
@@ -655,6 +657,53 @@ object Recording {
     }
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val callsRunning = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Hands shed the new calls in the calls folder and schedules their sending (files: not on the main thread). A pass
+     * already running makes it return at once.
+     */
+    suspend fun backUpCalls(context: android.content.Context) {
+        if (!callsRunning.tryLock()) return
+        try {
+            if (backup.callsFolder != null) openCallsFolder()
+            runCatching { backup.backUpCalls() }.onFailure { android.util.Log.e("Recording", "backing up calls failed", it) }
+            if (backup.waiting() > 0) scheduleUploads(context)
+        } finally {
+            callsRunning.unlock()
+        }
+    }
+
+    /** The calls folder kept, read through its picked tree while the app still may; else none until picked again. */
+    private fun openCallsFolder() {
+        val folder = backup.callsFolder?.let(Uri::parse)
+        val allowed = folder != null && resolver.persistedUriPermissions.any { it.uri == folder && it.isReadPermission }
+        backup.useCallsFolder(if (allowed) SafFileSystem(resolver, folder!!) else null, LIBRARY_ROOT)
+    }
+
+    /** Backs up the calls in the folder the user picked ([tree], from the system's folder picker), reading it only. */
+    fun chooseCallsFolder(context: android.content.Context, tree: Uri) {
+        resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        releaseCallsFolder(except = tree)
+        backup.chooseCallsFolder(tree.toString(), runCatching { SafFileSystem(resolver, tree).name }.getOrNull())
+        openCallsFolder()
+        syncScope.launch { backUpCalls(context) }
+    }
+
+    /** Stops backing up calls; what was sent stays on the server, and the phone keeps its calls. */
+    fun stopCalls() {
+        releaseCallsFolder(except = null)
+        backup.chooseCallsFolder(null, null)
+    }
+
+    /** Gives back the read permission of the calls folder kept, unless it is [except] or the lectures folder's tree. */
+    private fun releaseCallsFolder(except: Uri?) {
+        val old = backup.callsFolder?.let(Uri::parse) ?: return
+        if (old == except) return
+        val lectures = settings.lectureFolder?.let(Uri::parse)?.let { DocumentsContract.buildTreeDocumentUri(it.authority, DocumentsContract.getTreeDocumentId(it)) }
+        if (old == lectures) return
+        runCatching { resolver.releasePersistableUriPermission(old, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    }
     private val syncing = kotlinx.coroutines.sync.Mutex()
 
     @Volatile private var lastServerSync = 0L
@@ -759,6 +808,8 @@ object Recording {
         backup = ServerBackup(store, FileSystem.SYSTEM, root, utcOffset)
         shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator, listedKinds = setOf(com.chencohensolution.shed.FileKind.AUDIO))
         backup.attach(shed.shed, shed.journal)
+        openCallsFolder()
+        CallsWorker.schedule(app)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
         npuGuard = NpuLoadGuard(installedModels, log = { android.util.Log.i("NpuLoadGuard", it) }) {

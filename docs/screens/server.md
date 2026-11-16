@@ -24,7 +24,11 @@ without a server.
   answer (trying again later) or no longer accepts this phone; moments the server refused, by title; **Back up now**;
   **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
-  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Behind your fingerprint**: **Lock calls** and **Lock voice messages**
+  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Back up
+  calls** (Nov 16, 2026: Audio Logs, not the journal app, backs calls up): **Choose the calls folder** opens the
+  system's folder picker (Samsung: Recordings › Call, which has a `.nomedia`), read only; then "From Call: 1,420 calls
+  backed up" or "… waiting to be sent", that new calls are sent whether or not the app shows calls and nothing is
+  deleted from the phone, **Change folder** and **Stop**; **Behind your fingerprint**: **Lock calls** and **Lock voice messages**
   (kept on this phone), and that a label can be locked too; **Free up
   space**: rule chips (Everything backed up, Older than 3 months, Older than 12 months, Keep the newest 10 GB), what
   it would free ("12 moments, 3.2 GB"), a **Free up …** button, its progress and result; **Cache on this phone**: how
@@ -32,6 +36,12 @@ without a server.
   the phone).
 
 ## How it behaves
+
+- Calls: each backup pass (the app opening, a moment finishing, Back up now) and `CallsWorker` every 3 hours hand
+  shed the sound files in the calls folder not handed over yet, or changed (`ServerBackup.backUpCalls`, kept by path,
+  size and time in `backup.json`), with source `call` and the folder's name; shed finds them by the ref
+  `call:<path>` when it sends. The server reads who and when from each name. Calls the server already has (from the
+  journal app, which backed them up before) are answered "exists" and not sent again.
 
 - Nothing is handed over or sent until the user pairs. Pairing makes a key in the Android Keystore (StrongBox when
   there is one) and enrolls Audio Logs as a device of its own with the app name `audio-logs`, so the server shows it

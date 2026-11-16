@@ -94,6 +94,36 @@ class ServerBackupTest {
     }
 
     @Test
+    fun callsInThePickedFolderAreSentOnceAsCallsAndNothingIsDeleted() = runTest {
+        val calls = "/sdcard/Recordings/Call".toPath()
+        fs.createDirectories(calls / "old")
+        fs.write(calls / "Call recording Dana_251116_101500.m4a") { writeUtf8("call one") }
+        fs.write(calls / "old" / "Call recording Avi_240101_090000.m4a") { writeUtf8("call two") }
+        fs.write(calls / ".nomedia") {}
+        fs.write(calls / "notes.txt") { writeUtf8("not a call") }
+        val backup = backup(paired = true)
+        backup.useCallsFolder(fs, calls)
+        assertEquals(0, backup.backUpCalls(), "not picked yet")
+        backup.chooseCallsFolder("content://tree/Call", "Call")
+        assertEquals(2, backup.backUpCalls())
+        assertEquals(0, backup.backUpCalls(), "handed over once")
+        assertEquals(2, backup.state.value.callsWaiting)
+        assertEquals(RunResult.Done(sent = 2, refused = 0), backup.runUploads())
+        assertEquals(setOf("call one", "call two"), server.files.values.map { it.decodeToString() }.toSet())
+        assertEquals(listOf("call", "call"), server.abouts.values.map { it.source })
+        assertEquals("Call", server.abouts.values.first().folder)
+        assertTrue(fs.exists(calls / "old" / "Call recording Avi_240101_090000.m4a"), "the phone keeps its calls")
+        assertEquals("Call", backup.state.value.callsFolder)
+        assertEquals(2, backup.state.value.callsHanded)
+        // A new call later: only it is sent.
+        fs.write(calls / "Call recording Dana_251117_101500.m4a") { writeUtf8("call three") }
+        assertEquals(1, backup.backUpCalls())
+        backup.chooseCallsFolder(null, null)
+        assertEquals(0, backup.backUpCalls())
+        assertEquals(null, backup.state.value.callsFolder)
+    }
+
+    @Test
     fun aMomentIsDeletedOnlyOnceTheServerKeepsItPrivate() = runTest {
         moment("a")
         assertEquals(PrivateResult.NotPaired, backup(paired = false).makePrivate("a", emptySet()))
@@ -265,11 +295,14 @@ private object PairedKeys : DeviceKeys {
 /** A storage in memory. */
 private class MemoryStorage : ShedBackend {
     val files = mutableMapOf<String, ByteArray>()
+    val abouts = mutableMapOf<String, FileAbout>()
     private val partial = mutableMapOf<String, ByteArray>()
     override val capabilities = Capabilities(changeList = true)
 
-    override suspend fun startUpload(sha256: String, size: Long, about: FileAbout): UploadStart =
-        if (sha256 in files) UploadStart.Exists else UploadStart.Ready(partial[sha256]?.size?.toLong() ?: 0, 4)
+    override suspend fun startUpload(sha256: String, size: Long, about: FileAbout): UploadStart {
+        abouts[sha256] = about
+        return if (sha256 in files) UploadStart.Exists else UploadStart.Ready(partial[sha256]?.size?.toLong() ?: 0, 4)
+    }
 
     override suspend fun sendPiece(sha256: String, offset: Long, bytes: ByteArray, total: Long): PieceAnswer {
         val have = partial[sha256] ?: ByteArray(0)
