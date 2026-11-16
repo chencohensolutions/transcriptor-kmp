@@ -735,11 +735,8 @@ object Recording {
         return ids
     }
 
-    /** Puts a label's moments behind the phone's lock, or takes them out; the Calls label is Settings' Lock calls too. */
-    fun setLabelLocked(id: String, locked: Boolean) {
-        if (id == com.chencohensolution.transcriptor.notebook.CALLS_LABEL) settings.lockCalls = locked
-        library.setLabelLocked(id, locked)
-    }
+    /** Puts a label's moments behind the phone's lock, or takes them out. */
+    fun setLabelLocked(id: String, locked: Boolean) = library.setLabelLocked(id, locked)
 
     /** Whether calls and voice messages are behind the phone's lock (Settings › Server backup). */
     fun locks() = com.chencohensolution.transcriptor.notebook.Locks(settings.lockCalls, settings.lockVoiceMessages)
@@ -748,10 +745,7 @@ object Recording {
     fun setLocks(locks: com.chencohensolution.transcriptor.notebook.Locks) {
         settings.lockCalls = locks.calls
         settings.lockVoiceMessages = locks.voiceMessages
-        // The Calls label's Needs fingerprint is the same switch.
-        if (library.library.value.labels.any { it.id == com.chencohensolution.transcriptor.notebook.CALLS_LABEL }) {
-            library.setLabelLocked(com.chencohensolution.transcriptor.notebook.CALLS_LABEL, locks.calls)
-        } else library.locksChanged()
+        library.locksChanged()
     }
 
     /** The moment's whole audio on the phone, brought from the server when it is there only: before a pass reads it. */
@@ -789,7 +783,7 @@ object Recording {
         // Notebooks became labels: the app's own storage moves now (quick: one folder rename per moment); the
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
-        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks, callsLabel = { app.getString(R.string.label_calls) },
+        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks,
             onServer = { if (backup.state.value.paired == null) null else { id -> backup.stateOf(id) is com.chencohensolution.transcriptor.backup.MomentBackup.BackedUp } })
         // A backup done, or the pairing changed: the marks again.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { backup.state.collect { runCatching { library.locksChanged() } } }

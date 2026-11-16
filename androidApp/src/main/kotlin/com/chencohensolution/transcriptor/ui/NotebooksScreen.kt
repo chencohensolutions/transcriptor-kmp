@@ -107,7 +107,7 @@ import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.Label
-import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
+import com.chencohensolution.transcriptor.notebook.isCall
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.NotebooksState
 import com.chencohensolution.transcriptor.notebook.RecordingNow
@@ -266,7 +266,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
     var creating by remember { mutableStateOf(false) }
 
     val guessed = state.guess?.labels.orEmpty().filter { id -> state.labels.any { it.id == id } }
-    val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL && it != CALLS_LABEL }?.let { listOf(it) } ?: guessed)
+    val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL && it != CALLS_FILTER }?.let { listOf(it) } ?: guessed)
     val labelsById = state.labels.associateBy { it.id }
     val unlabeled = state.moments.filter { it.labels.isEmpty() }
     fun groupOf(m: LectureSummary): Int {
@@ -280,6 +280,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
     fun inFilter(m: LectureSummary) = when (filter) {
         null -> true
         NO_LABEL -> m.labels.isEmpty()
+        CALLS_FILTER -> isCall(m.source)
         else -> filter in m.labels
     }
     val shown = state.moments.filter(::inFilter).groupBy(::groupOf)
@@ -420,8 +421,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                         }
                                     }
                                     LabelsMenu(
-                                        // Calls is for calls: not a label to record under.
-                                        expanded = choosingLabels, labels = state.labels.filter { it.id != CALLS_LABEL }, checked = nextLabels.toSet(), guessed = guessed.toSet(),
+                                        expanded = choosingLabels, labels = state.labels, checked = nextLabels.toSet(), guessed = guessed.toSet(),
                                         onDismiss = { choosingLabels = false },
                                         onNone = { chosen = emptyList(); choosingLabels = false },
                                         onToggle = { id -> chosen = if (id in nextLabels) nextLabels - id else nextLabels + id },
@@ -515,6 +515,14 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                             )
                         }
                     }
+                    // Calls, by their type (not a label): when there are any.
+                    if (all.moments.any { isCall(it.source) }) item {
+                        FilterChip(
+                            selected = filter == CALLS_FILTER, onClick = { filter = if (filter == CALLS_FILTER) null else CALLS_FILTER; chosen = null },
+                            label = { Text(stringResource(R.string.label_calls)) }, leadingIcon = { Icon(Icons.Filled.Call, null, Modifier.size(16.dp)) },
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                     items(state.labels, key = { it.id }) { l ->
                         FilterChip(
                             selected = filter == l.id, onClick = { filter = if (filter == l.id) null else l.id; chosen = null },
@@ -578,6 +586,9 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
 }
 
 private const val NO_LABEL = "-"
+
+/** The filter for calls, by their type. */
+private const val CALLS_FILTER = "~calls"
 
 /** Pages in a row that added no row before the list stops reading on by itself. */
 private const val EMPTY_PAGES = 3

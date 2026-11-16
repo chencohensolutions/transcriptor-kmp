@@ -42,9 +42,8 @@ data class Locks(val calls: Boolean = false, val voiceMessages: Boolean = false)
 fun isCall(source: String?): Boolean = source.equals("call", ignoreCase = true)
 
 /**
- * The label every call has, made the first time a call is in the list (with the same id on every phone, so the
- * server's copy of the labels merges them): calls are told apart from recordings, and its Needs fingerprint hides
- * them. It is never written into a moment: a call has it while it is a call.
+ * The Calls label builds of Nov 16, 2026 made for every call: dropped (hen's call, Nov 16) since a call shows its call
+ * icon, the list filters calls by their type, and Settings' Lock calls hides them. Deleted from the labels once.
  */
 const val CALLS_LABEL = "calls"
 
@@ -147,8 +146,6 @@ class NotebooksController(
     private val defaultLanguage: () -> String = { "en" },
     /** Whether calls and voice messages are behind the phone's lock (Settings). */
     private val locks: () -> Locks = { Locks() },
-    /** The Calls label's name in the phone's language ([CALLS_LABEL]); null: calls get no label. */
-    private val callsLabel: () -> String? = { null },
     /** Whether a moment is backed up on the server; null while the phone isn't paired with one (then no mark at all). */
     private val onServer: () -> ((String) -> Boolean)? = { null },
 ) {
@@ -161,6 +158,10 @@ class NotebooksController(
         local = all.map { it.summary().copy(audioOnServer = it.serverSha256 != null && !it.hasAudio) }
         localLanguage = all.firstOrNull()?.language
         known = labels.all()
+        if (known.any { it.id == CALLS_LABEL }) {
+            runCatching { labels.delete(CALLS_LABEL) }
+            known = labels.all()
+        }
         compose()
         lectures.saveIndex()
     }
@@ -181,11 +182,6 @@ class NotebooksController(
     }
 
     private fun compose() {
-        val name = callsLabel()
-        if (name != null && known.none { it.id == CALLS_LABEL } && (local.any { isCall(it.source) } || server.moments.any { isCall(it.source) })) {
-            runCatching { labels.ensure(CALLS_LABEL, name, now(), locks().calls) }
-            known = labels.all()
-        }
         val ids = known.map { it.id }.toSet()
         val backedUp = onServer()
         val lockedLabels = known.filter { it.locked }.map { it.id }.toSet()
@@ -200,10 +196,7 @@ class NotebooksController(
         val moments = (mine + server.moments.filter { it.id !in hereIds }).sortedByDescending { it.startedAtMillis }
         _library.value = Library(
             labels = known,
-            moments = moments.map { s ->
-                val withCall = if (isCall(s.source) && CALLS_LABEL in ids && CALLS_LABEL !in s.labels) s.labels + CALLS_LABEL else s.labels
-                s.copy(labels = withCall.filter { l -> l in ids }).let { it.copy(locked = locked(it)) }
-            },
+            moments = moments.map { s -> s.copy(labels = s.labels.filter { l -> l in ids }, locked = locked(s)) },
             lastLanguage = localLanguage ?: defaultLanguage(),
             serverOlder = server.older,
             serverNewer = server.newer,

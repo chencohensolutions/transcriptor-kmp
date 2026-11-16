@@ -96,20 +96,17 @@ class NotebooksTest {
     }
 
     @Test
-    fun everyCallHasTheCallsLabelWhoseFingerprintHidesThem() {
+    fun theCallsLabelOfEarlierBuildsIsDroppedAndCallsAreLockedByTheirType() {
+        labels.ensure(CALLS_LABEL, "Calls", 1)
         lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
         lectures.save(lecture("c", 2_000).copy(title = "A call", source = "Call"))
-        val controller = NotebooksController(labels, lectures, now = { 4_000 }, callsLabel = { "Calls" })
+        var locks = Locks()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, locks = { locks })
         controller.reload()
-        assertEquals(listOf(CALLS_LABEL), labels.all().map { it.id })
-        assertEquals(mapOf("a" to emptyList(), "c" to listOf(CALLS_LABEL)), controller.library.value.moments.associate { it.id to it.labels })
-        // Never written into the moment itself.
-        assertEquals(emptyList(), lectures.load("c")!!.labels)
-        controller.setLabelLocked(CALLS_LABEL, true)
+        assertEquals(emptyList(), labels.all().map { it.id })
+        locks = Locks(calls = true)
+        controller.locksChanged()
         assertEquals(mapOf("a" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
-        // A server's call gets it too.
-        controller.setServer(ServerPart(listOf(lecture("s", 3_000).copy(source = "call").summary())))
-        assertEquals(listOf(CALLS_LABEL), controller.library.value.moments.first { it.id == "s" }.labels)
     }
 
     @Test
