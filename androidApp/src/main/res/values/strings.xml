@@ -643,6 +643,9 @@
     <string name="server_calls_stop_title">Stop sending calls?</string>
     <string name="server_calls_stop_note">Calls already on the server stay there, and the phone keeps its calls.</string>
     <string name="server_calls_stop">Stop</string>
+    <string name="server_show_server">Recordings from the server</string>
+    <string name="server_show_server_on">The list shows the server\'s recordings too: from other phones, calls and recorders.</string>
+    <string name="server_show_server_off">The list shows only what you recorded in Audio Logs. Backup goes on.</string>
     <string name="server_show_calls_backed_up">Hidden here, still backed up.</string>
     <string name="server_show_calls">Calls</string>
     <string name="server_show_calls_note">Recorded phone calls. Off: the server doesn\'t send them to this app.</string>

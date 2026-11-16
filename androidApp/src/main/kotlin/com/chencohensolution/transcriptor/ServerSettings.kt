@@ -115,6 +115,7 @@ fun ServerSettings(onBack: () -> Unit) {
                 }
             },
             backUpNow = { scope.launch(Dispatchers.IO) { Recording.backUp(context); Recording.refreshServerMoments() } },
+            setShowServer = { on -> scope.launch(Dispatchers.IO) { Recording.backup.setShowServer(on) } },
             setShown = { shown ->
                 scope.launch(Dispatchers.IO) {
                     runCatching { Recording.backup.setShown(shown) }

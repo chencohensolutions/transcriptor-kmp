@@ -43,7 +43,8 @@ The code still calls it `NotebooksScreen`.
   its Play button spins while the first blocks come. Back from a moment or Settings finds the list where it was.
   The list reads the moments' index (`moments-index.json` in the app's storage, `LectureStore.index`), not every
   moment's folder; the folders are read again once each start (`rescan`). The server's list kept on the phone is
-  shown at once on start, before the server answers.
+  shown at once on start, before the server answers. Settings › Server backup › **Recordings from the server** off leaves them all out (and moments from a
+  recorder or a call kept here), in the list and in search.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

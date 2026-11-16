@@ -88,6 +88,11 @@ data class ServerState(
     /** Call recordings handed over, and those of them still waiting to be sent. */
     val callsHanded: Int = 0,
     val callsWaiting: Int = 0,
+    /**
+     * The moments list shows the server's recordings (owner's call, Nov 16, 2026); off, it shows only what Audio Logs
+     * recorded on this phone. A choice of this phone only: backup goes on either way.
+     */
+    val showServer: Boolean = true,
 )
 
 /** How marking a moment private ended ([ServerBackup.makePrivate]). */
@@ -133,6 +138,8 @@ private data class BackupFileV1(
     val callsFolderName: String? = null,
     /** Call recordings handed to shed, by their path in that folder. */
     val calls: Map<String, HandedCall> = emptyMap(),
+    /** The moments list shows the server's recordings (Settings › Server backup); off: only what Audio Logs recorded here. */
+    val showServer: Boolean = true,
 )
 
 /** A call recording handed to shed ([ServerBackup.backUpCalls]): its size and time then, and its sha256. */
@@ -187,7 +194,7 @@ class ServerBackup(
     private var kept: BackupFileV1 = load()
     private lateinit var shed: Shed
     private lateinit var journal: JournalBackend
-    private val _state = MutableStateFlow(ServerState(wifiOnly = kept.wifiOnly))
+    private val _state = MutableStateFlow(ServerState(wifiOnly = kept.wifiOnly, showServer = kept.showServer))
     val state: StateFlow<ServerState> = _state.asStateFlow()
 
     /** Finds a handed-over moment's audio wherever the moment is now: shed asks when it sends it. */
@@ -238,6 +245,12 @@ class ServerBackup(
 
     fun setWifiOnly(on: Boolean) {
         save(kept.copy(wifiOnly = on))
+        refresh()
+    }
+
+    /** Shows the server's recordings in the moments list, or only what Audio Logs recorded here ([ServerState.showServer]). */
+    fun setShowServer(on: Boolean) {
+        save(kept.copy(showServer = on))
         refresh()
     }
 
@@ -732,6 +745,7 @@ class ServerBackup(
             callsReadable = callsAt != null,
             callsHanded = kept.calls.size,
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
+            showServer = kept.showServer,
         )
     }
 

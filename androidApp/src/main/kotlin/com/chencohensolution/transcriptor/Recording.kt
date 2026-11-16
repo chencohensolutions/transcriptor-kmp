@@ -830,7 +830,11 @@ object Recording {
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
         library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks,
             onServer = { if (backup.state.value.paired == null) null else { id -> backup.stateOf(id) is com.chencohensolution.transcriptor.backup.MomentBackup.BackedUp } },
-            shown = { backup.state.value.shown?.let { com.chencohensolution.transcriptor.notebook.Shown(it.calls, it.voiceMessages) } ?: com.chencohensolution.transcriptor.notebook.Shown() })
+            shown = {
+                val state = backup.state.value
+                val kinds = state.shown
+                com.chencohensolution.transcriptor.notebook.Shown(kinds?.calls ?: true, kinds?.voiceMessages ?: true, server = state.paired == null || state.showServer)
+            })
         // A backup done, or the pairing changed: the marks again.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { backup.state.collect { runCatching { library.locksChanged() } } }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
