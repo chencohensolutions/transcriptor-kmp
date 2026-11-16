@@ -720,7 +720,6 @@
     <string name="server_calls_only_waiting">כל הרגעים שהסתיימו נמצאים בשרת (%3$d). %1$d שיחות ממתינות · נשארו %2$s.</string>
     <string name="server_uploading">שולח עכשיו…</string>
     <string name="server_upload_now">להעלות עכשיו</string>
-    <string name="server_calls_upload_now">להעלות שיחות עכשיו</string>
     <string name="server_mobile_title">להעלות דרך חבילת הגלישה?</string>
     <string name="server_mobile_note">הטלפון לא מחובר ל־Wi-Fi. כ־%1$s יישלחו עכשיו דרך חבילת הגלישה. ״רק ב־Wi-Fi״ נשאר דלוק להעלאות ברקע.</string>
     <string name="server_mobile_send">להעלות עכשיו</string>

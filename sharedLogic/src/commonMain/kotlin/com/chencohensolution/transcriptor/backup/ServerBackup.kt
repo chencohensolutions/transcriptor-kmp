@@ -689,13 +689,7 @@ class ServerBackup(
 
     /** One pass of shed's queue, from the app's background work. */
     suspend fun runUploads(): RunResult {
-        uploading = true
-        refresh()
-        val result = try {
-            shed.runUploads()
-        } finally {
-            uploading = false
-        }
+        val result = shed.runUploads()
         refresh(lastRun = result)
         if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
         return result
@@ -732,6 +726,12 @@ class ServerBackup(
     /** The state again from shed, the pairing and what was handed over. */
     @kotlin.concurrent.Volatile
     private var uploading = false
+
+    /** Upload now is running in the app (from the tap until it ends): the screen says so at once. */
+    fun markUploading(on: Boolean) {
+        uploading = on
+        refresh()
+    }
 
     fun refresh(lastRun: RunResult? = _state.value.lastRun) {
         if (!::shed.isInitialized) return

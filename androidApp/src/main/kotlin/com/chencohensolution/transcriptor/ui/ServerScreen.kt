@@ -288,8 +288,6 @@ private fun CallsSection(state: ServerState, actions: ServerActions) {
         Switch(checked = folder != null, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
     if (folder != null) {
-        // The waiting calls sent now, from here too, where they are counted.
-        if (state.callsReadable && state.callsWaiting > 0) BackUpNowButton(state, actions, R.string.server_calls_upload_now)
         Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = actions.chooseCallsFolder) {
             Text(stringResource(if (state.callsReadable) R.string.server_calls_change else R.string.server_calls_allow))

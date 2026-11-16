@@ -664,10 +664,21 @@ object Recording {
      * background work is scheduled again for what is left.
      */
     fun uploadNow(context: android.content.Context) {
+        if (backup.state.value.uploading) return
+        backup.markUploading(true)
         syncScope.launch {
-            runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
-            if (backup.callsFolder != null) backUpCalls(context)
-            runCatching { backup.runUploads() }.onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+            try {
+                // What already waits goes first: reading the calls folder for new calls can take a while.
+                android.util.Log.i("Recording", "upload now: ${backup.waiting()} waiting")
+                runCatching { backup.runUploads() }.onSuccess { android.util.Log.i("Recording", "upload now: $it") }
+                    .onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+                runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
+                if (backup.callsFolder != null) backUpCalls(context)
+                if (backup.waiting() > 0) runCatching { backup.runUploads() }.onSuccess { android.util.Log.i("Recording", "upload now, new: $it") }
+                    .onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+            } finally {
+                backup.markUploading(false)
+            }
             if (backup.waiting() > 0) scheduleUploads(context)
             refreshServerMoments()
         }

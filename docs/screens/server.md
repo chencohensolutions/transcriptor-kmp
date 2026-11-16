@@ -24,8 +24,9 @@ without a server.
   waiting too ("2 moments and 64 calls waiting · …", "Every finished moment is on the server (917). 64 calls waiting ·
   …"; before Nov 16, 2026 it said every moment was there while calls waited); "Sending now…" with a bar while a send
   runs; the server didn't answer (trying again later) or no longer accepts this phone; moments the server refused, by
-  title; **Back up now**, or **Upload now** while something waits (also **Upload calls now** under Calls backup while
-  calls wait): it sends the queue in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
+  title; **Back up now**, or **Upload now** while something waits (one button for moments and calls, hen's call): from
+  the tap it says "Sending now…", sends what already waits first, then hands over new moments and calls and sends
+  those, in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
   the background work, which may be waiting out a retry or for Wi‑Fi; with Wi‑Fi only on and the phone on mobile data
   it asks first, with how much would go;
   **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
