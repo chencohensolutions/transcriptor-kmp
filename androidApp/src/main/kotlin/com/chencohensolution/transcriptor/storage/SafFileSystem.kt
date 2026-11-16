@@ -113,7 +113,12 @@ class SafFileSystem(private val resolver: ContentResolver, private val tree: Uri
         forget(path)
     }
 
-    override fun openReadOnly(file: Path): FileHandle = throw UnsupportedOperationException("the lectures folder is read as streams")
+    /**
+     * A file of the folder read at any offset (shed's uploads read a piece at a time, resuming where the server is):
+     * through its file descriptor's channel. Before Nov 16, 2026 this threw, and every upload run stopped at the first
+     * call from the calls folder.
+     */
+    override fun openReadOnly(file: Path): FileHandle = DescriptorHandle(openFd(file, "r"))
     override fun openReadWrite(file: Path, mustCreate: Boolean, mustExist: Boolean): FileHandle = throw UnsupportedOperationException("the lectures folder is written as streams")
     override fun createSymlink(source: Path, target: Path) = throw UnsupportedOperationException("no links in the lectures folder")
 
@@ -156,4 +161,30 @@ class SafFileSystem(private val resolver: ContentResolver, private val tree: Uri
     )?.use { c ->
         buildList { while (c.moveToNext()) add(Doc(c.getString(0), c.getString(1), c.getString(2), c.getLong(3), c.getLong(4))) }
     } ?: emptyList()
+}
+
+/** A read-only [FileHandle] over a document's file descriptor, read with positional reads. */
+private class DescriptorHandle(private val fd: ParcelFileDescriptor) : FileHandle(readWrite = false) {
+    private val input = java.io.FileInputStream(fd.fileDescriptor)
+    private val channel = input.channel
+
+    override fun protectedRead(fileOffset: Long, array: ByteArray, arrayOffset: Int, byteCount: Int): Int {
+        val buffer = java.nio.ByteBuffer.wrap(array, arrayOffset, byteCount)
+        var read = 0
+        while (buffer.hasRemaining()) {
+            val n = channel.read(buffer, fileOffset + read)
+            if (n < 0) break
+            read += n
+        }
+        return if (read == 0 && byteCount > 0) -1 else read
+    }
+
+    override fun protectedSize(): Long = channel.size()
+    override fun protectedWrite(fileOffset: Long, array: ByteArray, arrayOffset: Int, byteCount: Int) = throw IOException("read only")
+    override fun protectedFlush() = Unit
+    override fun protectedResize(size: Long) = throw IOException("read only")
+    override fun protectedClose() {
+        runCatching { input.close() }
+        fd.close()
+    }
 }
