@@ -123,12 +123,13 @@ class MainActivity : ComponentActivity() {
                         openLecture(lecture.id)
                     }
                 }
-                // The lists again when a lecture stops, one closes, or a pass on one ends; and finished lectures move
-                // to the lectures folder.
+                // The lists again when a lecture stops, one closes, or a pass on one ends; finished lectures are handed
+                // to the server backup (when paired) and move to the lectures folder.
                 LaunchedEffect(live == null, opened == null, working.keys) {
                     withContext(Dispatchers.IO) {
                         Recording.migrateLibrary()
                         Recording.library.reload()
+                        Recording.backUp(this@MainActivity)
                         runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
                     }
                 }

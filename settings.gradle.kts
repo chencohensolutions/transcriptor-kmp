@@ -29,3 +29,7 @@ dependencyResolutionManagement {
 
 include(":androidApp")
 include(":sharedLogic")
+
+// shed (github.com/chencohensolutions/shed-kmp, the submodule shed/): backing up moments to the journal server.
+// `git submodule update --init` after cloning.
+includeBuild("shed")

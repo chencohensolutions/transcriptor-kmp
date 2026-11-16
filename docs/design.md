@@ -295,6 +295,24 @@ live and for the refine pass; other phones keep whisper.cpp on the CPU. On a 41-
 fast as the CPU and used about a fifth of the energy. ivrit.ai large-v3 has an NPU build too (Nov 5), for the refine pass only. Its files and the QNN-enabled sherpa-onnx AAR are ours to
 publish (owner: on Hugging Face); not yet. Details and next steps: [npu-plan.md](npu-plan.md).
 
+### Server backup (owner's request, Nov 16, 2026)
+
+Audio Logs works on the phone alone; a server is optional. Paired with the owner's journal server (Settings › Server
+backup, [screens/server.md](screens/server.md)), it backs up each finished moment's audio through **shed**
+([shed-kmp](https://github.com/chencohensolutions/shed-kmp), the submodule `shed/`, `includeBuild`), the storage
+library the journal app will share:
+
+- Audio Logs asks shed to upload; nothing else watches its folders. The audio goes as it is kept (FLAC, AAC, or WAV,
+  which the server keeps as FLAC), as a sound recording (`kind` AUDIO, source `recording`) with the moment's title as
+  its file name, when it started (with the phone's offset) and its length. Notes, lines and `lecture.json` stay on the
+  phone for now.
+- The app enrolls as its own device, `audio-logs` (journal-server-go from Nov 16, 2026, `serverInfo.deviceApps`): a
+  device of Audio Logs sees sound recordings, which the server hides from other devices by default.
+- What was handed over is in `backup.json` (version 1, in the app's storage): moment id → the audio's sha256 and file.
+  Shed keeps its own queue, cache and the server's list under `files/shed/`; its key is in the Keystore.
+- The server's recordings that aren't moments here are listed on the Server page; showing them as moments without
+  metadata (metadata added later) is the next step.
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.

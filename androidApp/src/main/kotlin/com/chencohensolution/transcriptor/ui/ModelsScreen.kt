@@ -150,6 +150,8 @@ data class ModelsState(
     /** Stop asks for a second tap, in the app and on the tile ([com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
     val stopTwice: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
+    /** Settings › Server backup's line: off, or on to which server and how many moments wait. */
+    val server: String = "",
     /** The voice-print model speaker labels use (its id; [Recording.voiceModel]); null without one. */
     val voiceModel: String? = null,
     /** The voice-print models with an NPU build for this phone in their folder. */
@@ -256,6 +258,7 @@ class ModelsActions(
     val setLevelMeter: (LevelMeterStyle) -> Unit = {},
     val setMicInput: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
     val chooseFolder: () -> Unit = {},
+    val openServer: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
     /** Searches Hugging Face, in a language (null: any), of a kind (null: all), and only this phone's NPU builds. */
@@ -421,6 +424,7 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             SectionTitle(stringResource(R.string.settings_storage))
             Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp))
             LecturesFolder(state.folder, actions.chooseFolder)
+            NavRow(stringResource(R.string.server_title), state.server, actions.openServer)
             NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
             MicrophoneRow(state, actions.setMicInput)
             SwitchRow(

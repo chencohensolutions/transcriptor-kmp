@@ -26,9 +26,14 @@ update those docs whenever a screen changes.
   (Zipformer: `StreamingEngine`), `Downsampler`, `Speakers.kt` (`SpeakerTracker`, `SpeakerLabeler`:
   speaker labels from voice prints). `notebook/VoiceStore.kt`: the voices the app knows (`voices.json`, one list). `review/`:
   `LectureReview` (a recorded lecture opened: playback, edits, speakers, notes), `AudioPlayer`, `ReviewState`.
+  `backup/ServerBackup.kt`: backing up moments to the journal server through shed (`backup.json`).
+- `shed/` — a git submodule ([shed-kmp](https://github.com/chencohensolutions/shed-kmp)), included with `includeBuild`:
+  the storage library shared with the journal app (upload queue, cache, the journal server's backend, Android keys and
+  uploads). `git submodule update --init` after cloning.
 - `androidApp/` — Jetpack Compose UI, package `com.chencohensolution.transcriptor.ui`; `Theme.kt` has
   `TranscriptorTheme`, `LocalTranscriptorColors`, `layoutDirectionOf`, `titleDirection`, `isolated` and `formatClock`.
-  `NotebooksScreen.kt` is the first screen; `ModelsScreen.kt` is Settings and Settings › Models (fed by `Settings.kt`).
+  `NotebooksScreen.kt` is the first screen; `ModelsScreen.kt` is Settings and Settings › Models (fed by `Settings.kt`);
+  `ServerScreen.kt` is Settings › Server backup (fed by `ServerSettings.kt`).
   `storage/SafFileSystem.kt`: the lectures folder the user picks, as an okio file system under `/library`. Strings in
   `res/values/` (Hebrew in `values-iw/`). The UI lab is in `src/debug/`. whisper.cpp's JNI bridge is
   `src/main/cpp/` with `speech/WhisperEngine.kt`; `speech/ModelFiles.kt` downloads models; `speech/SherpaStreamingEngine.kt`

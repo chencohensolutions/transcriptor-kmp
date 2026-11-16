@@ -35,6 +35,9 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.atomicfu)
             api(libs.okio) // Path and FileSystem are in the stores' and the recorder's API
+            // shed: its Shed and journal backend are in ServerBackup's API (backup/).
+            api("com.chencohensolution.shed:core:0.1.0")
+            api("com.chencohensolution.shed:backend-journal:0.1.0")
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)

@@ -40,6 +40,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path = folder(lecture.id) / file
 
+    /** The file system the lecture's folder is on: the app's own, or the library's. */
+    fun fileSystemOf(lectureId: String): FileSystem = placeOf(lectureId).fileSystem
+
     /** The lecture is in the app's own storage, not (yet) in the library. */
     fun isLocal(lecture: Lecture) = placeOf(lecture.id) == local
 

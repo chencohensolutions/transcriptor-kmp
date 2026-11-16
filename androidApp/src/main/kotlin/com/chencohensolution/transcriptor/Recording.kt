@@ -1,5 +1,9 @@
 package com.chencohensolution.transcriptor
 
+import com.chencohensolution.shed.android.AndroidShed
+import com.chencohensolution.shed.android.ShedHost
+import com.chencohensolution.shed.android.ShedUploads
+import com.chencohensolution.transcriptor.backup.ServerBackup
 import kotlinx.coroutines.cancel
 import android.app.Application
 import android.content.ContentResolver
@@ -595,9 +599,27 @@ object Recording {
         if (archiveFinished(store) { it in busy() } > 0) library.reload()
     }
 
+    /** Backing up moments to the journal server through shed; off until the user pairs (Settings › Server backup). */
+    lateinit var backup: ServerBackup
+    lateinit var shed: AndroidShed
+
+    /**
+     * Hands the finished moments not backed up yet to shed and starts the upload work if anything waits (files: not
+     * on the main thread). Nothing happens while the app isn't paired with a server.
+     */
+    suspend fun backUp(context: android.content.Context) {
+        runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
+        if (backup.waiting() > 0) scheduleUploads(context)
+    }
+
+    fun scheduleUploads(context: android.content.Context) = ShedUploads.schedule(context, backup.wifiOnly)
+
     fun init(app: Application) {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
+        backup = ServerBackup(store, FileSystem.SYSTEM, root, utcOffset)
+        shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator)
+        backup.attach(shed.shed, shed.journal)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
         npuGuard = NpuLoadGuard(installedModels, log = { android.util.Log.i("NpuLoadGuard", it) }) {
@@ -718,7 +740,10 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
     )
 }
 
-class TranscriptorApp : Application() {
+class TranscriptorApp : Application(), ShedHost {
+    /** Shed's background uploads run the queue of [Recording.backup] (it refreshes from shed when shown). */
+    override val androidShed: AndroidShed get() = Recording.shed
+
     override fun onCreate() {
         super.onCreate()
         Recording.init(this)

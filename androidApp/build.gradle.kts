@@ -75,6 +75,8 @@ tasks.named("preBuild") { dependsOn(unpackQnnLibs) }
 
 dependencies {
     implementation(project(":sharedLogic"))
+    // shed on Android: the device key in the Keystore, uploads with WorkManager.
+    implementation("com.chencohensolution.shed:android:0.1.0")
     implementation(files(sherpaOnnx))
 
     implementation(libs.androidx.activity.compose)
@@ -134,6 +136,10 @@ android {
     }
     sourceSets.named("main") { jniLibs.srcDir(qnnJniLibs) }
     packaging {
+        // Ktor and OkHttp (shed) bring the same license files.
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
         jniLibs {
             // Unpacked on install: the NPU loads its part of Qualcomm's runtime (the Skel) from a file.
             useLegacyPackaging = true

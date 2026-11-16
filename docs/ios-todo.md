@@ -218,3 +218,17 @@ anything left to decide. Remove an entry once it is built.
   `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.
   language, `SettingsStore.recordLive`) and stops with one tap. iOS: a Control Center control (`ControlWidget`,
   iOS 18) with an App Intent doing the same. String `tile_finishing`.
+
+## Server backup (Nov 16, 2026)
+
+- Android: Settings › Server backup ([screens/server.md](screens/server.md)) pairs Audio Logs with the journal server
+  through shed and backs up finished moments. Shared: `ServerBackup` (`state: StateFlow<ServerState>`, `preview`,
+  `pair`, `unpair`, `setWifiOnly`, `backUpFinished(busy)`, `runUploads`, `syncServerList`, `refresh`, `stateOf`,
+  `locator`). Make it with shed's `Shed` and `JournalBackend` and call `attach(shed, journal)`, as `Recording.init`
+  does.
+- iOS needs shed's iOS pieces, not built yet: `DeviceKeys` in the Secure Enclave (an identity mTLS can present), a
+  `JournalClients` on Ktor's Darwin engine that pins the server's key and presents the identity, and uploads in the
+  background (`BGProcessingTask`, or a background `URLSession`). See shed-kmp's README.
+- Files to mirror: `ui/ServerScreen.kt`, `ServerSettings.kt`, the Server row in `ui/ModelsScreen.kt`. Strings
+  `server_*`.
+

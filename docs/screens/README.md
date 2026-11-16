@@ -10,6 +10,7 @@ are in [docs/ux-history/](../ux-history/README.md), linked from each screen's "D
 | Moment, while recording | New moment | [lecture.md](lecture.md) | In the app (recording and notes; no lines yet) |
 | Moment, after | Opening a recorded moment: play, edit, speakers, notes | [lecture-review.md](lecture-review.md) | In the app (the refine pass to come) |
 | Settings › Models | The gear on Notebooks: the moments folder, audio, models per language, Hugging Face | [models.md](models.md) | In the app |
+| Settings › Server backup | Settings › Recordings: pairing with the journal server, the backup | [server.md](server.md) | Android only |
 
 ```
 Get your models (first launch) ──► Notebooks
@@ -17,4 +18,5 @@ Get your models (first launch) ──► Notebooks
 Notebooks ──► Lecture (recording) ──Stop──► Lecture (after) ◄── Notebooks
     │
     └──► Settings ──► Models
+                  └──► Server backup
 ```
