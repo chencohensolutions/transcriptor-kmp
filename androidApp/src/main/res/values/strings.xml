@@ -705,11 +705,20 @@
     <string name="review_compare_close">Close</string>
     <string name="notebooks_versions">%1$d versions</string>
     <!-- Backup: calls counted in the status, Upload now (Nov 16, 2026). -->
-    <string name="server_waiting_with_calls">%1$d moments and %2$d calls waiting · %3$s left · %4$d moments on the server</string>
-    <string name="server_calls_only_waiting">Every finished moment is on the server (%3$d). %1$d calls waiting · %2$s left.</string>
     <string name="server_uploading">Sending now…</string>
     <string name="server_upload_now">Upload now</string>
     <string name="server_mobile_title">Upload on mobile data?</string>
     <string name="server_mobile_note">The phone isn’t on Wi-Fi. About %1$s would be sent over mobile data now. Wi-Fi only stays on for the uploads in the background.</string>
     <string name="server_mobile_send">Upload now</string>
+    <!-- Backup: moments on the phone and uploaded (Nov 17, 2026). -->
+    <string name="server_phone_counts">%1$d moments on the phone · %2$d uploaded</string>
+    <string name="server_waiting_line">Waiting to upload: %1$s · %2$s left</string>
+    <plurals name="server_n_moments">
+        <item quantity="one">%d moment</item>
+        <item quantity="other">%d moments</item>
+    </plurals>
+    <plurals name="server_n_calls">
+        <item quantity="one">%d call</item>
+        <item quantity="other">%d calls</item>
+    </plurals>
 </resources>

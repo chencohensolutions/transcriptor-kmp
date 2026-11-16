@@ -178,16 +178,22 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
     )
     // Moments and calls both: "every moment is on the server" said while calls wait read as all sent (hen, Nov 16, 2026).
     val calls = if (state.callsFolder != null) state.callsWaiting else 0
+    // How many moments are on the phone and how many of them are uploaded, then what still waits (hen, Nov 17, 2026).
     Text(
-        when {
-            state.waiting > 0 && calls > 0 -> stringResource(R.string.server_waiting_with_calls, state.waiting, calls, modelsSize(state.bytesLeft + state.callsBytesLeft), state.backedUp)
-            state.waiting > 0 -> stringResource(R.string.server_waiting, state.waiting, modelsSize(state.bytesLeft), state.backedUp)
-            calls > 0 -> stringResource(R.string.server_calls_only_waiting, calls, modelsSize(state.callsBytesLeft), state.backedUp)
-            state.backedUp > 0 -> stringResource(R.string.server_all_backed_up, state.backedUp)
-            else -> stringResource(R.string.server_none_yet)
-        },
+        if (state.onPhone == 0 && state.waiting == 0) stringResource(R.string.server_none_yet)
+        else stringResource(R.string.server_phone_counts, state.onPhone, state.uploaded),
         style = MaterialTheme.typography.bodyMedium,
     )
+    if (state.waiting + calls > 0) {
+        val parts = listOfNotNull(
+            if (state.waiting > 0) pluralStringResource(R.plurals.server_n_moments, state.waiting, state.waiting) else null,
+            if (calls > 0) pluralStringResource(R.plurals.server_n_calls, calls, calls) else null,
+        )
+        Text(
+            stringResource(R.string.server_waiting_line, parts.joinToString(" · "), modelsSize(state.bytesLeft + state.callsBytesLeft)),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
     if (state.uploading) {
         Text(stringResource(R.string.server_uploading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         LinearProgressIndicator(Modifier.fillMaxWidth())
