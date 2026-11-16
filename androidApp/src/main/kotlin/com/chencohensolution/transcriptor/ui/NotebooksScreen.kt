@@ -483,8 +483,10 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
         val list = place.list
         val nearEnd by remember { androidx.compose.runtime.derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.index >= list.layoutInfo.totalItemsCount - 15 } == true } }
         val nearTop by remember { androidx.compose.runtime.derivedStateOf { list.firstVisibleItemIndex <= 10 } }
-        LaunchedEffect(nearEnd, state.serverOlder, state.moments.size) { if (nearEnd && state.serverOlder) actions.olderFromServer() }
-        LaunchedEffect(nearTop, state.serverNewer, state.moments.size) { if (nearTop && state.serverNewer) actions.newerFromServer() }
+        // Asked again each time a page arrives: a page whose recordings are all moments here already (or all out of
+        // the label shown) adds no row, and the list still needs the next one.
+        LaunchedEffect(nearEnd, state.serverOlder, state.serverLoading, state.moments.size) { if (nearEnd && state.serverOlder && !state.serverLoading) actions.olderFromServer() }
+        LaunchedEffect(nearTop, state.serverNewer, state.serverLoading, state.moments.size) { if (nearTop && state.serverNewer && !state.serverLoading) actions.newerFromServer() }
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
             folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
             item {

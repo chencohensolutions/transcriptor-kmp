@@ -702,10 +702,17 @@ object Recording {
     }
 
     /** The list neared its end: the next older page of the server's recordings. */
-    suspend fun olderServerMoments() = runCatching { backup.serverMoments.older() }
+    suspend fun olderServerMoments() = runCatching {
+        // After a page that couldn't be read, a pause before asking the server again.
+        if (backup.serverMoments.window.value.failed != null) kotlinx.coroutines.delay(5_000)
+        backup.serverMoments.older()
+    }
 
     /** The list neared its top after scrolling far: the page just newer. */
-    suspend fun newerServerMoments() = runCatching { backup.serverMoments.newer() }
+    suspend fun newerServerMoments() = runCatching {
+        if (backup.serverMoments.window.value.failed != null) kotlinx.coroutines.delay(5_000)
+        backup.serverMoments.newer()
+    }
 
     /**
      * Makes the server's recordings among [lectureIds] moments here (before they are opened or changed): each from its
