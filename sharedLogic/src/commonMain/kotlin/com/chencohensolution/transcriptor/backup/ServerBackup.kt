@@ -28,6 +28,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import com.chencohensolution.shed.BackendException
+import okio.HashingSink
+import okio.blackholeSink
+import okio.buffer
+import okio.use
+import okio.ByteString.Companion.encodeUtf8
 import okio.FileSystem
 import okio.Path
 import kotlin.math.abs
@@ -70,6 +76,9 @@ data class ServerState(
     val shown: SoundRecordingsShown? = null,
     /** Recordings on the server that aren't moments here and are tucked away (left out of [onServerOnly]). */
     val tuckedOnServer: Int = 0,
+    /** Most bytes shed's cache keeps, and what it keeps now (as of [ServerBackup.refreshCache]). */
+    val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
+    val cacheBytes: Long = 0,
 )
 
 /** How marking a moment private ended ([ServerBackup.makePrivate]). */
@@ -93,10 +102,37 @@ private data class BackupFileV1(
     val wifiOnly: Boolean = true,
     /** Moments handed to shed: id to the sha256 of its audio, and which audio file it was. */
     val moments: Map<String, HandedOver> = emptyMap(),
+    /** Recordings of the server the user deleted here: not made moments again. */
+    val dismissed: Set<String> = emptySet(),
+    /** Most bytes shed's cache keeps of what was read from the server (Settings › Server backup). */
+    val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
 )
 
 @Serializable
-private data class HandedOver(val sha256: String, val audioFile: String)
+private data class HandedOver(
+    val sha256: String,
+    val audioFile: String,
+    /** The sha256 of the moment's note last kept on the server ([ServerBackup.syncNotes]); null before one. */
+    val note: String? = null,
+)
+
+/** What Free up space removes: the audio of moments the server holds ([ServerBackup.freeUpPlan]). */
+sealed interface FreeUpRule {
+    /** Every moment backed up. */
+    data object Everything : FreeUpRule
+
+    /** Moments recorded more than [months] months ago. */
+    data class OlderThan(val months: Int) : FreeUpRule
+
+    /** All but the newest moments' audio up to [bytes] (every moment with its audio here counts, backed up or not). */
+    data class KeepNewest(val bytes: Long) : FreeUpRule
+}
+
+/** The moments a rule frees ([ids], oldest first), their audio's [bytes], and the dates they span. */
+data class FreeUpPlan(val ids: List<String>, val bytes: Long, val firstMillis: Long? = null, val lastMillis: Long? = null)
+
+/** How a Free up space run ended: [freed] moments, [bytes] freed, and why it stopped early ([stopped], null when it didn't). */
+data class FreeUpResult(val freed: Int, val bytes: Long, val stopped: String? = null)
 
 /**
  * Backing up Audio Logs' moments to the journal server through shed (docs/design.md, "Server backup"). The app works
@@ -133,6 +169,7 @@ class ServerBackup(
     fun attach(shed: Shed, journal: JournalBackend) {
         this.shed = shed
         this.journal = journal
+        shed.cacheLimitBytes = kept.cacheLimitBytes
         refresh()
     }
 
@@ -157,7 +194,7 @@ class ServerBackup(
         journal.unpair()
         shown = null
         shed.forgetRemote()
-        save(kept.copy(moments = emptyMap()))
+        save(kept.copy(moments = emptyMap(), dismissed = emptySet()))
         refresh()
     }
 
@@ -252,10 +289,220 @@ class ServerBackup(
     }
 
     private var shown: SoundRecordingsShown? = null
+    private var cacheBytes = 0L
+
+    /** Sets the most shed's cache keeps; the oldest read goes first once it is over. */
+    suspend fun setCacheLimit(bytes: Long) {
+        save(kept.copy(cacheLimitBytes = bytes))
+        shed.cacheLimitBytes = bytes
+        refreshCache()
+    }
+
+    /** What shed's cache keeps now, for the Server page. Files: not on the main thread. */
+    suspend fun refreshCache() {
+        cacheBytes = runCatching { shed.cacheBytes() }.getOrDefault(cacheBytes)
+        refresh()
+    }
+
+    // The server's copy of each moment
+
+    /**
+     * Keeps each backed-up moment's transcript, notes, labels and speakers on the server, as the note of its audio
+     * ([LectureStore.serverNote] under `audioLogs`), whenever they changed since they were last sent: a phone that
+     * pairs later, or this one after Free up space, gets them back. Skips the [busy] moments and those not on the
+     * server yet; stops at the first network failure. Returns how many it sent.
+     */
+    suspend fun syncNotes(busy: Set<String>): Int {
+        if (journal.state.value !is JournalState.Paired) return 0
+        var sent = 0
+        for ((id, handed) in kept.moments) {
+            if (id in busy) continue
+            if (momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == handed.sha256 }) != MomentBackup.BackedUp) continue
+            val lecture = store.load(id) ?: continue
+            if (lecture.pendingEncode) continue
+            val note = noteOf(lecture)
+            val hash = note.toString().encodeUtf8().sha256().hex()
+            if (handed.note == hash) continue
+            val kept = try {
+                journal.setNote(handed.sha256, note)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: BackendException) {
+                if (e.offline || e.unauthorized) break
+                false
+            } catch (_: Exception) {
+                false
+            }
+            if (!kept) continue
+            mutex.withLock { this.kept.moments[id]?.let { save(this.kept.copy(moments = this.kept.moments + (id to it.copy(note = hash)))) } }
+            sent++
+        }
+        return sent
+    }
+
+    private fun noteOf(lecture: Lecture): JsonObject =
+        buildJsonObject { put("audioLogs", json.parseToJsonElement(store.serverNote(lecture)).jsonObject) }
+
+    /**
+     * Makes the server's recordings moments here (as of the last [syncServerList]): each recording, and each call or
+     * voice message the user shows ([setShown]), that is no moment here yet becomes one, with its transcript, notes and
+     * labels when the server keeps them (a moment backed up from a phone), else as a moment not transcribed yet, in
+     * [defaultLanguage]. Its audio stays on the server until it is opened ([bringAudio]). A moment whose recording
+     * left the server's list (made private, a call while calls are off) and whose audio isn't on the phone goes too.
+     * The recordings the user deleted here aren't made moments again. Returns how many it made.
+     */
+    suspend fun adoptServerRecordings(defaultLanguage: String, busy: Set<String> = emptySet()): Int {
+        if (journal.state.value !is JournalState.Paired) return 0
+        val remote = shed.remote.value.filter { it.about.kind == FileKind.AUDIO }
+        if (remote.isEmpty()) return 0
+        val onServer = remote.map { it.sha256 }.toSet()
+        val lectures = store.all()
+        for (lecture in lectures) {
+            val sha = lecture.serverSha256 ?: continue
+            if (sha in onServer || lecture.id in busy || store.hasAudio(lecture)) continue
+            store.delete(lecture.id)
+            mutex.withLock { save(kept.copy(moments = kept.moments - lecture.id)) }
+        }
+        val known = lectures.mapNotNull { it.serverSha256 }.toSet() + kept.moments.values.map { it.sha256 }
+        var made = 0
+        for (file in remote) {
+            if (file.sha256 in known || file.sha256 in kept.dismissed) continue
+            val lecture = momentOf(file, defaultLanguage)
+            if (store.load(lecture.id) != null) continue
+            store.save(lecture)
+            mutex.withLock {
+                save(kept.copy(moments = kept.moments + (lecture.id to HandedOver(file.sha256, lecture.audioFile, noteOf(lecture).toString().encodeUtf8().sha256().hex()))))
+            }
+            made++
+        }
+        refresh()
+        return made
+    }
+
+    /** The moment the server's recording [file] is: from its note when the server keeps one, else a new one. */
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    internal fun momentOf(file: RemoteFile, defaultLanguage: String): Lecture {
+        val extension = file.about.fileName.substringAfterLast('.', "").lowercase().takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) } ?: "m4a"
+        val restored = file.note
+            ?.let { runCatching { json.parseToJsonElement(it).jsonObject["audioLogs"]?.toString() }.getOrNull() }
+            ?.let(store::fromServerNote)
+        if (restored != null) {
+            return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, source = restored.source ?: file.about.source)
+        }
+        val started = listOfNotNull(file.about.takenAt, file.storedAt).firstNotNullOfOrNull {
+            runCatching { kotlin.time.Instant.parse(it).toEpochMilliseconds() }.getOrNull()
+        } ?: 0L
+        return Lecture(
+            id = "server-" + file.sha256.take(16),
+            title = titleOf(file.about.fileName),
+            language = defaultLanguage,
+            startedAtMillis = started,
+            durationMillis = file.about.durationMillis ?: 0,
+            segments = emptyList(),
+            notes = emptyList(),
+            audioFile = "audio.$extension",
+            pendingTranscript = true,
+            tucked = file.tucked,
+            serverSha256 = file.sha256,
+            source = file.about.source,
+        )
+    }
+
+    /**
+     * Brings the moment's audio back to the phone from the server, through shed (with [progress]), when it is there
+     * only: before it is played or transcribed. True when the audio is on the phone now. Not on the main thread.
+     */
+    suspend fun bringAudio(lectureId: String, progress: (got: Long, of: Long) -> Unit = { _, _ -> }): Boolean {
+        val lecture = store.load(lectureId) ?: return false
+        if (store.hasAudio(lecture)) return true
+        val sha = lecture.serverSha256 ?: kept.moments[lectureId]?.sha256 ?: return false
+        val fetched = shed.fetch(sha, progress)
+        val fs = store.fileSystemOf(lectureId)
+        val to = store.audioPath(lecture)
+        val temp = to.parent!! / "${to.name}.part"
+        fs.createDirectories(to.parent!!)
+        fileSystem.source(fetched).use { from -> fs.sink(temp).buffer().use { it.writeAll(from) } }
+        fs.atomicMove(temp, to)
+        return true
+    }
+
+    /**
+     * What Free up space would remove with [rule] at [now]: the audio of finished moments here that are on the server
+     * as they are now, oldest first (not the [busy] ones, nor one waiting to be encoded or sent). Their transcripts,
+     * notes and labels stay. Files: not on the main thread.
+     */
+    fun freeUpPlan(rule: FreeUpRule, now: Long, busy: Set<String> = emptySet()): FreeUpPlan {
+        val withAudio = store.all().filter { store.hasAudio(it) }.sortedBy { it.startedAtMillis }
+        val sizes = withAudio.associate { it.id to (store.audioBytes(it) ?: 0L) }
+        val candidates = withAudio.filter { lecture ->
+            val handed = kept.moments[lecture.id]
+            lecture.id !in busy && !lecture.pendingEncode && handed != null && handed.audioFile == lecture.audioFile &&
+                momentState(shed.uploads.value.firstOrNull { it.ref == lecture.id && it.sha256 == handed.sha256 }) == MomentBackup.BackedUp
+        }
+        val chosen = when (rule) {
+            FreeUpRule.Everything -> candidates
+            is FreeUpRule.OlderThan -> candidates.filter { it.startedAtMillis < now - rule.months * 30L * 86_400_000L }
+            is FreeUpRule.KeepNewest -> {
+                var kept = 0L
+                val keep = mutableSetOf<String>()
+                for (lecture in withAudio.reversed()) {
+                    if (kept + (sizes[lecture.id] ?: 0) > rule.bytes) break
+                    kept += sizes[lecture.id] ?: 0
+                    keep += lecture.id
+                }
+                candidates.filter { it.id !in keep }
+            }
+        }
+        return FreeUpPlan(chosen.map { it.id }, chosen.sumOf { sizes[it.id] ?: 0L }, chosen.firstOrNull()?.startedAtMillis, chosen.lastOrNull()?.startedAtMillis)
+    }
+
+    /**
+     * Removes the audio of [ids] from the phone, each only once the phone's copy hashes to what was sent and the
+     * server checked it holds that whole (`/verify`); the moment keeps its transcript, notes and labels and remembers
+     * the audio's sha256, so opening it brings the audio back ([bringAudio]). An unreachable server stops the run:
+     * nothing unchecked is removed. Files and network: not on the main thread.
+     */
+    suspend fun freeUp(ids: List<String>, busy: Set<String> = emptySet(), progress: (done: Int, of: Int) -> Unit = { _, _ -> }): FreeUpResult {
+        var freed = 0
+        var bytes = 0L
+        for ((i, id) in ids.withIndex()) {
+            progress(i, ids.size)
+            val lecture = store.load(id) ?: continue
+            val handed = kept.moments[id] ?: continue
+            if (id in busy || lecture.pendingEncode || handed.audioFile != lecture.audioFile || !store.hasAudio(lecture)) continue
+            val fs = store.fileSystemOf(id)
+            val audio = store.audioPath(lecture)
+            val hash = HashingSink.sha256(blackholeSink()).also { sink -> fs.source(audio).buffer().use { it.readAll(sink) } }.hash.hex()
+            if (hash != handed.sha256) continue
+            val held = try {
+                shed.verify(handed.sha256)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return FreeUpResult(freed, bytes, e.message ?: "the server didn't answer")
+            }
+            if (!held) continue
+            val size = store.audioBytes(lecture) ?: 0L
+            store.save(lecture.copy(serverSha256 = handed.sha256))
+            store.deleteAudio(lecture)
+            freed++
+            bytes += size
+        }
+        progress(ids.size, ids.size)
+        return FreeUpResult(freed, bytes)
+    }
+
+    /** The user deleted these moments here: the server's recordings they were aren't made moments again. */
+    fun dismiss(lectureIds: Collection<String>) {
+        val shas = lectureIds.mapNotNull { id -> store.load(id)?.serverSha256 ?: kept.moments[id]?.sha256 }
+        if (shas.isEmpty()) return
+        save(kept.copy(dismissed = kept.dismissed + shas, moments = kept.moments - lectureIds.toSet()))
+    }
 
     /** One pass of shed's queue, from the app's background work. */
     suspend fun runUploads(): RunResult = shed.runUploads().also { result ->
         refresh(lastRun = result)
+        if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
     }
 
     /** The server's list of recordings brought up to date. */
@@ -307,6 +554,8 @@ class ServerBackup(
             lastRun = lastRun,
             shown = if (paired == null) null else shown,
             tuckedOnServer = others.count { it.tucked },
+            cacheLimitBytes = kept.cacheLimitBytes,
+            cacheBytes = cacheBytes,
         )
     }
 
@@ -365,4 +614,12 @@ internal fun rfc3339(millis: Long, offsetMillis: Long): String {
     fun two(n: Long) = n.toString().padStart(2, '0')
     return "${year.toString().padStart(4, '0')}-${two(month)}-${two(day)}T${two(seconds / 3600)}:${two(seconds / 60 % 60)}:${two(seconds % 60)}" +
         "$sign${two(abs(offsetMinutes) / 60)}:${two(abs(offsetMinutes) % 60)}"
+}
+
+private val SAMSUNG_CALL = Regex("""^(?:Call recording|הקלטת שיחה|שיחה) (.+)_\d{6}_\d{6}$""")
+
+/** A moment's title from a server recording's file name: whom a Samsung call was with, else the name without its extension. */
+internal fun titleOf(fileName: String): String {
+    val base = fileName.substringBeforeLast('.').trim()
+    return SAMSUNG_CALL.find(base)?.groupValues?.get(1)?.trim()?.ifEmpty { null } ?: base.ifEmpty { fileName }
 }

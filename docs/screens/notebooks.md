@@ -29,6 +29,10 @@ The code still calls it `NotebooksScreen`.
   kept on the server with their transcripts and notes, then deleted from the phone, and Audio Logs won't show them
   again); without a server it says to pair first and offers Settings. A snackbar says how many left the phone, or why
   the rest stayed.
+- **Moments from the server** (Nov 16, 2026; docs/design.md "Server backup"): a row may carry small marks: **Call** or
+  **Voice message** for what came from the server as one, and **On the server** when its audio is there only (from
+  the server, or freed here). Opening such a moment shows "Bringing the recording from the server" with its progress,
+  then opens it; if it can't, a message says why and the moment stays.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

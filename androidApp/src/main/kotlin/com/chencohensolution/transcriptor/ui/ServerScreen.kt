@@ -44,6 +44,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import com.chencohensolution.shed.RunResult
 import com.chencohensolution.transcriptor.R
+import kotlinx.coroutines.launch
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
+import com.chencohensolution.transcriptor.backup.FreeUpResult
+import com.chencohensolution.transcriptor.backup.FreeUpPlan
+import com.chencohensolution.transcriptor.backup.FreeUpRule
 import com.chencohensolution.shed.journal.SoundRecordingsShown
 import com.chencohensolution.transcriptor.backup.ServerState
 
@@ -71,6 +82,12 @@ class ServerActions(
     val unpair: () -> Unit = {},
     /** Turns calls or voice messages on or off for Audio Logs on the server. */
     val setShown: (SoundRecordingsShown) -> Unit = {},
+    /** Sets the most shed's cache keeps on the phone. */
+    val setCacheLimit: (Long) -> Unit = {},
+    /** What Free up space would remove with a rule (files: off the main thread). */
+    val planFreeUp: suspend (FreeUpRule) -> FreeUpPlan = { FreeUpPlan(emptyList(), 0) },
+    /** Removes the audio of these moments from the phone, once the server checked it holds it. */
+    val freeUp: suspend (ids: List<String>, progress: (Int, Int) -> Unit) -> FreeUpResult = { _, _ -> FreeUpResult(0, 0) },
 )
 
 /**
@@ -202,6 +219,20 @@ private fun Paired(state: ServerState, actions: ServerActions) {
         Text(stringResource(R.string.server_tucked_on_server, state.tuckedOnServer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     HorizontalDivider()
+    FreeUpSection(state, actions)
+    HorizontalDivider()
+    Text(stringResource(R.string.server_cache), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Text(
+        stringResource(R.string.server_cache_note, modelsSize(state.cacheBytes), modelsSize(state.cacheLimitBytes)),
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CACHE_LIMITS.forEach { gb ->
+            val bytes = gb.toLong() shl 30
+            FilterChip(selected = state.cacheLimitBytes == bytes, onClick = { actions.setCacheLimit(bytes) }, label = { Text(stringResource(R.string.server_cache_gb, gb)) })
+        }
+    }
+    HorizontalDivider()
     TextButton(onClick = { unpairing = true }) { Text(stringResource(R.string.server_unpair), color = MaterialTheme.colorScheme.error) }
     if (unpairing) AlertDialog(
         onDismissRequest = { unpairing = false },
@@ -225,4 +256,67 @@ private fun ShowSwitch(title: Int, note: Int, on: Boolean, onChange: (Boolean) -
         }
         Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
+}
+
+private val CACHE_LIMITS = listOf(2, 10, 20, 50)
+
+/** The rules Free up space offers, as in the journal app: everything backed up, older than, or all but the newest. */
+private val FREE_UP_RULES = listOf(FreeUpRule.Everything, FreeUpRule.OlderThan(3), FreeUpRule.OlderThan(12), FreeUpRule.KeepNewest(10L shl 30))
+
+@Composable
+private fun ruleName(rule: FreeUpRule): String = when (rule) {
+    FreeUpRule.Everything -> stringResource(R.string.server_free_everything)
+    is FreeUpRule.OlderThan -> pluralStringResource(R.plurals.server_free_older, rule.months, rule.months)
+    is FreeUpRule.KeepNewest -> stringResource(R.string.server_free_keep_newest, (rule.bytes shr 30).toInt())
+}
+
+/**
+ * Free up space (as in the journal app, manual only): a rule, what it would remove ("12 moments · 3.2 GB"), and one
+ * button. Only the audio goes, once the server checked it holds it; transcripts, notes and labels stay, and opening a
+ * moment brings its audio back.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FreeUpSection(state: ServerState, actions: ServerActions) {
+    var rule by remember { mutableStateOf<FreeUpRule>(FreeUpRule.Everything) }
+    var plan by remember { mutableStateOf<FreeUpPlan?>(null) }
+    var running by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var result by remember { mutableStateOf<FreeUpResult?>(null) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(rule, state.backedUp, result) { plan = actions.planFreeUp(rule) }
+    Text(stringResource(R.string.server_free), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Text(stringResource(R.string.server_free_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FREE_UP_RULES.forEach { r -> FilterChip(selected = rule == r, onClick = { rule = r; result = null }, label = { Text(ruleName(r)) }) }
+    }
+    val p = plan
+    Text(
+        when {
+            p == null -> stringResource(R.string.server_checking)
+            p.ids.isEmpty() -> stringResource(R.string.server_free_nothing)
+            else -> pluralStringResource(R.plurals.server_free_plan, p.ids.size, p.ids.size, modelsSize(p.bytes))
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    running?.let { (done, of) ->
+        LinearProgressIndicator(progress = { if (of == 0) 0f else done.toFloat() / of }, modifier = Modifier.fillMaxWidth())
+    }
+    result?.let { r ->
+        Text(
+            if (r.stopped == null) stringResource(R.string.server_free_done, r.freed, modelsSize(r.bytes))
+            else stringResource(R.string.server_free_stopped, r.freed, r.stopped),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    FilledTonalButton(
+        enabled = p != null && p.ids.isNotEmpty() && running == null,
+        onClick = {
+            val ids = p?.ids ?: return@FilledTonalButton
+            running = 0 to ids.size
+            scope.launch {
+                result = actions.freeUp(ids) { done, of -> running = done to of }
+                running = null
+            }
+        },
+    ) { Text(stringResource(R.string.server_free_button, modelsSize(p?.bytes ?: 0))) }
 }

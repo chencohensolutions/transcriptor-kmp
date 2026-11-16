@@ -25,7 +25,10 @@ without a server.
   **Wi‑Fi only** (on by default); **On the server**: how many of the server's recordings aren't moments here and the
   newest 20 by date, length and name (tucked ones counted apart); **What Audio Logs shows from the server**: **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
-  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Unpair** (asks first: what was sent stays on the server, every moment stays on
+  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Free up
+  space**: rule chips (Everything backed up, Older than 3 months, Older than 12 months, Keep the newest 10 GB), what
+  it would free ("12 moments, 3.2 GB"), a **Free up …** button, its progress and result; **Cache on this phone**: how
+  much shed keeps of the limit, with 2, 10, 20 and 50 GB chips; **Unpair** (asks first: what was sent stays on the server, every moment stays on
   the phone).
 
 ## How it behaves
@@ -38,7 +41,10 @@ without a server.
   encoded. Shed hashes the audio once (`backup.json` in the app's storage keeps which), queues it and sends it with
   WorkManager when the network allows (Wi‑Fi only, or any), resuming where it stopped. A moment that moved to the
   moments folder since is found there by its id.
-- The page refreshes every second while open, and fetches the server's list of recordings when it opens.
+- The page refreshes every second while open, and fetches the server's list of recordings when it opens (which also
+  turns new ones into moments).
+- Free up space deletes a moment's audio only after hashing it again and the server's `/verify` saying it holds it
+  whole; a moment being recorded, worked on, or waiting to be encoded or sent is left out.
 
 ## Code
 
@@ -54,7 +60,6 @@ without a server.
 
 ## Not yet
 
-- The server's recordings as moments in the list (without notes or lines until transcribed), playing from the server
-  with shed's range reads.
+- Playing a server moment from the server with shed's range reads, without bringing all of it first.
 - Scanning the QR code in the app (the link is pasted for now).
 - A moment's own backup state on its row and on its page (`ServerBackup.stateOf`).

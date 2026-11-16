@@ -647,4 +647,32 @@
     <string name="server_tucked_on_server">עוד %1$d מוצנעות.</string>
     <string name="notebooks_unlock_tucked">הצגת רגעים מוצנעים</string>
     <string name="notebooks_private_busy">הוא בהקלטה או בעיבוד; אפשר לנסות שוב כשזה יסתיים</string>
+    <string name="server_cache">מטמון בטלפון</string>
+    <string name="server_cache_note">הקלטות שהובאו מהשרת נשמרות כאן: %1$s מתוך %2$s. כשהוא מתמלא, הישנות ביותר שנפתחו יוצאות ראשונות.</string>
+    <string name="server_cache_gb">%1$d GB</string>
+    <string name="server_free">פינוי מקום</string>
+    <string name="server_free_note">מסיר את השמע של רגעים שכבר שמורים בשרת. המילים וההערות נשארים; פתיחת רגע מביאה את השמע שלו בחזרה.</string>
+    <string name="server_free_everything">כל מה שגובה</string>
+    <plurals name="server_free_older">
+        <item quantity="one">ישן מחודש</item>
+        <item quantity="two">ישן מחודשיים</item>
+        <item quantity="other">ישן מ-%1$d חודשים</item>
+    </plurals>
+    <string name="server_free_keep_newest">להשאיר את ה-%1$d GB החדשים</string>
+    <string name="server_free_nothing">אין מה לפנות: אף רגע מגובה לא מתאים.</string>
+    <plurals name="server_free_plan">
+        <item quantity="one">רגע אחד, %2$s</item>
+        <item quantity="two">שני רגעים, %2$s</item>
+        <item quantity="other">%1$d רגעים, %2$s</item>
+    </plurals>
+    <string name="server_free_done">פונו %2$s מ-%1$d רגעים.</string>
+    <string name="server_free_stopped">פונו %1$d רגעים, ואז נעצר: %2$s</string>
+    <string name="server_free_button">לפנות %1$s</string>
+    <string name="bring_title">ההקלטה מגיעה מהשרת</string>
+    <string name="bring_progress">%1$s מתוך %2$s</string>
+    <string name="bring_failed">לא ניתן להביא את ההקלטה: %1$s</string>
+    <string name="bring_not_on_server">היא לא נמצאת בשרת</string>
+    <string name="notebooks_on_server">בשרת</string>
+    <string name="notebooks_source_call">שיחה</string>
+    <string name="notebooks_source_voice_message">הודעה קולית</string>
 </resources>

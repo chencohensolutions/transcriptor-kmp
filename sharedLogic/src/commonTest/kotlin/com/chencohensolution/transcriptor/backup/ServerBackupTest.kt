@@ -24,6 +24,11 @@ import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import com.chencohensolution.shed.FileKind
+import com.chencohensolution.transcriptor.notebook.Note
+import com.chencohensolution.transcriptor.notebook.Segment
+import okio.ByteString.Companion.toByteString
 
 class ServerBackupTest {
     private val fs = FakeFileSystem()
@@ -110,6 +115,79 @@ class ServerBackupTest {
     }
 
     @Test
+    fun theServersRecordingsBecomeMomentsWhoseAudioComesWhenOpened() = runTest {
+        val backup = backup(paired = true)
+        val call = "the sound of a call".encodeToByteArray()
+        val callSha = call.toByteString().sha256().hex()
+        server.files[callSha] = call
+        server.listed += RemoteFile(callSha, call.size.toLong(), FileAbout("Call recording אבא_250206_142813.m4a", "audio/mp4", FileKind.AUDIO,
+            takenAt = "2025-02-06T14:28:13+02:00", durationMillis = 61_000, source = "call"))
+        // A moment another phone backed up, with its transcript kept on the server.
+        val earlier = Lecture("lecture-5", "Psychology", "he", 1_700_000_000_000, 90_000, listOf(Segment("s1", 0, 900, "שלום", "m")), listOf(Note("n1", 10, "exam")), audioFile = AUDIO_FLAC)
+        val note = "{\"audioLogs\": ${store.serverNote(earlier)}}"
+        server.files["e".repeat(64)] = "flac".encodeToByteArray()
+        server.listed += RemoteFile("e".repeat(64), 4, FileAbout("Psychology.flac", "audio/flac", FileKind.AUDIO, source = "recording"), note = note)
+        backup.syncServerList()
+
+        assertEquals(2, backup.adoptServerRecordings("he"))
+        val made = store.load("server-" + callSha.take(16))!!
+        assertEquals("אבא", made.title)
+        assertEquals("call", made.source)
+        assertEquals(true, made.pendingTranscript)
+        assertEquals(1_738_844_893_000, made.startedAtMillis)
+        assertEquals("audio.m4a", made.audioFile)
+        assertEquals(false, store.hasAudio(made))
+        val restored = store.load("lecture-5")!!
+        assertEquals(listOf("שלום"), restored.segments.map { it.text })
+        assertEquals(listOf("exam"), restored.notes.map { it.text })
+        assertEquals("e".repeat(64), restored.serverSha256)
+        assertEquals(0, backup.adoptServerRecordings("he"), "made once")
+
+        assertTrue(backup.bringAudio(made.id))
+        assertEquals("the sound of a call", fs.read(store.audioPath(made)) { readUtf8() })
+
+        // Deleted here: not made a moment again. Gone from the server (made private): gone here too, audio not on the phone.
+        backup.dismiss(listOf(made.id))
+        store.delete(made.id)
+        server.listed.removeAll { it.sha256 == "e".repeat(64) }
+        server.gone += "e".repeat(64)
+        server.listed += RemoteFile("f".repeat(64), 1, FileAbout("x.m4a", "audio/mp4", FileKind.AUDIO))
+        backup.syncServerList()
+        backup.adoptServerRecordings("he")
+        assertEquals(null, store.load(made.id))
+        assertEquals(null, store.load("lecture-5"))
+    }
+
+    @Test
+    fun freeUpRemovesAudioOnlyOnceTheServerHoldsItAndOpeningBringsItBack() = runTest {
+        moment("a")
+        moment("b")
+        val backup = backup(paired = true)
+        backup.backUpFinished(busy = setOf("b"))
+        assertEquals(RunResult.Done(sent = 1, refused = 0), backup.runUploads())
+        val plan = backup.freeUpPlan(FreeUpRule.Everything, now = 1_800_000_000_000)
+        assertEquals(listOf("a"), plan.ids)
+        assertEquals("the sound of a".length.toLong(), plan.bytes)
+        assertEquals(emptyList(), backup.freeUpPlan(FreeUpRule.KeepNewest(1L shl 30), now = 1_800_000_000_000).ids)
+
+        assertEquals(FreeUpResult(1, 14), backup.freeUp(plan.ids))
+        val a = store.load("a")!!
+        assertEquals(false, store.hasAudio(a))
+        assertEquals(backup.sha256Of("a"), a.serverSha256)
+        assertTrue(store.hasAudio(store.load("b")!!), "not on the server: kept")
+
+        assertTrue(backup.bringAudio("a"))
+        assertEquals("the sound of a", fs.read(store.audioPath(a)) { readUtf8() })
+    }
+
+    @Test
+    fun aCallsTitleIsWhomItWasWith() {
+        assertEquals("אבא", titleOf("Call recording אבא_250206_142813.m4a"))
+        assertEquals("0501234567", titleOf("הקלטת שיחה 0501234567_211115_200618.m4a"))
+        assertEquals("Voice 012", titleOf("Voice 012.m4a"))
+    }
+
+    @Test
     fun theServerIsToldWhenAndWhatTheMomentIs() {
         val about = backup(paired = false).aboutOf(moment("a"))
         assertEquals("Class a.flac", about.fileName)
@@ -138,7 +216,7 @@ private object PairedKeys : DeviceKeys {
 private class MemoryStorage : ShedBackend {
     val files = mutableMapOf<String, ByteArray>()
     private val partial = mutableMapOf<String, ByteArray>()
-    override val capabilities = Capabilities()
+    override val capabilities = Capabilities(changeList = true)
 
     override suspend fun startUpload(sha256: String, size: Long, about: FileAbout): UploadStart =
         if (sha256 in files) UploadStart.Exists else UploadStart.Ready(partial[sha256]?.size?.toLong() ?: 0, 4)
@@ -159,6 +237,9 @@ private class MemoryStorage : ShedBackend {
     override suspend fun size(sha256: String): Long? = files[sha256]?.size?.toLong()
     override suspend fun read(sha256: String, from: Long, length: Int): ByteArray =
         files[sha256]?.let { it.copyOfRange(from.toInt(), minOf(it.size, (from + length).toInt())) } ?: throw BackendException("gone")
-    override suspend fun changes(cursor: String?) = ChangePage(emptyList<RemoteFile>(), emptyList(), "c", false)
+    /** What the change list answers: everything listed, every time. */
+    val listed = mutableListOf<RemoteFile>()
+    val gone = mutableListOf<String>()
+    override suspend fun changes(cursor: String?) = ChangePage(listed.toList(), gone.toList(), "c", false)
     override suspend fun holds(sha256: String) = sha256 in files
 }

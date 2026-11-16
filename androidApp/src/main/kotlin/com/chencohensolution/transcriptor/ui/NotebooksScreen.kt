@@ -29,7 +29,9 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
@@ -565,6 +567,15 @@ private fun privateMessage(res: android.content.res.Resources, outcome: PrivateO
     else -> res.getString(R.string.notebooks_private_failed, outcome.done, asked, outcome.failed.orEmpty())
 }
 
+/** A small mark on a moment's row: an icon and its word. */
+@Composable
+private fun MomentMark(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
 @Composable
 private fun GroupTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp))
@@ -583,9 +594,16 @@ private fun MomentRow(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         LabelPills(labels)
-        if (m.tucked) Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.VisibilityOff, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.notebooks_tucked), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+        // Marks: tucked away, its audio on the server only (opening brings it), and a call or voice message.
+        val source = when (m.source?.lowercase()) {
+            "call" -> stringResource(R.string.notebooks_source_call)
+            "folder:whatsapp", "whatsapp" -> stringResource(R.string.notebooks_source_voice_message)
+            else -> null
+        }
+        if (m.tucked || m.audioOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (m.tucked) MomentMark(Icons.Filled.VisibilityOff, stringResource(R.string.notebooks_tucked))
+            if (source != null) MomentMark(if (m.source.equals("call", true)) Icons.Filled.Call else Icons.Filled.Mic, source)
+            if (m.audioOnServer) MomentMark(Icons.Filled.Cloud, stringResource(R.string.notebooks_on_server))
         }
         Text(l.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Who was in it, and how it started: what tells one dated moment from the next.

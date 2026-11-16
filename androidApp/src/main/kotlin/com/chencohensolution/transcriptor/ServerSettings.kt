@@ -59,7 +59,8 @@ fun ServerSettings(onBack: () -> Unit) {
     // The server's list of recordings, once paired and each time the page opens.
     LaunchedEffect(state.paired != null) {
         if (state.paired != null) withContext(Dispatchers.IO) {
-            runCatching { Recording.backup.syncServerList() }.onFailure { android.util.Log.w("ServerSettings", "the server's list", it) }
+            Recording.refreshServerMoments()
+            Recording.backup.refreshCache()
         }
     }
     val failed = { e: Throwable ->
@@ -108,8 +109,16 @@ fun ServerSettings(onBack: () -> Unit) {
                     if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context)
                 }
             },
-            backUpNow = { scope.launch(Dispatchers.IO) { Recording.backUp(context) } },
-            setShown = { shown -> scope.launch(Dispatchers.IO) { runCatching { Recording.backup.setShown(shown) } } },
+            backUpNow = { scope.launch(Dispatchers.IO) { Recording.backUp(context); Recording.refreshServerMoments() } },
+            setShown = { shown ->
+                scope.launch(Dispatchers.IO) {
+                    runCatching { Recording.backup.setShown(shown) }
+                    Recording.refreshServerMoments()
+                }
+            },
+            setCacheLimit = { bytes -> scope.launch(Dispatchers.IO) { Recording.backup.setCacheLimit(bytes) } },
+            planFreeUp = { rule -> withContext(Dispatchers.IO) { Recording.freeUpPlan(rule) } },
+            freeUp = { ids, progress -> withContext(Dispatchers.IO) { Recording.freeUp(ids, progress) } },
             unpair = {
                 scope.launch(Dispatchers.IO) {
                     com.chencohensolution.shed.android.ShedUploads.cancel(context)

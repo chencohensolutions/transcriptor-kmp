@@ -245,3 +245,18 @@ anything left to decide. Remove an entry once it is built.
   `MainActivity.askPhoneLock`, `Recording.setTucked` / `makePrivate`, `ui/ServerScreen.kt` (`ShowSwitch`). Strings
   `notebooks_tuck*`, `notebooks_private*`, `notebooks_unlock_tucked`, `notebooks_more`, `notebooks_cancel`,
   `server_show*`, `server_tucked_on_server`.
+
+
+## Server moments, Free up space and the cache limit (Nov 16, 2026)
+
+- Android: the server's recordings (and calls and voice messages when shown) appear as moments; rows carry Call /
+  Voice message / On the server marks (`MomentMark` in `ui/NotebooksScreen.kt`); opening one whose audio is on the
+  server only shows a progress dialog while it comes (`MainActivity.openLecture`, `BringingDialog`). Settings › Server
+  backup has Free up space (rule chips, plan, button, progress, result) and Cache on this phone (2/10/20/50 GB chips).
+  Docs: design.md "Server backup", screens/server.md, screens/notebooks.md.
+- Shared: `LectureSummary.audioOnServer` and `source`; `ServerBackup.adoptServerRecordings`, `syncNotes`,
+  `bringAudio(id, progress)`, `freeUpPlan(rule, now, busy)` (`FreeUpRule`, `FreeUpPlan`), `freeUp(ids, busy,
+  progress)` (`FreeUpResult`), `setCacheLimit`, `refreshCache`, `dismiss`; `ServerState.cacheLimitBytes` and
+  `cacheBytes`. Android files to mirror: `Recording.backUp` / `refreshServerMoments` / `freeUp` / `freeUpPlan`,
+  `ServerSettings.kt`, `ui/ServerScreen.kt` (`FreeUpSection`). Strings `server_free*`, `server_cache*`, `bring_*`,
+  `notebooks_on_server`, `notebooks_source_*`.

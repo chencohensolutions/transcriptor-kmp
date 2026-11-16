@@ -31,6 +31,10 @@ data class LectureSummary(
     val preview: String = "",
     /** Tucked away ([Lecture.tucked]): out of the list until the user shows tucked moments, never found by search. */
     val tucked: Boolean = false,
+    /** Where the recording came from on the server ([Lecture.source]): `call`, `recording`, a voice message's folder; null for one recorded here. */
+    val source: String? = null,
+    /** Its audio is on the server only (freed from the phone, or never brought here): opening it fetches it. */
+    val audioOnServer: Boolean = false,
 )
 
 /**
@@ -76,6 +80,14 @@ data class Lecture(
      * user shows tucked moments with the phone's lock, never found by search. Told to the server too once backed up.
      */
     val tucked: Boolean = false,
+    /**
+     * The sha256 of its audio on the server, when the audio may be there only: a recording of the server's (a call, a
+     * recording from before) made a moment here, or a moment whose audio Free up space removed from the phone.
+     * Opening it fetches the audio again ([com.chencohensolution.transcriptor.backup.ServerBackup.bringAudio]).
+     */
+    val serverSha256: String? = null,
+    /** Where the server says the recording came from (`call`, `recording`, `folder:whatsapp`); null for one recorded here. */
+    val source: String? = null,
 )
 
 /**

@@ -73,7 +73,7 @@ fun Lecture.summary(): LectureSummary {
     return LectureSummary(
         id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels, pendingTranscript,
         people = spoke.filter { it.name.isNotEmpty() }.map { it.name }, unnamedPeople = spoke.count { it.name.isEmpty() },
-        preview = previewOf(this), tucked = tucked,
+        preview = previewOf(this), tucked = tucked, source = source,
     )
 }
 
@@ -111,7 +111,11 @@ class NotebooksController(
         val ids = known.map { it.id }.toSet()
         _library.value = Library(
             labels = known,
-            moments = all.map { it.summary().let { s -> s.copy(labels = s.labels.filter { l -> l in ids }) } },
+            moments = all.map {
+                it.summary().let { s ->
+                    s.copy(labels = s.labels.filter { l -> l in ids }, audioOnServer = it.serverSha256 != null && !lectures.hasAudio(it))
+                }
+            },
             lastLanguage = all.firstOrNull()?.language ?: defaultLanguage(),
         )
     }

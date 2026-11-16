@@ -68,7 +68,18 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      * word times (the largest part, rebuilt by transcribing again), as a JSON text.
      */
     fun serverNote(lecture: Lecture): String =
-        json.encodeToString(LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) })))
+        json.encodeToString(LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) }, serverSha256 = null)))
+
+    /** A moment from what [serverNote] wrote (the server's note's `audioLogs`); null when it isn't one. */
+    fun fromServerNote(text: String): Lecture? = runCatching { json.decodeFromString<LectureFileV1>(text).toLecture() }.getOrNull()
+
+    /** Whether the moment's audio is on the phone (here or in the library), not only on the server. */
+    fun hasAudio(lecture: Lecture): Boolean = runCatching { fileSystemOf(lecture.id).exists(audioPath(lecture)) }.getOrDefault(false)
+
+    /** Deletes the moment's audio from the phone, keeping the rest (Free up space, once the server holds it). */
+    fun deleteAudio(lecture: Lecture) {
+        fileSystemOf(lecture.id).delete(audioPath(lecture), mustExist = false)
+    }
 
     /** Gives the moment these labels (ids), and returns it. Not while it is being recorded or a pass runs on it. */
     fun setLabels(lecture: Lecture, labels: List<String>): Lecture =
@@ -283,6 +294,10 @@ private data class LectureFileV1(
     val liveOff: List<LiveOffV1> = emptyList(),
     /** Tucked away by the user. */
     val tucked: Boolean = false,
+    /** The sha256 of its audio on the server, when the audio may be there only. */
+    val server: String? = null,
+    /** Where the server says it came from (`call`, `recording`, …). */
+    val source: String? = null,
 ) {
     @OptIn(ExperimentalTime::class)
     fun toLecture() = Lecture(
@@ -295,7 +310,7 @@ private data class LectureFileV1(
         versions = versions.map { it.toInfo() }, pendingTranscript = pendingTranscript,
         pauses = pauses.map { Pause(it.atMs, it.pausedAt, it.resumedAt) },
         liveOff = liveOff.map { LiveOff(it.fromMs, it.toMs, it.offAt, it.onAt) },
-        tucked = tucked,
+        tucked = tucked, serverSha256 = server, source = source,
     )
 
     companion object {
@@ -315,7 +330,7 @@ private data class LectureFileV1(
             labels = lecture.labels,
             pauses = lecture.pauses.map { PauseV1(it.atMillis, it.pausedAtMillis, it.resumedAtMillis) },
             liveOff = lecture.liveOff.map { LiveOffV1(it.fromMillis, it.toMillis, it.offAtMillis, it.onAtMillis) },
-            tucked = lecture.tucked,
+            tucked = lecture.tucked, server = lecture.serverSha256, source = lecture.source,
         )
     }
 }

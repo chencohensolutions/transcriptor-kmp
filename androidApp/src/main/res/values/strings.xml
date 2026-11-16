@@ -638,4 +638,30 @@
     <string name="server_tucked_on_server">%1$d more are tucked away.</string>
     <string name="notebooks_unlock_tucked">Show tucked moments</string>
     <string name="notebooks_private_busy">it is being recorded or worked on; try again when it is done</string>
+    <string name="server_cache">Cache on this phone</string>
+    <string name="server_cache_note">Recordings brought from the server are kept here: %1$s of %2$s. The oldest opened leave first when it is full.</string>
+    <string name="server_cache_gb">%1$d GB</string>
+    <string name="server_free">Free up space</string>
+    <string name="server_free_note">Removes the audio of moments the server already holds. Their words and notes stay; opening one brings its audio back.</string>
+    <string name="server_free_everything">Everything backed up</string>
+    <plurals name="server_free_older">
+        <item quantity="one">Older than a month</item>
+        <item quantity="other">Older than %1$d months</item>
+    </plurals>
+    <string name="server_free_keep_newest">Keep the newest %1$d GB</string>
+    <string name="server_free_nothing">Nothing to free: no backed-up moment matches.</string>
+    <plurals name="server_free_plan">
+        <item quantity="one">%1$d moment, %2$s</item>
+        <item quantity="other">%1$d moments, %2$s</item>
+    </plurals>
+    <string name="server_free_done">Freed %2$s from %1$d moments.</string>
+    <string name="server_free_stopped">Freed %1$d moments, then stopped: %2$s</string>
+    <string name="server_free_button">Free up %1$s</string>
+    <string name="bring_title">Bringing the recording from the server</string>
+    <string name="bring_progress">%1$s of %2$s</string>
+    <string name="bring_failed">Couldn\'t bring the recording: %1$s</string>
+    <string name="bring_not_on_server">the server doesn\'t have it</string>
+    <string name="notebooks_on_server">On the server</string>
+    <string name="notebooks_source_call">Call</string>
+    <string name="notebooks_source_voice_message">Voice message</string>
 </resources>

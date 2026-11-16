@@ -304,14 +304,28 @@ library the journal app will share:
 
 - Audio Logs asks shed to upload; nothing else watches its folders. The audio goes as it is kept (FLAC, AAC, or WAV,
   which the server keeps as FLAC), as a sound recording (`kind` AUDIO, source `recording`) with the moment's title as
-  its file name, when it started (with the phone's offset) and its length. Notes, lines and `lecture.json` stay on the
-  phone for now.
+  its file name, when it started (with the phone's offset) and its length.
+- **The words go too** (owner's request, Nov 16, 2026): once a moment's audio is on the server, its transcript, notes,
+  labels, speakers and title are kept with it there as its note (`setNote`, `{"audioLogs": <lecture.json without word
+  times>}`), sent again whenever they change (`ServerBackup.syncNotes`, a hash of the note in `backup.json`).
 - The app enrolls as its own device, `audio-logs` (journal-server-go from Nov 16, 2026, `serverInfo.deviceApps`): a
   device of Audio Logs sees sound recordings, which the server hides from other devices by default.
 - What was handed over is in `backup.json` (version 1, in the app's storage): moment id → the audio's sha256 and file.
   Shed keeps its own queue, cache and the server's list under `files/shed/`; its key is in the Keystore.
-- The server's recordings that aren't moments here are listed on the Server page; showing them as moments without
-  metadata (metadata added later) is the next step.
+- **The server's recordings are moments** (Nov 16, 2026): each recording the server sends Audio Logs (and calls and
+  voice messages once shown) that isn't a moment here becomes one (`ServerBackup.adoptServerRecordings`, about once a
+  minute while the app is open): from its note when Audio Logs saved one (title, lines, notes, labels), else titled
+  by its name (a call: whom it was with) and waiting to be transcribed. Its audio stays on the server until the moment
+  is opened; then shed brings it, with its progress shown, and keeps it here. A moment the server stops sending
+  (deleted, made private, calls turned off) leaves the list unless its audio is here. A server moment deleted here is
+  not brought back (`backup.json` `dismissed`).
+- **Free up space** (as in the journal app, manual only; owner's request, Nov 16, 2026): Settings › Server backup
+  removes the audio of finished moments the server holds (everything backed up, older than 3 or 12 months, or all but
+  the newest 10 GB). Each one's audio is hashed again and checked with the server (`/verify`) before it is deleted;
+  the words stay, and opening the moment brings the audio back. Nothing is dropped on its own.
+- **Cache on this phone**: what shed keeps of what it brought from the server, up to a limit the user picks (2, 10,
+  20 or 50 GB; 2 GB by default), the least recently used leaving first. Shed handles the cache for every app using
+  it; Audio Logs only sets the limit (`ServerBackup.setCacheLimit`).
 
 ### Calls, tucked and private moments (owner's request, Nov 16, 2026)
 

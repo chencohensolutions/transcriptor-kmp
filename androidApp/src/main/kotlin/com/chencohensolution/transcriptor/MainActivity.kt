@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.chencohensolution.transcriptor.notebook.RecordingNow
@@ -85,6 +87,9 @@ class MainActivity : ComponentActivity() {
             if (waiting && charging && !Recording.session.isRecording && Recording.refining.value == null) RecordingService.improvePending(this@MainActivity)
         }
     }
+
+    /** A moment whose audio is on the server only, being brought before it opens: what has come of how much. */
+    private val bringing = mutableStateOf<Pair<Long, Long>?>(null)
 
     /** Asks to show the moment recording now (a long press on the Quick Settings tile): counted, so each one shows it. */
     private val showRecording = androidx.compose.runtime.mutableIntStateOf(0)
@@ -148,6 +153,7 @@ class MainActivity : ComponentActivity() {
                 val chooseFolder = { pickFolder.launch(DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents")) }
                 CompressPending()
                 ReviewPasses()
+                bringing.value?.let { (got, of) -> BringingDialog(got, of) }
                 val state = live
                 val review = opened
                 when {
@@ -373,8 +379,25 @@ class MainActivity : ComponentActivity() {
     /** Opens a recorded moment, under its labels' names. */
     private fun openLecture(lectureId: String, atMillis: Long? = null) {
         val library = Recording.library.library.value
-        val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-        Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)
+        val moment = library.moments.firstOrNull { it.id == lectureId }
+        val labels = moment?.labels.orEmpty()
+        if (moment?.audioOnServer != true) { Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis); return }
+        // Its audio is on the server only (from there, or freed here): brought first, with its progress shown.
+        if (bringing.value != null) return
+        bringing.value = 0L to 0L
+        lifecycleScope.launch {
+            val brought = withContext(Dispatchers.IO) {
+                runCatching { Recording.backup.bringAudio(lectureId) { got, of -> bringing.value = got to of } }
+            }
+            bringing.value = null
+            if (brought.getOrNull() == true) {
+                withContext(Dispatchers.IO) { Recording.library.reload() }
+                Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)
+            } else {
+                val why = brought.exceptionOrNull()?.message ?: getString(R.string.bring_not_on_server)
+                Toast.makeText(this@MainActivity, getString(R.string.bring_failed, why), Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */
@@ -387,6 +410,23 @@ class MainActivity : ComponentActivity() {
         /** Opens on the moment recording now, if one is (else on the moments). */
         const val EXTRA_SHOW_RECORDING = "showRecording"
     }
+}
+
+/** "Bringing the recording from the server": shown while a moment's audio comes before it opens. */
+@Composable
+private fun BringingDialog(got: Long, of: Long) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = {},
+        confirmButton = {},
+        title = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.bring_title)) },
+        text = {
+            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                if (of > 0) androidx.compose.material3.LinearProgressIndicator(progress = { (got.toFloat() / of).coerceIn(0f, 1f) }, modifier = androidx.compose.ui.Modifier.fillMaxWidth())
+                else androidx.compose.material3.LinearProgressIndicator(modifier = androidx.compose.ui.Modifier.fillMaxWidth())
+                if (of > 0) androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.bring_progress, android.text.format.Formatter.formatShortFileSize(LocalContext.current, got), android.text.format.Formatter.formatShortFileSize(LocalContext.current, of)))
+            }
+        },
+    )
 }
 
 /** Lectures recorded as WAV and waiting for FLAC or AAC: encoded on launch, or left to [EncodeJob] when that waits for the charger. */

@@ -453,6 +453,7 @@ object Recording {
     /** Deletes lectures for good (files: not on the main thread), except those recording, open or worked on now. */
     fun delete(lectureIds: List<String>) {
         val busy = busy()
+        backup.dismiss(lectureIds.filter { it !in busy })
         library.delete(lectureIds) { it in busy }
     }
 
@@ -638,7 +639,36 @@ object Recording {
     suspend fun backUp(context: android.content.Context) {
         runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
         if (backup.waiting() > 0) scheduleUploads(context)
+        // The server's recordings as moments, and the moments' transcripts and notes to the server: at most once a minute.
+        val now = System.currentTimeMillis()
+        if (backup.state.value.paired != null && now - lastServerSync > 60_000) {
+            lastServerSync = now
+            runCatching {
+                backup.syncServerList()
+                if (backup.adoptServerRecordings(library.library.value.lastLanguage, busy()) > 0) library.reload()
+                backup.syncNotes(busy())
+            }.onFailure { android.util.Log.w("Recording", "the server's recordings", it) }
+        }
     }
+
+    @Volatile private var lastServerSync = 0L
+
+    /** The server's recordings made moments now (after Calls was switched, or Back up now), not waiting a minute. */
+    suspend fun refreshServerMoments() {
+        lastServerSync = System.currentTimeMillis()
+        runCatching {
+            backup.syncServerList()
+            backup.adoptServerRecordings(library.library.value.lastLanguage, busy())
+            library.reload()
+            backup.syncNotes(busy())
+        }.onFailure { android.util.Log.w("Recording", "the server's recordings", it) }
+    }
+
+    /** Free up space: removes the audio of [ids] the server holds (files and network: not on the main thread). */
+    suspend fun freeUp(ids: List<String>, progress: (Int, Int) -> Unit) =
+        backup.freeUp(ids, busy(), progress).also { library.reload() }
+
+    fun freeUpPlan(rule: com.chencohensolution.transcriptor.backup.FreeUpRule) = backup.freeUpPlan(rule, System.currentTimeMillis(), busy())
 
     fun scheduleUploads(context: android.content.Context) = ShedUploads.schedule(context, backup.wifiOnly)
 
