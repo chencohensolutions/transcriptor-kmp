@@ -22,7 +22,9 @@ without a server.
 - **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands ("3 moments waiting · 120 MB left ·
   12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"); the server didn't
   answer (trying again later) or no longer accepts this phone; moments the server refused, by title; **Back up now**;
-  **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: **Calls**
+  **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
+  choice of this phone kept in `backup.json`; off, the moments list and search show only what was recorded in Audio
+  Logs, nothing from the server or other phones, and backup goes on; Nov 16, 2026), then, while it is on, **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
   private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Back up calls** (Nov 16, 2026: Audio Logs, not the journal app, backs calls up, apart from whether it shows
   them), right under Wi‑Fi only: a switch that first explains and opens the system's folder picker (Samsung:

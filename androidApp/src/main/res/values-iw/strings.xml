@@ -652,6 +652,9 @@
     <string name="server_calls_stop_title">להפסיק לשלוח שיחות?</string>
     <string name="server_calls_stop_note">השיחות שכבר בשרת נשארות שם, והטלפון שומר את השיחות שלו.</string>
     <string name="server_calls_stop">הפסקה</string>
+    <string name="server_show_server">הקלטות מהשרת</string>
+    <string name="server_show_server_on">הרשימה מציגה גם את ההקלטות שבשרת: מטלפונים אחרים, שיחות ומכשירי הקלטה.</string>
+    <string name="server_show_server_off">הרשימה מציגה רק מה שהקלטת ביומן קול. הגיבוי ממשיך.</string>
     <string name="server_show_calls_backed_up">מוסתרות כאן, ועדיין מגובות.</string>
     <string name="server_show_calls">שיחות</string>
     <string name="server_show_calls_note">הקלטות של שיחות טלפון. כבוי: השרת לא שולח אותן לאפליקציה הזו.</string>

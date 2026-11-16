@@ -80,6 +80,8 @@ class ServerActions(
     val setWifiOnly: (Boolean) -> Unit = {},
     val backUpNow: () -> Unit = {},
     val unpair: () -> Unit = {},
+    /** Shows the server's recordings in the moments list, or only what Audio Logs recorded. */
+    val setShowServer: (Boolean) -> Unit = {},
     /** Turns calls or voice messages on or off for Audio Logs on the server. */
     val setShown: (SoundRecordingsShown) -> Unit = {},
     /** Puts calls or voice messages behind the phone's lock, or takes them out. */
@@ -202,9 +204,11 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         Switch(checked = state.wifiOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
     CallsSection(state, actions)
-    state.shown?.let { shown ->
-        HorizontalDivider()
-        Text(stringResource(R.string.server_show), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    HorizontalDivider()
+    Text(stringResource(R.string.server_show), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    // Off: the list shows only what Audio Logs recorded; backup goes on (owner's call, Nov 16, 2026).
+    ShowSwitch(R.string.server_show_server, if (state.showServer) R.string.server_show_server_on else R.string.server_show_server_off, state.showServer, actions.setShowServer)
+    state.shown?.takeIf { state.showServer }?.let { shown ->
         // Hidden here and still backed up: said so, so the calls don't look gone.
         val callsNote = if (!shown.calls && state.callsFolder != null) R.string.server_show_calls_backed_up else R.string.server_show_calls_note
         ShowSwitch(R.string.server_show_calls, callsNote, shown.calls) { actions.setShown(shown.copy(calls = it)) }

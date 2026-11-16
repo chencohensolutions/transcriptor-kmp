@@ -125,6 +125,21 @@ class NotebooksTest {
     }
 
     @Test
+    fun theServersRecordingsTurnedOffLeaveOnlyWhatAudioLogsRecorded() {
+        lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
+        lectures.save(lecture("r", 2_000).copy(title = "A recorder's lecture", source = "recording"))
+        var shown = Shown()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, shown = { shown })
+        controller.reload()
+        controller.setServer(ServerPart(listOf(lecture("s", 3_000).copy(title = "Another phone's lecture").summary())))
+        assertEquals(listOf("s", "r", "a"), controller.library.value.moments.map { it.id })
+        shown = Shown(server = false)
+        controller.reload()
+        assertEquals(listOf("a"), controller.library.value.moments.map { it.id })
+        assertEquals(listOf("a"), controller.search("lecture").map { it.moment.id })
+    }
+
+    @Test
     fun withAServerTheMomentsOnlyHereAreMarkedAndNothingElse() {
         lectures.save(lecture("here", 1_000))
         lectures.save(lecture("backed", 2_000))

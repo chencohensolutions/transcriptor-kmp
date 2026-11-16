@@ -39,8 +39,15 @@ data class RecordingNow(val labels: List<String>, val lectureTitle: String, val 
 data class Locks(val calls: Boolean = false, val voiceMessages: Boolean = false)
 
 /** Whether a moment from the server's [source] is a phone call. */
-/** Which kinds of sound from the server the list shows (Settings › Server backup); both while not paired. */
-data class Shown(val calls: Boolean = true, val voiceMessages: Boolean = true)
+/**
+ * Which kinds of sound from the server the list shows (Settings › Server backup); both while not paired. [server] off:
+ * none of the server's recordings, only moments Audio Logs recorded (on this phone, or on another and kept here).
+ */
+data class Shown(val calls: Boolean = true, val voiceMessages: Boolean = true, val server: Boolean = true) {
+    /** Whether the list leaves out a moment from [source] (null: recorded in Audio Logs). */
+    fun hides(source: String?): Boolean =
+        (!server && source != null) || (!calls && isCall(source)) || (!voiceMessages && isVoiceMessage(source))
+}
 
 fun isCall(source: String?): Boolean = source.equals("call", ignoreCase = true)
 
@@ -202,8 +209,8 @@ class NotebooksController(
         val hereIds = here.map { it.id }.toSet()
         val mine = if (backedUp == null) here else here.map { it.copy(notOnServer = !it.audioOnServer && it.source == null && !backedUp(it.id)) }
         val kinds = shown()
-        val moments = (mine + server.moments.filter { it.id !in hereIds })
-            .filter { (kinds.calls || !isCall(it.source)) && (kinds.voiceMessages || !isVoiceMessage(it.source)) }
+        val fromServer = if (kinds.server) server.moments.filter { it.id !in hereIds } else emptyList()
+        val moments = (mine + fromServer).filter { !kinds.hides(it.source) }
             .sortedByDescending { it.startedAtMillis }
         _library.value = Library(
             labels = known,
@@ -221,8 +228,7 @@ class NotebooksController(
     fun search(query: String): List<SearchHit> {
         val shut = _library.value.moments.filter { it.locked }.map { it.id }.toSet()
         val kinds = shown()
-        val off = { l: Lecture -> (!kinds.calls && isCall(l.source)) || (!kinds.voiceMessages && isVoiceMessage(l.source)) }
-        return searchMoments(lectures.all().filter { !it.tucked && it.id !in shut && !off(it) }, labels.all(), query)
+        return searchMoments(lectures.all().filter { !it.tucked && it.id !in shut && !kinds.hides(it.source) }, labels.all(), query)
     }
 
     /** Puts the label's moments behind the phone's lock ("Needs fingerprint"), or takes them out. */
