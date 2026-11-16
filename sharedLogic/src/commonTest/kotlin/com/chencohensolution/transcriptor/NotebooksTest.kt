@@ -5,6 +5,7 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
 import com.chencohensolution.transcriptor.notebook.INDEX_FILE
 import com.chencohensolution.transcriptor.notebook.ServerPart
+import com.chencohensolution.transcriptor.notebook.Shown
 import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.LabelStore
@@ -107,6 +108,20 @@ class NotebooksTest {
         locks = Locks(calls = true)
         controller.locksChanged()
         assertEquals(mapOf("a" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
+    }
+
+    @Test
+    fun callsTurnedOffLeaveTheListAndItsSearch() {
+        lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
+        lectures.save(lecture("c", 2_000).copy(title = "A call", source = "call"))
+        var shown = Shown()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, shown = { shown })
+        controller.reload()
+        assertEquals(listOf("c", "a"), controller.library.value.moments.map { it.id })
+        shown = Shown(calls = false)
+        controller.reload()
+        assertEquals(listOf("a"), controller.library.value.moments.map { it.id })
+        assertEquals(emptyList(), controller.search("call").map { it.moment.id })
     }
 
     @Test

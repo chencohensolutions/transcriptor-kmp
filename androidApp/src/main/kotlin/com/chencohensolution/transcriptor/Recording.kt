@@ -690,28 +690,20 @@ object Recording {
     /** The server's recordings the list holds, by the id their moment has: to make one a moment here when it is opened. */
     @Volatile private var serverById: Map<String, com.chencohensolution.shed.RemoteFile> = emptyMap()
 
-    /** The list's server recordings as moments, each time its window of pages changes. */
+    @Volatile private var summaryCache: Map<com.chencohensolution.shed.RemoteFile, Pair<String, com.chencohensolution.transcriptor.notebook.LectureSummary>> = emptyMap()
+
+    /** The list's server recordings as moments, each time the server's list changes. */
     private fun showServerMoments(window: com.chencohensolution.transcriptor.backup.ServerWindow) {
         // Moments made earlier from these recordings take the source they have now (calls filed as recordings).
         if (runCatching { backup.takeSources(window.files) }.getOrDefault(false)) library.reload()
         val language = library.library.value.lastLanguage
         val shown = window.files.filter { !backup.isMomentHere(it.sha256) && !backup.isDismissed(it.sha256) }
-        val summaries = shown.map { it to backup.summaryOf(it, language) }
+        // Made again only for a recording that changed: the list may hold thousands.
+        val before = summaryCache
+        val summaries = shown.map { f -> f to (before[f]?.takeIf { it.first == language }?.second ?: backup.summaryOf(f, language)) }
+        summaryCache = summaries.associate { (f, s) -> f to (language to s) }
         serverById = summaries.associate { (file, s) -> s.id to file }
         library.setServer(com.chencohensolution.transcriptor.notebook.ServerPart(summaries.map { it.second }, window.older, window.newer, window.loading))
-    }
-
-    /** The list neared its end: the next older page of the server's recordings. */
-    suspend fun olderServerMoments() = runCatching {
-        // After a page that couldn't be read, a pause before asking the server again.
-        if (backup.serverMoments.window.value.failed != null) kotlinx.coroutines.delay(5_000)
-        backup.serverMoments.older()
-    }
-
-    /** The list neared its top after scrolling far: the page just newer. */
-    suspend fun newerServerMoments() = runCatching {
-        if (backup.serverMoments.window.value.failed != null) kotlinx.coroutines.delay(5_000)
-        backup.serverMoments.newer()
     }
 
     /**
@@ -765,7 +757,7 @@ object Recording {
         val root = app.filesDir.toOkioPath()
         store = LectureStore(FileSystem.SYSTEM, root, utcOffset)
         backup = ServerBackup(store, FileSystem.SYSTEM, root, utcOffset)
-        shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator)
+        shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator, listedKinds = setOf(com.chencohensolution.shed.FileKind.AUDIO))
         backup.attach(shed.shed, shed.journal)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
@@ -784,7 +776,8 @@ object Recording {
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
         library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks,
-            onServer = { if (backup.state.value.paired == null) null else { id -> backup.stateOf(id) is com.chencohensolution.transcriptor.backup.MomentBackup.BackedUp } })
+            onServer = { if (backup.state.value.paired == null) null else { id -> backup.stateOf(id) is com.chencohensolution.transcriptor.backup.MomentBackup.BackedUp } },
+            shown = { backup.state.value.shown?.let { com.chencohensolution.transcriptor.notebook.Shown(it.calls, it.voiceMessages) } ?: com.chencohensolution.transcriptor.notebook.Shown() })
         // A backup done, or the pairing changed: the marks again.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { backup.state.collect { runCatching { library.locksChanged() } } }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {

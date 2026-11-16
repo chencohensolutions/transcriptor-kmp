@@ -304,8 +304,6 @@ class MainActivity : ComponentActivity() {
             notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode),
             NotebooksActions(
                 openLecture = ::openLecture,
-                olderFromServer = { io { Recording.olderServerMoments() } },
-                newerFromServer = { io { Recording.newerServerMoments() } },
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
                 openLectureAt = { id, at -> openLecture(id, at) },
                 search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },

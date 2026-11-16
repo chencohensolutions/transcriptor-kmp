@@ -122,32 +122,6 @@ private data class BackupFileV1(
     val labelsBase: List<ServerLabel>? = null,
 )
 
-/** `server-page.json`: the server's newest page of recordings, shown at once on the next start (version 1). */
-@Serializable
-private data class KeptPageV1(val v: Int = 1, val files: List<KeptFileV1> = emptyList(), val older: String? = null) {
-    fun toPage() = com.chencohensolution.shed.FilePage(files.map { it.toFile() }, older, null)
-
-    companion object {
-        fun of(page: com.chencohensolution.shed.FilePage) = KeptPageV1(files = page.files.map(KeptFileV1::of), older = page.older)
-    }
-}
-
-@Serializable
-private data class KeptFileV1(
-    val sha256: String,
-    val size: Long,
-    val about: com.chencohensolution.shed.FileAbout,
-    val storedAt: String? = null,
-    val tucked: Boolean = false,
-    val note: String? = null,
-) {
-    fun toFile() = com.chencohensolution.shed.RemoteFile(sha256, size, about, storedAt, tucked, note)
-
-    companion object {
-        fun of(f: com.chencohensolution.shed.RemoteFile) = KeptFileV1(f.sha256, f.size, f.about, f.storedAt, f.tucked, f.note)
-    }
-}
-
 @Serializable
 private data class HandedOver(
     val sha256: String,
@@ -210,31 +184,14 @@ class ServerBackup(
     private val prefetch = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
 
     /**
-     * The server's recordings that the moments list holds now, read a page at a time as the user scrolls: those that
-     * are moments here already are left out by the list ([isMomentHere]).
+     * The server's recordings for the moments list, from shed's copy of the server's list kept on the phone and brought
+     * up to date from the change feed: those that are moments here already are left out by the list ([isMomentHere]).
      */
     val serverMoments = ServerMoments(
-        { before, after, limit -> shed.page(FileKind.AUDIO, before, after, limit) },
-        kept = keptPage(),
-        keep = ::keepPage,
+        files = { if (::shed.isInitialized) shed.remote.value else emptyList() },
+        sync = { shed.sync() },
+        forget = { shed.forgetRemote() },
     )
-
-    /** The server's newest page as kept last time ([ServerMoments]); null when none or it can't be read. */
-    private fun keptPage(): com.chencohensolution.shed.FilePage? = runCatching {
-        if (!fileSystem.exists(pageFile)) return null
-        json.decodeFromString<KeptPageV1>(fileSystem.read(pageFile) { readUtf8() }).toPage()
-    }.getOrNull()
-
-    private fun keepPage(page: com.chencohensolution.shed.FilePage?) {
-        if (page == null) {
-            fileSystem.delete(pageFile, mustExist = false)
-            return
-        }
-        fileSystem.createDirectories(pageFile.parent!!)
-        val temp = pageFile.parent!! / "server-page.json.tmp"
-        fileSystem.write(temp) { writeUtf8(Json.encodeToString(KeptPageV1.of(page))) }
-        fileSystem.atomicMove(temp, pageFile)
-    }
 
     /** Whether the server's recording [sha256] is a moment here already (handed over from here, or opened). */
     fun isMomentHere(sha256: String): Boolean = sha256 in momentShas
@@ -250,6 +207,9 @@ class ServerBackup(
         this.shed = shed
         this.journal = journal
         shed.cacheLimitBytes = kept.cacheLimitBytes
+        // The newest page kept by builds that read the server's list in pages; the whole list is kept by shed now.
+        runCatching { fileSystem.delete(pageFile, mustExist = false) }
+        serverMoments.show()
         refresh()
     }
 

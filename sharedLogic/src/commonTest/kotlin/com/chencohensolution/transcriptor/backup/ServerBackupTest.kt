@@ -160,48 +160,20 @@ class ServerBackupTest {
     }
 
     @Test
-    fun theWindowKeepsAFewPagesWhicheverWayTheUserScrolls() = runTest {
-        fun file(i: Int) = RemoteFile(i.toString().padStart(64, '0'), 1, FileAbout("$i.m4a", "audio/mp4", FileKind.AUDIO))
-        var all = (24 downTo 0).map(::file)
-        val moments = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, maxPages = 2)
+    fun theServersListIsShownWholeNewestFirstFromWhatThePhoneKeeps() = runTest {
+        fun file(i: Int, taken: String?) = RemoteFile(i.toString().padStart(64, '0'), 1, FileAbout("$i.m4a", "audio/mp4", FileKind.AUDIO, takenAt = taken), storedAt = "2026-01-0${i}T10:00:00Z")
+        var kept = listOf(file(1, "2025-03-01T10:00:00+02:00"), file(2, null), file(3, "2024-01-01T10:00:00Z"))
+        var forgot = false
+        val moments = ServerMoments({ kept }, { kept = kept + file(4, "2026-11-16T10:00:00Z") }, { forgot = true; kept = emptyList() })
         fun shown() = moments.window.value.files.map { it.about.fileName.substringBefore('.').toInt() }
+        moments.show()
+        assertEquals(listOf(2, 1, 3), shown(), "as kept, before the server answers; by when each was made, else stored")
         moments.refresh()
-        assertEquals((24 downTo 20).toList(), shown())
-        moments.older()
-        moments.older()
-        assertEquals((19 downTo 10).toList(), shown(), "the newest page was let go")
-        assertTrue(moments.window.value.newer && moments.window.value.older)
-        moments.refresh()
-        assertEquals((19 downTo 10).toList(), shown(), "scrolled away from the newest: left as it is")
-        moments.newer()
-        assertEquals((24 downTo 15).toList(), shown())
-        assertEquals(false, moments.window.value.newer)
-        // A new recording arrives: the newest page is read again and meets the window.
-        all = listOf(file(25)) + all
-        moments.refresh()
-        assertEquals((25 downTo 15).toList(), shown())
-    }
-
-    @Test
-    fun theNewestPageIsKeptAndShownAtOnceOnTheNextStart() = runTest {
-        fun file(i: Int) = RemoteFile(i.toString().padStart(64, '0'), 1, FileAbout("$i.m4a", "audio/mp4", FileKind.AUDIO))
-        var all = (9 downTo 0).map(::file)
-        var kept: FilePage? = null
-        val first = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, keep = { kept = it })
-        first.refresh()
-        first.older()
-        assertEquals((9 downTo 5).toList(), kept!!.files.map { it.about.fileName.substringBefore('.').toInt() }, "only the newest page")
-        // The next start: shown before the server answers, then brought up to date.
-        all = listOf(file(10)) + all
-        val next = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, kept = kept, keep = { kept = it })
-        assertEquals((9 downTo 5).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
-        assertTrue(next.window.value.older)
-        next.refresh()
-        assertEquals((10 downTo 5).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
-        next.older()
-        assertEquals((10 downTo 0).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
-        next.clear()
-        assertEquals(null, kept)
+        assertEquals(listOf(4, 2, 1, 3), shown())
+        assertEquals(false, moments.window.value.older || moments.window.value.loading)
+        assertEquals(1L, moments.find("4".padStart(64, '0'))?.size)
+        moments.clear()
+        assertTrue(forgot && moments.window.value.files.isEmpty())
     }
 
     @Test
@@ -318,7 +290,7 @@ private class MemoryStorage : ShedBackend {
     /** What the change list answers: everything listed, every time. */
     val listed = mutableListOf<RemoteFile>()
     val gone = mutableListOf<String>()
-    override suspend fun changes(cursor: String?) = ChangePage(listed.toList(), gone.toList(), "c", false)
+    override suspend fun changes(cursor: String?, kinds: Set<FileKind>) = ChangePage(listed.toList(), gone.toList(), "c", false)
     override suspend fun holds(sha256: String) = sha256 in files
     override suspend fun page(kind: FileKind, before: String?, after: String?, limit: Int) = pageOf(listed.toList(), before, after, limit)
     var appData = mutableMapOf<String, String>()

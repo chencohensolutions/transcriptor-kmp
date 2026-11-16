@@ -39,6 +39,9 @@ data class RecordingNow(val labels: List<String>, val lectureTitle: String, val 
 data class Locks(val calls: Boolean = false, val voiceMessages: Boolean = false)
 
 /** Whether a moment from the server's [source] is a phone call. */
+/** Which kinds of sound from the server the list shows (Settings › Server backup); both while not paired. */
+data class Shown(val calls: Boolean = true, val voiceMessages: Boolean = true)
+
 fun isCall(source: String?): Boolean = source.equals("call", ignoreCase = true)
 
 /**
@@ -148,6 +151,11 @@ class NotebooksController(
     private val locks: () -> Locks = { Locks() },
     /** Whether a moment is backed up on the server; null while the phone isn't paired with one (then no mark at all). */
     private val onServer: () -> ((String) -> Boolean)? = { null },
+    /**
+     * The kinds of sound the user turned off in Audio Logs (calls, voice messages; the server stops sending them): their
+     * moments leave the list too, those opened from the server earlier among them, so no Calls filter is left.
+     */
+    private val shown: () -> Shown = { Shown() },
 ) {
     private val _library = MutableStateFlow(Library())
     val library: StateFlow<Library> = _library.asStateFlow()
@@ -193,7 +201,10 @@ class NotebooksController(
         val here = local.filter { (newest == null || it.startedAtMillis <= newest) && (oldest == null || it.startedAtMillis >= oldest) }
         val hereIds = here.map { it.id }.toSet()
         val mine = if (backedUp == null) here else here.map { it.copy(notOnServer = !it.audioOnServer && it.source == null && !backedUp(it.id)) }
-        val moments = (mine + server.moments.filter { it.id !in hereIds }).sortedByDescending { it.startedAtMillis }
+        val kinds = shown()
+        val moments = (mine + server.moments.filter { it.id !in hereIds })
+            .filter { (kinds.calls || !isCall(it.source)) && (kinds.voiceMessages || !isVoiceMessage(it.source)) }
+            .sortedByDescending { it.startedAtMillis }
         _library.value = Library(
             labels = known,
             moments = moments.map { s -> s.copy(labels = s.labels.filter { l -> l in ids }, locked = locked(s)) },
@@ -209,7 +220,9 @@ class NotebooksController(
     /** The moments [query] is found in, newest first ([searchMoments]). Reads every moment: not on the main thread. */
     fun search(query: String): List<SearchHit> {
         val shut = _library.value.moments.filter { it.locked }.map { it.id }.toSet()
-        return searchMoments(lectures.all().filter { !it.tucked && it.id !in shut }, labels.all(), query)
+        val kinds = shown()
+        val off = { l: Lecture -> (!kinds.calls && isCall(l.source)) || (!kinds.voiceMessages && isVoiceMessage(l.source)) }
+        return searchMoments(lectures.all().filter { !it.tucked && it.id !in shut && !off(it) }, labels.all(), query)
     }
 
     /** Puts the label's moments behind the phone's lock ("Needs fingerprint"), or takes them out. */

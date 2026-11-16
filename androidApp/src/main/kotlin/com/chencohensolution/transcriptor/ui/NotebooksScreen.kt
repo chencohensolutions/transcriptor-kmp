@@ -120,10 +120,6 @@ import java.util.Locale
 class NotebooksActions(
     /** Opens a recorded moment. */
     val openLecture: (lectureId: String) -> Unit = {},
-    /** The list neared its end: read the next older page of the server's recordings. */
-    val olderFromServer: () -> Unit = {},
-    /** The list neared its top after older pages let the newest go: read the page just newer. */
-    val newerFromServer: () -> Unit = {},
     /** Opens a moment a search found, at the line or note it found ([atMillis]; null: from where it was). */
     val openLectureAt: (lectureId: String, atMillis: Long?) -> Unit = { _, _ -> },
     /** The moments a query is found in (titles, people, labels, notes, what was said); reads files off the main thread. */
@@ -478,27 +474,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
             SearchResults(searching, hits, labelsById, state, padding) { hit -> actions.openLectureAt(hit.moment.id, hit.atMillis) }
             return@Scaffold
         }
-        // The server's recordings come a page at a time: near the end the next older page, near the top (after older
-        // pages let the newest go) the page just newer. The list keeps its place by each row's key.
+        // The server's recordings are all listed, from the copy of the server's list kept on the phone.
         val list = place.list
-        val nearEnd by remember { androidx.compose.runtime.derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.index >= list.layoutInfo.totalItemsCount - 15 } == true } }
-        val nearTop by remember { androidx.compose.runtime.derivedStateOf { list.firstVisibleItemIndex <= 10 } }
-        // Asked again each time a page arrives: a page whose recordings are all moments here already (or all out of
-        // the label shown) adds no row, and the list still needs the next one.
-        // Pages that showed nothing (all behind the lock, or under another label) are read on only a few times in a
-        // row: then a button asks before going further back, so the list doesn't walk through years on its own.
-        var emptyPages by remember { mutableStateOf(-1) } // the first count is the list as it opens, not a page
-        var rowsBefore by remember { mutableStateOf(state.moments.size) }
-        LaunchedEffect(state.serverLoading) {
-            if (state.serverLoading) return@LaunchedEffect
-            emptyPages = if (state.moments.size == rowsBefore) emptyPages + 1 else 0
-            rowsBefore = state.moments.size
-        }
-        val readOn = emptyPages < EMPTY_PAGES
-        LaunchedEffect(nearEnd, state.serverOlder, state.serverLoading, state.moments.size, readOn) {
-            if (nearEnd && state.serverOlder && !state.serverLoading && readOn) actions.olderFromServer()
-        }
-        LaunchedEffect(nearTop, state.serverNewer, state.serverLoading, state.moments.size) { if (nearTop && state.serverNewer && !state.serverLoading) actions.newerFromServer() }
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
             folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
             item {
@@ -575,10 +552,10 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                     }
                 }
             }
-            if (state.serverOlder || state.serverLoading) item(key = "server-more") {
+            // Only the first time the server's list is read, with nothing of it on the phone yet.
+            if (state.serverLoading) item(key = "server-more") {
                 Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    if (state.serverLoading || readOn) androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                    else TextButton(onClick = { emptyPages = 0; rowsBefore = state.moments.size }) { Text(stringResource(R.string.notebooks_older)) }
+                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
             }
         }
@@ -590,8 +567,6 @@ private const val NO_LABEL = "-"
 /** The filter for calls, by their type. */
 private const val CALLS_FILTER = "~calls"
 
-/** Pages in a row that added no row before the list stops reading on by itself. */
-private const val EMPTY_PAGES = 3
 private const val DAY = 24 * 60 * 60_000L
 
 @Composable
