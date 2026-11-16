@@ -48,6 +48,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
+    var wifiOnly by remember { mutableStateOf(Recording.settings.modelsOnWifiOnly) }
     var micInput by remember { mutableStateOf(Recording.settings.micInput) }
     var micInputs by remember { mutableStateOf(Recording.audioInputs.connected()) }
     androidx.compose.runtime.DisposableEffect(Unit) {
@@ -95,7 +96,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters, levelMeter = levelMeter, modelsOnWifiOnly = wifiOnly, micInput = micInput, micInputs = micInputs,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -143,6 +144,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             },
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
+            setModelsOnWifiOnly = { wifiOnly = it; io { Recording.settings.modelsOnWifiOnly = it } },
             setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
             chooseFolder = chooseFolder,
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },

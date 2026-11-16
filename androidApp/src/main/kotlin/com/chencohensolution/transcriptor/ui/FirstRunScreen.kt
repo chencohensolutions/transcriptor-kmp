@@ -1,5 +1,6 @@
 package com.chencohensolution.transcriptor.ui
 
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,12 +41,16 @@ data class FirstRunModel(val model: SpeechModel, val job: FirstRunJob, val statu
  * First run's "Get your models": the defaults for [language] on this phone ([models]), their total size, and
  * whether their download was [started].
  */
-data class FirstRunState(val languages: List<String>, val models: List<FirstRunModel>, val started: Boolean) {
+data class FirstRunState(val languages: List<String>, val models: List<FirstRunModel>, val started: Boolean, val wifiOnly: Boolean = false) {
     val totalBytes get() = models.sumOf { it.model.sizeBytes }
     val allReady get() = models.all { it.status == ModelStatus.Ready }
 }
 
-class FirstRunActions(val download: () -> Unit, val later: () -> Unit, val retry: (SpeechModel) -> Unit, val done: () -> Unit)
+class FirstRunActions(
+    val download: () -> Unit, val later: () -> Unit, val retry: (SpeechModel) -> Unit, val done: () -> Unit,
+    /** Downloads wait for Wi-Fi (Settings › Advanced has it too). */
+    val setWifiOnly: (Boolean) -> Unit = {},
+)
 
 /**
  * The app's first screen on a new install: the models it will use, got with one tap through the same downloads as
@@ -74,6 +79,18 @@ fun FirstRunScreen(state: FirstRunState, actions: FirstRunActions) {
                     stringResource(R.string.first_run_total, modelsSize(state.totalBytes)),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // Any network by default; waiting for Wi-Fi spares mobile data (the models are large).
+                if (!state.started) Row(
+                    Modifier.fillMaxWidth().padding(top = 8.dp)
+                        .toggleable(value = state.wifiOnly, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = actions.setWifiOnly),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Checkbox(checked = state.wifiOnly, onCheckedChange = null)
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text(stringResource(R.string.models_wifi_only), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.models_wifi_only_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 if (state.started && !state.allReady) {
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.first_run_background), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

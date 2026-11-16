@@ -24,10 +24,11 @@ sealed interface ModelStatus {
 /**
  * The models on the phone, in the app's external files: `Android/data/<app>/files/models/<id>/`, one file per
  * [ModelFile], and `.ok` once the model is ready. Each file is downloaded by the system's DownloadManager (it goes
- * on in the background, resumes, and shows its own notification), over Wi-Fi only, to `<name>.part`; then checked
+ * on in the background, resumes, and shows its own notification), over any network or, when [wifiOnly] says so,
+ * Wi-Fi only (as the download is started), to `<name>.part`; then checked
  * against the catalog's sha256, quantized when the catalog says so (a Whisper model's one file), and renamed.
  */
-class ModelFiles(context: Context) {
+class ModelFiles(context: Context, private val wifiOnly: () -> Boolean = { false }) {
     private val root = File(context.getExternalFilesDir(null), "models").apply { mkdirs() }
     private val downloads = context.getSystemService(DownloadManager::class.java)
     private val prefs = context.getSharedPreferences("model-downloads", Context.MODE_PRIVATE)
@@ -60,7 +61,8 @@ class ModelFiles(context: Context) {
                     .setTitle("${model.name} · ${file.name}")
                     .setDestinationUri(Uri.fromFile(part(model, file)))
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-                    .setAllowedOverMetered(false),
+                    .setAllowedOverMetered(!wifiOnly())
+                    .setAllowedOverRoaming(!wifiOnly()),
             )
             prefs.edit().putLong(key(model, file), id).apply()
         }

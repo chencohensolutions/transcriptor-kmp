@@ -615,7 +615,7 @@ object Recording {
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
         library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage)
-        models = ModelFiles(app)
+        models = ModelFiles(app) { settings.modelsOnWifiOnly }
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
             AndroidRecorder(inputs = com.chencohensolution.transcriptor.recording.AndroidAudioInputs(app).also { audioInputs = it }), store, settings, CoroutineScope(SupervisorJob() + Dispatchers.Default),

@@ -9,10 +9,11 @@ the phone (`DefaultModels.offerFirstRun`). A phone set up before first run exist
 
 ## What it shows
 
-- "Get your models", and that everything is transcribed on the phone and downloads over Wi-Fi.
+- "Get your models", and that everything is transcribed on the phone.
 - One row per model, by job: live transcript, improve after recording, telling voices apart, who speaks when, speakers after recording; each
   with its name and size, then its download: progress, Waiting for Wi-Fi, a check mark, or Retry.
-- The total size.
+- The total size, and **Download models over Wi-Fi only** (a checkbox, off by default: hen, Nov 16, 2026; the same
+  switch as Settings › Advanced, `SettingsStore.modelsOnWifiOnly`, read as each download starts).
 - Later and Download; once started, Continue (they go on downloading in the background) or, when all are here, Start.
 
 ## Behaviour

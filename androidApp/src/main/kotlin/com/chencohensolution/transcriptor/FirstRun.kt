@@ -40,6 +40,7 @@ fun FirstRun(onDone: () -> Unit) {
     val languages = remember { listOf(Recording.phoneLanguage(), DefaultModels.FIRST_LANGUAGE).distinct() }
     val chip = SherpaNpuWhisperEngine.chip
     var started by remember { mutableStateOf(false) }
+    var wifiOnly by remember { mutableStateOf(Recording.settings.modelsOnWifiOnly) }
     var changed by remember { mutableStateOf(0) }
     val all = remember(changed) {
         languages.associateWith { DefaultModels.forLanguage(it, chip, fails = { m -> Recording.modelLibrary.npu(m.id)?.runs == false }) }
@@ -109,6 +110,7 @@ fun FirstRun(onDone: () -> Unit) {
                 FirstRunModel(m, job, if (status == ModelStatus.Ready && m.id in checking) ModelStatus.Checking else status, language)
             },
             started = started,
+            wifiOnly = wifiOnly,
         ),
         FirstRunActions(
             download = {
@@ -118,6 +120,7 @@ fun FirstRun(onDone: () -> Unit) {
             later = { io { Recording.settings.firstRunDone = true }; onDone() },
             retry = { m -> io { Recording.models.download(m) } },
             done = onDone,
+            setWifiOnly = { on -> wifiOnly = on; io { Recording.settings.modelsOnWifiOnly = on } },
         ),
     )
 }

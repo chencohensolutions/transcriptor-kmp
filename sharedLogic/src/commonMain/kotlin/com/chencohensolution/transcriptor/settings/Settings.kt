@@ -171,6 +171,8 @@ private data class SettingsFileV1(
     val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
+    /** Model downloads wait for Wi-Fi; off (the default, the owner's choice, Nov 16, 2026): any network. */
+    val modelsOnWifiOnly: Boolean = false,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -311,6 +313,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var levelMeter: LevelMeterStyle
         get() = LevelMeterStyle.of(read().levelMeter)
         set(value) = write(read().copy(levelMeter = value.key))
+
+    /** Model downloads wait for Wi-Fi instead of going over any network (the default). */
+    var modelsOnWifiOnly: Boolean
+        get() = read().modelsOnWifiOnly
+        set(value) = write(read().copy(modelsOnWifiOnly = value))
 
     /** How readily [modelId] starts a new speaker: -1 fewer speakers, 1 more, 0 its tuned thresholds. */
     fun speakerTuning(modelId: String): Float = read().speakerTuning[modelId] ?: DEFAULT_SPEAKER_TUNING[modelId] ?: 0f
