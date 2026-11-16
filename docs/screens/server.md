@@ -12,7 +12,9 @@ without a server.
 
 - Settings, under **Recordings**, a **Server backup** row: "Off: moments stay on this phone only", or "On, to
   home.example:56398", with how many moments wait.
-- **Not paired**: what it does and that the app works without it; how to get the link (run `journal-server
+- **Not paired**: what it does and that the app works without it; when another app on the phone uses shed (the
+  journal app, once it moves to shed), **Use the server from Journal**: that app asks the user to confirm and shares
+  its server, with no new enrollment code (one enrollment per phone, owner's request, Nov 16, 2026); how to get the link (run `journal-server
   enroll-code <user>` on the server's computer and copy the `journal://enroll…` link under its QR code); the link field
   (always left to right), the phone's name on the server (the phone's model by default), **Check** (asks the server
   who the code is for without using it: "For hen on home.example:56398") and **Pair**. Errors in plain words: not an
@@ -44,6 +46,8 @@ without a server.
   `Recording.scheduleUploads`; `TranscriptorApp` is shed's `ShedHost` for the upload work.
 - Shared: `sharedLogic/.../backup/ServerBackup.kt` (`ServerBackup`, `ServerState`, `MomentBackup`), tested in
   `ServerBackupTest`.
+- One enrollment per phone: shed's `ShedSiblings` (finding and asking the other apps) and `SharePairingActivity` (Audio
+  Logs answers journal's ask the same way, once paired).
 - Strings: `server_*`.
 
 ## Not yet

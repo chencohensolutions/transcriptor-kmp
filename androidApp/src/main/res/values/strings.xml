@@ -603,4 +603,7 @@
     <string name="server_unpair_title">Unpair from the server?</string>
     <string name="server_unpair_note">What was sent stays on the server, and every moment stays on this phone. Nothing is sent until you pair again.</string>
     <string name="server_cancel">Cancel</string>
+    <string name="server_from_app">Use the server from %1$s</string>
+    <string name="server_from_app_note">No new enrollment code: %1$s asks you to confirm, and this phone joins the server once for both apps. Or pair with a link below.</string>
+    <string name="server_from_app_not_paired">%1$s isn\'t paired with a server yet.</string>
 </resources>

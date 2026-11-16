@@ -609,4 +609,7 @@
     <string name="server_unpair_title">לנתק מהשרת?</string>
     <string name="server_unpair_note">מה שנשלח נשאר בשרת, וכל הרגעים נשארים בטלפון. שום דבר לא יישלח עד שיחברו שוב.</string>
     <string name="server_cancel">ביטול</string>
+    <string name="server_from_app">שימוש בשרת של %1$s</string>
+    <string name="server_from_app_note">בלי קוד רישום חדש: %1$s יבקש אישור, והטלפון הזה יירשם לשרת פעם אחת לשתי האפליקציות. אפשר גם לחבר עם קישור למטה.</string>
+    <string name="server_from_app_not_paired">%1$s עוד לא מחובר לשרת.</string>
 </resources>

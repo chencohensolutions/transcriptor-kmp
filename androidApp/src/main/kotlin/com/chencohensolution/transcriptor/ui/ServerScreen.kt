@@ -63,6 +63,8 @@ class ServerActions(
     /** Asks the server who the link in the text is for, without using its code. */
     val check: (text: String) -> Unit = {},
     val pair: (text: String, deviceName: String) -> Unit = { _, _ -> },
+    /** Asks another app on the phone that uses shed (by its place in the list) for its pairing. */
+    val pairFrom: (Int) -> Unit = {},
     val setWifiOnly: (Boolean) -> Unit = {},
     val backUpNow: () -> Unit = {},
     val unpair: () -> Unit = {},
@@ -75,7 +77,7 @@ class ServerActions(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServerScreen(state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions) {
+fun ServerScreen(state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions, siblings: List<String> = emptyList()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -89,17 +91,27 @@ fun ServerScreen(state: ServerState, pairing: PairingUi, defaultDeviceName: Stri
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val paired = state.paired
-            if (paired == null) NotPaired(pairing, defaultDeviceName, actions) else Paired(state, actions)
+            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions)
             Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-private fun NotPaired(pairing: PairingUi, defaultDeviceName: String, actions: ServerActions) {
+private fun NotPaired(pairing: PairingUi, defaultDeviceName: String, siblings: List<String>, actions: ServerActions) {
     var link by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf(defaultDeviceName) }
     Text(stringResource(R.string.server_intro), style = MaterialTheme.typography.bodyMedium)
+    // One enrollment per phone: an app already paired (journal) shares its server, with no new code.
+    if (siblings.isNotEmpty()) {
+        siblings.forEachIndexed { i, label ->
+            Button(onClick = { actions.pairFrom(i) }, enabled = pairing != PairingUi.Checking) {
+                Text(stringResource(R.string.server_from_app, isolated(label)))
+            }
+        }
+        Text(stringResource(R.string.server_from_app_note, isolated(siblings.joinToString())), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider()
+    }
     Text(stringResource(R.string.server_how), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     // The link and the name are left to right whatever the phone's language.
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

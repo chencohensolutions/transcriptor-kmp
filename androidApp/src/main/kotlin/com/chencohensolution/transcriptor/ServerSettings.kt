@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,6 +11,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chencohensolution.shed.android.ShedSiblings
+import com.chencohensolution.shed.android.SiblingApp
 import com.chencohensolution.shed.journal.PairingException
 import com.chencohensolution.transcriptor.ui.PairingUi
 import com.chencohensolution.transcriptor.ui.ServerActions
@@ -25,6 +29,27 @@ fun ServerSettings(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val state by Recording.backup.state.collectAsStateWithLifecycle()
     var pairing by remember { mutableStateOf<PairingUi>(PairingUi.Idle) }
+    // Other apps on the phone built with shed (journal): one of them may already be paired.
+    val siblings = remember { ShedSiblings.find(context) }
+    var asked by remember { mutableStateOf<SiblingApp?>(null) }
+    val askSibling = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val from = asked ?: return@rememberLauncherForActivityResult
+        val link = ShedSiblings.linkOf(result.data)
+        if (link == null) {
+            pairing = when (ShedSiblings.reasonOf(result.data)) {
+                ShedSiblings.NOT_PAIRED -> PairingUi.Failed(context.getString(R.string.server_from_app_not_paired, from.label))
+                ShedSiblings.FAILED -> PairingUi.Failed(context.getString(R.string.server_failed, result.data?.getStringExtra(ShedSiblings.EXTRA_MESSAGE) ?: ""))
+                else -> PairingUi.Idle
+            }
+            return@rememberLauncherForActivityResult
+        }
+        pairing = PairingUi.Checking
+        scope.launch {
+            pairing = runCatching { withContext(Dispatchers.IO) { Recording.backup.pair(link, Recording.shed.defaultDeviceName) } }
+                .fold({ PairingUi.Idle }, { PairingUi.Failed(context.getString(R.string.server_failed, it.message ?: it.toString())) })
+            if (pairing == PairingUi.Idle) withContext(Dispatchers.IO) { Recording.backUp(context) }
+        }
+    }
     LaunchedEffect(Unit) {
         while (true) {
             withContext(Dispatchers.IO) { Recording.backup.refresh() }
@@ -62,6 +87,12 @@ fun ServerSettings(onBack: () -> Unit) {
                         .fold({ PairingUi.Preview(it.user, it.server.removePrefix("https://")) }, failed)
                 }
             },
+            pairFrom = { i ->
+                siblings.getOrNull(i)?.let { sibling ->
+                    asked = sibling
+                    askSibling.launch(ShedSiblings.ask(sibling, "audio-logs"))
+                }
+            },
             pair = { text, name ->
                 pairing = PairingUi.Checking
                 scope.launch {
@@ -85,5 +116,6 @@ fun ServerSettings(onBack: () -> Unit) {
                 }
             },
         ),
+        siblings.map { it.label },
     )
 }
