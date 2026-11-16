@@ -3,6 +3,7 @@ package com.chencohensolution.transcriptor
 import com.chencohensolution.shed.android.AndroidShed
 import com.chencohensolution.shed.android.ShedHost
 import com.chencohensolution.shed.android.ShedUploads
+import com.chencohensolution.transcriptor.backup.PrivateResult
 import com.chencohensolution.transcriptor.backup.ServerBackup
 import kotlinx.coroutines.cancel
 import android.app.Application
@@ -462,6 +463,33 @@ object Recording {
     fun setLabels(lectureIds: List<String>, add: Set<String>, remove: Set<String>) {
         val busy = busy()
         library.setLabels(lectureIds, add, remove) { it in busy }
+    }
+
+    /**
+     * Tucks moments away, or brings them back (files and network: not on the main thread), except those recording or
+     * worked on now; the server is told for those backed up.
+     */
+    suspend fun setTucked(lectureIds: List<String>, tucked: Boolean) {
+        val busy = busy()
+        val changed = library.setTucked(lectureIds, tucked) { it in busy }
+        backup.setTucked(changed, tucked)
+    }
+
+    /**
+     * Marks moments private: each is kept on the server, then deleted from the phone ([ServerBackup.makePrivate]).
+     * Returns how many left the phone, and why the first that didn't stayed. Not on the main thread.
+     */
+    suspend fun makePrivate(lectureIds: List<String>): Pair<Int, PrivateResult?> {
+        var done = 0
+        var failed: PrivateResult? = null
+        for (id in lectureIds) {
+            when (val result = backup.makePrivate(id, busy())) {
+                PrivateResult.Done -> done++
+                else -> if (failed == null) failed = result
+            }
+        }
+        library.reload()
+        return done to failed
     }
 
     /** Deletes a label; its moments stay, without it. Files: not on the main thread. */

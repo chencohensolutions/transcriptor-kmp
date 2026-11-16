@@ -12,6 +12,7 @@ import com.chencohensolution.shed.UploadStatus
 import com.chencohensolution.shed.journal.JournalBackend
 import com.chencohensolution.shed.journal.JournalState
 import com.chencohensolution.shed.journal.PairingPreview
+import com.chencohensolution.shed.journal.SoundRecordingsShown
 import com.chencohensolution.transcriptor.notebook.AUDIO_AAC
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.Lecture
@@ -24,6 +25,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import okio.FileSystem
 import okio.Path
 import kotlin.math.abs
@@ -59,7 +63,29 @@ data class ServerState(
     val onServerOnly: List<RemoteFile> = emptyList(),
     /** What the last run of the queue ended with; null before one. */
     val lastRun: RunResult? = null,
+    /**
+     * Whether the server sends calls and voice messages to Audio Logs (off until the user turns them on); null before
+     * the server was asked, or when it is too old to know.
+     */
+    val shown: SoundRecordingsShown? = null,
+    /** Recordings on the server that aren't moments here and are tucked away (left out of [onServerOnly]). */
+    val tuckedOnServer: Int = 0,
 )
+
+/** How marking a moment private ended ([ServerBackup.makePrivate]). */
+sealed interface PrivateResult {
+    /** On the server, private, and deleted from the phone. */
+    data object Done : PrivateResult
+
+    /** Not paired with a server: there is nowhere to keep it. */
+    data object NotPaired : PrivateResult
+
+    /** Being recorded, worked on or encoded: try again when it is done. */
+    data object Busy : PrivateResult
+
+    /** The server couldn't be reached, or doesn't hold it whole yet: nothing was deleted. */
+    data class NotOnServer(val reason: String) : PrivateResult
+}
 
 @Serializable
 private data class BackupFileV1(
@@ -129,6 +155,7 @@ class ServerBackup(
     /** Forgets the server. What was sent stays there; the phone keeps every moment. */
     suspend fun unpair() {
         journal.unpair()
+        shown = null
         shed.forgetRemote()
         save(kept.copy(moments = emptyMap()))
         refresh()
@@ -158,6 +185,74 @@ class ServerBackup(
         return handed
     }
 
+    /**
+     * Marks the moment private (the owner's call, Nov 16, 2026): its audio is sent to the server if it isn't there
+     * yet, the server checks it holds it whole, its transcript, notes and labels are kept with it there (a note,
+     * [LectureStore.serverNote]), the server marks it private, and only then is it deleted from the phone. The server
+     * never sends a private file to Audio Logs again, so it leaves the app; it stays on the server (journal on a phone
+     * that may see private files shows it). Nothing is deleted when a step fails. Not on the main thread.
+     */
+    suspend fun makePrivate(lectureId: String, busy: Set<String>): PrivateResult {
+        if (journal.state.value !is JournalState.Paired) return PrivateResult.NotPaired
+        val lecture = store.load(lectureId) ?: return PrivateResult.Done
+        if (lectureId in busy || lecture.pendingEncode) return PrivateResult.Busy
+        return try {
+            var sha = kept.moments[lectureId]?.takeIf { it.audioFile == lecture.audioFile }?.sha256
+            if (sha == null) {
+                val fs = store.fileSystemOf(lectureId)
+                sha = shed.put(store.audioPath(lecture), aboutOf(lecture), ref = lectureId, from = fs)
+                mutex.withLock { save(kept.copy(moments = kept.moments + (lectureId to HandedOver(sha, lecture.audioFile)))) }
+            }
+            if (shed.uploads.value.any { it.sha256 == sha && it.state == UploadState.WAITING }) {
+                val run = shed.runUploads()
+                refresh(lastRun = run)
+            }
+            shed.uploads.value.firstOrNull { it.sha256 == sha && it.state == UploadState.REFUSED }?.let {
+                return PrivateResult.NotOnServer(it.refused ?: "refused")
+            }
+            if (!shed.verify(sha)) return PrivateResult.NotOnServer("not whole on the server yet")
+            val note = buildJsonObject { put("audioLogs", json.parseToJsonElement(store.serverNote(lecture)).jsonObject) }
+            if (!journal.setNote(sha, note)) return PrivateResult.NotOnServer("its notes weren't kept")
+            journal.setPrivate(listOf(sha), true)
+            store.delete(lectureId)
+            mutex.withLock { save(kept.copy(moments = kept.moments - lectureId)) }
+            refresh()
+            PrivateResult.Done
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            PrivateResult.NotOnServer(e.message ?: e::class.simpleName ?: "error")
+        }
+    }
+
+    /**
+     * Tells the server the moments were tucked away or brought back, for those it has (best effort: the phone's mark
+     * is the truth for its own moments).
+     */
+    suspend fun setTucked(lectureIds: Collection<String>, tucked: Boolean) {
+        if (journal.state.value !is JournalState.Paired) return
+        val shas = lectureIds.mapNotNull { kept.moments[it]?.sha256 }
+        if (shas.isEmpty()) return
+        runCatching { journal.setTucked(shas, tucked) }
+    }
+
+    /** Asks the server whether it sends calls and voice messages to Audio Logs. */
+    suspend fun refreshShown() {
+        if (journal.state.value !is JournalState.Paired) return
+        shown = runCatching { journal.soundRecordingsShown() }.getOrNull() ?: shown
+        refresh()
+    }
+
+    /** Turns calls or voice messages on or off for Audio Logs on the server, then brings the server's list up to date. */
+    suspend fun setShown(new: SoundRecordingsShown) {
+        shown = journal.setSoundRecordingsShown(new)
+        refresh()
+        shed.sync()
+        refresh()
+    }
+
+    private var shown: SoundRecordingsShown? = null
+
     /** One pass of shed's queue, from the app's background work. */
     suspend fun runUploads(): RunResult = shed.runUploads().also { result ->
         refresh(lastRun = result)
@@ -166,6 +261,7 @@ class ServerBackup(
     /** The server's list of recordings brought up to date. */
     suspend fun syncServerList() {
         if (journal.state.value !is JournalState.Paired) return
+        if (shown == null) shown = runCatching { journal.soundRecordingsShown() }.getOrNull()
         shed.sync()
         refresh()
     }
@@ -199,6 +295,7 @@ class ServerBackup(
         }
         val waiting = byMoment.values.filterIsInstance<MomentBackup.Waiting>()
         val mine = kept.moments.values.map { it.sha256 }.toSet()
+        val others = if (paired == null) emptyList() else shed.remote.value.filter { it.about.kind == FileKind.AUDIO && it.sha256 !in mine }
         _state.value = ServerState(
             paired = paired,
             wifiOnly = kept.wifiOnly,
@@ -206,8 +303,10 @@ class ServerBackup(
             bytesLeft = waiting.sumOf { it.size - it.sent },
             backedUp = byMoment.values.count { it == MomentBackup.BackedUp },
             refused = byMoment.mapNotNull { (id, s) -> (s as? MomentBackup.Refused)?.let { (store.load(id)?.title ?: id) to it.reason } },
-            onServerOnly = if (paired == null) emptyList() else shed.remote.value.filter { it.about.kind == FileKind.AUDIO && it.sha256 !in mine },
+            onServerOnly = others.filter { !it.tucked },
             lastRun = lastRun,
+            shown = if (paired == null) null else shown,
+            tuckedOnServer = others.count { it.tucked },
         )
     }
 

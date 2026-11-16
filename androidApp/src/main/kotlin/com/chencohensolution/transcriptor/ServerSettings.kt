@@ -109,6 +109,7 @@ fun ServerSettings(onBack: () -> Unit) {
                 }
             },
             backUpNow = { scope.launch(Dispatchers.IO) { Recording.backUp(context) } },
+            setShown = { shown -> scope.launch(Dispatchers.IO) { runCatching { Recording.backup.setShown(shown) } } },
             unpair = {
                 scope.launch(Dispatchers.IO) {
                     com.chencohensolution.shed.android.ShedUploads.cancel(context)

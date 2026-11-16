@@ -23,7 +23,9 @@ without a server.
   12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"); the server didn't
   answer (trying again later) or no longer accepts this phone; moments the server refused, by title; **Back up now**;
   **Wi‑Fi only** (on by default); **On the server**: how many of the server's recordings aren't moments here and the
-  newest 20 by date, length and name; **Unpair** (asks first: what was sent stays on the server, every moment stays on
+  newest 20 by date, length and name (tucked ones counted apart); **What Audio Logs shows from the server**: **Calls**
+  and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
+  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Unpair** (asks first: what was sent stays on the server, every moment stays on
   the phone).
 
 ## How it behaves

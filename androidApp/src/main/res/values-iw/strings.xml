@@ -612,4 +612,39 @@
     <string name="server_from_app">שימוש בשרת של %1$s</string>
     <string name="server_from_app_note">בלי קוד רישום חדש: %1$s יבקש אישור, והטלפון הזה יירשם לשרת פעם אחת לשתי האפליקציות. אפשר גם לחבר עם קישור למטה.</string>
     <string name="server_from_app_not_paired">%1$s עוד לא מחובר לשרת.</string>
+    <string name="notebooks_more">עוד</string>
+    <string name="notebooks_cancel">ביטול</string>
+    <string name="notebooks_tuck_away">הצנעה</string>
+    <string name="notebooks_bring_back">החזרה</string>
+    <string name="notebooks_tucked">מוצנע</string>
+    <string name="notebooks_mark_private">סימון כפרטי…</string>
+    <string name="notebooks_private_body">הם יגובו לשרת שלך וישמרו שם עם התמלול וההערות, ואז יימחקו מהטלפון הזה. יומן קול לא יציג אותם יותר; אפליקציית היומן מציגה אותם במכשירים שמורשים לראות קבצים פרטיים.</string>
+    <string name="notebooks_private_no_server">רגעים פרטיים נשמרים בשרת שלך, ויומן קול לא מחובר לשרת. צריך לחבר אותו קודם בהגדרות › גיבוי לשרת.</string>
+    <string name="notebooks_private_confirm">סימון כפרטי</string>
+    <string name="notebooks_private_settings">הגדרות</string>
+    <string name="notebooks_private_failed">%1$d מתוך %2$d סומנו כפרטיים. השאר נשארו בטלפון: %3$s</string>
+    <plurals name="notebooks_tucked_pill">
+        <item quantity="one">רגע מוצנע אחד · הצגה</item>
+        <item quantity="two">%1$d רגעים מוצנעים · הצגה</item>
+        <item quantity="other">%1$d רגעים מוצנעים · הצגה</item>
+    </plurals>
+    <plurals name="notebooks_private_title">
+        <item quantity="one">לסמן את הרגע הזה כפרטי?</item>
+        <item quantity="two">לסמן %1$d רגעים כפרטיים?</item>
+        <item quantity="other">לסמן %1$d רגעים כפרטיים?</item>
+    </plurals>
+    <plurals name="notebooks_private_done">
+        <item quantity="one">הרגע סומן כפרטי והוסר מהטלפון</item>
+        <item quantity="two">%1$d רגעים סומנו כפרטיים והוסרו מהטלפון</item>
+        <item quantity="other">%1$d רגעים סומנו כפרטיים והוסרו מהטלפון</item>
+    </plurals>
+    <string name="server_show">מה יומן קול מציג מהשרת</string>
+    <string name="server_show_calls">שיחות</string>
+    <string name="server_show_calls_note">הקלטות של שיחות טלפון. כבוי: השרת לא שולח אותן לאפליקציה הזו.</string>
+    <string name="server_show_voice">הודעות קוליות</string>
+    <string name="server_show_voice_note">הודעות קוליות מוואטסאפ. כבוי: השרת לא שולח אותן לאפליקציה הזו.</string>
+    <string name="server_show_private_note">הקלטות שסומנו כפרטיות לא מגיעות ליומן קול אף פעם.</string>
+    <string name="server_tucked_on_server">עוד %1$d מוצנעות.</string>
+    <string name="notebooks_unlock_tucked">הצגת רגעים מוצנעים</string>
+    <string name="notebooks_private_busy">הוא בהקלטה או בעיבוד; אפשר לנסות שוב כשזה יסתיים</string>
 </resources>

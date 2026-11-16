@@ -313,6 +313,24 @@ library the journal app will share:
 - The server's recordings that aren't moments here are listed on the Server page; showing them as moments without
   metadata (metadata added later) is the next step.
 
+### Calls, tucked and private moments (owner's request, Nov 16, 2026)
+
+- **Calls and voice messages are optional**: the server sends Audio Logs its recordings, and calls and voice messages
+  only once the user turns them on (Settings › Server backup, **What Audio Logs shows from the server**; off by
+  default). The choice is kept on the server for Audio Logs' device only (`setSoundRecordingsShown`), so while it is
+  off they never reach the phone through this app, and journal on the same phone isn't affected.
+- **Tuck away** (as in the journal app, Hebrew מוצנע): a light hiding. A tucked moment leaves the list, a pill under
+  its group ("2 tucked away · Show") shows them after the phone's lock (fingerprint, face or screen lock; at once on
+  a phone with no lock) until the app is opened again, search never finds one, and the server is told for those
+  backed up (`setTucked`). `Lecture.tucked`, kept in `lecture.json`.
+- **Private** (the owner's call: delete the phone's copy once the server has it): the moment's audio is sent if it
+  isn't on the server yet, the server checks it holds it whole (`/verify`), its transcript, notes and labels are kept
+  with it there as its note (`setNote`: `{"audioLogs": <lecture.json without word times>}`,
+  `LectureStore.serverNote`), the server marks it private, and only then is it deleted from the phone. The server never
+  sends a private file to Audio Logs (`audio-logs` devices always withhold private files), so it leaves the app on
+  every phone; journal shows it where private files are allowed. Needs a paired server; nothing is deleted when a step
+  fails. A note larger than the server's 256 KiB (a very long moment) is refused, and the moment stays.
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.

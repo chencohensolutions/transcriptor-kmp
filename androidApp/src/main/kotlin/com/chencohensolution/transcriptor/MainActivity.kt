@@ -42,6 +42,8 @@ import com.chencohensolution.transcriptor.ui.LiveLectureActions
 import com.chencohensolution.transcriptor.ui.FolderNotice
 import com.chencohensolution.transcriptor.ui.NotebooksActions
 import com.chencohensolution.transcriptor.ui.NotebooksScreen
+import com.chencohensolution.transcriptor.ui.PrivateOutcome
+import com.chencohensolution.transcriptor.backup.PrivateResult
 import com.chencohensolution.transcriptor.ui.ReviewActions
 import com.chencohensolution.transcriptor.ui.ReviewScreen
 import com.chencohensolution.transcriptor.ui.TranscriptorTheme
@@ -266,6 +268,7 @@ class MainActivity : ComponentActivity() {
         chooseFolder: () -> Unit,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
+        val server by Recording.backup.state.collectAsStateWithLifecycle()
         val folder by Recording.folder.collectAsStateWithLifecycle()
         var asked by rememberSaveable { mutableStateOf(Recording.settings.lectureFolderAsked) }
         val notice = when (val f = folder) {
@@ -310,8 +313,44 @@ class MainActivity : ComponentActivity() {
                 chooseFolder = chooseFolder,
                 keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
                 delete = { ids -> io { Recording.delete(ids) } },
+                setTucked = { ids, tucked -> lifecycleScope.launch(Dispatchers.IO) { Recording.setTucked(ids, tucked) } },
+                revealTucked = ::askPhoneLock,
+                makePrivate = { ids ->
+                    val (done, failed) = withContext(Dispatchers.IO) { Recording.makePrivate(ids) }
+                    PrivateOutcome(
+                        done, notPaired = failed == PrivateResult.NotPaired,
+                        failed = when (failed) {
+                            is PrivateResult.NotOnServer -> failed.reason
+                            PrivateResult.Busy -> getString(R.string.notebooks_private_busy)
+                            else -> null
+                        },
+                    )
+                },
             ),
             notice,
+            paired = server.paired != null,
+        )
+    }
+
+    /**
+     * Asks for the phone's lock (fingerprint, face or the screen lock) before tucked moments are shown, then calls
+     * [onUnlocked]. A phone with no lock shows them at once.
+     */
+    private fun askPhoneLock(onUnlocked: () -> Unit) {
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        if (keyguard?.isDeviceSecure != true) return onUnlocked()
+        val prompt = android.hardware.biometrics.BiometricPrompt.Builder(this)
+            .setTitle(getString(R.string.notebooks_unlock_tucked))
+            .setAllowedAuthenticators(
+                android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+            .build()
+        prompt.authenticate(
+            android.os.CancellationSignal(), mainExecutor,
+            object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult) = onUnlocked()
+            },
         )
     }
 

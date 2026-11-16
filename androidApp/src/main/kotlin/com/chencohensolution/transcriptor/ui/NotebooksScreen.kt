@@ -32,6 +32,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
@@ -135,7 +138,16 @@ class NotebooksActions(
     val keepInApp: () -> Unit = {},
     /** Deletes moments for good (their folders: recording, transcript, notes), once their Undo is gone. */
     val delete: (lectureIds: List<String>) -> Unit = {},
+    /** Tucks moments away, or brings them back. */
+    val setTucked: (lectureIds: List<String>, tucked: Boolean) -> Unit = { _, _ -> },
+    /** Asks for the phone's lock, then calls back to show the tucked moments (at once on a phone with no lock). */
+    val revealTucked: (onRevealed: () -> Unit) -> Unit = { it() },
+    /** Marks moments private: kept on the server, then deleted from the phone. Files and network: off the main thread. */
+    val makePrivate: suspend (lectureIds: List<String>) -> PrivateOutcome = { PrivateOutcome(0) },
 )
+
+/** How marking moments private went: [done] of them left the phone; [notPaired] when there is no server; [failed] says why the rest stayed. */
+data class PrivateOutcome(val done: Int, val notPaired: Boolean = false, val failed: String? = null)
 
 /** What the Notebooks screen says about the lectures folder, on top of the list. */
 sealed interface FolderNotice {
@@ -156,9 +168,15 @@ sealed interface FolderNotice {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null) {
+fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null, paired: Boolean = false) {
     var hidden by remember { mutableStateOf(emptySet<String>()) }
-    val state = all.copy(moments = all.moments.filter { it.id !in hidden })
+    // Tucked moments are shown after the phone's lock, until the app is opened again (not saved: a restart hides them).
+    var revealed by remember { mutableStateOf(false) }
+    val state = all.copy(moments = all.moments.filter { it.id !in hidden && (revealed || !it.tucked) })
+    val tuckedOut = if (revealed) emptyList() else all.moments.filter { it.tucked && it.id !in hidden }
+    var askingPrivate by remember { mutableStateOf<List<String>?>(null) }
+    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+    var privateBusy by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val deletedOne = stringResource(R.string.notebooks_deleted_one)
@@ -206,17 +224,41 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL }?.let { listOf(it) } ?: guessed)
     val labelsById = state.labels.associateBy { it.id }
     val unlabeled = state.moments.filter { it.labels.isEmpty() }
-    val shown = when (filter) {
-        null -> state.moments
-        NO_LABEL -> unlabeled
-        else -> state.moments.filter { filter in it.labels }
-    }.groupBy { m ->
+    fun groupOf(m: LectureSummary): Int {
         val days = state.nowMillis / DAY - m.startedAtMillis / DAY
-        when {
+        return when {
             days == 0L -> R.string.notebooks_today
             days < 7 -> R.string.notebooks_this_week
             else -> R.string.notebooks_earlier
         }
+    }
+    fun inFilter(m: LectureSummary) = when (filter) {
+        null -> true
+        NO_LABEL -> m.labels.isEmpty()
+        else -> filter in m.labels
+    }
+    val shown = state.moments.filter(::inFilter).groupBy(::groupOf)
+    // How many tucked moments each group leaves out: a pill under its title shows them after the phone's lock.
+    val tuckedByGroup = tuckedOut.filter(::inFilter).groupingBy(::groupOf).eachCount()
+    val groups = (shown.keys + tuckedByGroup.keys).sortedBy { listOf(R.string.notebooks_today, R.string.notebooks_this_week, R.string.notebooks_earlier).indexOf(it) }
+
+    askingPrivate?.let { ids ->
+        PrivateDialog(
+            count = ids.size, paired = paired, busy = privateBusy,
+            onDismiss = { if (!privateBusy) askingPrivate = null },
+            onSettings = { askingPrivate = null; actions.settings() },
+            onConfirm = {
+                privateBusy = true
+                scope.launch {
+                    val outcome = actions.makePrivate(ids)
+                    privateBusy = false
+                    askingPrivate = null
+                    selected = emptySet()
+                    snackbar.currentSnackbarData?.dismiss()
+                    snackbar.showSnackbar(privateMessage(resources, outcome, ids.size), duration = SnackbarDuration.Long)
+                }
+            },
+        )
     }
 
     labeling?.let { ids ->
@@ -274,6 +316,23 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                     actions = {
                         IconButton(onClick = { labeling = selected.toList() }) { Icon(Icons.AutoMirrored.Outlined.Label, stringResource(R.string.notebooks_labels)) }
                         IconButton(onClick = { deleteWithUndo(selected.toList()); selected = emptySet() }) { Icon(Icons.Filled.Delete, stringResource(R.string.notebooks_delete)) }
+                        var menu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, stringResource(R.string.notebooks_more)) }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                val allTucked = state.moments.filter { it.id in selected }.all { it.tucked }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (allTucked) R.string.notebooks_bring_back else R.string.notebooks_tuck_away)) },
+                                    leadingIcon = { Icon(Icons.Filled.VisibilityOff, null) },
+                                    onClick = { menu = false; actions.setTucked(selected.toList(), !allTucked); selected = emptySet() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.notebooks_mark_private)) },
+                                    leadingIcon = { Icon(Icons.Filled.Lock, null) },
+                                    onClick = { menu = false; askingPrivate = selected.toList() },
+                                )
+                            }
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
                 )
@@ -405,8 +464,12 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
             if (state.moments.isEmpty()) item { Empty() }
             // One list by date: a moment without labels is a row like the others, with a quiet way to give it one
             // (the label its time suggests, else the labels sheet).
-            shown.forEach { (group, rows) ->
+            groups.forEach { group ->
+                val rows = shown[group].orEmpty()
                 item(key = group) { GroupTitle(stringResource(group)) }
+                tuckedByGroup[group]?.let { count ->
+                    item(key = "tucked-$group") { TuckedPill(count) { actions.revealTucked { revealed = true } } }
+                }
                 items(rows, key = { it.id }) { m ->
                     val suggestion = state.suggested[m.id]?.takeIf { m.labels.isEmpty() && m.id !in state.working }?.let { labelsById[it] }
                     MomentRow(
@@ -461,6 +524,47 @@ private fun LabelPills(labels: List<Label>) {
     }
 }
 
+/** "2 tucked away · Show": the tucked moments a group leaves out, shown after the phone's lock. */
+@Composable
+private fun TuckedPill(count: Int, onShow: () -> Unit) {
+    AssistChip(
+        onClick = onShow,
+        label = { Text(stringResource(R.string.notebooks_tucked_pill, count)) },
+        leadingIcon = { Icon(Icons.Filled.VisibilityOff, null, Modifier.size(16.dp)) },
+        modifier = Modifier.padding(horizontal = 20.dp),
+    )
+}
+
+/**
+ * Asks before marking moments private: they are kept on the server and deleted from the phone, and Audio Logs won't
+ * show them again. Without a server there is nowhere to keep them: it says so and offers Settings.
+ */
+@Composable
+private fun PrivateDialog(count: Int, paired: Boolean, busy: Boolean, onDismiss: () -> Unit, onSettings: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Lock, null) },
+        title = { Text(pluralStringResource(R.plurals.notebooks_private_title, count, count)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(if (paired) R.string.notebooks_private_body else R.string.notebooks_private_no_server))
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            if (paired) TextButton(onClick = onConfirm, enabled = !busy) { Text(stringResource(R.string.notebooks_private_confirm)) }
+            else TextButton(onClick = onSettings) { Text(stringResource(R.string.notebooks_private_settings)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(R.string.notebooks_cancel)) } },
+    )
+}
+
+private fun privateMessage(res: android.content.res.Resources, outcome: PrivateOutcome, asked: Int): String = when {
+    outcome.notPaired -> res.getString(R.string.notebooks_private_no_server)
+    outcome.done == asked -> res.getQuantityString(R.plurals.notebooks_private_done, asked, asked)
+    else -> res.getString(R.string.notebooks_private_failed, outcome.done, asked, outcome.failed.orEmpty())
+}
+
 @Composable
 private fun GroupTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp))
@@ -479,6 +583,10 @@ private fun MomentRow(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         LabelPills(labels)
+        if (m.tucked) Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.VisibilityOff, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.notebooks_tucked), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+        }
         Text(l.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Who was in it, and how it started: what tells one dated moment from the next.
         peopleLine(m)?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) }

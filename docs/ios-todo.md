@@ -232,3 +232,16 @@ anything left to decide. Remove an entry once it is built.
 - Files to mirror: `ui/ServerScreen.kt`, `ServerSettings.kt`, the Server row in `ui/ModelsScreen.kt`. Strings
   `server_*`.
 
+
+## Calls, tucked and private moments (Nov 16, 2026)
+
+- Android: the moments list's selection ⋮ has Tuck away / Bring back and Mark private…; tucked moments hide behind a
+  pill per group that asks for the phone's lock (`BiometricPrompt`, biometric or device credential; iOS:
+  `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`); Settings › Server backup has Calls and Voice messages
+  switches. Docs: screens/notebooks.md, screens/server.md, design.md "Calls, tucked and private moments".
+- Shared: `NotebooksController.setTucked(ids, tucked, busy)`, `LectureSummary.tucked`, `ServerBackup.setTucked`,
+  `ServerBackup.makePrivate(id, busy)` (`PrivateResult`), `ServerBackup.setShown`, `ServerState.shown` and
+  `tuckedOnServer`. Android files to mirror: `ui/NotebooksScreen.kt` (`TuckedPill`, `PrivateDialog`, `PrivateOutcome`),
+  `MainActivity.askPhoneLock`, `Recording.setTucked` / `makePrivate`, `ui/ServerScreen.kt` (`ShowSwitch`). Strings
+  `notebooks_tuck*`, `notebooks_private*`, `notebooks_unlock_tucked`, `notebooks_more`, `notebooks_cancel`,
+  `server_show*`, `server_tucked_on_server`.

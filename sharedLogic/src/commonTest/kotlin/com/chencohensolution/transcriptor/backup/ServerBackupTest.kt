@@ -85,6 +85,31 @@ class ServerBackupTest {
     }
 
     @Test
+    fun aMomentIsDeletedOnlyOnceTheServerKeepsItPrivate() = runTest {
+        moment("a")
+        assertEquals(PrivateResult.NotPaired, backup(paired = false).makePrivate("a", emptySet()))
+        val backup = backup(paired = true)
+        assertEquals(PrivateResult.Busy, backup.makePrivate("a", busy = setOf("a")))
+        // The audio reaches the server, but the server can't be asked to keep its notes and mark it: nothing is deleted.
+        assertIs<PrivateResult.NotOnServer>(backup.makePrivate("a", emptySet()))
+        assertEquals("the sound of a", server.files[backup.sha256Of("a")]?.decodeToString())
+        assertEquals("Class a", store.load("a")?.title)
+    }
+
+    @Test
+    fun theServerKeepsTheMomentsWordsWithoutWordTimes() {
+        val lecture = moment("a").copy(
+            segments = listOf(com.chencohensolution.transcriptor.notebook.Segment("s1", 0, 900, "שלום לכולם", "m",
+                words = listOf(com.chencohensolution.transcriptor.notebook.Word(0, "שלום")))),
+            notes = listOf(com.chencohensolution.transcriptor.notebook.Note("n1", 300, "exam")),
+            tucked = true,
+        )
+        val note = store.serverNote(lecture)
+        kotlin.test.assertTrue("שלום לכולם" in note && "exam" in note && "\"tucked\": true" in note, note)
+        kotlin.test.assertFalse("\"words\"" in note && "\"atMs\": 0" in note, note)
+    }
+
+    @Test
     fun theServerIsToldWhenAndWhatTheMomentIs() {
         val about = backup(paired = false).aboutOf(moment("a"))
         assertEquals("Class a.flac", about.fileName)

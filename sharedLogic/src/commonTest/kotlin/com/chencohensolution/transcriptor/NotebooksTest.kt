@@ -60,6 +60,20 @@ class NotebooksTest {
     }
 
     @Test
+    fun aTuckedMomentIsKeptMarkedAndNeverFoundBySearch() {
+        lectures.save(lecture("a", 1_000).copy(title = "Secret talk"))
+        lectures.save(lecture("b", 2_000).copy(title = "Secret plan"))
+        val controller = NotebooksController(labels, lectures, now = { 3_000 })
+        assertEquals(listOf("a"), controller.setTucked(listOf("a"), true, busy = { it == "b" }))
+        assertEquals(emptyList(), controller.setTucked(listOf("b"), true, busy = { it == "b" }))
+        assertEquals(true, lectures.load("a")?.tucked)
+        assertEquals(mapOf("a" to true, "b" to false), controller.library.value.moments.associate { it.id to it.tucked })
+        assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
+        controller.setTucked(listOf("a"), false)
+        assertEquals(listOf("b", "a"), controller.search("Secret").map { it.moment.id })
+    }
+
+    @Test
     fun labelsAreKeptInAVersionedFileEachWithItsOwnColor() {
         val psych = labels.create(" פסיכולוגיה ", 1)
         val exam = labels.create("Exam", 2)

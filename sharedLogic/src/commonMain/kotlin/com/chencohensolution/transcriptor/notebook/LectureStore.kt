@@ -59,6 +59,17 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         fs.atomicMove(transcript, folder / TRANSCRIPT)
     }
 
+    /** Tucks the moment away, or brings it back, and returns it. Not while it is being recorded or a pass runs on it. */
+    fun setTucked(lecture: Lecture, tucked: Boolean): Lecture =
+        if (lecture.tucked == tucked) lecture else lecture.copy(tucked = tucked).also(::save)
+
+    /**
+     * The moment's data as the server keeps it beside its audio (a note, `setNote`): `lecture.json` without each line's
+     * word times (the largest part, rebuilt by transcribing again), as a JSON text.
+     */
+    fun serverNote(lecture: Lecture): String =
+        json.encodeToString(LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) })))
+
     /** Gives the moment these labels (ids), and returns it. Not while it is being recorded or a pass runs on it. */
     fun setLabels(lecture: Lecture, labels: List<String>): Lecture =
         if (lecture.labels == labels) lecture else lecture.copy(labels = labels).also(::save)
@@ -270,6 +281,8 @@ private data class LectureFileV1(
     val pauses: List<PauseV1> = emptyList(),
     /** Where live transcription was off. */
     val liveOff: List<LiveOffV1> = emptyList(),
+    /** Tucked away by the user. */
+    val tucked: Boolean = false,
 ) {
     @OptIn(ExperimentalTime::class)
     fun toLecture() = Lecture(
@@ -282,6 +295,7 @@ private data class LectureFileV1(
         versions = versions.map { it.toInfo() }, pendingTranscript = pendingTranscript,
         pauses = pauses.map { Pause(it.atMs, it.pausedAt, it.resumedAt) },
         liveOff = liveOff.map { LiveOff(it.fromMs, it.toMs, it.offAt, it.onAt) },
+        tucked = tucked,
     )
 
     companion object {
@@ -301,6 +315,7 @@ private data class LectureFileV1(
             labels = lecture.labels,
             pauses = lecture.pauses.map { PauseV1(it.atMillis, it.pausedAtMillis, it.resumedAtMillis) },
             liveOff = lecture.liveOff.map { LiveOffV1(it.fromMillis, it.toMillis, it.offAtMillis, it.onAtMillis) },
+            tucked = lecture.tucked,
         )
     }
 }

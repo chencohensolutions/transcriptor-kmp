@@ -44,6 +44,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import com.chencohensolution.shed.RunResult
 import com.chencohensolution.transcriptor.R
+import com.chencohensolution.shed.journal.SoundRecordingsShown
 import com.chencohensolution.transcriptor.backup.ServerState
 
 /** Pairing as the Server page shows it, between the user's taps. */
@@ -68,6 +69,8 @@ class ServerActions(
     val setWifiOnly: (Boolean) -> Unit = {},
     val backUpNow: () -> Unit = {},
     val unpair: () -> Unit = {},
+    /** Turns calls or voice messages on or off for Audio Logs on the server. */
+    val setShown: (SoundRecordingsShown) -> Unit = {},
 )
 
 /**
@@ -172,6 +175,13 @@ private fun Paired(state: ServerState, actions: ServerActions) {
         }
         Switch(checked = state.wifiOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
+    state.shown?.let { shown ->
+        HorizontalDivider()
+        Text(stringResource(R.string.server_show), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        ShowSwitch(R.string.server_show_calls, R.string.server_show_calls_note, shown.calls) { actions.setShown(shown.copy(calls = it)) }
+        ShowSwitch(R.string.server_show_voice, R.string.server_show_voice_note, shown.voiceMessages) { actions.setShown(shown.copy(voiceMessages = it)) }
+        Text(stringResource(R.string.server_show_private_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     HorizontalDivider()
     Text(stringResource(R.string.server_on_server), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
     if (state.onServerOnly.isEmpty()) {
@@ -188,6 +198,9 @@ private fun Paired(state: ServerState, actions: ServerActions) {
         }
         Text(stringResource(R.string.server_on_server_later), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    if (state.tuckedOnServer > 0) {
+        Text(stringResource(R.string.server_tucked_on_server, state.tuckedOnServer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     HorizontalDivider()
     TextButton(onClick = { unpairing = true }) { Text(stringResource(R.string.server_unpair), color = MaterialTheme.colorScheme.error) }
     if (unpairing) AlertDialog(
@@ -197,4 +210,19 @@ private fun Paired(state: ServerState, actions: ServerActions) {
         confirmButton = { TextButton(onClick = { unpairing = false; actions.unpair() }) { Text(stringResource(R.string.server_unpair)) } },
         dismissButton = { TextButton(onClick = { unpairing = false }) { Text(stringResource(R.string.server_cancel)) } },
     )
+}
+
+/** One switch of what Audio Logs shows from the server, with what it means. */
+@Composable
+private fun ShowSwitch(title: Int, note: Int, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = onChange).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+    }
 }

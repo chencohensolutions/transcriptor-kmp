@@ -73,7 +73,7 @@ fun Lecture.summary(): LectureSummary {
     return LectureSummary(
         id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels, pendingTranscript,
         people = spoke.filter { it.name.isNotEmpty() }.map { it.name }, unnamedPeople = spoke.count { it.name.isEmpty() },
-        preview = previewOf(this),
+        preview = previewOf(this), tucked = tucked,
     )
 }
 
@@ -119,7 +119,18 @@ class NotebooksController(
     fun newLabel(name: String): Label = labels.create(name, now()).also { reload() }
 
     /** The moments [query] is found in, newest first ([searchMoments]). Reads every moment: not on the main thread. */
-    fun search(query: String): List<SearchHit> = searchMoments(lectures.all(), labels.all(), query)
+    fun search(query: String): List<SearchHit> = searchMoments(lectures.all().filter { !it.tucked }, labels.all(), query)
+
+    /** Tucks [lectureIds] away, or brings them back, skipping the [busy] ones; returns the ids changed. */
+    fun setTucked(lectureIds: Collection<String>, tucked: Boolean, busy: (String) -> Boolean = { false }): List<String> {
+        val changed = lectureIds.filter { id ->
+            if (busy(id)) return@filter false
+            val lecture = lectures.load(id) ?: return@filter false
+            lecture.tucked != tucked && lectures.setTucked(lecture, tucked) != lecture
+        }
+        reload()
+        return changed
+    }
 
     /** Adds [add] and removes [remove] on each of [lectureIds] that isn't [busy]; returns the ids changed. */
     fun setLabels(lectureIds: Collection<String>, add: Set<String>, remove: Set<String>, busy: (String) -> Boolean = { false }): List<String> {

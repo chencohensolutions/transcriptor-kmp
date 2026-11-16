@@ -606,4 +606,36 @@
     <string name="server_from_app">Use the server from %1$s</string>
     <string name="server_from_app_note">No new enrollment code: %1$s asks you to confirm, and this phone joins the server once for both apps. Or pair with a link below.</string>
     <string name="server_from_app_not_paired">%1$s isn\'t paired with a server yet.</string>
+    <string name="notebooks_more">More</string>
+    <string name="notebooks_cancel">Cancel</string>
+    <string name="notebooks_tuck_away">Tuck away</string>
+    <string name="notebooks_bring_back">Bring back</string>
+    <string name="notebooks_tucked">Tucked away</string>
+    <string name="notebooks_mark_private">Mark private…</string>
+    <string name="notebooks_private_body">They are backed up to your server and kept there with their transcripts and notes, then deleted from this phone. Audio Logs won\'t show them again; the journal app shows them where private files are allowed.</string>
+    <string name="notebooks_private_no_server">Private moments are kept on your server, and Audio Logs isn\'t paired with one. Pair it in Settings › Server backup first.</string>
+    <string name="notebooks_private_confirm">Make private</string>
+    <string name="notebooks_private_settings">Settings</string>
+    <string name="notebooks_private_failed">%1$d of %2$d made private. The rest stay on this phone: %3$s</string>
+    <plurals name="notebooks_tucked_pill">
+        <item quantity="one">%1$d tucked away · Show</item>
+        <item quantity="other">%1$d tucked away · Show</item>
+    </plurals>
+    <plurals name="notebooks_private_title">
+        <item quantity="one">Make this moment private?</item>
+        <item quantity="other">Make %1$d moments private?</item>
+    </plurals>
+    <plurals name="notebooks_private_done">
+        <item quantity="one">Moment made private and removed from this phone</item>
+        <item quantity="other">%1$d moments made private and removed from this phone</item>
+    </plurals>
+    <string name="server_show">What Audio Logs shows from the server</string>
+    <string name="server_show_calls">Calls</string>
+    <string name="server_show_calls_note">Recorded phone calls. Off: the server doesn\'t send them to this app.</string>
+    <string name="server_show_voice">Voice messages</string>
+    <string name="server_show_voice_note">WhatsApp voice messages. Off: the server doesn\'t send them to this app.</string>
+    <string name="server_show_private_note">Recordings marked private never reach Audio Logs.</string>
+    <string name="server_tucked_on_server">%1$d more are tucked away.</string>
+    <string name="notebooks_unlock_tucked">Show tucked moments</string>
+    <string name="notebooks_private_busy">it is being recorded or worked on; try again when it is done</string>
 </resources>

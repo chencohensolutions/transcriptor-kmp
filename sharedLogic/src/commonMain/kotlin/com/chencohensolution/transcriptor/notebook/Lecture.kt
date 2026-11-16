@@ -29,6 +29,8 @@ data class LectureSummary(
     val unnamedPeople: Int = 0,
     /** Its first sentence of some length, to tell it from the moments around it; empty before it is transcribed. */
     val preview: String = "",
+    /** Tucked away ([Lecture.tucked]): out of the list until the user shows tucked moments, never found by search. */
+    val tucked: Boolean = false,
 )
 
 /**
@@ -69,6 +71,11 @@ data class Lecture(
     val pauses: List<Pause> = emptyList(),
     /** Where live transcription was switched off while recording (and on again): those stretches have no live lines. */
     val liveOff: List<LiveOff> = emptyList(),
+    /**
+     * Tucked away by the user (a lighter hiding than private, as in the journal app): left out of the list until the
+     * user shows tucked moments with the phone's lock, never found by search. Told to the server too once backed up.
+     */
+    val tucked: Boolean = false,
 )
 
 /**
