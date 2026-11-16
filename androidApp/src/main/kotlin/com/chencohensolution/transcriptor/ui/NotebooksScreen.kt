@@ -95,6 +95,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -176,11 +177,44 @@ sealed interface FolderNotice {
  * deleted.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+/**
+ * What the list keeps while a moment or Settings is open, held by the screen that shows it: where it was scrolled,
+ * and whether the phone's lock opened it. Not saved: a restart starts at the top, locked.
+ */
+class NotebooksPlace {
+    val list = androidx.compose.foundation.lazy.LazyListState()
+    var revealed by mutableStateOf(false)
+}
+
 @Composable
-fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null, paired: Boolean = false) {
+fun NotebooksScreen(
+    all: NotebooksState, actions: NotebooksActions, folder: FolderNotice? = null, paired: Boolean = false,
+    place: NotebooksPlace = remember { NotebooksPlace() },
+    /** A moment is being opened (one only on the server takes a moment): a spinner over the list, which waits. */
+    opening: Boolean = false,
+) {
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        NotebooksContent(all, actions, folder, paired, place)
+        if (opening) OpeningMoment()
+    }
+}
+
+/** The list dimmed under a spinner, taking the taps, while a moment opens. */
+@Composable
+private fun OpeningMoment() {
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize()
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.25f))
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } },
+        contentAlignment = Alignment.Center,
+    ) { androidx.compose.material3.CircularProgressIndicator() }
+}
+
+@Composable
+private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, folder: FolderNotice?, paired: Boolean, place: NotebooksPlace) {
     var hidden by remember { mutableStateOf(emptySet<String>()) }
     // Tucked moments are shown after the phone's lock, until the app is opened again (not saved: a restart hides them).
-    var revealed by remember { mutableStateOf(false) }
+    var revealed by place::revealed
     // Tucked moments, locked labels' and locked calls stay behind the phone's lock until it opens them.
     val state = all.copy(moments = all.moments.filter { it.id !in hidden && (revealed || !(it.tucked || it.locked)) })
     val tuckedOut = if (revealed) emptyList() else all.moments.filter { (it.tucked || it.locked) && it.id !in hidden }
@@ -443,7 +477,7 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
         }
         // The server's recordings come a page at a time: near the end the next older page, near the top (after older
         // pages let the newest go) the page just newer. The list keeps its place by each row's key.
-        val list = androidx.compose.foundation.lazy.rememberLazyListState()
+        val list = place.list
         val nearEnd by remember { androidx.compose.runtime.derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.index >= list.layoutInfo.totalItemsCount - 15 } == true } }
         val nearTop by remember { androidx.compose.runtime.derivedStateOf { list.firstVisibleItemIndex <= 10 } }
         LaunchedEffect(nearEnd, state.serverOlder, state.moments.size) { if (nearEnd && state.serverOlder) actions.olderFromServer() }

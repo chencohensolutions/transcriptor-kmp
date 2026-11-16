@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
     /** Asks to show the moment recording now (a long press on the Quick Settings tile): counted, so each one shows it. */
     private val showRecording = androidx.compose.runtime.mutableIntStateOf(0)
 
+    /** The moment being opened: one only on the server takes a moment to become one here, under a spinner. */
+    private val opening = mutableStateOf<String?>(null)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_SHOW_RECORDING, false)) showRecording.intValue++
@@ -112,6 +115,8 @@ class MainActivity : ComponentActivity() {
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
+                // The list's scroll and lock, kept while a moment or Settings is open, so Back returns to the same place.
+                val notebooksPlace = remember { com.chencohensolution.transcriptor.ui.NotebooksPlace() }
                 LaunchedEffect(showRecording.intValue) { if (showRecording.intValue > 0) { showLive = true; settings = false } }
                 // A new install opens on "Get your models" (FirstRun), until it is answered.
                 var firstRun by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -254,6 +259,7 @@ class MainActivity : ComponentActivity() {
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
+                        place = notebooksPlace,
                     )
                 }
               }
@@ -265,7 +271,7 @@ class MainActivity : ComponentActivity() {
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
         onRecord: (labels: List<String>, language: String, mode: RecordMode) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
-        chooseFolder: () -> Unit,
+        chooseFolder: () -> Unit, place: com.chencohensolution.transcriptor.ui.NotebooksPlace,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
         val server by Recording.backup.state.collectAsStateWithLifecycle()
@@ -332,6 +338,8 @@ class MainActivity : ComponentActivity() {
             ),
             notice,
             paired = server.paired != null,
+            place = place,
+            opening = opening.value != null,
         )
     }
 
@@ -378,12 +386,19 @@ class MainActivity : ComponentActivity() {
      * audio stays on the server and plays as it streams.
      */
     private fun openLecture(lectureId: String, atMillis: Long? = null) {
+        if (opening.value != null) return
+        opening.value = lectureId
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) { Recording.momentsHere(listOf(lectureId)) }
-            val library = Recording.library.library.value
-            val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-            if (!Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)) {
-                Toast.makeText(this@MainActivity, getString(R.string.bring_failed, getString(R.string.bring_not_on_server)), Toast.LENGTH_LONG).show()
+            try {
+                withContext(Dispatchers.IO) { Recording.momentsHere(listOf(lectureId)) }
+                val library = Recording.library.library.value
+                val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
+                if (!Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)) {
+                    android.util.Log.w("MainActivity", "opening $lectureId: no such moment here")
+                    Toast.makeText(this@MainActivity, getString(R.string.bring_failed, getString(R.string.bring_not_on_server)), Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                opening.value = null
             }
         }
     }
