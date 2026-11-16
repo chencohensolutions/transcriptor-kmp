@@ -48,17 +48,15 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      */
     fun index(): List<IndexedMoment> {
         synchronized(indexLock) { indexed }?.let { return it.values.toList() }
-        val kept = runCatching {
+        val file = runCatching {
             if (!local.exists(indexFile)) null
-            else json.decodeFromString<MomentIndexFileV1>(local.fileSystem.read(indexFile) { readUtf8() }).moments
+            else json.decodeFromString<MomentIndexFileV1>(local.fileSystem.read(indexFile) { readUtf8() })
         }.getOrNull()
-        if (kept == null || library != null && !libraryIndexed) return rescan()
-        synchronized(indexLock) { if (indexed == null) indexed = kept.associateBy { it.id } }
-        return kept
+        // Made with the lectures folder, or without it, as the app is now: else read from the folders.
+        if (file == null || file.library != (library != null)) return rescan()
+        synchronized(indexLock) { if (indexed == null) indexed = file.moments.associateBy { it.id } }
+        return file.moments
     }
-
-    // The kept index was made with a library: read once the app set it (each start reads the folders again anyway).
-    private var libraryIndexed = false
 
     /** The index made again from every moment's folder, and kept. Reads them all: not on the main thread. */
     fun rescan(): List<IndexedMoment> {
@@ -66,7 +64,6 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         synchronized(indexLock) {
             indexed = all.associateBy { it.id }
             indexDirty = true
-            libraryIndexed = library != null
         }
         saveIndex()
         return all
@@ -85,7 +82,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         runCatching {
             local.fileSystem.createDirectories(local.root)
             val temp = local.root / "$INDEX_FILE.tmp"
-            local.fileSystem.write(temp) { writeUtf8(json.encodeToString(MomentIndexFileV1(moments = moments))) }
+            local.fileSystem.write(temp) { writeUtf8(json.encodeToString(MomentIndexFileV1(moments = moments, library = library != null))) }
             local.fileSystem.atomicMove(temp, indexFile)
         }
     }

@@ -48,4 +48,9 @@ fun Lecture.indexed(hasAudio: Boolean): IndexedMoment = summary().let { s ->
 
 /** `moments-index.json` in the app's own storage (version 1). */
 @Serializable
-internal data class MomentIndexFileV1(val v: Int = 1, val moments: List<IndexedMoment> = emptyList())
+internal data class MomentIndexFileV1(
+    val v: Int = 1,
+    val moments: List<IndexedMoment> = emptyList(),
+    /** Made with the lectures folder outside the app counted: one made without it lacks those moments. */
+    val library: Boolean = false,
+)

@@ -134,8 +134,9 @@ class MainActivity : ComponentActivity() {
                 // to the server backup (when paired) and move to the lectures folder.
                 LaunchedEffect(live == null, opened == null, working.keys) {
                     withContext(Dispatchers.IO) {
-                        Recording.migrateLibrary()
+                        // The list from the index first (one small file), then the slower work in the lectures folder.
                         Recording.library.reload()
+                        Recording.migrateLibrary()
                         Recording.checkIndexOnce()
                         Recording.backUp(this@MainActivity)
                         runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
