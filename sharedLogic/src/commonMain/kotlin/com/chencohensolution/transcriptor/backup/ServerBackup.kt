@@ -99,6 +99,8 @@ data class ServerState(
     val uploaded: Int = 0,
     /** Of them, still WAV waiting to be compressed (on the charger, as Settings has it): sent once they are. */
     val awaitingEncode: Int = 0,
+    /** Upload now is compressing this many WAV moments before it sends them. */
+    val compressing: Int = 0,
     /** Bytes of the waiting calls not sent yet. */
     val callsBytesLeft: Long = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
@@ -813,6 +815,15 @@ class ServerBackup(
     @kotlin.concurrent.Volatile
     private var uploading = false
 
+    @kotlin.concurrent.Volatile
+    private var compressing = 0
+
+    /** Upload now is compressing [count] moments first (0: done). */
+    fun markCompressing(count: Int) {
+        compressing = count
+        refresh()
+    }
+
     /** Upload now is running in the app (from the tap until it ends): the screen says so at once. */
     fun markUploading(on: Boolean) {
         uploading = on
@@ -855,6 +866,7 @@ class ServerBackup(
             awaitingEncode = here.count { it.pendingEncode && byMoment[it.id] != MomentBackup.BackedUp },
             callsBytesLeft = shed.uploads.value.filter { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING }.sumOf { it.size - it.sent },
             uploading = uploading,
+            compressing = compressing,
             showServer = kept.showServer,
         )
     }

@@ -732,8 +732,12 @@
         <item quantity="one">שיחה אחת</item>
         <item quantity="other">%d שיחות</item>
     </plurals>
+    <plurals name="server_compressing">
+        <item quantity="one">דוחס רגע אחד, ואז שולח…</item>
+        <item quantity="other">דוחס %d רגעים, ואז שולח…</item>
+    </plurals>
     <plurals name="server_awaiting_encode">
-        <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה), ואז יישלח.</item>
-        <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה), ואז יישלחו.</item>
+        <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלח.</item>
+        <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלחו.</item>
     </plurals>
 </resources>

@@ -152,13 +152,14 @@ object Recording {
     /**
      * Encodes the lectures waiting for FLAC or AAC, one after another, when the setting allows it now (right after Stop,
      * or on the charger above 30%); [progress] gets each one's string and 0..1. False when none ran (none waiting, one
-     * already running, or the setting waits for the charger, which then gets an [EncodeJob]).
+     * already running, or the setting waits for the charger, which then gets an [EncodeJob]). [now]: whatever the
+     * setting and the charger (Upload now, which the user tapped).
      */
-    fun encodePending(context: android.content.Context, progress: (Lecture, Float) -> Unit = { _, _ -> }): Boolean {
+    fun encodePending(context: android.content.Context, now: Boolean = false, progress: (Lecture, Float) -> Unit = { _, _ -> }): Boolean {
         val pending = compression.pending()
         if (pending.isEmpty()) return false
         val (percent, charging) = battery(context)
-        if (!settings.encodeAfter.allows(charging, percent)) { EncodeJob.schedule(context); return false }
+        if (!now && !settings.encodeAfter.allows(charging, percent)) { EncodeJob.schedule(context); return false }
         if (!encoding.compareAndSet(false, true)) return false
         try {
             for (lecture in pending) {
@@ -674,6 +675,13 @@ object Recording {
                 android.util.Log.i("Recording", "upload now: ${backup.waiting()} waiting")
                 runCatching { backup.runUploads() }.onSuccess { android.util.Log.i("Recording", "upload now: $it") }
                     .onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+                // Moments still WAV, waiting for the charger to be compressed, are compressed now and then sent (hen,
+                // Nov 17, 2026: Upload now sends everything).
+                if (!session.isRecording && compression.pending().isNotEmpty()) {
+                    backup.markCompressing(compression.pending().size)
+                    runCatching { encodePending(context, now = true) }.onFailure { android.util.Log.e("Recording", "compressing failed", it) }
+                    backup.markCompressing(0)
+                }
                 runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
                 if (backup.callsFolder != null) backUpCalls(context)
                 if (backup.waiting() > 0) runCatching { backup.runUploads() }.onSuccess { android.util.Log.i("Recording", "upload now, new: $it") }
