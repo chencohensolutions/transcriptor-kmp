@@ -16,23 +16,26 @@ enum class ModelJob { Live, Improve }
  */
 object ModelChoices {
     /**
-     * A model can do [job]: live, one fast enough to keep up; improve, a Whisper model (CPU or NPU), since it
-     * transcribes a line at a time with punctuation; the streaming models would only write the live text again.
+     * A model can do [job]: live, one fast enough to keep up; improve, any model that transcribes. Whisper (CPU or
+     * NPU) writes a line at a time with punctuation, listed first; a streaming model (the Zipformer, on the NPU too)
+     * is listed after them, for the owner's pick (Nov 16, 2026): writing a moment recorded without a transcript on
+     * the NPU, quickly and on little battery, or writing the lines again with it after another live model.
      */
     fun fits(model: SpeechModel, job: ModelJob) = when (job) {
         ModelJob.Live -> model.kind.transcribes && model.runsLive
-        ModelJob.Improve -> model.kind == ModelKind.Whisper || model.kind == ModelKind.WhisperNpu || model.kind == ModelKind.WhisperNpuEncoder
+        ModelJob.Improve -> model.kind.transcribes
     }
 
     /**
-     * The models for [job]: the ready ones first, then those to get; for improving, the large ones before the fast.
+     * The models for [job]: the ready ones first, then those to get; for improving, the large ones before the fast
+     * and Whisper before the streaming models.
      * Live, a model that runs in windows ([SpeechModel.liveWindowSeconds]: a large one, slower) is offered only once it
      * is ready (it is got for improving), after the ones that write lines, so it runs live only when chosen.
      */
     fun candidates(forLanguage: List<SpeechModel>, job: ModelJob, ready: (SpeechModel) -> Boolean): List<SpeechModel> {
         val fit = forLanguage.filter { fits(it, job) }
         return when (job) {
-            ModelJob.Improve -> fit.sortedBy { it.fitsLive }.let { it.filter(ready) + it.filterNot(ready) }
+            ModelJob.Improve -> fit.sortedWith(compareBy({ it.kind.streams }, { it.fitsLive })).let { it.filter(ready) + it.filterNot(ready) }
             ModelJob.Live -> fit.filter(ready).sortedBy { !it.fitsLive } + fit.filterNot(ready).filter { it.fitsLive }
         }
     }

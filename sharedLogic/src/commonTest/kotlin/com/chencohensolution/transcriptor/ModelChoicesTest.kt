@@ -14,12 +14,13 @@ class ModelChoicesTest {
     private fun ready(vararg models: SpeechModel): (SpeechModel) -> Boolean = { m -> models.any { it.id == m.id } }
 
     @Test
-    fun improvingOffersWhisperOnlyTheLargeOnesFirst() {
+    fun improvingOffersWhisperTheLargeOnesFirstThenTheZipformer() {
         val ids = ModelChoices.candidates(hebrew, ModelJob.Improve, ready()).map { it.id }
         assertEquals(
             listOf(
                 "ivrit-whisper-large-v3-npu-encoder-sm8750", "ivrit-whisper-large-v3-npu-sm8750", "hf:Hezi1991/ivrit-whisper-large-v3-ggml-q8:ivrit-whisper-large-v3-q8_0", "ivrit-whisper-large-v3", "whisper-large-v3",
                 "ivrit-whisper-large-v3-turbo-npu-sm8750", "ivrit-whisper-large-v3-turbo", "whisper-large-v3-turbo",
+                "ivrit-zipformer2-66m-streaming-npu-sm8750", "ivrit-zipformer2-66m-streaming",
             ),
             ids,
         )

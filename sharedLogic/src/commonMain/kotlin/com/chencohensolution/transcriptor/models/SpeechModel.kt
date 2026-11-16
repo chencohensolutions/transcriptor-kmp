@@ -41,6 +41,9 @@ enum class ModelKind {
     /** Turns speech into text. */
     val transcribes get() = this == Whisper || this == WhisperNpu || this == WhisperNpuEncoder || this == StreamingTransducer || this == StreamingTransducerNpu
 
+    /** A streaming transducer (the Zipformer), on the CPU or the NPU: words as the audio arrives. */
+    val streams get() = this == StreamingTransducer || this == StreamingTransducerNpu
+
     /** Runs (in part) on a Qualcomm NPU: checked there once, loaded inside the NPU memory guard. */
     val onNpu get() = this == WhisperNpu || this == WhisperNpuEncoder || this == StreamingTransducerNpu
 }

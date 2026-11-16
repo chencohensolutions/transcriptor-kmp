@@ -54,6 +54,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -61,7 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -175,19 +178,23 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
     // While following, the whole transcript moves as one: when the live line wraps to a new row or a line or note
     // comes in, everything in view (the grey words too) moves up together in a single ease-in-out tween, no spring
     // and no line on its own, and the new words fade in once it ends. Each layout, a line that was already in view
-    // tells how far the text moved; the list is drawn that far back down, then eased up to its place.
-    val lift = remember { FloatAnimatable(0f) }
-    LaunchedEffect(list) {
-        var before = emptyMap<Any, Int>()
-        snapshotFlow { list.layoutInfo }.collect { info ->
-            val anchor = info.visibleItemsInfo.firstOrNull { it.key != "live" && it.key in before }
-            val moved = anchor?.let { it.offset - before.getValue(it.key) } ?: 0
-            before = info.visibleItemsInfo.associate { it.key to it.offset }
-            if (moved != 0 && following && !list.isScrollInProgress) launch {
-                lift.snapTo(lift.value + moved)
-                lift.animateTo(0f, tween(MOVE_MILLIS, easing = FastOutSlowInEasing))
-            }
+    // tells how far the text moved; the list is drawn that far back down, then eased up to its place. That is
+    // worked out while the list is laid out, before the frame is drawn: done a frame later (after the layout was
+    // drawn), the text jumps up for a frame first, a flicker on every new line.
+    val glide = remember { Glide() }
+    LaunchedEffect(glide.running) {
+        if (glide.running) while (glide.step(withFrameNanos { it })) Unit
+    }
+    val follow = Modifier.layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        Snapshot.withoutReadObservation {
+            val info = list.layoutInfo
+            val anchor = info.visibleItemsInfo.firstOrNull { it.key != "live" && it.key in glide.before }
+            val moved = anchor?.let { it.offset - glide.before.getValue(it.key) } ?: 0
+            glide.before = info.visibleItemsInfo.associate { it.key to it.offset }
+            if (moved != 0 && following && !list.isScrollInProgress) glide.add(moved.toFloat())
         }
+        layout(placeable.width, placeable.height) { placeable.placeWithLayer(0, 0) { translationY = glide.offset } }
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).imePadding()) {
@@ -236,12 +243,12 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
         Box(Modifier.weight(1f).clipToBounds()) {
             val appDirection = LocalLayoutDirection.current
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-                LazyColumn(state = list, reverseLayout = true, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize().graphicsLayer { translationY = lift.value }) {
+                LazyColumn(state = list, reverseLayout = true, contentPadding = PaddingValues(vertical = 12.dp), modifier = Modifier.fillMaxSize().then(follow)) {
                     item(key = "live") {
                         Box(Modifier.fillMaxWidth()) { if (state.partial != null) {
                             Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                                 Text(formatClock(state.lecture.segments.lastOrNull()?.endMillis ?: 0), style = MaterialTheme.typography.labelSmall, color = colors.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
-                                key(state.lecture.segments.size) { FadingWords(state.partial.orEmpty(), colors.partial, settled = !lift.isRunning) }
+                                key(state.lecture.segments.size) { FadingWords(state.partial.orEmpty(), colors.partial, settled = !glide.running) }
                             }
                         } }
                     }
@@ -337,6 +344,38 @@ private fun TextStyle.inNotebookDirection() =
 
 /** How long the transcript takes to move up as one when the text below grows. */
 private const val MOVE_MILLIS = 320
+
+/**
+ * The live transcript's move up as one: [offset] is how far below its place it is drawn now, eased to 0 over
+ * [MOVE_MILLIS] from the frame after a move was [add]ed. A move added while one is running starts from where it is.
+ */
+private class Glide {
+    /** The visible items' offsets at the last layout, by key. */
+    var before: Map<Any, Int> = emptyMap()
+    var running by mutableStateOf(false)
+        private set
+    private var from by mutableFloatStateOf(0f)
+    private var progress by mutableFloatStateOf(1f)
+    private var startNanos = -1L
+    val offset get() = from * (1f - FastOutSlowInEasing.transform(progress))
+
+    fun add(moved: Float) {
+        from = offset + moved
+        progress = 0f
+        startNanos = -1L
+        running = true
+    }
+
+    /** One frame; false once the move is done. */
+    fun step(nanos: Long): Boolean {
+        if (startNanos < 0) startNanos = nanos
+        progress = ((nanos - startNanos) / 1_000_000f / MOVE_MILLIS).coerceIn(0f, 1f)
+        if (progress < 1f) return true
+        from = 0f
+        running = false
+        return false
+    }
+}
 
 @Composable
 private fun SpeechRow(
@@ -530,10 +569,12 @@ private fun FadingWords(text: String, color: Color, settled: Boolean) {
     val words = text.split(" ")
     val alphas = remember { HashMap<Int, FloatAnimatable<Float, AnimationVector1D>>() }
     for (i in words.indices) alphas.getOrPut(i) { FloatAnimatable(0f) }
-    // New words wait for the text to finish moving up, then fade in.
+    // New words wait for the text to finish moving up, then fade in. A fade cut off (a word came, or the text moved
+    // again) is picked up from where it stopped: going by the fade's target (already 1) instead of where the word is
+    // left it stuck half-faded, nearly invisible on the dark background.
     LaunchedEffect(words.size, settled) {
         if (!settled) return@LaunchedEffect
-        for (i in words.indices) { val a = alphas.getValue(i); if (a.targetValue < 1f) launch { a.animateTo(1f, tween(200)) } }
+        for (i in words.indices) { val a = alphas.getValue(i); if (a.value < 1f) launch { a.animateTo(1f, tween(200)) } }
     }
     val shown = buildAnnotatedString {
         words.forEachIndexed { i, w ->

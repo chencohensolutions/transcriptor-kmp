@@ -385,8 +385,9 @@ See [screens/](screens/README.md). Designed in the UI lab first, one screen at a
   model is ivrit.ai large-v3 for Hebrew (q8_0 on the phone), with live transcription's filters (no non-speech
   pieces, no impossible word counts, loops collapsed, no direction marks). Lines keep their times and speakers; edited lines and
   lines the model gives nothing for keep their text. `lecture.json` records `refinedWith`. The UI calls it Improve.
-  Any downloaded Whisper model for the language can improve (`ModelChoices`; the Zipformer could, a line at a time with
-  `transcribeLineStreaming`, but is no longer offered since Nov 6: it writes the live text again). Before a pass, the current transcript is kept as a **version**
+  Any downloaded model for the language can improve (`ModelChoices`): Whisper first, then the Zipformer (CPU or NPU),
+  a line at a time with `transcribeLineStreaming`. Not offered Nov 6 to 16 (it writes the live text again); offered
+  again on the owner's ask (Nov 16, 2026), to transcribe a moment recorded without a transcript on the NPU. Before a pass, the current transcript is kept as a **version**
   (`versions/<id>.json` in the moment's folder: its lines, speakers and edits; `lecture.json` lists them under
   `versions`); the review screen switches between them, keeping the one it replaces. Not timed on the phone yet;
   large-v3 is expected to run several times slower than turbo there (the NPU plan targets it).
