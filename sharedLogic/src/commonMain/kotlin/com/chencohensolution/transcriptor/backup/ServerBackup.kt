@@ -97,6 +97,8 @@ data class ServerState(
     /** Moments recorded in Audio Logs that are on the phone now, and how many of them are uploaded. */
     val onPhone: Int = 0,
     val uploaded: Int = 0,
+    /** Of them, still WAV waiting to be compressed (on the charger, as Settings has it): sent once they are. */
+    val awaitingEncode: Int = 0,
     /** Bytes of the waiting calls not sent yet. */
     val callsBytesLeft: Long = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
@@ -850,6 +852,7 @@ class ServerBackup(
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
             onPhone = here.size,
             uploaded = here.count { byMoment[it.id] == MomentBackup.BackedUp },
+            awaitingEncode = here.count { it.pendingEncode && byMoment[it.id] != MomentBackup.BackedUp },
             callsBytesLeft = shed.uploads.value.filter { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING }.sumOf { it.size - it.sent },
             uploading = uploading,
             showServer = kept.showServer,

@@ -721,4 +721,8 @@
         <item quantity="one">%d call</item>
         <item quantity="other">%d calls</item>
     </plurals>
+    <plurals name="server_awaiting_encode">
+        <item quantity="one">1 moment waits to be compressed (when charging), then it is sent.</item>
+        <item quantity="other">%d moments wait to be compressed (when charging), then they are sent.</item>
+    </plurals>
 </resources>

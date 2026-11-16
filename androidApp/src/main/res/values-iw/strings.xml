@@ -732,4 +732,8 @@
         <item quantity="one">שיחה אחת</item>
         <item quantity="other">%d שיחות</item>
     </plurals>
+    <plurals name="server_awaiting_encode">
+        <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה), ואז יישלח.</item>
+        <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה), ואז יישלחו.</item>
+    </plurals>
 </resources>
