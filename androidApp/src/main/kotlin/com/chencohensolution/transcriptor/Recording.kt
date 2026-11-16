@@ -667,7 +667,7 @@ object Recording {
         if (!callsRunning.tryLock()) return
         try {
             if (backup.callsFolder != null) openCallsFolder()
-            runCatching { backup.backUpCalls() }.onFailure { android.util.Log.e("Recording", "backing up calls failed", it) }
+            runCatching { backup.backUpCalls(System.currentTimeMillis()) }.onFailure { android.util.Log.e("Recording", "backing up calls failed", it) }
             if (backup.waiting() > 0) scheduleUploads(context)
         } finally {
             callsRunning.unlock()

@@ -201,15 +201,16 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         }
         Switch(checked = state.wifiOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
+    CallsSection(state, actions)
     state.shown?.let { shown ->
         HorizontalDivider()
         Text(stringResource(R.string.server_show), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        ShowSwitch(R.string.server_show_calls, R.string.server_show_calls_note, shown.calls) { actions.setShown(shown.copy(calls = it)) }
+        // Hidden here and still backed up: said so, so the calls don't look gone.
+        val callsNote = if (!shown.calls && state.callsFolder != null) R.string.server_show_calls_backed_up else R.string.server_show_calls_note
+        ShowSwitch(R.string.server_show_calls, callsNote, shown.calls) { actions.setShown(shown.copy(calls = it)) }
         ShowSwitch(R.string.server_show_voice, R.string.server_show_voice_note, shown.voiceMessages) { actions.setShown(shown.copy(voiceMessages = it)) }
         Text(stringResource(R.string.server_show_private_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    HorizontalDivider()
-    CallsSection(state, actions)
     HorizontalDivider()
     // Calls and voice messages behind the phone's lock, in the moments list and search (owner's request, Nov 16, 2026).
     Text(stringResource(R.string.server_lock), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
@@ -241,28 +242,56 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
     )
 }
 
-/** Backing up the phone's call recordings: the folder picked, how many were handed over, or a button to pick one. */
+/**
+ * Backing up the phone's call recordings (owner's call, Nov 16, 2026: Audio Logs backs calls up, apart from whether it
+ * shows them): a switch that asks for the calls folder the first time, then how many were sent and what waits, the
+ * folder (tap to change it), and a way back in when the phone took the access away. Turning it off asks first.
+ */
 @Composable
 private fun CallsSection(state: ServerState, actions: ServerActions) {
-    Text(stringResource(R.string.server_calls), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    var stopping by rememberSaveable { mutableStateOf(false) }
     val folder = state.callsFolder
-    if (folder == null) {
-        Text(stringResource(R.string.server_calls_off), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FilledTonalButton(onClick = actions.chooseCallsFolder) { Text(stringResource(R.string.server_calls_choose)) }
-        return
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = folder != null, role = Role.Switch, onValueChange = { on -> if (on) explaining = true else stopping = true })
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.server_calls), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                when {
+                    folder == null -> stringResource(R.string.server_calls_off)
+                    !state.callsReadable -> stringResource(R.string.server_calls_no_access, isolated(folder))
+                    state.callsWaiting > 0 -> stringResource(R.string.server_calls_waiting, isolated(folder), state.callsHanded - state.callsWaiting, state.callsWaiting)
+                    else -> stringResource(R.string.server_calls_on, isolated(folder), state.callsHanded)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (folder != null && !state.callsReadable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = folder != null, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
-    Text(
-        when {
-            state.callsWaiting > 0 -> stringResource(R.string.server_calls_waiting, isolated(folder), state.callsWaiting)
-            else -> stringResource(R.string.server_calls_on, isolated(folder), state.callsHanded)
-        },
-        style = MaterialTheme.typography.bodyMedium,
+    if (folder != null) {
+        Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = actions.chooseCallsFolder) {
+            Text(stringResource(if (state.callsReadable) R.string.server_calls_change else R.string.server_calls_allow))
+        }
+    }
+    if (explaining) AlertDialog(
+        onDismissRequest = { explaining = false },
+        title = { Text(stringResource(R.string.server_calls)) },
+        text = { Text(stringResource(R.string.server_calls_pick_note)) },
+        confirmButton = { TextButton(onClick = { explaining = false; actions.chooseCallsFolder() }) { Text(stringResource(R.string.server_calls_choose)) } },
+        dismissButton = { TextButton(onClick = { explaining = false }) { Text(stringResource(R.string.server_cancel)) } },
     )
-    Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = actions.chooseCallsFolder) { Text(stringResource(R.string.server_calls_change)) }
-        TextButton(onClick = actions.stopCalls) { Text(stringResource(R.string.server_calls_stop)) }
-    }
+    if (stopping) AlertDialog(
+        onDismissRequest = { stopping = false },
+        title = { Text(stringResource(R.string.server_calls_stop_title)) },
+        text = { Text(stringResource(R.string.server_calls_stop_note)) },
+        confirmButton = { TextButton(onClick = { stopping = false; actions.stopCalls() }) { Text(stringResource(R.string.server_calls_stop)) } },
+        dismissButton = { TextButton(onClick = { stopping = false }) { Text(stringResource(R.string.server_cancel)) } },
+    )
 }
 
 /** One switch of what Audio Logs shows from the server, with what it means. */

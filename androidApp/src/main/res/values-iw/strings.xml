@@ -640,13 +640,19 @@
     </plurals>
     <string name="server_show">מה יומן קול מציג מהשרת</string>
     <string name="server_calls">גיבוי שיחות</string>
-    <string name="server_calls_off">שליחת הקלטות השיחות של הטלפון לשרת. יש לבחור את התיקייה שבה הטלפון מקליט שיחות (בסמסונג: Recordings › Call).</string>
-    <string name="server_calls_choose">בחירת תיקיית השיחות</string>
-    <string name="server_calls_on">מ־%1$s: %2$d שיחות גובו.</string>
-    <string name="server_calls_waiting">מ־%1$s: %2$d שיחות ממתינות לשליחה.</string>
-    <string name="server_calls_note">שיחות חדשות נשלחות כשהן מגיעות, גם כשהאפליקציה לא מציגה שיחות. שום דבר לא נמחק מהטלפון.</string>
+    <string name="server_calls_off">שליחת הקלטות השיחות של הטלפון לשרת, גם כשהאפליקציה לא מציגה שיחות.</string>
+    <string name="server_calls_pick_note">יש לבחור את התיקייה שבה הטלפון מקליט שיחות (בסמסונג: Recordings › Call). יומן קול רק קורא ממנה: שום דבר בה לא משתנה או נמחק.</string>
+    <string name="server_calls_choose">בחירת התיקייה</string>
+    <string name="server_calls_on">מ־%1$s · %2$d נשלחו</string>
+    <string name="server_calls_waiting">מ־%1$s · %2$d נשלחו · %3$d ממתינות</string>
+    <string name="server_calls_no_access">יומן קול כבר לא יכול לקרוא את %1$s. צריך לאשר שוב כדי להמשיך.</string>
+    <string name="server_calls_note">שיחה נשלחת כמה דקות אחרי שהיא מסתיימת, גם כששיחות מוסתרות כאן. שום דבר לא נמחק מהטלפון.</string>
     <string name="server_calls_change">החלפת תיקייה</string>
+    <string name="server_calls_allow">אישור גישה להקלטות השיחות</string>
+    <string name="server_calls_stop_title">להפסיק לשלוח שיחות?</string>
+    <string name="server_calls_stop_note">השיחות שכבר בשרת נשארות שם, והטלפון שומר את השיחות שלו.</string>
     <string name="server_calls_stop">הפסקה</string>
+    <string name="server_show_calls_backed_up">מוסתרות כאן, ועדיין מגובות.</string>
     <string name="server_show_calls">שיחות</string>
     <string name="server_show_calls_note">הקלטות של שיחות טלפון. כבוי: השרת לא שולח אותן לאפליקציה הזו.</string>
     <string name="server_show_voice">הודעות קוליות</string>

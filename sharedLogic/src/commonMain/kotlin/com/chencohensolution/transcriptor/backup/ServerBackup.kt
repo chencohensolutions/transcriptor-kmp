@@ -83,6 +83,8 @@ data class ServerState(
     val cacheBytes: Long = 0,
     /** The folder of call recordings backed up, by its name; null when calls aren't backed up. */
     val callsFolder: String? = null,
+    /** The app can read the calls folder now; false once the phone took the access back (pick it again). */
+    val callsReadable: Boolean = false,
     /** Call recordings handed over, and those of them still waiting to be sent. */
     val callsHanded: Int = 0,
     val callsWaiting: Int = 0,
@@ -727,6 +729,7 @@ class ServerBackup(
             cacheLimitBytes = kept.cacheLimitBytes,
             cacheBytes = cacheBytes,
             callsFolder = kept.callsFolderName.takeIf { kept.callsFolder != null },
+            callsReadable = callsAt != null,
             callsHanded = kept.calls.size,
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
         )
@@ -744,6 +747,7 @@ class ServerBackup(
     /** The app reads the calls folder through [fileSystem] at [root] (null: it can't now, the access was taken back). */
     fun useCallsFolder(fileSystem: FileSystem?, root: Path) {
         callsAt = fileSystem?.let { it to root }
+        refresh()
     }
 
     /**
@@ -759,9 +763,10 @@ class ServerBackup(
     /**
      * Hands shed the call recordings in the calls folder not handed over yet, or changed since, to send as calls (files:
      * not on the main thread). The server reads who each was with and when from its name. Nothing in the folder is
-     * changed or deleted. Returns how many were handed over.
+     * changed or deleted. A file changed in the last 2 minutes is left for a later pass: a call still going on.
+     * Returns how many were handed over.
      */
-    suspend fun backUpCalls(): Int {
+    suspend fun backUpCalls(now: Long): Int {
         if (journal.state.value !is JournalState.Paired || kept.callsFolder == null) return 0
         val (fs, root) = callsAt ?: return 0
         val name = kept.callsFolderName ?: "Call"
@@ -775,6 +780,8 @@ class ServerBackup(
             val size = meta.size ?: continue
             if (size == 0L) continue
             val modified = meta.lastModifiedAtMillis ?: 0L
+            // Still being written (a call going on): left for a later pass, so a half-recorded call isn't sent.
+            if (now - modified < SETTLED_MILLIS) continue
             val relative = path.relativeTo(root).toString()
             val before = kept.calls[relative]
             if (before != null && before.size == size && before.modified == modified) {
@@ -900,3 +907,6 @@ internal const val CALL_REF = "call:"
 
 /** The endings of sound files a phone's call recorder writes. */
 private val CALL_EXTENSIONS = setOf("m4a", "mp4", "mp3", "amr", "3gp", "aac", "wav", "ogg", "opus", "flac")
+
+/** How long a call's file must be left unchanged before it is sent: one changed more recently is still being recorded. */
+private const val SETTLED_MILLIS = 2 * 60_000L

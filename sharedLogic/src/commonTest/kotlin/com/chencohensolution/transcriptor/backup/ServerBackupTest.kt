@@ -103,10 +103,12 @@ class ServerBackupTest {
         fs.write(calls / "notes.txt") { writeUtf8("not a call") }
         val backup = backup(paired = true)
         backup.useCallsFolder(fs, calls)
-        assertEquals(0, backup.backUpCalls(), "not picked yet")
+        val later = fs.metadata(calls / "old").lastModifiedAtMillis!! + 10 * 60_000
+        assertEquals(0, backup.backUpCalls(later), "not picked yet")
         backup.chooseCallsFolder("content://tree/Call", "Call")
-        assertEquals(2, backup.backUpCalls())
-        assertEquals(0, backup.backUpCalls(), "handed over once")
+        assertEquals(0, backup.backUpCalls(later - 9 * 60_000), "still being written: left for later")
+        assertEquals(2, backup.backUpCalls(later))
+        assertEquals(0, backup.backUpCalls(later), "handed over once")
         assertEquals(2, backup.state.value.callsWaiting)
         assertEquals(RunResult.Done(sent = 2, refused = 0), backup.runUploads())
         assertEquals(setOf("call one", "call two"), server.files.values.map { it.decodeToString() }.toSet())
@@ -115,11 +117,12 @@ class ServerBackupTest {
         assertTrue(fs.exists(calls / "old" / "Call recording Avi_240101_090000.m4a"), "the phone keeps its calls")
         assertEquals("Call", backup.state.value.callsFolder)
         assertEquals(2, backup.state.value.callsHanded)
+        assertTrue(backup.state.value.callsReadable)
         // A new call later: only it is sent.
         fs.write(calls / "Call recording Dana_251117_101500.m4a") { writeUtf8("call three") }
-        assertEquals(1, backup.backUpCalls())
+        assertEquals(1, backup.backUpCalls(later + 60 * 60_000))
         backup.chooseCallsFolder(null, null)
-        assertEquals(0, backup.backUpCalls())
+        assertEquals(0, backup.backUpCalls(later + 60 * 60_000))
         assertEquals(null, backup.state.value.callsFolder)
     }
 
