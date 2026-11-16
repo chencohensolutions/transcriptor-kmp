@@ -511,6 +511,27 @@ class ServerBackup(
         refresh()
     }
 
+    /**
+     * Moments made earlier from the server's recordings in [files] take the source they have now (a call that was
+     * filed as a recording). Only moments that came from the server: one recorded here keeps none. True when any
+     * changed. Files: not on the main thread.
+     */
+    fun takeSources(files: List<RemoteFile>): Boolean {
+        var changed = false
+        for (file in files) {
+            val source = sourceOf(file) ?: continue
+            val id = store.idOfServerSha(file.sha256) ?: continue
+            val entry = store.index().firstOrNull { it.id == id } ?: continue
+            if (entry.source == null || entry.source == source) continue
+            val lecture = store.load(id) ?: continue
+            // A title that is still the whole file name (a call's name not read as one before) becomes whom it was with.
+            val wholeName = lecture.title == file.about.fileName.substringBeforeLast('.').trim()
+            store.save(lecture.copy(source = source, title = if (wholeName) titleOf(file.about.fileName) else lecture.title))
+            changed = true
+        }
+        return changed
+    }
+
     /** The hash of a note as it was sent before each app had its own (wrapped in `audioLogs`). */
     private fun legacyNoteHash(lecture: Lecture): String =
         buildJsonObject { put("audioLogs", noteOf(lecture)) }.toString().encodeUtf8().sha256().hex()
@@ -529,7 +550,7 @@ class ServerBackup(
             ?.let { (it["audioLogs"] as? JsonObject ?: it).toString() }
             ?.let(store::fromServerNote)
         if (restored != null) {
-            return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, source = restored.source ?: file.about.source)
+            return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, source = restored.source ?: sourceOf(file))
         }
         val started = listOfNotNull(file.about.takenAt, file.storedAt).firstNotNullOfOrNull {
             runCatching { kotlin.time.Instant.parse(it).toEpochMilliseconds() }.getOrNull()
@@ -546,7 +567,7 @@ class ServerBackup(
             pendingTranscript = true,
             tucked = file.tucked,
             serverSha256 = file.sha256,
-            source = file.about.source,
+            source = sourceOf(file),
         )
     }
 
@@ -775,13 +796,22 @@ internal fun rfc3339(millis: Long, offsetMillis: Long): String {
         "$sign${two(abs(offsetMinutes) / 60)}:${two(abs(offsetMinutes) % 60)}"
 }
 
-private val SAMSUNG_CALL = Regex("""^(?:Call recording|הקלטת שיחה|שיחה) (.+)_\d{6}_\d{6}$""")
+// Samsung's call recorder: "Call recording אבא_250206_142813", "הקלטת שיחה …", "שיחה אבא_…", and "Call אמא_…", with
+// invisible marks of writing direction around the contact (taken out first).
+private val SAMSUNG_CALL = Regex("""^(?:Call recording|Call|הקלטת שיחה|שיחה) +(.+)_\d{6}_\d{6}$""")
+private val DIRECTION_MARKS = Regex("[\u200E\u200F\u202A-\u202E\u2066-\u2069]")
+
+private fun callBase(fileName: String) = fileName.substringBeforeLast('.').replace(DIRECTION_MARKS, "").trim()
 
 /** A moment's title from a server recording's file name: whom a Samsung call was with, else the name without its extension. */
 internal fun titleOf(fileName: String): String {
-    val base = fileName.substringBeforeLast('.').trim()
+    val base = callBase(fileName)
     return SAMSUNG_CALL.find(base)?.groupValues?.get(1)?.trim()?.ifEmpty { null } ?: base.ifEmpty { fileName }
 }
+
+/** The server's recording's source, or a call when its name says so (the server may have filed it as a recording). */
+internal fun sourceOf(file: RemoteFile): String? =
+    if (SAMSUNG_CALL.matches(callBase(file.about.fileName))) "call" else file.about.source
 
 /** The name of the labels in Audio Logs' own data on the server. */
 private const val LABELS = "labels"

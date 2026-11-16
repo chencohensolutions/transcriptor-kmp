@@ -692,6 +692,8 @@ object Recording {
 
     /** The list's server recordings as moments, each time its window of pages changes. */
     private fun showServerMoments(window: com.chencohensolution.transcriptor.backup.ServerWindow) {
+        // Moments made earlier from these recordings take the source they have now (calls filed as recordings).
+        if (runCatching { backup.takeSources(window.files) }.getOrDefault(false)) library.reload()
         val language = library.library.value.lastLanguage
         val shown = window.files.filter { !backup.isMomentHere(it.sha256) && !backup.isDismissed(it.sha256) }
         val summaries = shown.map { it to backup.summaryOf(it, language) }

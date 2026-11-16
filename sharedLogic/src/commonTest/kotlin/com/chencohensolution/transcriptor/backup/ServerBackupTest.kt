@@ -258,6 +258,11 @@ class ServerBackupTest {
         assertEquals("אבא", titleOf("Call recording אבא_250206_142813.m4a"))
         assertEquals("0501234567", titleOf("הקלטת שיחה 0501234567_211115_200618.m4a"))
         assertEquals("Voice 012", titleOf("Voice 012.m4a"))
+        assertEquals("אחות הדר פרפל", titleOf("Call \u200e\u202bאחות הדר פרפל\u202c\u200e_260601_181926.m4a"))
+        fun remote(name: String, source: String?) = RemoteFile("0".repeat(64), 1, FileAbout(name, "audio/mp4", FileKind.AUDIO, source = source))
+        assertEquals("call", sourceOf(remote("Call \u200eאמא_260515_114640.m4a", "recording")))
+        assertEquals("call", sourceOf(remote("שיחה אבא_261028_122919.m4a", "other")))
+        assertEquals("recording", sourceOf(remote("audio.aac", "recording")))
     }
 
     @Test
