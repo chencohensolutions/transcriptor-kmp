@@ -7,6 +7,7 @@ import com.chencohensolution.transcriptor.notebook.LabelStore
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.LectureSummary
+import com.chencohensolution.transcriptor.notebook.Locks
 import com.chencohensolution.transcriptor.notebook.NOTEBOOKS_FILE
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.NotebooksController
@@ -71,6 +72,23 @@ class NotebooksTest {
         assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
         controller.setTucked(listOf("a"), false)
         assertEquals(listOf("b", "a"), controller.search("Secret").map { it.moment.id })
+    }
+
+    @Test
+    fun lockedLabelsAndCallsWaitForThePhonesLockAndSearchNeverFindsThem() {
+        val personal = labels.create("Personal", 1)
+        lectures.save(lecture("a", 1_000).copy(title = "Secret talk", labels = listOf(personal.id)))
+        lectures.save(lecture("b", 2_000).copy(title = "Secret lecture"))
+        lectures.save(lecture("c", 3_000).copy(title = "Secret call", source = "call"))
+        var locks = Locks()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, locks = { locks })
+        controller.reload()
+        assertEquals(mapOf("a" to false, "b" to false, "c" to false), controller.library.value.moments.associate { it.id to it.locked })
+        controller.setLabelLocked(personal.id, true)
+        locks = Locks(calls = true)
+        controller.locksChanged()
+        assertEquals(mapOf("a" to true, "b" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
+        assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
     }
 
     @Test

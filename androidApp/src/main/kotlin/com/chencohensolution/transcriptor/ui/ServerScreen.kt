@@ -82,6 +82,8 @@ class ServerActions(
     val unpair: () -> Unit = {},
     /** Turns calls or voice messages on or off for Audio Logs on the server. */
     val setShown: (SoundRecordingsShown) -> Unit = {},
+    /** Puts calls or voice messages behind the phone's lock, or takes them out. */
+    val setLocks: (com.chencohensolution.transcriptor.notebook.Locks) -> Unit = {},
     /** Sets the most shed's cache keeps on the phone. */
     val setCacheLimit: (Long) -> Unit = {},
     /** What Free up space would remove with a rule (files: off the main thread). */
@@ -97,7 +99,10 @@ class ServerActions(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServerScreen(state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions, siblings: List<String> = emptyList()) {
+fun ServerScreen(
+    state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions, siblings: List<String> = emptyList(),
+    locks: com.chencohensolution.transcriptor.notebook.Locks = com.chencohensolution.transcriptor.notebook.Locks(),
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -111,7 +116,7 @@ fun ServerScreen(state: ServerState, pairing: PairingUi, defaultDeviceName: Stri
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val paired = state.paired
-            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions)
+            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions, locks)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -155,7 +160,7 @@ private fun NotPaired(pairing: PairingUi, defaultDeviceName: String, siblings: L
 }
 
 @Composable
-private fun Paired(state: ServerState, actions: ServerActions) {
+private fun Paired(state: ServerState, actions: ServerActions, locks: com.chencohensolution.transcriptor.notebook.Locks) {
     val paired = state.paired ?: return
     var unpairing by rememberSaveable { mutableStateOf(false) }
     Text(
@@ -200,24 +205,11 @@ private fun Paired(state: ServerState, actions: ServerActions) {
         Text(stringResource(R.string.server_show_private_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     HorizontalDivider()
-    Text(stringResource(R.string.server_on_server), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-    if (state.onServerOnly.isEmpty()) {
-        Text(stringResource(R.string.server_on_server_none), style = MaterialTheme.typography.bodySmall)
-    } else {
-        Text(stringResource(R.string.server_on_server_count, state.onServerOnly.size), style = MaterialTheme.typography.bodySmall)
-        state.onServerOnly.sortedByDescending { it.about.takenAt ?: it.storedAt ?: "" }.take(20).forEach { file ->
-            val line = listOfNotNull(
-                file.about.takenAt?.take(16)?.replace('T', ' '),
-                file.about.durationMillis?.let(::formatClock),
-                file.about.fileName,
-            ).joinToString(" · ")
-            Text(isolated(line), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(stringResource(R.string.server_on_server_later), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if (state.tuckedOnServer > 0) {
-        Text(stringResource(R.string.server_tucked_on_server, state.tuckedOnServer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    // Calls and voice messages behind the phone's lock, in the moments list and search (owner's request, Nov 16, 2026).
+    Text(stringResource(R.string.server_lock), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    ShowSwitch(R.string.server_lock_calls, R.string.server_lock_calls_note, locks.calls) { actions.setLocks(locks.copy(calls = it)) }
+    ShowSwitch(R.string.server_lock_voice, R.string.server_lock_voice_note, locks.voiceMessages) { actions.setLocks(locks.copy(voiceMessages = it)) }
+    Text(stringResource(R.string.server_lock_labels_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     HorizontalDivider()
     FreeUpSection(state, actions)
     HorizontalDivider()

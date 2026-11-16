@@ -18,6 +18,7 @@ import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.pendingEncode
+import com.chencohensolution.transcriptor.notebook.summary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,6 +107,13 @@ private data class BackupFileV1(
     val dismissed: Set<String> = emptySet(),
     /** Most bytes shed's cache keeps of what was read from the server (Settings › Server backup). */
     val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
+    /**
+     * The server's recordings are read in pages ([ServerMoments]) since Nov 16, 2026: the moments made earlier for every
+     * one of them, with no audio here, were let go once ([tidyServerMoments]).
+     */
+    val paged: Boolean = false,
+    /** The labels as they were at the last sync with the server's ([syncLabels]); null before the first. */
+    val labelsBase: List<ServerLabel>? = null,
 )
 
 @Serializable
@@ -165,6 +173,21 @@ class ServerBackup(
         Located(store.fileSystemOf(id), store.audioPath(lecture))
     }
 
+    /**
+     * The server's recordings that the moments list holds now, read a page at a time as the user scrolls: those that
+     * are moments here already are left out by the list ([isMomentHere]).
+     */
+    val serverMoments = ServerMoments({ before, after, limit -> shed.page(FileKind.AUDIO, before, after, limit) })
+
+    /** Whether the server's recording [sha256] is a moment here already (handed over from here, or opened). */
+    fun isMomentHere(sha256: String): Boolean = sha256 in momentShas
+
+    /** Whether the user deleted the server's recording [sha256] here: the list leaves it out. */
+    fun isDismissed(sha256: String): Boolean = sha256 in kept.dismissed
+
+    @kotlin.concurrent.Volatile
+    private var momentShas: Set<String> = emptySet()
+
     /** Connects the shed made with [locator]; before any other call. */
     fun attach(shed: Shed, journal: JournalBackend) {
         this.shed = shed
@@ -194,7 +217,8 @@ class ServerBackup(
         journal.unpair()
         shown = null
         shed.forgetRemote()
-        save(kept.copy(moments = emptyMap(), dismissed = emptySet()))
+        serverMoments.clear()
+        save(kept.copy(moments = emptyMap(), dismissed = emptySet(), labelsBase = null))
         refresh()
     }
 
@@ -284,7 +308,7 @@ class ServerBackup(
     suspend fun setShown(new: SoundRecordingsShown) {
         shown = journal.setSoundRecordingsShown(new)
         refresh()
-        shed.sync()
+        runCatching { serverMoments.reset() }
         refresh()
     }
 
@@ -302,6 +326,43 @@ class ServerBackup(
     suspend fun refreshCache() {
         cacheBytes = runCatching { shed.cacheBytes() }.getOrDefault(cacheBytes)
         refresh()
+    }
+
+    // The labels, in Audio Logs' own data on the server
+
+    /**
+     * Brings the labels here and on the server together ([mergeLabels]): what the user added, renamed or deleted on
+     * either phone since the last sync is kept, and both end up with the same list. On the server they are Audio Logs'
+     * own data (`appData("labels")`), which no other app sees. True when the labels here changed. Network: not on the
+     * main thread; quiet when the server can't be reached.
+     */
+    suspend fun syncLabels(labels: com.chencohensolution.transcriptor.notebook.LabelStore, now: Long): Boolean {
+        if (!::shed.isInitialized || journal.state.value !is JournalState.Paired) return false
+        var changedHere = false
+        repeat(3) {
+            val there = try {
+                shed.appData(LABELS)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return changedHere
+            }
+            val server = there.content?.let { runCatching { json.decodeFromString(ServerLabelsV1.serializer(), it).labels.map { l -> l.toLabel() } }.getOrNull() }.orEmpty()
+            val local = labels.all()
+            val merged = mergeLabels(kept.labelsBase?.map { it.toLabel() }, local, server)
+            if (merged != local) {
+                labels.replaceAll(merged, now)
+                changedHere = true
+            }
+            if (merged != server || there.content == null) {
+                val content = json.encodeToString(ServerLabelsV1.serializer(), ServerLabelsV1(labels = merged.map { it.toServer() }))
+                val write = runCatching { shed.setAppData(LABELS, content, there.version) }.getOrNull() ?: return changedHere
+                if (write is com.chencohensolution.shed.AppDataWrite.Conflict) return@repeat // changed on another phone meanwhile: merge again
+            }
+            save(kept.copy(labelsBase = merged.map { it.toServer() }))
+            return changedHere
+        }
+        return changedHere
     }
 
     // The server's copy of each moment
@@ -340,51 +401,60 @@ class ServerBackup(
         return sent
     }
 
-    private fun noteOf(lecture: Lecture): JsonObject =
-        buildJsonObject { put("audioLogs", json.parseToJsonElement(store.serverNote(lecture)).jsonObject) }
+    /** The moment's note on the server: Audio Logs' own (the server keeps each app's note apart). */
+    private fun noteOf(lecture: Lecture): JsonObject = json.parseToJsonElement(store.serverNote(lecture)).jsonObject
 
     /**
-     * Makes the server's recordings moments here (as of the last [syncServerList]): each recording, and each call or
-     * voice message the user shows ([setShown]), that is no moment here yet becomes one, with its transcript, notes and
-     * labels when the server keeps them (a moment backed up from a phone), else as a moment not transcribed yet, in
-     * [defaultLanguage]. Its audio stays on the server until it is opened ([bringAudio]). A moment whose recording
-     * left the server's list (made private, a call while calls are off) and whose audio isn't on the phone goes too.
-     * The recordings the user deleted here aren't made moments again. Returns how many it made.
+     * Makes the server's recording [file] a moment here, when the user opens it (or changes it) from the list: from its
+     * note when Audio Logs kept one, else as a moment not transcribed yet, in [defaultLanguage]. Its audio stays on the
+     * server and plays from there ([openAudio]). The moment it already is, when it is one.
      */
-    suspend fun adoptServerRecordings(defaultLanguage: String, busy: Set<String> = emptySet()): Int {
-        if (journal.state.value !is JournalState.Paired) return 0
-        val remote = shed.remote.value.filter { it.about.kind == FileKind.AUDIO }
-        if (remote.isEmpty()) return 0
-        val onServer = remote.map { it.sha256 }.toSet()
-        val lectures = store.all()
-        for (lecture in lectures) {
-            val sha = lecture.serverSha256 ?: continue
-            if (sha in onServer || lecture.id in busy || store.hasAudio(lecture)) continue
+    suspend fun momentHere(file: RemoteFile, defaultLanguage: String): Lecture {
+        store.all().firstOrNull { it.serverSha256 == file.sha256 }?.let { return it }
+        val lecture = momentOf(file, defaultLanguage)
+        store.load(lecture.id)?.let { return it }
+        store.save(lecture)
+        mutex.withLock {
+            save(kept.copy(moments = kept.moments + (lecture.id to HandedOver(file.sha256, lecture.audioFile, noteOf(lecture).toString().encodeUtf8().sha256().hex()))))
+        }
+        refresh()
+        return lecture
+    }
+
+    /**
+     * Once, after the update that reads the server's recordings in pages: lets go of the moments made earlier for every
+     * recording of the server, those with no audio here whose words the server has as they are, since the list now
+     * reads them from the server as the user scrolls. Moments changed here since stay. Not the [busy] ones.
+     */
+    suspend fun tidyServerMoments(busy: Set<String> = emptySet()) {
+        if (kept.paged) return
+        for (lecture in store.all()) {
+            if (!lecture.id.startsWith("server-") || lecture.id in busy || store.hasAudio(lecture)) continue
+            val handed = kept.moments[lecture.id] ?: continue
+            if (handed.note != noteOf(lecture).toString().encodeUtf8().sha256().hex() && handed.note != legacyNoteHash(lecture)) continue
             store.delete(lecture.id)
             mutex.withLock { save(kept.copy(moments = kept.moments - lecture.id)) }
         }
-        val known = lectures.mapNotNull { it.serverSha256 }.toSet() + kept.moments.values.map { it.sha256 }
-        var made = 0
-        for (file in remote) {
-            if (file.sha256 in known || file.sha256 in kept.dismissed) continue
-            val lecture = momentOf(file, defaultLanguage)
-            if (store.load(lecture.id) != null) continue
-            store.save(lecture)
-            mutex.withLock {
-                save(kept.copy(moments = kept.moments + (lecture.id to HandedOver(file.sha256, lecture.audioFile, noteOf(lecture).toString().encodeUtf8().sha256().hex()))))
-            }
-            made++
-        }
+        save(kept.copy(paged = true))
         refresh()
-        return made
     }
+
+    /** The hash of a note as it was sent before each app had its own (wrapped in `audioLogs`). */
+    private fun legacyNoteHash(lecture: Lecture): String =
+        buildJsonObject { put("audioLogs", noteOf(lecture)) }.toString().encodeUtf8().sha256().hex()
+
+    /** The server's recording [file] as the moments list shows it, before it is a moment here: its audio on the server. */
+    fun summaryOf(file: RemoteFile, defaultLanguage: String): com.chencohensolution.transcriptor.notebook.LectureSummary =
+        momentOf(file, defaultLanguage).summary().copy(audioOnServer = true)
 
     /** The moment the server's recording [file] is: from its note when the server keeps one, else a new one. */
     @OptIn(kotlin.time.ExperimentalTime::class)
     internal fun momentOf(file: RemoteFile, defaultLanguage: String): Lecture {
         val extension = file.about.fileName.substringAfterLast('.', "").lowercase().takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) } ?: "m4a"
+        // Audio Logs' own note on the server; one sent before each app had its own is wrapped in "audioLogs".
         val restored = file.note
-            ?.let { runCatching { json.parseToJsonElement(it).jsonObject["audioLogs"]?.toString() }.getOrNull() }
+            ?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+            ?.let { (it["audioLogs"] as? JsonObject ?: it).toString() }
             ?.let(store::fromServerNote)
         if (restored != null) {
             return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, source = restored.source ?: file.about.source)
@@ -405,6 +475,21 @@ class ServerBackup(
             tucked = file.tucked,
             serverSha256 = file.sha256,
             source = file.about.source,
+        )
+    }
+
+    /**
+     * The moment's audio on the server, to play as it streams ([com.chencohensolution.transcriptor.review.AudioStream]):
+     * read through shed by blocks, kept in its cache. Null when the server doesn't hold it (or it is on the phone).
+     */
+    fun streamOf(lecture: Lecture): com.chencohensolution.transcriptor.review.AudioStream? {
+        if (!::shed.isInitialized || journal.state.value !is JournalState.Paired) return null
+        val sha = lecture.serverSha256 ?: kept.moments[lecture.id]?.sha256 ?: return null
+        var reader: com.chencohensolution.shed.ShedReader? = null
+        val open: suspend () -> com.chencohensolution.shed.ShedReader = { reader ?: shed.open(sha).also { reader = it } }
+        return com.chencohensolution.transcriptor.review.AudioStream(
+            size = { open().size },
+            read = { position, length -> open().read(position, length) },
         )
     }
 
@@ -505,11 +590,11 @@ class ServerBackup(
         if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
     }
 
-    /** The server's list of recordings brought up to date. */
+    /** The server's recordings the list holds brought up to date (the newest page, while the list is at the top). */
     suspend fun syncServerList() {
         if (journal.state.value !is JournalState.Paired) return
         if (shown == null) shown = runCatching { journal.soundRecordingsShown() }.getOrNull()
-        shed.sync()
+        serverMoments.refresh()
         refresh()
     }
 
@@ -542,7 +627,8 @@ class ServerBackup(
         }
         val waiting = byMoment.values.filterIsInstance<MomentBackup.Waiting>()
         val mine = kept.moments.values.map { it.sha256 }.toSet()
-        val others = if (paired == null) emptyList() else shed.remote.value.filter { it.about.kind == FileKind.AUDIO && it.sha256 !in mine }
+        momentShas = mine
+        val others = if (paired == null) emptyList() else serverMoments.window.value.files.filter { it.sha256 !in mine && it.sha256 !in kept.dismissed }
         _state.value = ServerState(
             paired = paired,
             wifiOnly = kept.wifiOnly,
@@ -623,3 +709,6 @@ internal fun titleOf(fileName: String): String {
     val base = fileName.substringBeforeLast('.').trim()
     return SAMSUNG_CALL.find(base)?.groupValues?.get(1)?.trim()?.ifEmpty { null } ?: base.ifEmpty { fileName }
 }
+
+/** The name of the labels in Audio Logs' own data on the server. */
+private const val LABELS = "labels"

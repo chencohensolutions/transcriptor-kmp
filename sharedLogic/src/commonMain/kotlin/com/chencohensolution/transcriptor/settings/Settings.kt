@@ -151,6 +151,10 @@ private data class SettingsFileV1(
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** Stop asks for a second tap, in the recording screens and on the Quick Settings tile; off by default (owner's choice, Nov 15, 2026). */
     val stopTwice: Boolean = false,
+    /** Calls stay out of the moments list and search until the phone's lock opens them (owner's request, Nov 16, 2026). */
+    val lockCalls: Boolean = false,
+    /** The same for voice messages. */
+    val lockVoiceMessages: Boolean = false,
     /** Each improve model's speed on this phone: milliseconds of work per millisecond of audio, from its last run. */
     val improveSpeeds: Map<String, Double> = emptyMap(),
     /** Moments to improve on their own once the phone is charging (lecture ids; "notebookId/lectureId" before labels). */
@@ -257,6 +261,14 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var stopTwice: Boolean
         get() = read().stopTwice
         set(value) = write(read().copy(stopTwice = value))
+
+    var lockCalls: Boolean
+        get() = read().lockCalls
+        set(value) = write(read().copy(lockCalls = value))
+
+    var lockVoiceMessages: Boolean
+        get() = read().lockVoiceMessages
+        set(value) = write(read().copy(lockVoiceMessages = value))
 
     /** How long [modelId] took on this phone per millisecond of audio, last time it improved a lecture; null before. */
     fun improveSpeed(modelId: String): Double? = read().improveSpeeds[modelId]

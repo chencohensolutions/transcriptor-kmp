@@ -618,8 +618,8 @@
     <string name="notebooks_private_settings">Settings</string>
     <string name="notebooks_private_failed">%1$d of %2$d made private. The rest stay on this phone: %3$s</string>
     <plurals name="notebooks_tucked_pill">
-        <item quantity="one">%1$d tucked away · Show</item>
-        <item quantity="other">%1$d tucked away · Show</item>
+        <item quantity="one">%1$d more behind your lock · Show</item>
+        <item quantity="other">%1$d more behind your lock · Show</item>
     </plurals>
     <plurals name="notebooks_private_title">
         <item quantity="one">Make this moment private?</item>
@@ -657,11 +657,18 @@
     <string name="server_free_done">Freed %2$s from %1$d moments.</string>
     <string name="server_free_stopped">Freed %1$d moments, then stopped: %2$s</string>
     <string name="server_free_button">Free up %1$s</string>
-    <string name="bring_title">Bringing the recording from the server</string>
-    <string name="bring_progress">%1$s of %2$s</string>
     <string name="bring_failed">Couldn\'t bring the recording: %1$s</string>
     <string name="bring_not_on_server">the server doesn\'t have it</string>
     <string name="notebooks_on_server">On the server</string>
     <string name="notebooks_source_call">Call</string>
     <string name="notebooks_source_voice_message">Voice message</string>
+    <string name="notebooks_locked">Locked</string>
+    <string name="notebooks_label_locked">Needs fingerprint</string>
+    <string name="notebooks_label_locked_note">Moments with this label stay out of the list and search until your fingerprint or screen lock opens them.</string>
+    <string name="server_lock">Behind your fingerprint</string>
+    <string name="server_lock_calls">Lock calls</string>
+    <string name="server_lock_calls_note">Calls stay out of the list and search until your fingerprint or screen lock opens them.</string>
+    <string name="server_lock_voice">Lock voice messages</string>
+    <string name="server_lock_voice_note">The same for voice messages.</string>
+    <string name="server_lock_labels_note">A label can be locked too: Needs fingerprint, in the label\'s edit dialog.</string>
 </resources>

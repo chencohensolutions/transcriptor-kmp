@@ -312,13 +312,23 @@ library the journal app will share:
   device of Audio Logs sees sound recordings, which the server hides from other devices by default.
 - What was handed over is in `backup.json` (version 1, in the app's storage): moment id → the audio's sha256 and file.
   Shed keeps its own queue, cache and the server's list under `files/shed/`; its key is in the Keystore.
-- **The server's recordings are moments** (Nov 16, 2026): each recording the server sends Audio Logs (and calls and
-  voice messages once shown) that isn't a moment here becomes one (`ServerBackup.adoptServerRecordings`, about once a
-  minute while the app is open): from its note when Audio Logs saved one (title, lines, notes, labels), else titled
-  by its name (a call: whom it was with) and waiting to be transcribed. Its audio stays on the server until the moment
-  is opened; then shed brings it, with its progress shown, and keeps it here. A moment the server stops sending
-  (deleted, made private, calls turned off) leaves the list unless its audio is here. A server moment deleted here is
-  not brought back (`backup.json` `dismissed`).
+- **The server's recordings in the list, by pages** (owner's request, Nov 16, 2026): the list reads the server's
+  recordings (and calls and voice messages once shown) a page of 50 at a time as the user scrolls, newest first
+  (`recordingsPage`, shed's `page`, `ServerMoments`), never the whole change feed, which would carry every photo too.
+  At most 6 pages are held: scrolling back years lets the newest go, and scrolling up reads them again, so memory
+  stays the same. A recording becomes a moment here only when the user opens or changes it (`ServerBackup.momentHere`),
+  from its note when Audio Logs kept one. Moments made earlier for every recording are let go once
+  (`tidyServerMoments`).
+- **Playing streams** (owner's request, Nov 16, 2026: no download step): a moment whose audio is on the server plays at
+  once, reading only what is played through shed's reader (1 MB blocks kept in its cache; `ServerBackup.streamOf`,
+  `AudioStream`, `AndroidAudioPlayer` on a `MediaDataSource`). The whole file comes only when a pass needs it
+  (transcribing, finding speakers: `Recording.audioHere`).
+- **Each app's own note and data** (owner's call, Nov 16, 2026): the server keeps Audio Logs' note on a file apart from
+  journal's, and Audio Logs' labels (names, colors, locks) as its own data (`appData("labels")`), merged with this
+  phone's at each sync (`mergeLabels`: what either side added, renamed or deleted since the last sync is kept).
+- **Behind the phone's lock** (owner's request, Nov 16, 2026): Settings › Server backup's **Lock calls** and **Lock
+  voice messages**, and a label's **Needs fingerprint**, keep those moments out of the list and search until the
+  phone's lock opens them (`Locks`, `LectureSummary.locked`), as tucked moments are; lectures and concerts stay open.
 - **Free up space** (as in the journal app, manual only; owner's request, Nov 16, 2026): Settings › Server backup
   removes the audio of finished moments the server holds (everything backed up, older than 3 or 12 months, or all but
   the newest 10 GB). Each one's audio is hashed again and checked with the server (`/verify`) before it is deleted;

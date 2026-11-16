@@ -15,6 +15,7 @@ import com.chencohensolution.shed.journal.DeviceKeys
 import com.chencohensolution.shed.journal.JournalBackend
 import com.chencohensolution.shed.journal.JournalClients
 import com.chencohensolution.transcriptor.notebook.AUDIO_FLAC
+import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Place
@@ -26,6 +27,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import com.chencohensolution.shed.FileKind
+import com.chencohensolution.shed.FilePage
+import com.chencohensolution.shed.AppData
+import com.chencohensolution.shed.AppDataWrite
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Segment
 import okio.ByteString.Companion.toByteString
@@ -115,47 +119,94 @@ class ServerBackupTest {
     }
 
     @Test
-    fun theServersRecordingsBecomeMomentsWhoseAudioComesWhenOpened() = runTest {
+    fun theServersRecordingsAreReadByPagesAndBecomeMomentsWhenOpened() = runTest {
         val backup = backup(paired = true)
         val call = "the sound of a call".encodeToByteArray()
         val callSha = call.toByteString().sha256().hex()
         server.files[callSha] = call
-        server.listed += RemoteFile(callSha, call.size.toLong(), FileAbout("Call recording אבא_250206_142813.m4a", "audio/mp4", FileKind.AUDIO,
+        val callFile = RemoteFile(callSha, call.size.toLong(), FileAbout("Call recording אבא_250206_142813.m4a", "audio/mp4", FileKind.AUDIO,
             takenAt = "2025-02-06T14:28:13+02:00", durationMillis = 61_000, source = "call"))
-        // A moment another phone backed up, with its transcript kept on the server.
+        // A moment another phone backed up, with its transcript kept on the server as Audio Logs' own note.
         val earlier = Lecture("lecture-5", "Psychology", "he", 1_700_000_000_000, 90_000, listOf(Segment("s1", 0, 900, "שלום", "m")), listOf(Note("n1", 10, "exam")), audioFile = AUDIO_FLAC)
-        val note = "{\"audioLogs\": ${store.serverNote(earlier)}}"
         server.files["e".repeat(64)] = "flac".encodeToByteArray()
-        server.listed += RemoteFile("e".repeat(64), 4, FileAbout("Psychology.flac", "audio/flac", FileKind.AUDIO, source = "recording"), note = note)
+        val earlierFile = RemoteFile("e".repeat(64), 4, FileAbout("Psychology.flac", "audio/flac", FileKind.AUDIO, source = "recording"), note = store.serverNote(earlier))
+        server.listed += listOf(callFile, earlierFile)
         backup.syncServerList()
+        assertEquals(listOf(callSha, "e".repeat(64)), backup.serverMoments.window.value.files.map { it.sha256 })
+        assertEquals(emptyList(), store.all(), "nothing is saved here until opened")
 
-        assertEquals(2, backup.adoptServerRecordings("he"))
-        val made = store.load("server-" + callSha.take(16))!!
+        val made = backup.momentHere(callFile, "he")
         assertEquals("אבא", made.title)
         assertEquals("call", made.source)
         assertEquals(true, made.pendingTranscript)
         assertEquals(1_738_844_893_000, made.startedAtMillis)
-        assertEquals("audio.m4a", made.audioFile)
         assertEquals(false, store.hasAudio(made))
-        val restored = store.load("lecture-5")!!
-        assertEquals(listOf("שלום"), restored.segments.map { it.text })
-        assertEquals(listOf("exam"), restored.notes.map { it.text })
-        assertEquals("e".repeat(64), restored.serverSha256)
-        assertEquals(0, backup.adoptServerRecordings("he"), "made once")
-
+        assertEquals(made.id, backup.momentHere(callFile, "he").id, "made once")
+        // It plays as it streams.
+        val stream = backup.streamOf(made)!!
+        assertEquals(call.size.toLong(), stream.size())
+        assertEquals("sound", stream.read(4, 5).decodeToString())
+        // Transcribing brings the whole file.
         assertTrue(backup.bringAudio(made.id))
         assertEquals("the sound of a call", fs.read(store.audioPath(made)) { readUtf8() })
 
-        // Deleted here: not made a moment again. Gone from the server (made private): gone here too, audio not on the phone.
-        backup.dismiss(listOf(made.id))
-        store.delete(made.id)
-        server.listed.removeAll { it.sha256 == "e".repeat(64) }
-        server.gone += "e".repeat(64)
-        server.listed += RemoteFile("f".repeat(64), 1, FileAbout("x.m4a", "audio/mp4", FileKind.AUDIO))
-        backup.syncServerList()
-        backup.adoptServerRecordings("he")
-        assertEquals(null, store.load(made.id))
-        assertEquals(null, store.load("lecture-5"))
+        val restored = backup.momentHere(earlierFile, "he")
+        assertEquals("lecture-5", restored.id)
+        assertEquals(listOf("שלום"), restored.segments.map { it.text })
+        assertEquals(listOf("exam"), restored.notes.map { it.text })
+        // A note sent before each app had its own is read too.
+        val wrapped = earlierFile.copy(sha256 = "d".repeat(64), note = "{\"audioLogs\": ${store.serverNote(earlier.copy(id = "lecture-6"))}}")
+        assertEquals("lecture-6", backup.momentOf(wrapped, "he").id)
+    }
+
+    @Test
+    fun theWindowKeepsAFewPagesWhicheverWayTheUserScrolls() = runTest {
+        fun file(i: Int) = RemoteFile(i.toString().padStart(64, '0'), 1, FileAbout("$i.m4a", "audio/mp4", FileKind.AUDIO))
+        var all = (24 downTo 0).map(::file)
+        val moments = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, maxPages = 2)
+        fun shown() = moments.window.value.files.map { it.about.fileName.substringBefore('.').toInt() }
+        moments.refresh()
+        assertEquals((24 downTo 20).toList(), shown())
+        moments.older()
+        moments.older()
+        assertEquals((19 downTo 10).toList(), shown(), "the newest page was let go")
+        assertTrue(moments.window.value.newer && moments.window.value.older)
+        moments.refresh()
+        assertEquals((19 downTo 10).toList(), shown(), "scrolled away from the newest: left as it is")
+        moments.newer()
+        assertEquals((24 downTo 15).toList(), shown())
+        assertEquals(false, moments.window.value.newer)
+        // A new recording arrives: the newest page is read again and meets the window.
+        all = listOf(file(25)) + all
+        moments.refresh()
+        assertEquals((25 downTo 15).toList(), shown())
+    }
+
+    @Test
+    fun labelsMergeWithTheServersOwnCopy() {
+        val a = Label("a", "Psychology", 0)
+        val b = Label("b", "Exam", 1)
+        val c = Label("c", "Family", 2)
+        // First sync: both sides' labels.
+        assertEquals(listOf(a, c), mergeLabels(null, listOf(a), listOf(c)))
+        // Renamed here, deleted on the server, added there: each kept.
+        val renamed = a.copy(name = "Psych")
+        assertEquals(listOf(renamed, c), mergeLabels(listOf(a, b), listOf(renamed, b), listOf(a, c)))
+        // Deleted here: gone, though the server still has it unchanged.
+        assertEquals(listOf(a), mergeLabels(listOf(a, b), listOf(a), listOf(a, b)))
+    }
+
+    @Test
+    fun labelsGoToTheServerAsAudioLogsOwnData() = runTest {
+        val backup = backup(paired = true)
+        val labels = com.chencohensolution.transcriptor.notebook.LabelStore(fs, root)
+        labels.create("Psychology", 1)
+        assertEquals(false, backup.syncLabels(labels, 2))
+        assertTrue("Psychology" in server.appData["labels"]!!)
+        // Another phone adds one: it comes here.
+        server.appData["labels"] = server.appData["labels"]!!.replace("]", ", {\"id\": \"x\", \"name\": \"Family\", \"color\": 3}]")
+        assertEquals(true, backup.syncLabels(labels, 3))
+        assertEquals(listOf("Psychology", "Family"), labels.all().map { it.name })
     }
 
     @Test
@@ -242,4 +293,27 @@ private class MemoryStorage : ShedBackend {
     val gone = mutableListOf<String>()
     override suspend fun changes(cursor: String?) = ChangePage(listed.toList(), gone.toList(), "c", false)
     override suspend fun holds(sha256: String) = sha256 in files
+    override suspend fun page(kind: FileKind, before: String?, after: String?, limit: Int) = pageOf(listed.toList(), before, after, limit)
+    var appData = mutableMapOf<String, String>()
+    override suspend fun appData(name: String) = AppData(appData[name], appData[name]?.hashCode()?.toString())
+    override suspend fun setAppData(name: String, content: String?, baseVersion: String?): AppDataWrite {
+        if (appData[name]?.hashCode()?.toString() != baseVersion) return AppDataWrite.Conflict(appData(name))
+        if (content == null) appData.remove(name) else appData[name] = content
+        return AppDataWrite.Saved(appData(name))
+    }
+}
+
+/** A page of [files] (newest first) as a storage answers one: the cursor is a file's place in the list. */
+private fun pageOf(files: List<RemoteFile>, before: String?, after: String?, limit: Int): FilePage {
+    val from = when {
+        before != null -> files.indexOfFirst { it.sha256 == before } + 1
+        after != null -> maxOf(0, files.indexOfFirst { it.sha256 == after } - limit)
+        else -> 0
+    }
+    val to = when {
+        after != null -> files.indexOfFirst { it.sha256 == after }
+        else -> minOf(files.size, from + limit)
+    }
+    val page = files.subList(from, maxOf(from, to))
+    return FilePage(page, older = page.lastOrNull()?.sha256?.takeIf { to < files.size }, newer = page.firstOrNull()?.sha256?.takeIf { from > 0 })
 }

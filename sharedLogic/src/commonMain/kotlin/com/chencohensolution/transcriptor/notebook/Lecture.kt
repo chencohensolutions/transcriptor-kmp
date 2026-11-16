@@ -9,6 +9,8 @@ data class Label(
     val id: String,
     val name: String,
     val color: Int = 0,
+    /** Its moments stay out of the list and search until the phone's lock opens them ("Needs fingerprint"). */
+    val locked: Boolean = false,
 )
 
 /** A moment as a list shows it, with its language (it lays out its title) and its labels' ids. */
@@ -33,8 +35,10 @@ data class LectureSummary(
     val tucked: Boolean = false,
     /** Where the recording came from on the server ([Lecture.source]): `call`, `recording`, a voice message's folder; null for one recorded here. */
     val source: String? = null,
-    /** Its audio is on the server only (freed from the phone, or never brought here): opening it fetches it. */
+    /** Its audio is on the server only (freed from the phone, or never brought here): it plays as it streams. */
     val audioOnServer: Boolean = false,
+    /** Behind the phone's lock: a locked label's, or a call or voice message while those are locked ([Locks]). */
+    val locked: Boolean = false,
 )
 
 /**

@@ -77,6 +77,7 @@ fun ServerSettings(onBack: () -> Unit) {
             },
         )
     }
+    var locks by remember { mutableStateOf(Recording.locks()) }
     ServerScreen(
         state, pairing, Recording.shed.defaultDeviceName,
         ServerActions(
@@ -116,6 +117,10 @@ fun ServerSettings(onBack: () -> Unit) {
                     Recording.refreshServerMoments()
                 }
             },
+            setLocks = { new ->
+                locks = new
+                scope.launch(Dispatchers.IO) { Recording.setLocks(new) }
+            },
             setCacheLimit = { bytes -> scope.launch(Dispatchers.IO) { Recording.backup.setCacheLimit(bytes) } },
             planFreeUp = { rule -> withContext(Dispatchers.IO) { Recording.freeUpPlan(rule) } },
             freeUp = { ids, progress -> withContext(Dispatchers.IO) { Recording.freeUp(ids, progress) } },
@@ -127,5 +132,6 @@ fun ServerSettings(onBack: () -> Unit) {
             },
         ),
         siblings.map { it.label },
+        locks,
     )
 }

@@ -76,6 +76,7 @@ import com.chencohensolution.transcriptor.speech.WhisperEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import okio.FileSystem
@@ -451,7 +452,8 @@ object Recording {
     }
 
     /** Deletes lectures for good (files: not on the main thread), except those recording, open or worked on now. */
-    fun delete(lectureIds: List<String>) {
+    suspend fun delete(lectureIds: List<String>) {
+        momentsHere(lectureIds)
         val busy = busy()
         backup.dismiss(lectureIds.filter { it !in busy })
         library.delete(lectureIds) { it in busy }
@@ -461,7 +463,8 @@ object Recording {
      * Adds and removes labels on moments (files: not on the main thread), except those recording or worked on now
      * (an open one can't be on the list's screen).
      */
-    fun setLabels(lectureIds: List<String>, add: Set<String>, remove: Set<String>) {
+    suspend fun setLabels(lectureIds: List<String>, add: Set<String>, remove: Set<String>) {
+        momentsHere(lectureIds)
         val busy = busy()
         library.setLabels(lectureIds, add, remove) { it in busy }
     }
@@ -471,6 +474,7 @@ object Recording {
      * worked on now; the server is told for those backed up.
      */
     suspend fun setTucked(lectureIds: List<String>, tucked: Boolean) {
+        momentsHere(lectureIds)
         val busy = busy()
         val changed = library.setTucked(lectureIds, tucked) { it in busy }
         backup.setTucked(changed, tucked)
@@ -481,6 +485,7 @@ object Recording {
      * Returns how many left the phone, and why the first that didn't stayed. Not on the main thread.
      */
     suspend fun makePrivate(lectureIds: List<String>): Pair<Int, PrivateResult?> {
+        momentsHere(lectureIds)
         var done = 0
         var failed: PrivateResult? = null
         for (id in lectureIds) {
@@ -639,29 +644,73 @@ object Recording {
     suspend fun backUp(context: android.content.Context) {
         runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
         if (backup.waiting() > 0) scheduleUploads(context)
-        // The server's recordings as moments, and the moments' transcripts and notes to the server: at most once a minute.
+        // The newest page of the server's recordings, the labels, and the moments' words to the server: at most once a minute.
         val now = System.currentTimeMillis()
-        if (backup.state.value.paired != null && now - lastServerSync > 60_000) {
-            lastServerSync = now
-            runCatching {
-                backup.syncServerList()
-                if (backup.adoptServerRecordings(library.library.value.lastLanguage, busy()) > 0) library.reload()
-                backup.syncNotes(busy())
-            }.onFailure { android.util.Log.w("Recording", "the server's recordings", it) }
-        }
+        if (backup.state.value.paired != null && now - lastServerSync > 60_000) syncWithServer()
     }
 
     @Volatile private var lastServerSync = 0L
 
-    /** The server's recordings made moments now (after Calls was switched, or Back up now), not waiting a minute. */
-    suspend fun refreshServerMoments() {
+    /** The server's recordings, the labels and the moments' words brought up to date now (after Calls was switched, or Back up now). */
+    suspend fun refreshServerMoments() = syncWithServer()
+
+    private suspend fun syncWithServer() {
         lastServerSync = System.currentTimeMillis()
         runCatching {
+            backup.tidyServerMoments(busy())
             backup.syncServerList()
-            backup.adoptServerRecordings(library.library.value.lastLanguage, busy())
-            library.reload()
+            if (backup.syncLabels(labels, System.currentTimeMillis())) library.reload()
             backup.syncNotes(busy())
-        }.onFailure { android.util.Log.w("Recording", "the server's recordings", it) }
+        }.onFailure { android.util.Log.w("Recording", "syncing with the server", it) }
+        library.reload()
+    }
+
+    /** The server's recordings the list holds, by the id their moment has: to make one a moment here when it is opened. */
+    @Volatile private var serverById: Map<String, com.chencohensolution.shed.RemoteFile> = emptyMap()
+
+    /** The list's server recordings as moments, each time its window of pages changes. */
+    private fun showServerMoments(window: com.chencohensolution.transcriptor.backup.ServerWindow) {
+        val language = library.library.value.lastLanguage
+        val shown = window.files.filter { !backup.isMomentHere(it.sha256) && !backup.isDismissed(it.sha256) }
+        val summaries = shown.map { it to backup.summaryOf(it, language) }
+        serverById = summaries.associate { (file, s) -> s.id to file }
+        library.setServer(com.chencohensolution.transcriptor.notebook.ServerPart(summaries.map { it.second }, window.older, window.newer, window.loading))
+    }
+
+    /** The list neared its end: the next older page of the server's recordings. */
+    suspend fun olderServerMoments() = runCatching { backup.serverMoments.older() }
+
+    /** The list neared its top after scrolling far: the page just newer. */
+    suspend fun newerServerMoments() = runCatching { backup.serverMoments.newer() }
+
+    /**
+     * Makes the server's recordings among [lectureIds] moments here (before they are opened or changed): each from its
+     * note, its audio left on the server. Files and network: not on the main thread.
+     */
+    suspend fun momentsHere(lectureIds: Collection<String>) {
+        var made = false
+        for (id in lectureIds) {
+            val file = serverById[id] ?: continue
+            if (store.load(id) != null) continue
+            runCatching { backup.momentHere(file, library.library.value.lastLanguage) }.onSuccess { made = true }
+                .onFailure { android.util.Log.w("Recording", "making $id a moment", it) }
+        }
+        if (made) library.reload()
+    }
+
+    /** Whether calls and voice messages are behind the phone's lock (Settings › Server backup). */
+    fun locks() = com.chencohensolution.transcriptor.notebook.Locks(settings.lockCalls, settings.lockVoiceMessages)
+
+    /** Puts calls or voice messages behind the phone's lock, or takes them out. Files: not on the main thread. */
+    fun setLocks(locks: com.chencohensolution.transcriptor.notebook.Locks) {
+        settings.lockCalls = locks.calls
+        settings.lockVoiceMessages = locks.voiceMessages
+        library.locksChanged()
+    }
+
+    /** The moment's whole audio on the phone, brought from the server when it is there only: before a pass reads it. */
+    suspend fun audioHere(lecture: com.chencohensolution.transcriptor.notebook.Lecture) {
+        if (!store.hasAudio(lecture)) backup.bringAudio(lecture.id)
     }
 
     /** Free up space: removes the audio of [ids] the server holds (files and network: not on the main thread). */
@@ -694,7 +743,10 @@ object Recording {
         // Notebooks became labels: the app's own storage moves now (quick: one folder rename per moment); the
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
-        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage)
+        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            backup.serverMoments.window.collect { runCatching { showServerMoments(it) } }
+        }
         models = ModelFiles(app)
         nativeLibDir = app.applicationInfo.nativeLibraryDir
         session = LectureSession(
@@ -709,6 +761,7 @@ object Recording {
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,
+            streamOf = backup::streamOf,
         )
     }
 }

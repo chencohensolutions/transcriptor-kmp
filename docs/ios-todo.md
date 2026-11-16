@@ -260,3 +260,17 @@ anything left to decide. Remove an entry once it is built.
   `cacheBytes`. Android files to mirror: `Recording.backUp` / `refreshServerMoments` / `freeUp` / `freeUpPlan`,
   `ServerSettings.kt`, `ui/ServerScreen.kt` (`FreeUpSection`). Strings `server_free*`, `server_cache*`, `bring_*`,
   `notebooks_on_server`, `notebooks_source_*`.
+
+
+## Pages, streaming, labels on the server, locks (Nov 16, 2026)
+
+- Android: the moments list reads the server's recordings by pages as it scrolls (`NotebooksActions.olderFromServer` /
+  `newerFromServer`, `NotebooksState.serverOlder` / `serverNewer`); opening one makes it a moment here and plays it as
+  it streams (no download dialog); Settings › Server backup has Lock calls / Lock voice messages; a label's edit dialog
+  has Needs fingerprint; locked moments wait behind the same pill as tucked ones, after the phone's lock.
+- Shared: `ServerMoments` (window of pages), `ServerBackup.momentHere`, `summaryOf`, `streamOf` (`AudioStream`: iOS
+  plays it with an `AVAssetResourceLoaderDelegate`), `syncLabels`, `tidyServerMoments`, `NotebooksController.setServer`,
+  `setLabelLocked`, `locksChanged`, `Locks`, `LectureSummary.locked`, `Label.locked`, settings `lockCalls`,
+  `lockVoiceMessages`. Android files: `Recording.kt` (`showServerMoments`, `momentsHere`, `audioHere`, `setLocks`),
+  `AndroidAudioPlayer.kt` (`StreamedSource`), `ui/NotebooksScreen.kt`, `ui/ServerScreen.kt`. Strings `server_lock*`,
+  `notebooks_locked`, `notebooks_label_locked*`.

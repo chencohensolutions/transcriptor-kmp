@@ -37,6 +37,8 @@ class LectureReview(
     /** The user's "fewer ↔ more speakers" for a voice-print model, and setting it ([SettingsStore.speakerTuning]). */
     private val speakerTuning: (modelId: String) -> Float = { 0f },
     private val setSpeakerTuning: (modelId: String, more: Float) -> Unit = { _, _ -> },
+    /** The moment's audio on the server, for one whose audio isn't on the phone: played as it streams. Null without one. */
+    private val streamOf: (Lecture) -> AudioStream? = { null },
 ) {
     private class Open(val labelNames: String, val lecture: Lecture, val speed: Float) {
         var power: com.chencohensolution.transcriptor.recording.PowerReport? = null
@@ -162,7 +164,8 @@ class LectureReview(
         close()
         val lecture = store.load(lectureId) ?: return false
         store.repairAudio(lecture)
-        player.load(store.audioPath(lecture))
+        val stream = if (store.hasAudio(lecture)) null else streamOf(lecture)
+        if (stream != null) player.load(stream) else player.load(store.audioPath(lecture))
         open.value = Open(labelNames, lecture, 1f)
         if (atMillis != null) player.seekTo(atMillis.coerceIn(0, lecture.durationMillis))
         return true

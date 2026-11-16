@@ -29,6 +29,7 @@ class PeopleTest {
         override val positionMillis = MutableStateFlow(0L)
         override val playing = MutableStateFlow(false)
         override fun load(file: Path) {}
+        override fun load(stream: com.chencohensolution.transcriptor.review.AudioStream) {}
         override fun play() { playing.value = true }
         override fun pause() { playing.value = false }
         override fun seekTo(millis: Long) { positionMillis.value = millis }

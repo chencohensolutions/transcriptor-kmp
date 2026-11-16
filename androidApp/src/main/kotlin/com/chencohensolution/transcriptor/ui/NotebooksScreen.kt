@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -117,6 +118,10 @@ import java.util.Locale
 class NotebooksActions(
     /** Opens a recorded moment. */
     val openLecture: (lectureId: String) -> Unit = {},
+    /** The list neared its end: read the next older page of the server's recordings. */
+    val olderFromServer: () -> Unit = {},
+    /** The list neared its top after older pages let the newest go: read the page just newer. */
+    val newerFromServer: () -> Unit = {},
     /** Opens a moment a search found, at the line or note it found ([atMillis]; null: from where it was). */
     val openLectureAt: (lectureId: String, atMillis: Long?) -> Unit = { _, _ -> },
     /** The moments a query is found in (titles, people, labels, notes, what was said); reads files off the main thread. */
@@ -133,6 +138,8 @@ class NotebooksActions(
     val renameLabel: (labelId: String, name: String) -> Unit = { _, _ -> },
     /** Deletes a label: its moments stay, without it. */
     val deleteLabel: (labelId: String) -> Unit = {},
+    /** Puts a label's moments behind the phone's lock ("Needs fingerprint"), or takes them out. */
+    val setLabelLocked: (labelId: String, locked: Boolean) -> Unit = { _, _ -> },
     val settings: () -> Unit = {},
     /** Opens the system's folder picker for the lectures folder. */
     val chooseFolder: () -> Unit = {},
@@ -174,8 +181,9 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
     var hidden by remember { mutableStateOf(emptySet<String>()) }
     // Tucked moments are shown after the phone's lock, until the app is opened again (not saved: a restart hides them).
     var revealed by remember { mutableStateOf(false) }
-    val state = all.copy(moments = all.moments.filter { it.id !in hidden && (revealed || !it.tucked) })
-    val tuckedOut = if (revealed) emptyList() else all.moments.filter { it.tucked && it.id !in hidden }
+    // Tucked moments, locked labels' and locked calls stay behind the phone's lock until it opens them.
+    val state = all.copy(moments = all.moments.filter { it.id !in hidden && (revealed || !(it.tucked || it.locked)) })
+    val tuckedOut = if (revealed) emptyList() else all.moments.filter { (it.tucked || it.locked) && it.id !in hidden }
     var askingPrivate by remember { mutableStateOf<List<String>?>(null) }
     val resources = androidx.compose.ui.platform.LocalContext.current.resources
     var privateBusy by remember { mutableStateOf(false) }
@@ -269,7 +277,7 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
             onDismiss = { labeling = null; selected = emptySet() },
             onSet = { add, remove -> actions.setLabels(ids, add, remove) },
             onNew = { name -> actions.newLabel(name).also { actions.setLabels(ids, setOf(it), emptySet()) } },
-            onRename = actions.renameLabel, onDelete = actions.deleteLabel,
+            onRename = actions.renameLabel, onDelete = actions.deleteLabel, onLock = actions.setLabelLocked,
         )
     }
     if (creating) NewLabelDialog(onDismiss = { creating = false }) { actions.newLabel(it); creating = false }
@@ -433,7 +441,14 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
             SearchResults(searching, hits, labelsById, state, padding) { hit -> actions.openLectureAt(hit.moment.id, hit.atMillis) }
             return@Scaffold
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
+        // The server's recordings come a page at a time: near the end the next older page, near the top (after older
+        // pages let the newest go) the page just newer. The list keeps its place by each row's key.
+        val list = androidx.compose.foundation.lazy.rememberLazyListState()
+        val nearEnd by remember { androidx.compose.runtime.derivedStateOf { list.layoutInfo.visibleItemsInfo.lastOrNull()?.let { it.index >= list.layoutInfo.totalItemsCount - 15 } == true } }
+        val nearTop by remember { androidx.compose.runtime.derivedStateOf { list.firstVisibleItemIndex <= 10 } }
+        LaunchedEffect(nearEnd, state.serverOlder, state.moments.size) { if (nearEnd && state.serverOlder) actions.olderFromServer() }
+        LaunchedEffect(nearTop, state.serverNewer, state.moments.size) { if (nearTop && state.serverNewer) actions.newerFromServer() }
+        LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
             folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
             item {
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp)) {
@@ -499,6 +514,11 @@ fun NotebooksScreen(all: NotebooksState, actions: NotebooksActions, folder: Fold
                             )
                         }
                     }
+                }
+            }
+            if (state.serverOlder || state.serverLoading) item(key = "server-more") {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
             }
         }
@@ -600,8 +620,9 @@ private fun MomentRow(
             "folder:whatsapp", "whatsapp" -> stringResource(R.string.notebooks_source_voice_message)
             else -> null
         }
-        if (m.tucked || m.audioOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (m.tucked || m.locked || m.audioOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (m.tucked) MomentMark(Icons.Filled.VisibilityOff, stringResource(R.string.notebooks_tucked))
+            if (m.locked) MomentMark(Icons.Filled.Lock, stringResource(R.string.notebooks_locked))
             if (source != null) MomentMark(if (m.source.equals("call", true)) Icons.Filled.Call else Icons.Filled.Mic, source)
             if (m.audioOnServer) MomentMark(Icons.Filled.Cloud, stringResource(R.string.notebooks_on_server))
         }
@@ -739,11 +760,17 @@ internal fun LabelsSheet(
     labels: List<Label>, moments: List<LectureSummary>, onDismiss: () -> Unit,
     onSet: (add: Set<String>, remove: Set<String>) -> Unit, onNew: (String) -> Unit,
     onRename: (String, String) -> Unit, onDelete: (String) -> Unit,
+    onLock: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     var creating by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Label?>(null) }
     if (creating) NewLabelDialog(onDismiss = { creating = false }) { onNew(it); creating = false }
-    editing?.let { l -> EditLabelDialog(l, onDismiss = { editing = null }, onRename = { onRename(l.id, it); editing = null }, onDelete = { onDelete(l.id); editing = null }) }
+    editing?.let { l ->
+        EditLabelDialog(
+            l, onDismiss = { editing = null }, onRename = { onRename(l.id, it); editing = null }, onDelete = { onDelete(l.id); editing = null },
+            onLock = { onLock(l.id, it) },
+        )
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
             Text(
@@ -800,14 +827,27 @@ private fun NewLabelDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
 }
 
 @Composable
-private fun EditLabelDialog(label: Label, onDismiss: () -> Unit, onRename: (String) -> Unit, onDelete: () -> Unit) {
+private fun EditLabelDialog(label: Label, onDismiss: () -> Unit, onRename: (String) -> Unit, onDelete: () -> Unit, onLock: (Boolean) -> Unit = {}) {
     var name by remember { mutableStateOf(label.name) }
+    var locked by remember { mutableStateOf(label.locked) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.notebooks_edit_label)) },
         text = {
             Column {
                 OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, label = { Text(stringResource(R.string.notebooks_new_name)) }, modifier = Modifier.fillMaxWidth())
+                // Its moments behind the phone's lock, as calls can be: for private recordings, while lectures stay open.
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp)
+                        .toggleable(value = locked, role = androidx.compose.ui.semantics.Role.Switch) { locked = it; onLock(it) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.notebooks_label_locked), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.notebooks_label_locked_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.Switch(checked = locked, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+                }
                 TextButton(onClick = onDelete, modifier = Modifier.padding(top = 8.dp)) {
                     Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error)
                     Text(stringResource(R.string.notebooks_delete_label), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 8.dp))

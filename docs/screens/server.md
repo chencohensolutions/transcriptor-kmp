@@ -22,10 +22,10 @@ without a server.
 - **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands ("3 moments waiting · 120 MB left ·
   12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"); the server didn't
   answer (trying again later) or no longer accepts this phone; moments the server refused, by title; **Back up now**;
-  **Wi‑Fi only** (on by default); **On the server**: how many of the server's recordings aren't moments here and the
-  newest 20 by date, length and name (tucked ones counted apart); **What Audio Logs shows from the server**: **Calls**
+  **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
-  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Free up
+  private never reach Audio Logs (Nov 16, 2026; shown once the server answers `soundRecordingsShown`); **Behind your fingerprint**: **Lock calls** and **Lock voice messages**
+  (kept on this phone), and that a label can be locked too; **Free up
   space**: rule chips (Everything backed up, Older than 3 months, Older than 12 months, Keep the newest 10 GB), what
   it would free ("12 moments, 3.2 GB"), a **Free up …** button, its progress and result; **Cache on this phone**: how
   much shed keeps of the limit, with 2, 10, 20 and 50 GB chips; **Unpair** (asks first: what was sent stays on the server, every moment stays on

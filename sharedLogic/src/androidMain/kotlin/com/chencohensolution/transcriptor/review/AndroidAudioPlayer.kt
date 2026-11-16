@@ -30,6 +30,10 @@ class AndroidAudioPlayer(
     private var player: MediaPlayer? = null
     private var ticking: Job? = null
     private var speed = 1f
+    // A streamed recording is prepared in the background: play and seek wait for it.
+    private var prepared = true
+    private var playWhenPrepared = false
+    private var seekWhenPrepared: Long? = null
 
     override fun load(file: Path) {
         release()
@@ -41,10 +45,44 @@ class AndroidAudioPlayer(
         }
         position.value = 0
         speed = 1f
+        prepared = true
+    }
+
+    override fun load(stream: AudioStream) {
+        release()
+        prepared = false
+        playWhenPrepared = false
+        seekWhenPrepared = null
+        position.value = 0
+        speed = 1f
+        player = MediaPlayer().apply {
+            setDataSource(StreamedSource(stream))
+            setOnPreparedListener { p ->
+                if (player !== p) return@setOnPreparedListener
+                prepared = true
+                seekWhenPrepared?.let { p.seekTo(it, MediaPlayer.SEEK_CLOSEST) }
+                seekWhenPrepared = null
+                if (playWhenPrepared) play()
+            }
+            setOnCompletionListener { running.value = false; stopTicking(); position.value = duration.toLong() }
+            setOnErrorListener { _, what, extra ->
+                android.util.Log.w("AudioPlayer", "streaming failed: $what/$extra")
+                running.value = false
+                stopTicking()
+                true
+            }
+            // Reads the first blocks from the server: off the main thread, as the rest.
+            prepareAsync()
+        }
     }
 
     override fun play() {
         val p = player ?: return
+        if (!prepared) {
+            playWhenPrepared = true
+            running.value = true
+            return
+        }
         p.playbackParams = PlaybackParams().setSpeed(speed)
         p.start()
         running.value = true
@@ -58,6 +96,11 @@ class AndroidAudioPlayer(
     }
 
     override fun pause() {
+        playWhenPrepared = false
+        if (!prepared) {
+            running.value = false
+            return
+        }
         player?.takeIf { it.isPlaying }?.pause()
         running.value = false
         stopTicking()
@@ -65,18 +108,19 @@ class AndroidAudioPlayer(
     }
 
     override fun seekTo(millis: Long) {
-        player?.seekTo(millis, MediaPlayer.SEEK_CLOSEST)
+        if (!prepared) seekWhenPrepared = millis else player?.seekTo(millis, MediaPlayer.SEEK_CLOSEST)
         position.value = millis
     }
 
     override fun setSpeed(speed: Float) {
         this.speed = speed
         // Setting the speed of a paused player starts it: only while playing.
-        player?.takeIf { it.isPlaying }?.let { it.playbackParams = it.playbackParams.setSpeed(speed) }
+        if (prepared) player?.takeIf { it.isPlaying }?.let { it.playbackParams = it.playbackParams.setSpeed(speed) }
     }
 
     override fun release() {
         stopTicking()
+        playWhenPrepared = false
         player?.release()
         player = null
         running.value = false
@@ -86,4 +130,34 @@ class AndroidAudioPlayer(
         ticking?.cancel()
         ticking = null
     }
+}
+
+/**
+ * A recording on the server as Android's player reads it: each read goes to shed's reader (from its cache, else the
+ * server, a block at a time). The player reads on its own threads, so waiting here holds no screen.
+ */
+private class StreamedSource(private val stream: AudioStream) : android.media.MediaDataSource() {
+    private var size: Long? = null
+
+    override fun getSize(): Long = size ?: try {
+        kotlinx.coroutines.runBlocking(Dispatchers.IO) { stream.size() }.also { size = it }
+    } catch (e: Exception) {
+        -1
+    }
+
+    override fun readAt(position: Long, buffer: ByteArray, offset: Int, length: Int): Int {
+        val total = getSize()
+        if (total in 0..position) return -1
+        if (length == 0) return 0
+        val bytes = try {
+            kotlinx.coroutines.runBlocking(Dispatchers.IO) { stream.read(position, length) }
+        } catch (e: Exception) {
+            throw java.io.IOException("reading the recording from the server failed", e)
+        }
+        if (bytes.isEmpty()) return -1
+        bytes.copyInto(buffer, offset, 0, minOf(bytes.size, length))
+        return minOf(bytes.size, length)
+    }
+
+    override fun close() {}
 }

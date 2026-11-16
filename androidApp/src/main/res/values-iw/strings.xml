@@ -624,9 +624,9 @@
     <string name="notebooks_private_settings">הגדרות</string>
     <string name="notebooks_private_failed">%1$d מתוך %2$d סומנו כפרטיים. השאר נשארו בטלפון: %3$s</string>
     <plurals name="notebooks_tucked_pill">
-        <item quantity="one">רגע מוצנע אחד · הצגה</item>
-        <item quantity="two">%1$d רגעים מוצנעים · הצגה</item>
-        <item quantity="other">%1$d רגעים מוצנעים · הצגה</item>
+        <item quantity="one">עוד רגע אחד מאחורי הנעילה · הצגה</item>
+        <item quantity="two">עוד %1$d רגעים מאחורי הנעילה · הצגה</item>
+        <item quantity="other">עוד %1$d רגעים מאחורי הנעילה · הצגה</item>
     </plurals>
     <plurals name="notebooks_private_title">
         <item quantity="one">לסמן את הרגע הזה כפרטי?</item>
@@ -668,11 +668,18 @@
     <string name="server_free_done">פונו %2$s מ-%1$d רגעים.</string>
     <string name="server_free_stopped">פונו %1$d רגעים, ואז נעצר: %2$s</string>
     <string name="server_free_button">לפנות %1$s</string>
-    <string name="bring_title">ההקלטה מגיעה מהשרת</string>
-    <string name="bring_progress">%1$s מתוך %2$s</string>
     <string name="bring_failed">לא ניתן להביא את ההקלטה: %1$s</string>
     <string name="bring_not_on_server">היא לא נמצאת בשרת</string>
     <string name="notebooks_on_server">בשרת</string>
     <string name="notebooks_source_call">שיחה</string>
     <string name="notebooks_source_voice_message">הודעה קולית</string>
+    <string name="notebooks_locked">נעול</string>
+    <string name="notebooks_label_locked">דורש טביעת אצבע</string>
+    <string name="notebooks_label_locked_note">רגעים עם התווית הזו לא מופיעים ברשימה ובחיפוש עד שטביעת האצבע או נעילת המסך פותחות אותם.</string>
+    <string name="server_lock">מאחורי טביעת האצבע</string>
+    <string name="server_lock_calls">נעילת שיחות</string>
+    <string name="server_lock_calls_note">שיחות לא מופיעות ברשימה ובחיפוש עד שטביעת האצבע או נעילת המסך פותחות אותן.</string>
+    <string name="server_lock_voice">נעילת הודעות קוליות</string>
+    <string name="server_lock_voice_note">אותו הדבר להודעות קוליות.</string>
+    <string name="server_lock_labels_note">אפשר לנעול גם תווית: "דורש טביעת אצבע", בחלון עריכת התווית.</string>
 </resources>

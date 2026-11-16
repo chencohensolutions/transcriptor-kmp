@@ -162,6 +162,7 @@ class RecordingService : Service() {
             var shown = -1
             Recording.findingSpeakers.value = lecture.id to 0f
             runCatching {
+                Recording.audioHere(lecture)
                 Recording.findSpeakers(lecture) { p ->
                     Recording.findingSpeakers.value = lecture.id to p
                     val percent = (p * 100).toInt()
@@ -202,6 +203,8 @@ class RecordingService : Service() {
             var speakersNext: Lecture? = null
             Recording.refining.value = lecture.id to 0f
             runCatching {
+                // A moment whose audio is on the server: the whole file comes first (it played as it streamed).
+                Recording.audioHere(lecture)
                 Recording.refine(
                     lecture, modelId,
                     kept = { launch(Dispatchers.Main) { if (Recording.review.lecture?.id == lecture.id) Recording.review.reload() } },
