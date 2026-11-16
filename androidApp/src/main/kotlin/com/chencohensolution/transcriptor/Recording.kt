@@ -681,6 +681,8 @@ object Recording {
             } finally {
                 backup.markUploading(false)
             }
+            // What was handed over before uploads were recorded, asked of the server (cheap: by size).
+            runCatching { backup.confirmWithServer() }.onFailure { android.util.Log.w("Recording", "confirming uploads", it) }
             if (backup.waiting() > 0) scheduleUploads(context)
             refreshServerMoments()
         }
