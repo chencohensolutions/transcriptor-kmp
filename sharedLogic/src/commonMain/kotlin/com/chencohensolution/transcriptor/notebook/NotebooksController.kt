@@ -85,8 +85,10 @@ fun notebooksState(
     recording: RecordingNow? = null, working: Map<String, Float> = emptyMap(),
 ): NotebooksState {
     val moments = library.moments.filter { it.id != recording?.lectureId }
-    val guess = guessLabels(moments, now, utcOffset)
-    val language = guess?.labels?.firstOrNull()?.let { label -> usualLanguage(moments.filter { label in it.labels }) } ?: library.lastLanguage
+    // What the next moment recorded here is like: moments recorded here, not calls or voice messages from the server.
+    val recorded = moments.filter { it.source == null }
+    val guess = guessLabels(recorded, now, utcOffset)
+    val language = guess?.labels?.firstOrNull()?.let { label -> usualLanguage(recorded.filter { label in it.labels }) } ?: library.lastLanguage
     return NotebooksState(
         labels = library.labels,
         moments = moments,
@@ -95,7 +97,7 @@ fun notebooksState(
         guess = guess,
         // Not for calls and voice messages: a label by the hour is for classes and the like.
         suggested = moments.filter { it.labels.isEmpty() && it.source == null }
-            .mapNotNull { m -> guessLabels(moments, m.startedAtMillis, utcOffset)?.labels?.firstOrNull()?.let { m.id to it } }.toMap(),
+            .mapNotNull { m -> guessLabels(recorded, m.startedAtMillis, utcOffset)?.labels?.firstOrNull()?.let { m.id to it } }.toMap(),
         recording = recording,
         working = working,
         serverOlder = library.serverOlder,
