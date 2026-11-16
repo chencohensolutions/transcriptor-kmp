@@ -753,10 +753,22 @@ class ServerBackup(
         if (moments.isEmpty() && calls.isEmpty()) return
         val held = mutableSetOf<String>()
         val missing = mutableSetOf<String>()
-        for (sha in (moments.values.map { it.sha256 } + calls.values.map { it.sha256 }).toSet()) {
-            val there = try { shed.verify(sha) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; return }
-            if (there) held += sha else missing += sha
+        // The moments recorded here first (what the backup screen counts), then the rest. Asked by size, which the
+        // server answers from its index at once: verify re-reads the whole file there, about 14 s a call on the owner's
+        // server, hours for a thousand.
+        val here = runCatching { store.index().filter { it.source == null }.map { it.id }.toSet() }.getOrDefault(emptySet())
+        val order = (moments.filterKeys { it in here }.values.map { it.sha256 } + moments.values.map { it.sha256 } + calls.values.map { it.sha256 }).distinct()
+        val sizes = moments.values.associate { it.sha256 to null as Long? } + calls.values.associate { it.sha256 to it.size }
+        for ((i, sha) in order.withIndex()) {
+            val size = try { shed.backend.size(sha) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; break }
+            val expected = sizes[sha]
+            if (size != null && (expected == null || size == expected)) held += sha else missing += sha
+            // Kept as it goes, so the screen counts up and a cut-off pass doesn't ask again.
+            if (i % 25 == 24 || i == order.lastIndex) mark(held, missing)
         }
+    }
+
+    private suspend fun mark(held: Set<String>, missing: Set<String>) {
         mutex.withLock {
             save(kept.copy(
                 moments = kept.moments.mapValues { (_, h) -> if (h.sha256 in held) h.copy(uploaded = true) else h }
