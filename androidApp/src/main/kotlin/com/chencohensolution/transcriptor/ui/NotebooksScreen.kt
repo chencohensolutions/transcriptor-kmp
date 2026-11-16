@@ -485,7 +485,19 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
         val nearTop by remember { androidx.compose.runtime.derivedStateOf { list.firstVisibleItemIndex <= 10 } }
         // Asked again each time a page arrives: a page whose recordings are all moments here already (or all out of
         // the label shown) adds no row, and the list still needs the next one.
-        LaunchedEffect(nearEnd, state.serverOlder, state.serverLoading, state.moments.size) { if (nearEnd && state.serverOlder && !state.serverLoading) actions.olderFromServer() }
+        // Pages that showed nothing (all behind the lock, or under another label) are read on only a few times in a
+        // row: then a button asks before going further back, so the list doesn't walk through years on its own.
+        var emptyPages by remember { mutableStateOf(-1) } // the first count is the list as it opens, not a page
+        var rowsBefore by remember { mutableStateOf(state.moments.size) }
+        LaunchedEffect(state.serverLoading) {
+            if (state.serverLoading) return@LaunchedEffect
+            emptyPages = if (state.moments.size == rowsBefore) emptyPages + 1 else 0
+            rowsBefore = state.moments.size
+        }
+        val readOn = emptyPages < EMPTY_PAGES
+        LaunchedEffect(nearEnd, state.serverOlder, state.serverLoading, state.moments.size, readOn) {
+            if (nearEnd && state.serverOlder && !state.serverLoading && readOn) actions.olderFromServer()
+        }
         LaunchedEffect(nearTop, state.serverNewer, state.serverLoading, state.moments.size) { if (nearTop && state.serverNewer && !state.serverLoading) actions.newerFromServer() }
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp)) {
             folder?.let { notice -> item(key = "folder") { FolderCard(notice, actions) } }
@@ -557,7 +569,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
             }
             if (state.serverOlder || state.serverLoading) item(key = "server-more") {
                 Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    if (state.serverLoading || readOn) androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else TextButton(onClick = { emptyPages = 0; rowsBefore = state.moments.size }) { Text(stringResource(R.string.notebooks_older)) }
                 }
             }
         }
@@ -565,6 +578,9 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
 }
 
 private const val NO_LABEL = "-"
+
+/** Pages in a row that added no row before the list stops reading on by itself. */
+private const val EMPTY_PAGES = 3
 private const val DAY = 24 * 60 * 60_000L
 
 @Composable
