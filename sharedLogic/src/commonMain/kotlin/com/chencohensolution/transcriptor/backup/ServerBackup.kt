@@ -206,6 +206,8 @@ class ServerBackup(
 
     private val pageFile = root / "server-page.json"
 
+    private val prefetch = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+
     /**
      * The server's recordings that the moments list holds now, read a page at a time as the user scrolls: those that
      * are moments here already are left out by the list ([isMomentHere]).
@@ -579,7 +581,15 @@ class ServerBackup(
         if (!::shed.isInitialized || journal.state.value !is JournalState.Paired) return null
         val sha = lecture.serverSha256 ?: kept.moments[lecture.id]?.sha256 ?: return null
         var reader: com.chencohensolution.shed.ShedReader? = null
-        val open: suspend () -> com.chencohensolution.shed.ShedReader = { reader ?: shed.open(sha).also { reader = it } }
+        // The size from the list's page, so the first read doesn't ask for it; then the end of the file is fetched
+        // beside the start (a player reads an m4a's index there before it plays).
+        val known = serverMoments.find(sha)?.size
+        val open: suspend () -> com.chencohensolution.shed.ShedReader = {
+            reader ?: shed.open(sha, known).also { r ->
+                reader = r
+                if (r.size > TAIL) prefetch.launch { runCatching { r.read(r.size - TAIL, TAIL.toInt()) } }
+            }
+        }
         return com.chencohensolution.transcriptor.review.AudioStream(
             size = { open().size },
             read = { position, length -> open().read(position, length) },
@@ -812,6 +822,9 @@ internal fun titleOf(fileName: String): String {
 /** The server's recording's source, or a call when its name says so (the server may have filed it as a recording). */
 internal fun sourceOf(file: RemoteFile): String? =
     if (SAMSUNG_CALL.matches(callBase(file.about.fileName))) "call" else file.about.source
+
+/** How much of a streamed recording's end is fetched when it opens: a block of shed's cache. */
+private const val TAIL = 256L * 1024
 
 /** The name of the labels in Audio Logs' own data on the server. */
 private const val LABELS = "labels"
