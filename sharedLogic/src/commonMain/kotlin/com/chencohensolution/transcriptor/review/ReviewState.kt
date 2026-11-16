@@ -14,7 +14,10 @@ sealed interface PassState {
  * A model to pick, by [id], shown as [name]; for improving, about how many [minutes] it would take on this lecture
  * (null until it has run once on this phone) and whether it runs on the [npu].
  */
-data class ModelChoice(val id: String, val name: String, val minutes: Int? = null, val npu: Boolean = false)
+data class ModelChoice(
+    val id: String, val name: String, val minutes: Int? = null, val npu: Boolean = false,
+    val strength: com.chencohensolution.transcriptor.models.ModelStrength = com.chencohensolution.transcriptor.models.ModelStrength.Accurate,
+)
 
 /** A model to download, by [id], shown as [name] with its size. */
 data class ModelToGet(val id: String, val name: String, val sizeBytes: Long)

@@ -339,7 +339,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
  * guessed from the first letter: a Hebrew line that starts with an English word or a number stays right-to-left.
  */
 @Composable
-private fun TextStyle.inNotebookDirection() =
+internal fun TextStyle.inNotebookDirection() =
     copy(textDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextDirection.Rtl else TextDirection.Ltr)
 
 /** How long the transcript takes to move up as one when the text below grows. */

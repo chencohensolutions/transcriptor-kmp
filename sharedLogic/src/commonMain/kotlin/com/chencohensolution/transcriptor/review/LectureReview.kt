@@ -5,6 +5,7 @@ import com.chencohensolution.transcriptor.speech.LiveStretch
 import com.chencohensolution.transcriptor.speech.SpeakerTuning
 import com.chencohensolution.transcriptor.speech.VoicePrintThresholds
 import com.chencohensolution.transcriptor.notebook.Lecture
+import com.chencohensolution.transcriptor.notebook.Version
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Segment
@@ -209,6 +210,9 @@ class LectureReview(
         val lecture = store.load(o.lecture.id) ?: return
         open.value = Open(o.labelNames, lecture, o.speed)
     }
+
+    /** An earlier transcript of the open lecture, read from its file (for Compare); null if it is gone. */
+    fun version(versionId: String): Version? = open.value?.let { store.loadVersion(it.lecture, versionId) }
 
     /**
      * Makes an earlier transcript the current one: its lines, speakers and edits come back, and the transcript it

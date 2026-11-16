@@ -682,7 +682,9 @@ private fun MomentRow(
                 if (l.noteCount > 0) stringResource(R.string.notebooks_notes, l.noteCount) else null,
                 when {
                     l.pendingTranscript -> stringResource(R.string.notebooks_not_transcribed)
-                    l.refined -> stringResource(R.string.notebooks_refined)
+                    // Several transcripts: how many; else the model that transcribed it again, by its short name.
+                    l.versions > 0 -> stringResource(R.string.notebooks_versions, l.versions + 1)
+                    l.textModel != null -> stringResource(R.string.notebooks_refined, shortModelName(LocalModelNames.current(l.textModel!!)))
                     else -> null
                 },
             ).joinToString(" · "),
@@ -1028,5 +1030,16 @@ private fun FolderCard(notice: FolderNotice, actions: NotebooksActions) {
                 }
             }
         }
+    }
+}
+
+/** A model's name as the list shows it: "Zipformer", "Whisper turbo", "Whisper" (the rest of its name on its pages). */
+internal fun shortModelName(name: String): String {
+    val n = name.lowercase()
+    return when {
+        "zipformer" in n -> "Zipformer"
+        "whisper" in n && "turbo" in n -> "Whisper turbo"
+        "whisper" in n -> "Whisper"
+        else -> name
     }
 }

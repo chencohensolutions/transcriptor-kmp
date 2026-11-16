@@ -6,6 +6,13 @@ package com.chencohensolution.transcriptor.models
  */
 enum class ModelRemoval { Remove, DeleteDownload }
 
+/**
+ * What a model is good at when a moment is transcribed again, in one line on the sheet: [Accurate] (a large Whisper:
+ * the best text, with punctuation, slower), [Fast] (Whisper turbo: punctuation, quicker), [Streaming] (the Zipformer:
+ * quickest, close to the live text, no punctuation).
+ */
+enum class ModelStrength { Accurate, Fast, Streaming }
+
 /** What a model is chosen for, per language: writing the lines during the lecture, or improving them after. */
 enum class ModelJob { Live, Improve }
 
@@ -38,6 +45,13 @@ object ModelChoices {
             ModelJob.Improve -> fit.sortedWith(compareBy({ it.kind.streams }, { it.fitsLive })).let { it.filter(ready) + it.filterNot(ready) }
             ModelJob.Live -> fit.filter(ready).sortedBy { !it.fitsLive } + fit.filterNot(ready).filter { it.fitsLive }
         }
+    }
+
+    /** What [model] is good at for transcribing again ([ModelStrength]). */
+    fun strength(model: SpeechModel) = when {
+        model.kind.streams -> ModelStrength.Streaming
+        model.fitsLive -> ModelStrength.Fast
+        else -> ModelStrength.Accurate
     }
 
     /** The model that runs: the one chosen if it is ready, else the first ready one; null when none is. */

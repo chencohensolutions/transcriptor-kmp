@@ -14,6 +14,7 @@ import com.chencohensolution.transcriptor.lab.LabData
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.Speaker
 import com.chencohensolution.transcriptor.models.ModelCatalog
+import com.chencohensolution.transcriptor.models.ModelStrength
 import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
@@ -101,14 +102,22 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
         speakers = PassState.Done
         if (thenImprove) { thenImprove = false; refine = PassState.Running(0f) }
     }
+    // Fakes: an earlier transcript kept as a version (the Zipformer's, live), a few words heard otherwise, for Compare.
+    val earlier = remember(lecture.id) {
+        com.chencohensolution.transcriptor.notebook.VersionInfo("v-lab", ModelCatalog.ivritZipformerNpu.id, 1_763_300_000_000L, lecture.segments.size, 0, refined = false)
+    }
+    val earlierLines = remember(lecture.id) {
+        lecture.segments.mapIndexed { i, l -> if (i % 3 == 1) l.copy(text = l.text.split(' ').mapIndexed { j, w -> if (j == 2) w.reversed() else w }.joinToString(" ")) else l }
+    }
     val state = ReviewState(
-        labelNames = if (sample == null) com.chencohensolution.transcriptor.notebook.labelNames(lecture.labels, LabData.labels) else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture, positionMillis = position, playing = playing,
+        labelNames = if (sample == null) com.chencohensolution.transcriptor.notebook.labelNames(lecture.labels, LabData.labels) else "", onlySpeaker = only, knownNames = if (sample == null) emptyList() else LabData.knownNames, lecture = lecture.copy(versions = lecture.versions.ifEmpty { listOf(earlier) }), positionMillis = position, playing = playing,
         speed = speed, refine = refine, speakerPass = speakers,
         refineModels = if (!modelsDownloaded) emptyList() else listOf(
             ModelChoice(ModelCatalog.ivritLargeV3Npu.id, ModelCatalog.ivritLargeV3Npu.name, minutes = 1, npu = true),
             ModelChoice(ModelCatalog.whisperLargeV3.id, ModelCatalog.whisperLargeV3.name, minutes = 4),
-            ModelChoice(ModelCatalog.ivritTurboNpu.id, ModelCatalog.ivritTurboNpu.name, npu = true),
-            ModelChoice(ModelCatalog.ivritTurbo.id, ModelCatalog.ivritTurbo.name, minutes = 1),
+            ModelChoice(ModelCatalog.ivritTurboNpu.id, ModelCatalog.ivritTurboNpu.name, npu = true, strength = ModelStrength.Fast),
+            ModelChoice(ModelCatalog.ivritTurbo.id, ModelCatalog.ivritTurbo.name, minutes = 1, strength = ModelStrength.Fast),
+            ModelChoice(ModelCatalog.ivritZipformerNpu.id, ModelCatalog.ivritZipformerNpu.name, minutes = 1, npu = true, strength = ModelStrength.Streaming),
         ),
         improveDefault = ModelCatalog.ivritLargeV3Npu.id.takeIf { modelsDownloaded },
         improveToGet = ModelToGet(ModelCatalog.ivritLargeV3.id, ModelCatalog.ivritLargeV3.name, ModelCatalog.ivritLargeV3.sizeBytes).takeIf { !modelsDownloaded },
@@ -129,6 +138,7 @@ private fun rememberReviewLab(modelsDownloaded: Boolean, waiting: Boolean = fals
             )
         },
         back = labBack,
+        version = { com.chencohensolution.transcriptor.notebook.Version(earlier, earlierLines, lecture.speakers, false, null) },
         playPause = { if (position >= lecture.durationMillis) position = 0; playing = !playing },
         seek = { position = it.coerceIn(0, lecture.durationMillis) },
         playLine = { position = it.startMillis; playing = true },

@@ -41,6 +41,10 @@ data class LectureSummary(
     val notOnServer: Boolean = false,
     /** Behind the phone's lock: a locked label's, or a call or voice message while those are locked ([Locks]). */
     val locked: Boolean = false,
+    /** The model that wrote the text now when it was transcribed again ([Lecture.refinedWith]); null for the live text. */
+    val textModel: String? = null,
+    /** How many earlier transcripts it keeps ([Lecture.versions]). */
+    val versions: Int = 0,
 )
 
 /**

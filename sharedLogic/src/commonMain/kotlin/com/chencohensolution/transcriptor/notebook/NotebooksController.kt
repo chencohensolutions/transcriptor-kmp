@@ -126,7 +126,7 @@ fun Lecture.summary(): LectureSummary {
     return LectureSummary(
         id, title, startedAtMillis, durationMillis, notes.size, refinedWith != null, language, labels, pendingTranscript,
         people = spoke.filter { it.name.isNotEmpty() }.map { it.name }, unnamedPeople = spoke.count { it.name.isEmpty() },
-        preview = previewOf(this), tucked = tucked, source = source,
+        preview = previewOf(this), tucked = tucked, source = source, textModel = refinedWith, versions = versions.size,
     )
 }
 

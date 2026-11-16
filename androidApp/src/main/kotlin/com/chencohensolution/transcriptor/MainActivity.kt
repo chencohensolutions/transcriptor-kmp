@@ -230,6 +230,7 @@ class MainActivity : ComponentActivity() {
                                     lifecycleScope.launch(Dispatchers.IO) { Recording.modelLibrary.all.firstOrNull { it.id == id }?.let { Recording.models.download(it) } }
                                 },
                                 switchVersion = r::switchTo,
+                                version = r::version,
                                 addNote = r::addNote, editNote = r::editNote, deleteNote = r::deleteNote,
                                 shareWord = { lifecycleScope.launch(Dispatchers.IO) { r.word()?.let { (name, bytes) -> shareWord(name, bytes) } } },
                                 saveWord = {
@@ -464,7 +465,7 @@ private fun ReviewPasses() {
             refineModels = models.map {
                 ModelChoice(
                     it.id, it.name, ModelChoices.estimateMinutes(Recording.settings.improveSpeed(it.id), lecture.durationMillis),
-                    npu = it.kind.onNpu,
+                    npu = it.kind.onNpu, strength = ModelChoices.strength(it),
                 )
             },
             improveDefault = default?.id,

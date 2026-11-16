@@ -42,9 +42,9 @@ was unnamed, which the owner turned off (Nov 16, 2026).
 - **Short turns are compact**: a turn of up to 140 characters is one piece, the speaker's name in their color, its
   time, then the words (`COMPACT_TURN_CHARS`); tapping the name names the speaker. A longer turn keeps the chip and
   time above its paragraph, as a lecture reads.
-- **Where the transcript stands**: under the top bar, "Live draft. The better model hasn't written it yet." with
-  **Improve · about n min**, which opens the improve sheet. Shown while the moment has lines, a model to improve with,
-  and hasn't been improved.
+- **Where the transcript stands**: under the top bar, "Written live. You can transcribe it again with another
+  model." with **Transcribe again · about n min**, which opens the Transcribe with sheet. Shown while the moment has
+  lines, a model to transcribe with, and hasn't been transcribed again.
 - **One person's turns**: with two or more speakers, a chip per person above the player. Tapping one plays only their
   turns, skipping the others' and pausing after their last (`LectureReview.playOnly`, `Lecture.onlyOf`,
   `ReviewState.onlySpeaker`); the others' turns and lanes fade. Tapping it again plays everyone.
@@ -66,18 +66,22 @@ was unnamed, which the owner turned off (Nov 16, 2026).
   the playhead.
 - ⋮ → Find the speakers runs the speaker pass in the recording service (a banner shows its progress); the lines are
   read again when it finishes. Shown only when its models are downloaded.
-- ⋮ → Improve transcription… (round 2's a) is always there, whether or not moments improve on their own. Its sheet:
-  the moment's length, language and the model that wrote it now; the Whisper models downloaded for its language, the
-  large ones first, each with about how long it would take (from that model's last run on this phone; none before)
-  and NPU or CPU; the one chosen in Settings picked (another is a one-off); "Find the speakers first" when the speaker
-  pass can run and hasn't (improving drops the word times it reads); what is kept. Improve runs it in the recording
+- ⋮ → Transcribe again… (was Improve transcription…, renamed Nov 16, 2026: running the Zipformer after is a choice,
+  not always an improvement). Its sheet, **Transcribe with**: the moment's length and language, "Now: written live by
+  …" or "Now: transcribed again by …"; the models downloaded for its language (large Whisper, then turbo, then the
+  Zipformer), each with what it is good at (`ModelStrength`: most accurate with punctuation, slower / fast with
+  punctuation / fastest, close to the live text, no punctuation), about how long it would take (from that model's last
+  run on this phone; none before) and NPU or CPU; the one chosen in Settings picked (another is a one-off); "Find the
+  speakers first" when the speaker pass can run and hasn't; what is kept. Transcribe runs it in the recording
   service: every line transcribed again from its own audio, edited lines kept, times and speakers kept. The transcript
   it replaces is kept as a version first. With no model downloaded, the sheet offers the one to get.
-- With Improve automatically on (Settings), a moment is improved with its language's model after it stops (after the
+- With Transcribe again automatically on (Settings), a moment is improved with its language's model after it stops (after the
   speaker pass), if the phone is charging; otherwise it waits (`SettingsStore.improvePending`) until the app is open
   while the phone charges.
-- ⋮ → Versions (n): the transcript now and every earlier one (live or refined, its model, when it was kept, its lines
-  and edits). Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
+- ⋮ → Versions (n): the transcript now and every earlier one, named by what wrote it ("Live · Zipformer", or the
+  model's name), when it was kept, its lines and edits. **Compare** on an earlier one shows it beside the text now, a
+  line at a time (`compareTranscripts`: matched by time, words by longest common run, punctuation ignored), the words
+  that differ highlighted in both; only the lines that differ at first, with how many; **Use …** brings it back. Tapping one brings it back, with its lines, speakers and edits; the one it replaces is kept, so nothing
   is lost. Notes belong to the moment, not to a version.
 - Share, beside the pencil (round 3's b): one tap makes the moment's Word file (`transcriptDocx`: the title, the
   labels, date and length, a paragraph per speaker turn with the name and time above it, the notes as shaded italic

@@ -7,7 +7,7 @@ Settings.
 ## Two pages (Nov 15, 2026)
 
 Settings opens on the plain choices: **Languages** (a language with nothing downloaded says "No model yet. Tap to get
-one." in one calm line), **After a moment** (Improve automatically), and **Recordings** (the moments folder, the
+one." in one calm line), **After recording** (Transcribe again automatically), and **Recordings** (the moments folder, the
 audio format and FLAC effort), then an **Advanced** row. **Settings › Advanced** (`AdvancedPage`) holds what most
 people never change: Speaker recognition with its slider, Speaker turns, Find the speakers again after Stop, Manage
 models, and the processor meters. The speaker pages and the model library open from Advanced and return to it. What
@@ -22,7 +22,7 @@ for this phone's chip; `DefaultModels.setup`, `ModelsState.setup`), without mode
 - **No model yet.** with **Get the recommended models · 1.7 GB**: nothing transcribes the language. One tap downloads
   what is missing and picks them for live and for improving (`ModelsActions.download`, `useLive`, `useRefine`); the row
   says "Getting the recommended models…" meanwhile.
-- **Live: … / Improve: …** with **Use the recommended models** (or **Get … · size** when some are missing): other
+- **Live: … / After: …** with **Use the recommended models** (or **Get … · size** when some are missing): other
   models run, the user's own choice or what was on the phone before.
 
 There are no Fast / Balanced / Best tiers: each language has one combination worth recommending, and a second tier
@@ -78,13 +78,13 @@ stops.
 ## What it shows
 
 - **Settings**: **Languages**, one row per language in use (the moments', the phone's, those
-  added) with the model that writes it live and the one that improves its moments ("Live: … / Improve: …", red when
+  added) with the model that writes it live and the one that improves its moments ("Live: … / After: …", red when
   none is downloaded), and Add a language. **Speaker recognition**: its note, a **Voice model** row with the model in
   use and its facts ("3D-Speaker CAM++ · 7M", red "No model downloaded" without one), and under it the slider "How
   readily it starts a new speaker", Fewer ↔ More speakers, with Reset (one value per model,
   `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a moment**: Find the
   speakers again after Stop
-  (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
+  (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Transcribe again automatically (`autoImprove`, off by default). **Models and storage**:
   Manage models, the moments folder (Choose a folder / Change), **Server backup** (off, or on to which server; its own
   page: [server.md](server.md)), and a **Recording format** row whose line sums up the
   choice ("AAC · LC · 64 kbps · Mono · 48 kHz · hardware · while recording"). It opens the Recording format page:
@@ -101,7 +101,8 @@ stops.
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
-  to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first, then the Zipformer (CPU or
+  to keep up; **After recording** (was Improve transcription; the model for moments recorded with After, for transcribing
+  again automatically, and picked first in a moment's Transcribe again), the Whisper models (CPU or NPU), the large ones first, then the Zipformer (CPU or
   NPU; hen's ask, Nov 16, 2026). Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
   once, under Live. A large model that runs live in ~30 s windows (large-v3 on the CPU, `liveWindowSeconds`) is got

@@ -29,12 +29,15 @@ data class IndexedMoment(
     val pendingAac: Boolean = false,
     /** Its audio is on the phone, not only on the server. */
     val hasAudio: Boolean = false,
+    val textModel: String? = null,
+    val versions: Int = 0,
 ) {
     val pendingEncode: Boolean get() = pendingFlac || pendingAac
 
     fun summary() = LectureSummary(
         id, title, startedAtMillis, durationMillis, noteCount, refined, language, labels, pendingTranscript,
         people = people, unnamedPeople = unnamedPeople, preview = preview, tucked = tucked, source = source,
+        textModel = textModel, versions = versions,
     )
 }
 
@@ -43,6 +46,7 @@ fun Lecture.indexed(hasAudio: Boolean): IndexedMoment = summary().let { s ->
     IndexedMoment(
         id, title, language, startedAtMillis, durationMillis, s.noteCount, s.refined, labels, pendingTranscript, s.people,
         s.unnamedPeople, s.preview, tucked, source, serverSha256, audioFile, pendingFlac, pendingAac, hasAudio,
+        textModel = s.textModel, versions = s.versions,
     )
 }
 

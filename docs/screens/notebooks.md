@@ -11,7 +11,8 @@ The code still calls it `NotebooksScreen`.
   When the moment history has a label for that time, **Add <label>** adds it in one tap; **Labels…** (or **Add
   labels** without a suggestion) opens the labels sheet.
 - **Today / This week / Earlier**: every moment with labels, newest first, with all its labels in their colors (but
-  the one the list is narrowed to), its title, day, length, notes, Improved, and the progress of a pass running on it.
+  the one the list is narrowed to), its title, day, length, notes, the model that transcribed it again ("Zipformer", "Whisper"; `shortModelName`) or
+  "n versions" when it keeps earlier transcripts, and the progress of a pass running on it.
   A title goes by its own first letter, else its language's direction.
 - **One list by date** (Nov 15, 2026): moments without labels are rows like the others, in Today / This week /
   Earlier, with a quiet **Add <label>** (the one their time suggests) and **Labels…**, or **+ label**. The "No labels
