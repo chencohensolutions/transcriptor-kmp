@@ -1,5 +1,12 @@
 package com.chencohensolution.transcriptor.ui
 
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.chencohensolution.transcriptor.models.ModelStrength
+import com.chencohensolution.transcriptor.notebook.modelOfText
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Info
@@ -149,6 +156,8 @@ class ReviewActions(
     val getModel: (modelId: String) -> Unit = {},
     /** Makes an earlier transcript (a version's id) the current one, keeping this one as a version. */
     val switchVersion: (id: String) -> Unit = {},
+    /** An earlier transcript, for Compare; reads a file, called off the main thread. */
+    val version: (id: String) -> com.chencohensolution.transcriptor.notebook.Version? = { null },
     val findSpeakers: () -> Unit = {},
     /** "Tune on this lecture": the proposal by the user's corrections ([LectureReview.tuneSpeakers]); null: none. */
     val tuneSpeakers: () -> LectureReview.TuneProposal? = { null },
@@ -244,7 +253,9 @@ fun ReviewScreen(
     moving?.let { line -> MoveLineDialog(line, state.lecture.speakers, onDismiss = { moving = null }) { actions.setLineSpeaker(line.id, it); moving = null } }
     note?.let { n -> NoteDialog(stringResource(R.string.review_note_here, formatClock(n.atMillis)), n.text, onDelete = { actions.deleteNote(n.id); note = null }, onDismiss = { note = null }) { actions.editNote(n.id, it); note = null } }
     if (pickingModel) ImproveSheet(state, actions, onDismiss = { pickingModel = false })
-    if (showingVersions) VersionsDialog(state, onDismiss = { showingVersions = false }) { actions.switchVersion(it); showingVersions = false }
+    var comparing by remember { mutableStateOf<com.chencohensolution.transcriptor.notebook.VersionInfo?>(null) }
+    if (showingVersions) VersionsDialog(state, onDismiss = { showingVersions = false }, onCompare = { comparing = it; showingVersions = false }) { actions.switchVersion(it); showingVersions = false }
+    comparing?.let { v -> CompareDialog(state, v, actions, onDismiss = { comparing = null }) { actions.switchVersion(v.id); comparing = null } }
     noting?.let { at -> NoteDialog(stringResource(R.string.review_note_here, formatClock(at)), "", onDelete = null, onDismiss = { noting = null }) { actions.addNote(at, it); noting = null } }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -658,9 +669,17 @@ private fun ImproveSheet(state: ReviewState, actions: ReviewActions, onDismiss: 
             Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stringResource(R.string.review_improve_title), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    stringResource(R.string.review_improve_about, (lecture.durationMillis / 60_000).toInt(), languageName(lecture.language), LocalModelNames.current(lecture.refinedWith ?: lecture.segments.firstOrNull()?.modelId.orEmpty())),
+                    stringResource(R.string.review_improve_length, (lecture.durationMillis / 60_000).toInt(), languageName(lecture.language)),
                     style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time,
                 )
+                // What wrote the text now, so it is clear what a run would be set beside (kept under Versions).
+                if (lecture.segments.isNotEmpty()) {
+                    val nowModel = LocalModelNames.current(lecture.refinedWith ?: lecture.modelOfText.orEmpty())
+                    Text(
+                        stringResource(if (lecture.refinedWith != null) R.string.review_improve_now_again else R.string.review_improve_now_live, nowModel),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             if (state.refineModels.isEmpty()) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -683,6 +702,14 @@ private fun ImproveSheet(state: ReviewState, actions: ReviewActions, onDismiss: 
                         RadioButton(selected = picked == c.id, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(isolated(c.name), style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                stringResource(when (c.strength) {
+                                    ModelStrength.Accurate -> R.string.review_strength_accurate
+                                    ModelStrength.Fast -> R.string.review_strength_fast
+                                    ModelStrength.Streaming -> R.string.review_strength_streaming
+                                }),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             val facts = listOfNotNull(
                                 stringResource(R.string.review_default).takeIf { c.id == state.improveDefault },
                                 c.minutes?.let { stringResource(R.string.review_minutes, it) },
@@ -720,29 +747,32 @@ private fun ImproveSheet(state: ReviewState, actions: ReviewActions, onDismiss: 
     }
 }
 
-/** The transcript now and the earlier ones, newest first: who wrote each, when it was kept, its lines and edits. */
+/**
+ * The transcript now and the earlier ones, newest first, each named by what wrote it ("Live · Zipformer", "Whisper
+ * large-v3 · 21:14"), with its lines and edits: tap one to bring it back, Compare to see it beside the text now.
+ */
 @Composable
-private fun VersionsDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+private fun VersionsDialog(state: ReviewState, onDismiss: () -> Unit, onCompare: (com.chencohensolution.transcriptor.notebook.VersionInfo) -> Unit, onPick: (String) -> Unit) {
     val lecture = state.lecture
     val format = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.review_versions, lecture.versions.size + 1)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val nowModel = lecture.refinedWith ?: lecture.segments.groupingBy { it.modelId }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
                 VersionRow(
                     stringResource(R.string.review_version_now),
-                    stringResource(if (lecture.refinedWith != null) R.string.review_version_refined else R.string.review_version_live, LocalModelNames.current(nowModel)),
+                    versionName(lecture.refinedWith != null, nowModel, null),
                     stringResource(R.string.review_version_lines, lecture.segments.size, lecture.segments.count { it.edited }),
-                    current = true, onClick = null,
+                    current = true, onClick = null, onCompare = null,
                 )
                 lecture.versions.sortedByDescending { it.keptAtMillis }.forEach { v ->
                     VersionRow(
+                        versionName(v.refined, v.modelId, null),
                         format.format(java.util.Date(v.keptAtMillis)),
-                        stringResource(if (v.refined) R.string.review_version_refined else R.string.review_version_live, LocalModelNames.current(v.modelId)),
                         stringResource(R.string.review_version_lines, v.lines, v.edited),
-                        current = false, onClick = { onPick(v.id) },
+                        current = false, onClick = { onPick(v.id) }, onCompare = { onCompare(v) },
                     )
                 }
                 Text(stringResource(R.string.review_versions_note), style = MaterialTheme.typography.bodySmall)
@@ -752,16 +782,101 @@ private fun VersionsDialog(state: ReviewState, onDismiss: () -> Unit, onPick: (S
     )
 }
 
+/** "Live · Zipformer" for live text, the model's name for a transcript written again (with [time] when given). */
 @Composable
-private fun VersionRow(title: String, model: String, lines: String, current: Boolean, onClick: (() -> Unit)?) {
-    Column(
+private fun versionName(again: Boolean, modelId: String, time: String?): String {
+    val name = LocalModelNames.current(modelId)
+    return when {
+        !again -> stringResource(R.string.review_version_live, name)
+        time != null -> stringResource(R.string.review_version_refined, name, time)
+        else -> name
+    }
+}
+
+@Composable
+private fun VersionRow(title: String, model: String, lines: String, current: Boolean, onClick: (() -> Unit)?, onCompare: (() -> Unit)?) {
+    Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
             .background(if (current) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(12.dp),
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        Text(model, style = MaterialTheme.typography.bodyMedium)
-        Text(lines, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(model, style = MaterialTheme.typography.bodyMedium)
+            Text(lines, style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time)
+        }
+        if (onCompare != null) TextButton(onClick = onCompare) { Text(stringResource(R.string.review_version_compare)) }
+    }
+}
+
+/**
+ * The text now beside an earlier version, a line at a time ([compareTranscripts]): the words that differ are marked in
+ * both, the earlier one under the line now, in grey. Only the lines that differ at first; Use brings the earlier one back.
+ */
+@Composable
+private fun CompareDialog(state: ReviewState, info: com.chencohensolution.transcriptor.notebook.VersionInfo, actions: ReviewActions, onDismiss: () -> Unit, onUse: () -> Unit) {
+    val lecture = state.lecture
+    val lines by produceState<List<com.chencohensolution.transcriptor.review.ComparedLine>?>(null, info.id, lecture.segments) {
+        value = withContext(Dispatchers.Default) {
+            actions.version(info.id)?.let { com.chencohensolution.transcriptor.review.compareTranscripts(lecture.segments, it.segments) }
+        }
+    }
+    var onlyDiffering by remember { mutableStateOf(true) }
+    val short = shortModelName(LocalModelNames.current(info.modelId))
+    val name = if (info.refined) short else stringResource(R.string.review_version_live, short)
+    val mark = MaterialTheme.colorScheme.tertiaryContainer
+    val onMark = MaterialTheme.colorScheme.onTertiaryContainer
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize().padding(vertical = 24.dp, horizontal = 12.dp), shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxSize().padding(top = 16.dp)) {
+                Text(stringResource(R.string.review_compare_title, name), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 20.dp))
+                val all = lines
+                if (all != null) {
+                    Text(
+                        stringResource(R.string.review_compare_counts, all.count { it.differs }, all.size),
+                        style = MaterialTheme.typography.bodySmall, color = LocalTranscriptorColors.current.time, modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().toggleable(onlyDiffering, role = Role.Checkbox) { onlyDiffering = it }.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = onlyDiffering, onCheckedChange = null, modifier = Modifier.padding(horizontal = 12.dp))
+                    Text(stringResource(R.string.review_compare_only_diff), style = MaterialTheme.typography.bodyMedium)
+                }
+                HorizontalDivider()
+                CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(lecture.language)) {
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(vertical = 8.dp)) {
+                        items((all ?: emptyList()).filter { !onlyDiffering || it.differs }) { line ->
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                Text(formatClock(line.startMillis), style = MaterialTheme.typography.labelSmall, color = LocalTranscriptorColors.current.time, modifier = Modifier.width(44.dp).padding(top = 3.dp))
+                                Column(Modifier.weight(1f)) {
+                                    if (line.now.isNotEmpty()) Text(marked(line.now, mark, onMark), style = MaterialTheme.typography.bodyLarge.inNotebookDirection())
+                                    if (line.other.isNotEmpty()) Text(
+                                        marked(line.other, mark, onMark), style = MaterialTheme.typography.bodyMedium.inNotebookDirection(),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalDivider()
+                Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.review_compare_close)) }
+                    Button(onClick = onUse) { Text(stringResource(R.string.review_compare_use)) }
+                }
+            }
+        }
+    }
+}
+
+/** The words, those marked changed on a highlight. */
+private fun marked(words: List<com.chencohensolution.transcriptor.review.ComparedWord>, mark: Color, onMark: Color) = buildAnnotatedString {
+    words.forEachIndexed { i, w ->
+        if (i > 0) append(" ")
+        if (w.changed) withStyle(SpanStyle(background = mark, color = onMark)) { append(w.text) } else append(w.text)
     }
 }
 

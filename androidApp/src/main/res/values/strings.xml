@@ -30,7 +30,7 @@
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
     <string name="lecture_model_skipped_memory">Not enough free memory now for %1$s; using %2$s. Close other apps and try again.</string>
-    <string name="lecture_model_skipped_improve">%2$s writes the live lines: %1$s didn’t fit in the free memory with the recording. This moment is improved when you stop.</string>
+    <string name="lecture_model_skipped_improve">%2$s writes the live lines: %1$s didn’t fit in the free memory with the recording. This moment is transcribed again when you stop.</string>
     <string name="lecture_model_npu_failed">CPU (its NPU build failed)</string>
     <string name="lecture_speaker_pass_on_stop">After Stop: speaker pass, pyannote + %1$s</string>
     <string name="lecture_live_failed">Live transcription stopped (%1$s). Recording and notes go on.</string>
@@ -73,13 +73,13 @@
     <string name="review_move_line">Who said the line at %1$s?</string>
     <string name="start_lectures">Moments</string>
     <string name="start_speakers_count">%1$d speakers</string>
-    <string name="refining">Improving the transcript…</string>
+    <string name="refining">Transcribing again…</string>
     <string name="review_versions">Versions (%1$d)</string>
     <string name="review_version_now">Now</string>
     <string name="review_version_lines">%1$d lines · %2$d edited</string>
     <string name="review_versions_note">Tap one to bring it back; the transcript now is kept as a version. Notes stay as they are.</string>
     <string name="review_version_live">Live · %1$s</string>
-    <string name="review_version_refined">Improved · %1$s</string>
+    <string name="review_version_refined">%1$s · %2$s</string>
     <!-- Notebooks -->
     <string name="notebooks_settings">Settings</string>
     <string name="notebooks_record">Record</string>
@@ -95,8 +95,8 @@
     <string name="notebooks_hours">%1$d h</string>
     <string name="notebooks_hours_minutes">%1$d h %2$d min</string>
     <string name="notebooks_notes">%1$d notes</string>
-    <string name="notebooks_refined">Improved</string>
-    <string name="notebooks_improving">Improving the transcript · %1$d%%</string>
+    <string name="notebooks_refined">%1$s</string>
+    <string name="notebooks_improving">Transcribing again · %1$d%%</string>
     <string name="notebooks_recording">Recording · %1$s</string>
     <string name="notebooks_back_to_lecture">Back to it</string>
     <string name="notebooks_empty_title">Record a moment</string>
@@ -119,7 +119,7 @@
     <string name="folder_failed">Couldn\'t use that folder: %1$s</string>
     <!-- Settings › Models -->
     <string name="models_add_language">Add a language</string>
-    <string name="models_after_only">For improving only</string>
+    <string name="models_after_only">For after recording only</string>
     <string name="models_all_kinds">All kinds</string>
     <string name="models_any_language">Any language</string>
     <string name="models_badge_live">Live ✓</string>
@@ -130,7 +130,7 @@
     <string name="models_speaker_tuning_fewer">Fewer speakers</string>
     <string name="models_speaker_tuning_more">More speakers</string>
     <string name="models_speaker_tuning_reset">Reset</string>
-    <string name="models_badge_refine">Improve ✓</string>
+    <string name="models_badge_refine">After ✓</string>
     <string name="models_choose_size">Size</string>
     <string name="models_confirm_nc">This model\'s license allows personal and study use only. Add it anyway?</string>
     <string name="models_confirm_nc_title">Not for commercial use</string>
@@ -193,14 +193,14 @@
     <string name="settings_languages">Languages</string>
     <string name="settings_live_is">Live: %1$s</string>
     <string name="settings_live_none">Live: no model downloaded</string>
-    <string name="settings_improve_is">Improve: %1$s</string>
-    <string name="settings_improve_none">Improve: no model downloaded</string>
-    <string name="settings_after">After a moment</string>
+    <string name="settings_improve_is">After: %1$s</string>
+    <string name="settings_improve_none">After: no model downloaded</string>
+    <string name="settings_after">After recording</string>
     <string name="settings_find_speakers">Find the speakers again after Stop</string>
     <string name="settings_find_speakers_note">Off: speakers are found live while recording. On: the speaker pass also regroups them after Stop, in a minute or two.</string>
-    <string name="settings_auto_improve">Improve automatically</string>
-    <string name="settings_auto_improve_on">Each moment is transcribed again with its improve model after it stops, while the phone charges. If it isn\'t charging, the moment waits until the app is open on the charger.</string>
-    <string name="settings_auto_improve_off">Off: improve any moment from its menu, when you want.</string>
+    <string name="settings_auto_improve">Transcribe again automatically</string>
+    <string name="settings_auto_improve_on">A moment transcribed live is transcribed again with the language’s after-recording model once it stops, while the phone charges. If it isn’t charging, the moment waits until the app is open on the charger.</string>
+    <string name="settings_auto_improve_off">Off: transcribe a moment again from its menu, when you want.</string>
     <string name="settings_storage">Recordings</string>
     <string name="settings_manage">Manage models</string>
     <string name="settings_manage_note">Download, delete, find on Hugging Face</string>
@@ -217,14 +217,14 @@
     <string name="models_speaker_search_note">Speaker models exported for sherpa-onnx; each file is one model.</string>
     <string name="settings_live_title">Live transcription</string>
     <string name="settings_live_note">Writes the lines during the moment.</string>
-    <string name="settings_improve_title">Improve transcription</string>
-    <string name="settings_improve_note">Transcribes a moment again after it, by hand from its menu or automatically. You can pick another model for a single moment.</string>
+    <string name="settings_improve_title">After recording</string>
+    <string name="settings_improve_note">The model that writes moments recorded with After, transcribes again automatically, and is picked first in a moment’s Transcribe again. Whisper writes punctuation and is the most accurate; the Zipformer is fast and close to the live text.</string>
     <string name="settings_more">Find more models for %1$s</string>
     <string name="settings_streaming">Words as they\'re spoken</string>
     <!-- The lecture: improving its transcription. -->
-    <string name="review_improve">Improve transcription…</string>
-    <string name="review_improving">Improving the transcription · %1$d%%</string>
-    <string name="review_improve_title">Improve transcription</string>
+    <string name="review_improve">Transcribe again…</string>
+    <string name="review_improving">Transcribing again · %1$d%%</string>
+    <string name="review_improve_title">Transcribe with</string>
     <string name="review_improve_about">%1$d min · %2$s · now: %3$s</string>
     <string name="review_no_model">No model for %1$s is downloaded yet.</string>
     <string name="review_get_model">Get %1$s · %2$s</string>
@@ -233,9 +233,9 @@
     <string name="review_npu">NPU</string>
     <string name="review_cpu">CPU</string>
     <string name="review_speakers_first">Find the speakers first</string>
-    <string name="review_speakers_first_note">Improving drops the word times the speaker pass needs.</string>
-    <string name="review_kept">Lines you edited stay. The transcript now is kept, under Versions.</string>
-    <string name="review_improve_button">Improve</string>
+    <string name="review_speakers_first_note">Transcribing again drops the word times the speaker pass needs.</string>
+    <string name="review_kept">Lines you edited stay. The transcript now is kept under Versions, so you can switch back or compare.</string>
+    <string name="review_improve_button">Transcribe</string>
 
     <string name="review_tune_speakers">Tune speakers on this moment (%1$d corrections)</string>
     <string name="review_tune_title">Tune on this moment</string>
@@ -316,7 +316,7 @@
     <string name="models_delete_title">Delete the download of %1$s?</string>
     <string name="models_delete_text">Its files are deleted from the phone. It stays in the list, to download again.</string>
     <string name="models_removal_chosen">It is chosen now: its default is used instead.</string>
-    <string name="models_removal_busy">It may be in use: stop recording or improving first.</string>
+    <string name="models_removal_busy">It may be in use: stop recording or transcribing first.</string>
     <!-- Settings › Recording format, and its AAC and FLAC pages. -->
     <string name="rec_format_aac_short">Lossy and small, the lightest on the battery: on the phone\'s hardware encoder when it has one.</string>
     <string name="rec_format_bitrate">Bitrate</string>
@@ -426,9 +426,9 @@
     </plurals>
     <string name="review_share">Share</string>
     <string name="review_share_text">Share as text</string>
-    <string name="review_draft">Live draft. The better model hasn\'t written it yet.</string>
-    <string name="review_draft_improve">Improve</string>
-    <string name="review_draft_improve_minutes">Improve · about %1$d min</string>
+    <string name="review_draft">Written live. You can transcribe it again with another model.</string>
+    <string name="review_draft_improve">Transcribe again</string>
+    <string name="review_draft_improve_minutes">Transcribe again · about %1$d min</string>
     <string name="notebooks_search">Search</string>
     <string name="notebooks_search_close">Close search</string>
     <string name="notebooks_search_clear">Clear</string>
@@ -459,7 +459,7 @@
     <string name="first_run_title">Get your models</string>
     <string name="first_run_body">Audio Logs transcribes on your phone, with nothing sent anywhere. These are the models it uses for %1$s. They download over Wi-Fi.</string>
     <string name="first_run_live">Live transcript</string>
-    <string name="first_run_improve">Improve after recording</string>
+    <string name="first_run_improve">Transcribe after recording</string>
     <string name="first_run_voices">Telling voices apart</string>
     <string name="first_run_turns">Who speaks when</string>
     <string name="first_run_pass">Speakers after recording</string>
@@ -548,7 +548,7 @@
     <string name="settings_stop_twice_on">On: Stop asks for a second tap before it ends a moment, in the app and on the Record tile in Quick Settings.</string>
     <string name="settings_stop_twice_off">Off: one tap on Stop ends the moment, in the app and on the Record tile.</string>
     <string name="settings_transcribe_when">Transcribe moments recorded with After</string>
-    <string name="settings_transcribe_when_note">“After” on the Record bar records without transcribing; the transcript is made then, with the language’s improve model.</string>
+    <string name="settings_transcribe_when_note">“After” on the Record bar records without transcribing; the transcript is made then, with the language’s after-recording model.</string>
     <string name="settings_transcribe_when_stop">Right after the moment ends</string>
     <string name="settings_transcribe_when_charging">When charging, with 30% battery or more</string>
     <string name="first_run_two_languages">%1$s and %2$s</string>
@@ -690,4 +690,18 @@
     <string name="server_lock_voice">Lock voice messages</string>
     <string name="server_lock_voice_note">The same for voice messages.</string>
     <string name="server_lock_labels_note">A label can be locked too: Needs fingerprint, in the label\'s edit dialog.</string>
+    <!-- Transcribe again (Nov 16, 2026). -->
+    <string name="review_improve_now_live">Now: written live by %1$s</string>
+    <string name="review_improve_now_again">Now: transcribed again by %1$s</string>
+    <string name="review_improve_length">%1$d min · %2$s</string>
+    <string name="review_strength_accurate">Most accurate, with punctuation · slower</string>
+    <string name="review_strength_fast">Fast, with punctuation</string>
+    <string name="review_strength_streaming">Fastest, close to the live text, no punctuation</string>
+    <string name="review_version_compare">Compare</string>
+    <string name="review_compare_title">Now and %1$s</string>
+    <string name="review_compare_counts">%1$d of %2$d lines differ</string>
+    <string name="review_compare_only_diff">Only lines that differ</string>
+    <string name="review_compare_use">Use this version</string>
+    <string name="review_compare_close">Close</string>
+    <string name="notebooks_versions">%1$d versions</string>
 </resources>

@@ -30,7 +30,7 @@
     <string name="lecture_model_npu">NPU</string>
     <string name="lecture_model_cpu">CPU</string>
     <string name="lecture_model_skipped_memory">אין מספיק זיכרון פנוי כרגע עבור %1$s; משתמש ב־%2$s. סגור אפליקציות אחרות ונסה שוב.</string>
-    <string name="lecture_model_skipped_improve">%2$s כותב את השורות בזמן אמת: %1$s לא נכנס בזיכרון הפנוי לצד ההקלטה. הרגע הזה ישופר כשתעצרו.</string>
+    <string name="lecture_model_skipped_improve">%2$s כותב את השורות בזמן אמת: %1$s לא נכנס בזיכרון הפנוי לצד ההקלטה. הרגע הזה יתומלל מחדש כשתעצרו.</string>
     <string name="lecture_model_npu_failed">CPU (בניית ה־NPU נכשלה)</string>
     <string name="lecture_speaker_pass_on_stop">אחרי עצירה: זיהוי דוברים, pyannote + %1$s</string>
     <string name="lecture_live_failed">התמלול החי נעצר (%1$s). ההקלטה וההערות ממשיכות.</string>
@@ -73,13 +73,13 @@
     <string name="review_move_line">מי אמר את השורה ב־%1$s?</string>
     <string name="start_lectures">רגעים</string>
     <string name="start_speakers_count">%1$d דוברים</string>
-    <string name="refining">משפר את התמלול…</string>
+    <string name="refining">מתמלל מחדש…</string>
     <string name="review_versions">גרסאות (%1$d)</string>
     <string name="review_version_now">עכשיו</string>
     <string name="review_version_lines">%1$d שורות · %2$d נערכו</string>
     <string name="review_versions_note">הקישו על גרסה כדי להחזיר אותה; התמלול הנוכחי נשמר כגרסה. ההערות נשארות כמו שהן.</string>
     <string name="review_version_live">חי · %1$s</string>
-    <string name="review_version_refined">שופר · %1$s</string>
+    <string name="review_version_refined">%1$s · %2$s</string>
     <!-- Notebooks -->
     <string name="notebooks_settings">הגדרות</string>
     <string name="notebooks_record">הקלטה</string>
@@ -95,8 +95,8 @@
     <string name="notebooks_hours">%1$d ש׳</string>
     <string name="notebooks_hours_minutes">%1$d ש׳ %2$d דק׳</string>
     <string name="notebooks_notes">%1$d הערות</string>
-    <string name="notebooks_refined">משופר</string>
-    <string name="notebooks_improving">משפר את התמלול · %1$d%%</string>
+    <string name="notebooks_refined">%1$s</string>
+    <string name="notebooks_improving">מתמלל מחדש · %1$d%%</string>
     <string name="notebooks_recording">מקליט · %1$s</string>
     <string name="notebooks_back_to_lecture">חזרה לרגע</string>
     <string name="notebooks_empty_title">הקלטת רגע</string>
@@ -119,7 +119,7 @@
     <string name="folder_failed">אי אפשר להשתמש בתיקייה הזו: %1$s</string>
     <!-- Settings › Models -->
     <string name="models_add_language">הוספת שפה</string>
-    <string name="models_after_only">לשיפור בלבד</string>
+    <string name="models_after_only">רק לאחרי ההקלטה</string>
     <string name="models_all_kinds">כל הסוגים</string>
     <string name="models_any_language">כל שפה</string>
     <string name="models_badge_live">חי ✓</string>
@@ -130,7 +130,7 @@
     <string name="models_speaker_tuning_fewer">פחות דוברים</string>
     <string name="models_speaker_tuning_more">יותר דוברים</string>
     <string name="models_speaker_tuning_reset">איפוס</string>
-    <string name="models_badge_refine">שיפור ✓</string>
+    <string name="models_badge_refine">אחר כך ✓</string>
     <string name="models_choose_size">גודל</string>
     <string name="models_confirm_nc">הרישיון של המודל מתיר רק שימוש אישי ולימודי. להוסיף בכל זאת?</string>
     <string name="models_confirm_nc_title">לא לשימוש מסחרי</string>
@@ -193,14 +193,14 @@
     <string name="settings_languages">שפות</string>
     <string name="settings_live_is">בזמן אמת: %1$s</string>
     <string name="settings_live_none">בזמן אמת: לא הורד מודל</string>
-    <string name="settings_improve_is">שיפור: %1$s</string>
-    <string name="settings_improve_none">שיפור: לא הורד מודל</string>
-    <string name="settings_after">אחרי רגע</string>
+    <string name="settings_improve_is">אחר כך: %1$s</string>
+    <string name="settings_improve_none">אחר כך: לא הורד מודל</string>
+    <string name="settings_after">אחרי ההקלטה</string>
     <string name="settings_find_speakers">זיהוי הדוברים שוב אחרי העצירה</string>
     <string name="settings_find_speakers_note">כבוי: הדוברים מזוהים בזמן ההקלטה. מופעל: זיהוי הדוברים גם מקבץ אותם מחדש אחרי העצירה, תוך דקה או שתיים.</string>
-    <string name="settings_auto_improve">שיפור אוטומטי</string>
-    <string name="settings_auto_improve_on">כל רגע מתומלל שוב עם מודל השיפור שלו אחרי שהוא נעצר, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, הרגע מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
-    <string name="settings_auto_improve_off">כבוי: אפשר לשפר כל רגע מהתפריט שלו, מתי שרוצים.</string>
+    <string name="settings_auto_improve">תמלול מחדש אוטומטי</string>
+    <string name="settings_auto_improve_on">רגע שתומלל בזמן אמת מתומלל מחדש עם מודל ה״אחר כך״ של השפה אחרי שהוא נעצר, בזמן שהטלפון בטעינה. אם הוא לא בטעינה, הרגע מחכה עד שהאפליקציה פתוחה בזמן טעינה.</string>
+    <string name="settings_auto_improve_off">כבוי: אפשר לתמלל רגע מחדש מהתפריט שלו, מתי שרוצים.</string>
     <string name="settings_storage">הקלטות</string>
     <string name="settings_manage">ניהול מודלים</string>
     <string name="settings_manage_note">הורדה, מחיקה, חיפוש ב-Hugging Face</string>
@@ -217,14 +217,14 @@
     <string name="models_speaker_search_note">מודלי דוברים שיוצאו ל-sherpa-onnx; כל קובץ הוא מודל אחד.</string>
     <string name="settings_live_title">תמלול בזמן אמת</string>
     <string name="settings_live_note">כותב את השורות במהלך הרגע.</string>
-    <string name="settings_improve_title">שיפור התמלול</string>
-    <string name="settings_improve_note">מתמלל רגע שוב אחריו, ידנית מהתפריט שלו או אוטומטית. אפשר לבחור מודל אחר לרגע אחד.</string>
+    <string name="settings_improve_title">אחרי ההקלטה</string>
+    <string name="settings_improve_note">המודל שכותב רגעים שהוקלטו עם ״אחר כך״, מתמלל מחדש אוטומטית, ונבחר ראשון ב״תמלול מחדש״ של רגע. Whisper כותב פיסוק והוא המדויק ביותר; Zipformer מהיר וקרוב לטקסט החי.</string>
     <string name="settings_more">חיפוש מודלים נוספים ל%1$s</string>
     <string name="settings_streaming">מילים תוך כדי דיבור</string>
     <!-- The lecture: improving its transcription. -->
-    <string name="review_improve">שיפור התמלול…</string>
-    <string name="review_improving">משפר את התמלול · %1$d%%</string>
-    <string name="review_improve_title">שיפור התמלול</string>
+    <string name="review_improve">תמלול מחדש…</string>
+    <string name="review_improving">מתמלל מחדש · %1$d%%</string>
+    <string name="review_improve_title">תמלול עם</string>
     <string name="review_improve_about">%1$d דק׳ · %2$s · עכשיו: %3$s</string>
     <string name="review_no_model">עוד לא הורד מודל ל%1$s.</string>
     <string name="review_get_model">הורדת %1$s · %2$s</string>
@@ -233,9 +233,9 @@
     <string name="review_npu">NPU</string>
     <string name="review_cpu">CPU</string>
     <string name="review_speakers_first">קודם לזהות את הדוברים</string>
-    <string name="review_speakers_first_note">השיפור מוחק את זמני המילים שזיהוי הדוברים צריך.</string>
-    <string name="review_kept">שורות שערכת נשארות. התמלול הנוכחי נשמר, תחת גרסאות.</string>
-    <string name="review_improve_button">שיפור</string>
+    <string name="review_speakers_first_note">תמלול מחדש מוחק את זמני המילים שמציאת הדוברים צריכה.</string>
+    <string name="review_kept">שורות שערכת נשארות. התמלול הנוכחי נשמר תחת גרסאות, כך שאפשר לחזור אליו או להשוות.</string>
+    <string name="review_improve_button">תמלול</string>
 
     <string name="review_tune_speakers">כיוונון הדוברים לפי הרגע הזה (%1$d תיקונים)</string>
     <string name="review_tune_title">כיוונון לפי הרגע הזה</string>
@@ -316,7 +316,7 @@
     <string name="models_delete_title">למחוק את ההורדה של %1$s?</string>
     <string name="models_delete_text">הקבצים שלו יימחקו מהטלפון. הוא יישאר ברשימה ואפשר להוריד אותו שוב.</string>
     <string name="models_removal_chosen">הוא נבחר כעת: במקומו תשמש ברירת המחדל.</string>
-    <string name="models_removal_busy">ייתכן שהוא בשימוש: קודם צריך לעצור את ההקלטה או את השיפור.</string>
+    <string name="models_removal_busy">ייתכן שהוא בשימוש: עצרו קודם הקלטה או תמלול.</string>
     <!-- Settings › Recording format, and its AAC and FLAC pages. -->
     <string name="rec_format_aac_short">מאבד מעט מהצליל וקטן, הכי חסכוני בסוללה: במקודד החומרה של הטלפון כשיש לו.</string>
     <string name="rec_format_bitrate">קצב סיביות</string>
@@ -430,9 +430,9 @@
     </plurals>
     <string name="review_share">שיתוף</string>
     <string name="review_share_text">שיתוף כטקסט</string>
-    <string name="review_draft">טיוטה חיה. המודל הטוב יותר עוד לא כתב אותה.</string>
-    <string name="review_draft_improve">שיפור</string>
-    <string name="review_draft_improve_minutes">שיפור · כ־%1$d דק׳</string>
+    <string name="review_draft">נכתב בזמן אמת. אפשר לתמלל אותו מחדש עם מודל אחר.</string>
+    <string name="review_draft_improve">תמלול מחדש</string>
+    <string name="review_draft_improve_minutes">תמלול מחדש · כ־%1$d דק׳</string>
     <string name="notebooks_search">חיפוש</string>
     <string name="notebooks_search_close">לסגור את החיפוש</string>
     <string name="notebooks_search_clear">לנקות</string>
@@ -465,7 +465,7 @@
     <string name="first_run_title">הורדת המודלים</string>
     <string name="first_run_body">יומן קול מתמלל בטלפון, בלי לשלוח דבר לשום מקום. אלה המודלים שהוא משתמש בהם ל%1$s. הם יורדים ב־Wi-Fi.</string>
     <string name="first_run_live">תמלול חי</string>
-    <string name="first_run_improve">שיפור אחרי ההקלטה</string>
+    <string name="first_run_improve">תמלול אחרי ההקלטה</string>
     <string name="first_run_voices">הבחנה בין קולות</string>
     <string name="first_run_turns">מי מדבר מתי</string>
     <string name="first_run_pass">דוברים אחרי ההקלטה</string>
@@ -554,7 +554,7 @@
     <string name="settings_stop_twice_on">פעיל: סיום מבקש הקשה נוספת לפני שהוא מסיים רגע, באפליקציה ובאריח ההקלטה בהגדרות המהירות.</string>
     <string name="settings_stop_twice_off">כבוי: הקשה אחת על סיום מסיימת את הרגע, באפליקציה ובאריח ההקלטה.</string>
     <string name="settings_transcribe_when">תמלול רגעים שהוקלטו עם ״אחר כך״</string>
-    <string name="settings_transcribe_when_note">״אחר כך״ בסרגל ההקלטה מקליט בלי לתמלל. התמליל נעשה אז, עם מודל השיפור של השפה.</string>
+    <string name="settings_transcribe_when_note">״אחר כך״ בסרגל ההקלטה מקליט בלי לתמלל. התמליל נעשה אז, עם מודל ה״אחר כך״ של השפה.</string>
     <string name="settings_transcribe_when_stop">מיד כשהרגע נגמר</string>
     <string name="settings_transcribe_when_charging">בזמן טעינה, עם 30% סוללה ומעלה</string>
     <string name="first_run_two_languages">%1$s ול%2$s</string>
@@ -701,4 +701,18 @@
     <string name="server_lock_voice">נעילת הודעות קוליות</string>
     <string name="server_lock_voice_note">אותו הדבר להודעות קוליות.</string>
     <string name="server_lock_labels_note">אפשר לנעול גם תווית: "דורש טביעת אצבע", בחלון עריכת התווית.</string>
+    <!-- Transcribe again (Nov 16, 2026). -->
+    <string name="review_improve_now_live">עכשיו: נכתב בזמן אמת על ידי %1$s</string>
+    <string name="review_improve_now_again">עכשיו: תומלל מחדש על ידי %1$s</string>
+    <string name="review_improve_length">%1$d דק׳ · %2$s</string>
+    <string name="review_strength_accurate">המדויק ביותר, עם פיסוק · איטי יותר</string>
+    <string name="review_strength_fast">מהיר, עם פיסוק</string>
+    <string name="review_strength_streaming">הכי מהיר, קרוב לטקסט החי, בלי פיסוק</string>
+    <string name="review_version_compare">השוואה</string>
+    <string name="review_compare_title">עכשיו מול %1$s</string>
+    <string name="review_compare_counts">%1$d מתוך %2$d שורות שונות</string>
+    <string name="review_compare_only_diff">רק שורות שונות</string>
+    <string name="review_compare_use">להשתמש בגרסה הזו</string>
+    <string name="review_compare_close">סגירה</string>
+    <string name="notebooks_versions">%1$d גרסאות</string>
 </resources>
