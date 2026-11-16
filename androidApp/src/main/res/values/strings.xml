@@ -660,6 +660,7 @@
     <string name="bring_failed">Couldn\'t bring the recording: %1$s</string>
     <string name="bring_not_on_server">the server doesn\'t have it</string>
     <string name="notebooks_on_server">On the server</string>
+    <string name="notebooks_not_on_server">Not on the server yet</string>
     <string name="notebooks_source_call">Call</string>
     <string name="notebooks_source_voice_message">Voice message</string>
     <string name="notebooks_locked">Locked</string>

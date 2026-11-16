@@ -32,7 +32,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
@@ -654,11 +654,12 @@ private fun MomentRow(
             "folder:whatsapp", "whatsapp" -> stringResource(R.string.notebooks_source_voice_message)
             else -> null
         }
-        if (m.tucked || m.locked || m.audioOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (m.tucked || m.locked || m.notOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (m.tucked) MomentMark(Icons.Filled.VisibilityOff, stringResource(R.string.notebooks_tucked))
             if (m.locked) MomentMark(Icons.Filled.Lock, stringResource(R.string.notebooks_locked))
             if (source != null) MomentMark(if (m.source.equals("call", true)) Icons.Filled.Call else Icons.Filled.Mic, source)
-            if (m.audioOnServer) MomentMark(Icons.Filled.Cloud, stringResource(R.string.notebooks_on_server))
+            // Only on the phone while a server is paired (not backed up yet); nothing for what the server holds.
+            if (m.notOnServer) MomentMark(Icons.Filled.CloudOff, stringResource(R.string.notebooks_not_on_server))
         }
         Text(l.title, style = MaterialTheme.typography.bodyLarge.copy(textDirection = titleDirection(m.language)), maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Who was in it, and how it started: what tells one dated moment from the next.

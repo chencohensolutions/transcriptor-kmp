@@ -782,7 +782,10 @@ object Recording {
         // Notebooks became labels: the app's own storage moves now (quick: one folder rename per moment); the
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
-        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks, callsLabel = { app.getString(R.string.label_calls) })
+        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks, callsLabel = { app.getString(R.string.label_calls) },
+            onServer = { if (backup.state.value.paired == null) null else { id -> backup.stateOf(id) is com.chencohensolution.transcriptor.backup.MomentBackup.BackedUp } })
+        // A backup done, or the pairing changed: the marks again.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { backup.state.collect { runCatching { library.locksChanged() } } }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             backup.serverMoments.window.collect { runCatching { showServerMoments(it) } }
         }

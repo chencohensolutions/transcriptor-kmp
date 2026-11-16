@@ -149,6 +149,8 @@ class NotebooksController(
     private val locks: () -> Locks = { Locks() },
     /** The Calls label's name in the phone's language ([CALLS_LABEL]); null: calls get no label. */
     private val callsLabel: () -> String? = { null },
+    /** Whether a moment is backed up on the server; null while the phone isn't paired with one (then no mark at all). */
+    private val onServer: () -> ((String) -> Boolean)? = { null },
 ) {
     private val _library = MutableStateFlow(Library())
     val library: StateFlow<Library> = _library.asStateFlow()
@@ -185,6 +187,7 @@ class NotebooksController(
             known = labels.all()
         }
         val ids = known.map { it.id }.toSet()
+        val backedUp = onServer()
         val lockedLabels = known.filter { it.locked }.map { it.id }.toSet()
         val lock = locks()
         fun locked(s: LectureSummary) = s.labels.any { it in lockedLabels } ||
@@ -193,7 +196,8 @@ class NotebooksController(
         val oldest = server.moments.lastOrNull()?.startedAtMillis.takeIf { server.older }
         val here = local.filter { (newest == null || it.startedAtMillis <= newest) && (oldest == null || it.startedAtMillis >= oldest) }
         val hereIds = here.map { it.id }.toSet()
-        val moments = (here + server.moments.filter { it.id !in hereIds }).sortedByDescending { it.startedAtMillis }
+        val mine = if (backedUp == null) here else here.map { it.copy(notOnServer = !it.audioOnServer && it.source == null && !backedUp(it.id)) }
+        val moments = (mine + server.moments.filter { it.id !in hereIds }).sortedByDescending { it.startedAtMillis }
         _library.value = Library(
             labels = known,
             moments = moments.map { s ->
@@ -221,7 +225,7 @@ class NotebooksController(
         reload()
     }
 
-    /** The locks changed in Settings: the list again. */
+    /** The locks changed in Settings, or what is backed up: the list again. */
     fun locksChanged() = compose()
 
     /** Tucks [lectureIds] away, or brings them back, skipping the [busy] ones; returns the ids changed. */

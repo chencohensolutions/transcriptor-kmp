@@ -671,6 +671,7 @@
     <string name="bring_failed">לא ניתן להביא את ההקלטה: %1$s</string>
     <string name="bring_not_on_server">היא לא נמצאת בשרת</string>
     <string name="notebooks_on_server">בשרת</string>
+    <string name="notebooks_not_on_server">עדיין לא בשרת</string>
     <string name="notebooks_source_call">שיחה</string>
     <string name="notebooks_source_voice_message">הודעה קולית</string>
     <string name="notebooks_locked">נעול</string>

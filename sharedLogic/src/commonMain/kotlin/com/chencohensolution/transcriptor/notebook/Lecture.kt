@@ -37,6 +37,8 @@ data class LectureSummary(
     val source: String? = null,
     /** Its audio is on the server only (freed from the phone, or never brought here): it plays as it streams. */
     val audioOnServer: Boolean = false,
+    /** The phone is paired with a server and this moment isn't backed up there yet (only here). */
+    val notOnServer: Boolean = false,
     /** Behind the phone's lock: a locked label's, or a call or voice message while those are locked ([Locks]). */
     val locked: Boolean = false,
 )

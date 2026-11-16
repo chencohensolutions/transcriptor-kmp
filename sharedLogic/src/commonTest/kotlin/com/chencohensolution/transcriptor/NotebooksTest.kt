@@ -113,6 +113,19 @@ class NotebooksTest {
     }
 
     @Test
+    fun withAServerTheMomentsOnlyHereAreMarkedAndNothingElse() {
+        lectures.save(lecture("here", 1_000))
+        lectures.save(lecture("backed", 2_000))
+        var paired = false
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, onServer = { if (paired) { id -> id == "backed" } else null })
+        controller.reload()
+        assertEquals(mapOf("here" to false, "backed" to false), controller.library.value.moments.associate { it.id to it.notOnServer })
+        paired = true
+        controller.setServer(ServerPart(listOf(lecture("s", 3_000).summary())))
+        assertEquals(mapOf("here" to true, "backed" to false, "s" to false), controller.library.value.moments.associate { it.id to it.notOnServer })
+    }
+
+    @Test
     fun theListReadsTheIndexAndTheFoldersOnlyWhenAskedAgain() {
         lectures.save(lecture("a", 1_000).copy(title = "First", serverSha256 = "s".repeat(64)))
         val controller = NotebooksController(labels, lectures, now = { 4_000 })
