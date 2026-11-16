@@ -659,6 +659,19 @@ object Recording {
 
     @Volatile private var lastServerSync = 0L
 
+    @Volatile private var indexChecked = false
+
+    /**
+     * Once a start, after the list showed from the index: the index made again from every moment's folder (slow in the
+     * lectures folder), so what changed outside the app shows too. Files: not on the main thread.
+     */
+    fun checkIndexOnce() {
+        if (indexChecked) return
+        indexChecked = true
+        runCatching { store.rescan() }.onFailure { android.util.Log.w("Recording", "reading the moments again", it) }
+        library.reload()
+    }
+
     /** The server's recordings, the labels and the moments' words brought up to date now (after Calls was switched, or Back up now). */
     suspend fun refreshServerMoments() = syncWithServer()
 

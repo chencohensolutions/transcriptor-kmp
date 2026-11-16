@@ -121,6 +121,32 @@ private data class BackupFileV1(
     val labelsBase: List<ServerLabel>? = null,
 )
 
+/** `server-page.json`: the server's newest page of recordings, shown at once on the next start (version 1). */
+@Serializable
+private data class KeptPageV1(val v: Int = 1, val files: List<KeptFileV1> = emptyList(), val older: String? = null) {
+    fun toPage() = com.chencohensolution.shed.FilePage(files.map { it.toFile() }, older, null)
+
+    companion object {
+        fun of(page: com.chencohensolution.shed.FilePage) = KeptPageV1(files = page.files.map(KeptFileV1::of), older = page.older)
+    }
+}
+
+@Serializable
+private data class KeptFileV1(
+    val sha256: String,
+    val size: Long,
+    val about: com.chencohensolution.shed.FileAbout,
+    val storedAt: String? = null,
+    val tucked: Boolean = false,
+    val note: String? = null,
+) {
+    fun toFile() = com.chencohensolution.shed.RemoteFile(sha256, size, about, storedAt, tucked, note)
+
+    companion object {
+        fun of(f: com.chencohensolution.shed.RemoteFile) = KeptFileV1(f.sha256, f.size, f.about, f.storedAt, f.tucked, f.note)
+    }
+}
+
 @Serializable
 private data class HandedOver(
     val sha256: String,
@@ -178,11 +204,34 @@ class ServerBackup(
         Located(store.fileSystemOf(id), store.audioPath(lecture))
     }
 
+    private val pageFile = root / "server-page.json"
+
     /**
      * The server's recordings that the moments list holds now, read a page at a time as the user scrolls: those that
      * are moments here already are left out by the list ([isMomentHere]).
      */
-    val serverMoments = ServerMoments({ before, after, limit -> shed.page(FileKind.AUDIO, before, after, limit) })
+    val serverMoments = ServerMoments(
+        { before, after, limit -> shed.page(FileKind.AUDIO, before, after, limit) },
+        kept = keptPage(),
+        keep = ::keepPage,
+    )
+
+    /** The server's newest page as kept last time ([ServerMoments]); null when none or it can't be read. */
+    private fun keptPage(): com.chencohensolution.shed.FilePage? = runCatching {
+        if (!fileSystem.exists(pageFile)) return null
+        json.decodeFromString<KeptPageV1>(fileSystem.read(pageFile) { readUtf8() }).toPage()
+    }.getOrNull()
+
+    private fun keepPage(page: com.chencohensolution.shed.FilePage?) {
+        if (page == null) {
+            fileSystem.delete(pageFile, mustExist = false)
+            return
+        }
+        fileSystem.createDirectories(pageFile.parent!!)
+        val temp = pageFile.parent!! / "server-page.json.tmp"
+        fileSystem.write(temp) { writeUtf8(Json.encodeToString(KeptPageV1.of(page))) }
+        fileSystem.atomicMove(temp, pageFile)
+    }
 
     /** Whether the server's recording [sha256] is a moment here already (handed over from here, or opened). */
     fun isMomentHere(sha256: String): Boolean = sha256 in momentShas
@@ -237,8 +286,12 @@ class ServerBackup(
     suspend fun backUpFinished(busy: Set<String>): Int {
         if (journal.state.value !is JournalState.Paired) return 0
         var handed = 0
-        for (lecture in store.all()) {
-            if (lecture.id in busy || lecture.pendingEncode) continue
+        // By the index first: only the moments that may need handing over are read.
+        for (entry in store.index()) {
+            if (entry.id in busy || entry.pendingEncode || !entry.hasAudio) continue
+            if (kept.moments[entry.id]?.audioFile == entry.audioFile) continue
+            val lecture = store.load(entry.id) ?: continue
+            if (lecture.pendingEncode) continue
             if (kept.moments[lecture.id]?.audioFile == lecture.audioFile) continue
             val fs = store.fileSystemOf(lecture.id)
             val audio = store.audioPath(lecture)
@@ -415,7 +468,7 @@ class ServerBackup(
      * server and plays from there ([openAudio]). The moment it already is, when it is one.
      */
     suspend fun momentHere(file: RemoteFile, defaultLanguage: String): Lecture {
-        store.all().firstOrNull { it.serverSha256 == file.sha256 }?.let { return it }
+        store.idOfServerSha(file.sha256)?.let(store::load)?.let { return it }
         val lecture = momentOf(file, defaultLanguage)
         store.load(lecture.id)?.let { return it }
         store.save(lecture)
@@ -527,6 +580,7 @@ class ServerBackup(
         fs.createDirectories(to.parent!!)
         fileSystem.source(fetched).use { from -> fs.sink(temp).buffer().use { it.writeAll(from) } }
         fs.atomicMove(temp, to)
+        store.audioChanged(lectureId)
         return true
     }
 

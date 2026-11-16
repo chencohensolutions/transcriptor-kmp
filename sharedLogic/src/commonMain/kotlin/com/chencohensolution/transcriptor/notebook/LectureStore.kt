@@ -8,6 +8,8 @@ import kotlinx.serialization.json.Json
 import com.chencohensolution.transcriptor.speech.LiveStretch
 import com.chencohensolution.transcriptor.recording.PowerReport
 import com.chencohensolution.transcriptor.recording.PowerLogCsv
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import okio.FileSystem
 import okio.Path
 import kotlin.time.ExperimentalTime
@@ -28,6 +30,78 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     /** The lectures folder outside the app, once the user picked one; finished lectures move there ([archive]). */
     var library: Place? = null
+        set(value) {
+            field = value
+            // Moments may be there that the index doesn't know: read from the folders again when next asked.
+            synchronized(indexLock) { indexed = null }
+        }
+
+    // The index ([IndexedMoment]): in memory, kept in `moments-index.json` here when [saveIndex] is called.
+    private val indexLock = SynchronizedObject()
+    private var indexed: Map<String, IndexedMoment>? = null
+    private var indexDirty = false
+    private val indexFile: Path get() = local.root / INDEX_FILE
+
+    /**
+     * Every moment as the index has it, without reading their folders: from memory, else `moments-index.json`, else
+     * (the first time, or after [library] changed) from the folders ([rescan]). Files: not on the main thread.
+     */
+    fun index(): List<IndexedMoment> {
+        synchronized(indexLock) { indexed }?.let { return it.values.toList() }
+        val kept = runCatching {
+            if (!local.exists(indexFile)) null
+            else json.decodeFromString<MomentIndexFileV1>(local.fileSystem.read(indexFile) { readUtf8() }).moments
+        }.getOrNull()
+        if (kept == null || library != null && !libraryIndexed) return rescan()
+        synchronized(indexLock) { if (indexed == null) indexed = kept.associateBy { it.id } }
+        return kept
+    }
+
+    // The kept index was made with a library: read once the app set it (each start reads the folders again anyway).
+    private var libraryIndexed = false
+
+    /** The index made again from every moment's folder, and kept. Reads them all: not on the main thread. */
+    fun rescan(): List<IndexedMoment> {
+        val all = all().map { it.indexed(hasAudio(it)) }
+        synchronized(indexLock) {
+            indexed = all.associateBy { it.id }
+            indexDirty = true
+            libraryIndexed = library != null
+        }
+        saveIndex()
+        return all
+    }
+
+    /** The moment that holds the server's recording [sha256], by the index. */
+    fun idOfServerSha(sha256: String): String? = index().firstOrNull { it.serverSha256 == sha256 }?.id
+
+    /** Writes the index to `moments-index.json` when it changed since (a temp file, then renamed). */
+    fun saveIndex() {
+        val moments = synchronized(indexLock) {
+            if (!indexDirty) return
+            indexDirty = false
+            indexed?.values?.toList()
+        } ?: return
+        runCatching {
+            local.fileSystem.createDirectories(local.root)
+            val temp = local.root / "$INDEX_FILE.tmp"
+            local.fileSystem.write(temp) { writeUtf8(json.encodeToString(MomentIndexFileV1(moments = moments))) }
+            local.fileSystem.atomicMove(temp, indexFile)
+        }
+    }
+
+    /** The index learns [lecture] as it is now (null: [id] is gone). */
+    private fun indexNow(id: String, lecture: Lecture?) {
+        val entry = lecture?.indexed(hasAudio(lecture))
+        synchronized(indexLock) {
+            val now = indexed ?: return
+            indexed = if (entry == null) now - id else now + (id to entry)
+            indexDirty = true
+        }
+    }
+
+    /** The moment's audio arrived or left outside [save] (brought from the server): the index learns it. */
+    fun audioChanged(lectureId: String) = indexNow(lectureId, load(lectureId))
 
     /** Where a lecture is: here, or in the library; a new one is here. */
     private fun placeOf(lectureId: String): Place {
@@ -57,6 +131,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val transcript = folder / "transcript.md.tmp"
         fs.write(transcript) { writeUtf8(transcriptMarkdown(lecture, utcOffset(lecture.startedAtMillis))) }
         fs.atomicMove(transcript, folder / TRANSCRIPT)
+        indexNow(lecture.id, lecture)
     }
 
     /** Tucks the moment away, or brings it back, and returns it. Not while it is being recorded or a pass runs on it. */
@@ -79,6 +154,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     /** Deletes the moment's audio from the phone, keeping the rest (Free up space, once the server holds it). */
     fun deleteAudio(lecture: Lecture) {
         fileSystemOf(lecture.id).delete(audioPath(lecture), mustExist = false)
+        indexNow(lecture.id, load(lecture.id))
     }
 
     /** Gives the moment these labels (ids), and returns it. Not while it is being recorded or a pass runs on it. */
@@ -111,6 +187,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val folder = place.folder(lectureId)
         if (!place.exists(folder)) return false
         place.fileSystem.deleteRecursively(folder)
+        indexNow(lectureId, null)
         return true
     }
 
@@ -284,6 +361,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     /** The lectures still in the app's own storage. */
     fun localLectures(): List<Lecture> = local.folders(local.moments).mapNotNull { runCatching { read(local, it.name) }.getOrNull() }
 }
+
+/** The index of the moments ([IndexedMoment]), in the app's own storage. */
+const val INDEX_FILE = "moments-index.json"
 
 /** The readable transcript beside the audio. */
 const val TRANSCRIPT = "transcript.md"

@@ -3,6 +3,7 @@ package com.chencohensolution.transcriptor
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
 import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
+import com.chencohensolution.transcriptor.notebook.INDEX_FILE
 import com.chencohensolution.transcriptor.notebook.ServerPart
 import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Label
@@ -109,6 +110,29 @@ class NotebooksTest {
         // A server's call gets it too.
         controller.setServer(ServerPart(listOf(lecture("s", 3_000).copy(source = "call").summary())))
         assertEquals(listOf(CALLS_LABEL), controller.library.value.moments.first { it.id == "s" }.labels)
+    }
+
+    @Test
+    fun theListReadsTheIndexAndTheFoldersOnlyWhenAskedAgain() {
+        lectures.save(lecture("a", 1_000).copy(title = "First", serverSha256 = "s".repeat(64)))
+        val controller = NotebooksController(labels, lectures, now = { 4_000 })
+        controller.reload()
+        assertTrue(fs.exists(root / INDEX_FILE))
+        assertEquals(listOf("First"), controller.library.value.moments.map { it.title })
+        assertEquals("a", lectures.idOfServerSha("s".repeat(64)))
+        // Another store (the next start) reads the kept index, not the folders: a folder changed outside the app
+        // shows once they are read again.
+        val next = LectureStore(fs, root, israel)
+        val file = root / "moments" / "a" / "lecture.json"
+        val renamed = fs.read(file) { readUtf8() }.replace("First", "Renamed")
+        fs.write(file) { writeUtf8(renamed) }
+        assertEquals(listOf("First"), next.index().map { it.title })
+        assertEquals(listOf("Renamed"), next.rescan().map { it.title })
+        // Saves and deletes reach it at once.
+        next.save(lecture("b", 2_000).copy(title = "Second"))
+        assertEquals(setOf("a", "b"), next.index().map { it.id }.toSet())
+        next.delete("a")
+        assertEquals(listOf("b"), next.index().map { it.id })
     }
 
     @Test

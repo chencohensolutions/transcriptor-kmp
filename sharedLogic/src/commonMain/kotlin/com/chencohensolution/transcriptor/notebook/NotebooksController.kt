@@ -152,11 +152,13 @@ class NotebooksController(
     val library: StateFlow<Library> = _library.asStateFlow()
 
     fun reload() {
-        val all = lectures.all().sortedByDescending { it.startedAtMillis }
-        local = all.map { it.summary().copy(audioOnServer = it.serverSha256 != null && !lectures.hasAudio(it)) }
+        // The index, not every moment's folder (hundreds of files in the lectures folder).
+        val all = lectures.index().sortedByDescending { it.startedAtMillis }
+        local = all.map { it.summary().copy(audioOnServer = it.serverSha256 != null && !it.hasAudio) }
         localLanguage = all.firstOrNull()?.language
         known = labels.all()
         compose()
+        lectures.saveIndex()
     }
 
     private var local: List<LectureSummary> = emptyList()

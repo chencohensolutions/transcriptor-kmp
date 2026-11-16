@@ -38,6 +38,9 @@ The code still calls it `NotebooksScreen`.
   call is listed, id `calls`, never written into the moment): its Needs fingerprint is Settings' Lock calls. Opening a
   moment only on the server dims the list under a spinner until its screen opens (tried again for a few seconds), and
   its Play button spins while the first blocks come. Back from a moment or Settings finds the list where it was.
+  The list reads the moments' index (`moments-index.json` in the app's storage, `LectureStore.index`), not every
+  moment's folder; the folders are read again once each start (`rescan`). The server's newest page is kept
+  (`server-page.json`) and shown at once on the next start, before the server answers.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

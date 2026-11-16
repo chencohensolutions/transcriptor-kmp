@@ -183,6 +183,28 @@ class ServerBackupTest {
     }
 
     @Test
+    fun theNewestPageIsKeptAndShownAtOnceOnTheNextStart() = runTest {
+        fun file(i: Int) = RemoteFile(i.toString().padStart(64, '0'), 1, FileAbout("$i.m4a", "audio/mp4", FileKind.AUDIO))
+        var all = (9 downTo 0).map(::file)
+        var kept: FilePage? = null
+        val first = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, keep = { kept = it })
+        first.refresh()
+        first.older()
+        assertEquals((9 downTo 5).toList(), kept!!.files.map { it.about.fileName.substringBefore('.').toInt() }, "only the newest page")
+        // The next start: shown before the server answers, then brought up to date.
+        all = listOf(file(10)) + all
+        val next = ServerMoments({ before, after, limit -> pageOf(all, before, after, limit) }, pageSize = 5, kept = kept, keep = { kept = it })
+        assertEquals((9 downTo 5).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
+        assertTrue(next.window.value.older)
+        next.refresh()
+        assertEquals((10 downTo 5).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
+        next.older()
+        assertEquals((10 downTo 0).toList(), next.window.value.files.map { it.about.fileName.substringBefore('.').toInt() })
+        next.clear()
+        assertEquals(null, kept)
+    }
+
+    @Test
     fun labelsMergeWithTheServersOwnCopy() {
         val a = Label("a", "Psychology", 0)
         val b = Label("b", "Exam", 1)

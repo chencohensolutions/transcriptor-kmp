@@ -31,11 +31,19 @@ class ServerMoments(
     private val page: suspend (before: String?, after: String?, limit: Int) -> FilePage,
     private val pageSize: Int = 50,
     private val maxPages: Int = 6,
+    /**
+     * The newest page as it was kept last time: shown at once when the app opens, before the server answers (the list
+     * doesn't wait for the network); [refresh] then brings it up to date.
+     */
+    kept: FilePage? = null,
+    /** Keeps the newest page each time it changes (null: none, after unpairing), for the next start. */
+    private val keep: (FilePage?) -> Unit = {},
 ) {
     private val mutex = Mutex()
-    private val pages = ArrayDeque<FilePage>()
-    private val _window = MutableStateFlow(ServerWindow())
+    private val pages = ArrayDeque<FilePage>().apply { kept?.let { addLast(it.copy(newer = null)) } }
+    private val _window = MutableStateFlow(ServerWindow(files = kept?.files.orEmpty(), older = kept?.older != null))
     val window: StateFlow<ServerWindow> = _window.asStateFlow()
+    private var keptFirst: FilePage? = kept
 
     /**
      * Brings the window up to date: while it holds the newest recordings, the newest page is read again and put in
@@ -96,6 +104,8 @@ class ServerMoments(
     suspend fun clear() = mutex.withLock {
         pages.clear()
         _window.value = ServerWindow()
+        keptFirst = null
+        runCatching { keep(null) }
     }
 
     /** The recording [sha256] when the window holds it. */
@@ -113,6 +123,11 @@ class ServerMoments(
                 throw e
             } catch (e: Exception) {
                 e.message ?: e.toString()
+            }
+            // The newest page, kept for the next start when it changed.
+            pages.firstOrNull()?.takeIf { it.newer == null && it != keptFirst }?.let { first ->
+                keptFirst = first
+                runCatching { keep(first) }
             }
             val files = pages.flatMap { it.files }.distinctBy { it.sha256 }
             _window.value = ServerWindow(

@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
                     withContext(Dispatchers.IO) {
                         Recording.migrateLibrary()
                         Recording.library.reload()
+                        Recording.checkIndexOnce()
                         Recording.backUp(this@MainActivity)
                         runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
                     }
