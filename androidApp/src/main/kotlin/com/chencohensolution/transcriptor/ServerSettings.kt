@@ -114,7 +114,8 @@ fun ServerSettings(onBack: () -> Unit) {
                     if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context)
                 }
             },
-            backUpNow = { scope.launch(Dispatchers.IO) { Recording.backUp(context); Recording.refreshServerMoments() } },
+            backUpNow = { Recording.uploadNow(context) },
+            onMeteredNetwork = { Recording.onMeteredNetwork(context) },
             setShowServer = { on -> scope.launch(Dispatchers.IO) { Recording.backup.setShowServer(on) } },
             setShown = { shown ->
                 scope.launch(Dispatchers.IO) {

@@ -20,8 +20,14 @@ without a server.
   who the code is for without using it: "For hen on home.example:56398") and **Pair**. Errors in plain words: not an
   enrollment link, a wrong, expired or used code, too many tries, the server didn't answer.
 - **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands ("3 moments waiting · 120 MB left ·
-  12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"); the server didn't
-  answer (trying again later) or no longer accepts this phone; moments the server refused, by title; **Back up now**;
+  12 on the server", "Every finished moment is on the server (15)", "No moment backed up yet"), counting the calls
+  waiting too ("2 moments and 64 calls waiting · …", "Every finished moment is on the server (917). 64 calls waiting ·
+  …"; before Nov 16, 2026 it said every moment was there while calls waited); "Sending now…" with a bar while a send
+  runs; the server didn't answer (trying again later) or no longer accepts this phone; moments the server refused, by
+  title; **Back up now**, or **Upload now** while something waits (also **Upload calls now** under Calls backup while
+  calls wait): it sends the queue in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
+  the background work, which may be waiting out a retry or for Wi‑Fi; with Wi‑Fi only on and the phone on mobile data
+  it asks first, with how much would go;
   **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
   choice of this phone kept in `backup.json`; off, the moments list and search show only what was recorded in Audio
   Logs, nothing from the server or other phones, and backup goes on; Nov 16, 2026), then, while it is on, **Calls**

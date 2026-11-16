@@ -88,6 +88,10 @@ data class ServerState(
     /** Call recordings handed over, and those of them still waiting to be sent. */
     val callsHanded: Int = 0,
     val callsWaiting: Int = 0,
+    /** Bytes of the waiting calls not sent yet. */
+    val callsBytesLeft: Long = 0,
+    /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
+    val uploading: Boolean = false,
     /**
      * The moments list shows the server's recordings (owner's call, Nov 16, 2026); off, it shows only what Audio Logs
      * recorded on this phone. A choice of this phone only: backup goes on either way.
@@ -684,9 +688,17 @@ class ServerBackup(
     }
 
     /** One pass of shed's queue, from the app's background work. */
-    suspend fun runUploads(): RunResult = shed.runUploads().also { result ->
+    suspend fun runUploads(): RunResult {
+        uploading = true
+        refresh()
+        val result = try {
+            shed.runUploads()
+        } finally {
+            uploading = false
+        }
         refresh(lastRun = result)
         if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
+        return result
     }
 
     /** The server's recordings the list holds brought up to date (the newest page, while the list is at the top). */
@@ -718,6 +730,9 @@ class ServerBackup(
     }
 
     /** The state again from shed, the pairing and what was handed over. */
+    @kotlin.concurrent.Volatile
+    private var uploading = false
+
     fun refresh(lastRun: RunResult? = _state.value.lastRun) {
         if (!::shed.isInitialized) return
         val paired = journal.state.value as? JournalState.Paired
@@ -745,6 +760,8 @@ class ServerBackup(
             callsReadable = callsAt != null,
             callsHanded = kept.calls.size,
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
+            callsBytesLeft = shed.uploads.value.filter { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING }.sumOf { it.size - it.sent },
+            uploading = uploading,
             showServer = kept.showServer,
         )
     }
