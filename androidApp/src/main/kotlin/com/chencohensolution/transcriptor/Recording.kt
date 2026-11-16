@@ -808,6 +808,8 @@ object Recording {
         backup = ServerBackup(store, FileSystem.SYSTEM, root, utcOffset)
         shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator, listedKinds = setOf(com.chencohensolution.shed.FileKind.AUDIO))
         backup.attach(shed.shed, shed.journal)
+        // The resolver first: the calls folder is read through it.
+        resolver = app.contentResolver
         openCallsFolder()
         CallsWorker.schedule(app)
         settings = SettingsStore(FileSystem.SYSTEM, root)
