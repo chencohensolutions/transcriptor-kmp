@@ -76,6 +76,8 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 ./gradlew :sharedLogic:testAndroidHostTest          # shared tests on the JVM
 ./gradlew :androidApp:assembleDebug
 ./scripts/ui-lab.sh [screen] [option]               # UI lab on the phone, else the emulator
+./scripts/release.sh bump patch|minor|major        # version.properties: versionName and versionCode, committed
+./scripts/release.sh publish                         # on main: tag v<version>, build the release APK, GitHub release
 ```
 
 ## Gotchas

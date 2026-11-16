@@ -457,7 +457,7 @@
     <string name="settings_meters_section">While recording</string>
     <!-- First run: "Get your models" -->
     <string name="first_run_title">Get your models</string>
-    <string name="first_run_body">Audio Logs transcribes on your phone, with nothing sent anywhere. These are the models it uses for %1$s. They download over Wi-Fi.</string>
+    <string name="first_run_body">Audio Logs transcribes on your phone, with nothing sent anywhere. These are the models it uses for %1$s.</string>
     <string name="first_run_live">Live transcript</string>
     <string name="first_run_improve">Improve after recording</string>
     <string name="first_run_voices">Telling voices apart</string>
@@ -566,4 +566,6 @@
     <string name="glance_live_on">Transcribing live</string>
     <string name="glance_live_off">Live transcript off</string>
     <string name="info_live_off">Live transcript off</string>
+    <string name="models_wifi_only">Download models over Wi-Fi only</string>
+    <string name="models_wifi_only_note">Off: any network, mobile data too (they are large). Applies to downloads started from now on.</string>
 </resources>

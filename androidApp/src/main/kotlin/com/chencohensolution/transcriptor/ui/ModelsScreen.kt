@@ -161,6 +161,8 @@ data class ModelsState(
     /** The processor meters on the lecture screen while recording (Advanced). */
     val processorMeters: ProcessorMeterStyle = ProcessorMeterStyle.Off,
     val levelMeter: LevelMeterStyle = LevelMeterStyle.Bars,
+    /** Model downloads wait for Wi-Fi. */
+    val modelsOnWifiOnly: Boolean = false,
     /** The microphone picked to record from; null: the phone's own. */
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** The microphones connected now besides the phone's own. */
@@ -254,6 +256,7 @@ class ModelsActions(
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
     val setLevelMeter: (LevelMeterStyle) -> Unit = {},
+    val setModelsOnWifiOnly: (Boolean) -> Unit = {},
     val setMicInput: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
     val chooseFolder: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
@@ -472,6 +475,7 @@ private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeaker
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_library))
             NavRow(stringResource(R.string.settings_manage), stringResource(R.string.settings_manage_note), openCatalog)
+            SwitchRow(stringResource(R.string.models_wifi_only), stringResource(R.string.models_wifi_only_note), state.modelsOnWifiOnly, actions.setModelsOnWifiOnly)
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_meters_section))
             Column(Modifier.selectableGroup()) {

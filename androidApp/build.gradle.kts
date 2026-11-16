@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 import java.security.MessageDigest
 
 plugins {
@@ -93,6 +94,9 @@ dependencies {
     androidTestImplementation(libs.junit)
 }
 
+/** The app's version, kept in version.properties at the repository's root. */
+val appVersion = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
+
 android {
     namespace = "com.chencohensolution.transcriptor"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -101,8 +105,9 @@ android {
         applicationId = "com.chencohensolution.transcriptor"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        // From version.properties (scripts/release.sh bumps it).
+        versionCode = appVersion.getProperty("versionCode").toInt()
+        versionName = appVersion.getProperty("versionName")
         // whisper.cpp is built for 64-bit ARM only: every Android 15 phone, and the emulator on Apple silicon.
         ndk { abiFilters += "arm64-v8a" }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

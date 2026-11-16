@@ -89,6 +89,10 @@ class RecordingTest {
         // the moment, FLAC effort 8, a quiet notification.
         assertEquals(AudioFormat.WavThenAac, settings.audioFormat)
         assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
+        // Models download over any network unless Wi-Fi only is set (the owner's choice, Nov 16, 2026).
+        assertFalse(settings.modelsOnWifiOnly)
+        settings.modelsOnWifiOnly = true
+        assertTrue(SettingsStore(fs, root).modelsOnWifiOnly)
         assertTrue(settings.quietRecording)
         assertEquals(com.chencohensolution.transcriptor.settings.AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.Lc, 48_000, 2, 256, null), settings.aac)
         assertEquals(8, settings.flacLevel)
