@@ -643,6 +643,8 @@ object Recording {
      * on the main thread). Nothing happens while the app isn't paired with a server.
      */
     suspend fun backUp(context: android.content.Context) {
+        // What the background work sent while the app was closed, recorded and acknowledged.
+        runCatching { backup.recordUploads() }.onFailure { android.util.Log.e("Recording", "recording uploads failed", it) }
         runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
         if (backup.waiting() > 0) scheduleUploads(context)
         // The calls folder, in the app's own scope: the first time it hashes every call there.
@@ -765,6 +767,8 @@ object Recording {
             if (backup.syncLabels(labels, System.currentTimeMillis())) library.reload()
             backup.syncNotes(busy())
         }.onFailure { android.util.Log.w("Recording", "syncing with the server", it) }
+        // What was handed over before uploads were recorded: asked of the server once each.
+        runCatching { backup.confirmWithServer() }.onFailure { android.util.Log.w("Recording", "confirming uploads", it) }
         library.reload()
     }
 

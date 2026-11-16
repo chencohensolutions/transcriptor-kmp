@@ -51,6 +51,12 @@ sealed interface MomentBackup {
     /** On the server. */
     data object BackedUp : MomentBackup
 
+    /**
+     * Handed over before the app recorded uploads ([ServerBackup.confirmWithServer] asks the server): neither waiting
+     * nor known to be there.
+     */
+    data object Unconfirmed : MomentBackup
+
     /** The server won't take it, or its audio is gone from the phone. */
     data class Refused(val reason: String) : MomentBackup
 }
@@ -151,7 +157,11 @@ private data class BackupFileV1(
 
 /** A call recording handed to shed ([ServerBackup.backUpCalls]): its size and time then, and its sha256. */
 @Serializable
-private data class HandedCall(val size: Long, val modified: Long, val sha256: String)
+private data class HandedCall(
+    val size: Long, val modified: Long, val sha256: String,
+    /** shed said it is on the server (or the server said so when asked): recorded here, then shed forgets it. */
+    val uploaded: Boolean = false,
+)
 
 @Serializable
 private data class HandedOver(
@@ -159,6 +169,8 @@ private data class HandedOver(
     val audioFile: String,
     /** The sha256 of the moment's note last kept on the server ([ServerBackup.syncNotes]); null before one. */
     val note: String? = null,
+    /** shed said it is on the server (or the server said so when asked): recorded here, then shed forgets it. */
+    val uploaded: Boolean = false,
 )
 
 /** What Free up space removes: the audio of moments the server holds ([ServerBackup.freeUpPlan]). */
@@ -440,7 +452,7 @@ class ServerBackup(
         var sent = 0
         for ((id, handed) in kept.moments) {
             if (id in busy) continue
-            if (momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == handed.sha256 }) != MomentBackup.BackedUp) continue
+            if (momentState(id, handed) != MomentBackup.BackedUp) continue
             val lecture = store.load(id) ?: continue
             if (lecture.pendingEncode) continue
             val note = noteOf(lecture)
@@ -628,7 +640,7 @@ class ServerBackup(
         val candidates = withAudio.filter { lecture ->
             val handed = kept.moments[lecture.id]
             lecture.id !in busy && !lecture.pendingEncode && handed != null && handed.audioFile == lecture.audioFile &&
-                momentState(shed.uploads.value.firstOrNull { it.ref == lecture.id && it.sha256 == handed.sha256 }) == MomentBackup.BackedUp
+                momentState(lecture.id, handed) == MomentBackup.BackedUp
         }
         val chosen = when (rule) {
             FreeUpRule.Everything -> candidates
@@ -693,6 +705,7 @@ class ServerBackup(
     /** One pass of shed's queue, from the app's background work. */
     suspend fun runUploads(): RunResult {
         val result = shed.runUploads()
+        recordUploads()
         refresh(lastRun = result)
         if (result is RunResult.Done) runCatching { syncNotes(emptySet()) }
         return result
@@ -706,22 +719,78 @@ class ServerBackup(
         refresh()
     }
 
+    /**
+     * What shed sent since the app last looked, recorded as uploaded in `backup.json` (moments and calls), then
+     * acknowledged so shed forgets it (owner's call, Nov 17, 2026: shed keeps each upload until the app that handed it
+     * over has learned it ended). Cheap: run on every backup pass and whenever the backup screen opens.
+     */
+    suspend fun recordUploads() {
+        if (!::shed.isInitialized) return
+        val done = shed.uploads.value.filter { it.state == UploadState.DONE }
+        if (done.isEmpty()) return
+        val doneShas = done.map { it.sha256 }.toSet()
+        mutex.withLock {
+            save(kept.copy(
+                moments = kept.moments.mapValues { (_, h) -> if (!h.uploaded && h.sha256 in doneShas) h.copy(uploaded = true) else h },
+                calls = kept.calls.mapValues { (_, c) -> if (!c.uploaded && c.sha256 in doneShas) c.copy(uploaded = true) else c },
+            ))
+        }
+        // Recorded first, then forgotten: a crash between the two only leaves them listed, done, for next time.
+        shed.acknowledge(doneShas)
+        refresh()
+    }
+
+    /**
+     * Moments and calls handed over before uploads were recorded, and no longer in shed's list: the server is asked
+     * whether it holds each one. Held, it is recorded as uploaded; not held, it is forgotten here, so the next backup
+     * pass hands it over again (a moment or call whose file is gone stays forgotten). Once per item; on the network.
+     */
+    suspend fun confirmWithServer() {
+        if (!::shed.isInitialized || journal.state.value !is JournalState.Paired) return
+        val listed = shed.uploads.value.map { it.sha256 }.toSet()
+        val moments = kept.moments.filterValues { !it.uploaded && it.sha256 !in listed }
+        val calls = kept.calls.filterValues { !it.uploaded && it.sha256 !in listed }
+        if (moments.isEmpty() && calls.isEmpty()) return
+        val held = mutableSetOf<String>()
+        val missing = mutableSetOf<String>()
+        for (sha in (moments.values.map { it.sha256 } + calls.values.map { it.sha256 }).toSet()) {
+            val there = try { shed.verify(sha) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; return }
+            if (there) held += sha else missing += sha
+        }
+        mutex.withLock {
+            save(kept.copy(
+                moments = kept.moments.mapValues { (_, h) -> if (h.sha256 in held) h.copy(uploaded = true) else h }
+                    .filterValues { it.sha256 !in missing || it.uploaded },
+                calls = kept.calls.mapValues { (_, c) -> if (c.sha256 in held) c.copy(uploaded = true) else c }
+                    .filterValues { it.sha256 !in missing || it.uploaded },
+            ))
+        }
+        refresh()
+    }
+
+    internal fun shedUploadsForTest() = shed.uploads.value
+
     /** Waiting moments, for the app to decide whether to start its background work. */
     fun waiting(): Int = if (::shed.isInitialized) shed.waiting() else 0
 
     /** [lectureId]'s backup. */
     fun stateOf(lectureId: String): MomentBackup {
         val handed = kept.moments[lectureId] ?: return MomentBackup.None
-        val status = shed.uploads.value.firstOrNull { it.ref == lectureId && it.sha256 == handed.sha256 }
-        return momentState(status)
+        return momentState(lectureId, handed)
     }
 
     /** The sha256 the server knows the moment's audio by, once handed over. */
     fun sha256Of(lectureId: String): String? = kept.moments[lectureId]?.sha256
 
+    /** A moment handed over: recorded as uploaded, else as shed lists it. */
+    private fun momentState(id: String, handed: HandedOver): MomentBackup =
+        if (handed.uploaded) MomentBackup.BackedUp
+        else momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == handed.sha256 })
+
     private fun momentState(status: UploadStatus?): MomentBackup = when (status?.state) {
-        // Done files leave shed's list after a week: handed over and not listed is done.
-        null, UploadState.DONE -> MomentBackup.BackedUp
+        // Not listed and not recorded as uploaded: handed over before uploads were recorded (confirmWithServer).
+        null -> MomentBackup.Unconfirmed
+        UploadState.DONE -> MomentBackup.BackedUp
         UploadState.WAITING -> MomentBackup.Waiting(status.sent, status.size)
         UploadState.REFUSED -> MomentBackup.Refused(status.refused ?: "")
     }
@@ -740,7 +809,7 @@ class ServerBackup(
         if (!::shed.isInitialized) return
         val paired = journal.state.value as? JournalState.Paired
         val byMoment = kept.moments.mapValues { (id, h) ->
-            momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == h.sha256 })
+            momentState(id, h)
         }
         val waiting = byMoment.values.filterIsInstance<MomentBackup.Waiting>()
         // What the screen counts (hen, Nov 17, 2026): the moments recorded here that are on the phone, and how many of
