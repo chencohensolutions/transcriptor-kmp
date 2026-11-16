@@ -4,4 +4,4 @@
 [submodule "shed"]
 	path = shed
 	url = https://github.com/chencohensolutions/shed-kmp
-	branch = claude/project-thread-bgbgui
+	branch = main
