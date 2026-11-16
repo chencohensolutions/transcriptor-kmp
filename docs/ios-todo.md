@@ -218,3 +218,59 @@ anything left to decide. Remove an entry once it is built.
   `PowerAudio.input` (the microphone). View to mirror: `ui/MomentInfoSheet.kt`, menu item `review_info`; strings `info_*`.
   language, `SettingsStore.recordLive`) and stops with one tap. iOS: a Control Center control (`ControlWidget`,
   iOS 18) with an App Intent doing the same. String `tile_finishing`.
+
+## Server backup (Nov 16, 2026)
+
+- Android: Settings › Server backup ([screens/server.md](screens/server.md)) pairs Audio Logs with the journal server
+  through shed and backs up finished moments. Shared: `ServerBackup` (`state: StateFlow<ServerState>`, `preview`,
+  `pair`, `unpair`, `setWifiOnly`, `backUpFinished(busy)`, `runUploads`, `syncServerList`, `refresh`, `stateOf`,
+  `locator`). Make it with shed's `Shed` and `JournalBackend` and call `attach(shed, journal)`, as `Recording.init`
+  does.
+- iOS needs shed's iOS pieces, not built yet: `DeviceKeys` in the Secure Enclave (an identity mTLS can present), a
+  `JournalClients` on Ktor's Darwin engine that pins the server's key and presents the identity, and uploads in the
+  background (`BGProcessingTask`, or a background `URLSession`). See shed-kmp's README.
+- Files to mirror: `ui/ServerScreen.kt`, `ServerSettings.kt`, the Server row in `ui/ModelsScreen.kt`. Strings
+  `server_*`.
+
+
+## Calls, tucked and private moments (Nov 16, 2026)
+
+- Android: the moments list's selection ⋮ has Tuck away / Bring back and Mark private…; tucked moments hide behind a
+  pill per group that asks for the phone's lock (`BiometricPrompt`, biometric or device credential; iOS:
+  `LAContext.evaluatePolicy(.deviceOwnerAuthentication)`); Settings › Server backup has Calls and Voice messages
+  switches. Docs: screens/notebooks.md, screens/server.md, design.md "Calls, tucked and private moments".
+- Shared: `NotebooksController.setTucked(ids, tucked, busy)`, `LectureSummary.tucked`, `ServerBackup.setTucked`,
+  `ServerBackup.makePrivate(id, busy)` (`PrivateResult`), `ServerBackup.setShown`, `ServerState.shown` and
+  `tuckedOnServer`. Android files to mirror: `ui/NotebooksScreen.kt` (`TuckedPill`, `PrivateDialog`, `PrivateOutcome`),
+  `MainActivity.askPhoneLock`, `Recording.setTucked` / `makePrivate`, `ui/ServerScreen.kt` (`ShowSwitch`). Strings
+  `notebooks_tuck*`, `notebooks_private*`, `notebooks_unlock_tucked`, `notebooks_more`, `notebooks_cancel`,
+  `server_show*`, `server_tucked_on_server`.
+
+
+## Server moments, Free up space and the cache limit (Nov 16, 2026)
+
+- Android: the server's recordings (and calls and voice messages when shown) appear as moments; rows carry Call /
+  Voice message / On the server marks (`MomentMark` in `ui/NotebooksScreen.kt`); opening one whose audio is on the
+  server only shows a progress dialog while it comes (`MainActivity.openLecture`, `BringingDialog`). Settings › Server
+  backup has Free up space (rule chips, plan, button, progress, result) and Cache on this phone (2/10/20/50 GB chips).
+  Docs: design.md "Server backup", screens/server.md, screens/notebooks.md.
+- Shared: `LectureSummary.audioOnServer` and `source`; `ServerBackup.adoptServerRecordings`, `syncNotes`,
+  `bringAudio(id, progress)`, `freeUpPlan(rule, now, busy)` (`FreeUpRule`, `FreeUpPlan`), `freeUp(ids, busy,
+  progress)` (`FreeUpResult`), `setCacheLimit`, `refreshCache`, `dismiss`; `ServerState.cacheLimitBytes` and
+  `cacheBytes`. Android files to mirror: `Recording.backUp` / `refreshServerMoments` / `freeUp` / `freeUpPlan`,
+  `ServerSettings.kt`, `ui/ServerScreen.kt` (`FreeUpSection`). Strings `server_free*`, `server_cache*`, `bring_*`,
+  `notebooks_on_server`, `notebooks_source_*`.
+
+
+## Pages, streaming, labels on the server, locks (Nov 16, 2026)
+
+- Android: the moments list reads the server's recordings by pages as it scrolls (`NotebooksActions.olderFromServer` /
+  `newerFromServer`, `NotebooksState.serverOlder` / `serverNewer`); opening one makes it a moment here and plays it as
+  it streams (no download dialog); Settings › Server backup has Lock calls / Lock voice messages; a label's edit dialog
+  has Needs fingerprint; locked moments wait behind the same pill as tucked ones, after the phone's lock.
+- Shared: `ServerMoments` (window of pages), `ServerBackup.momentHere`, `summaryOf`, `streamOf` (`AudioStream`: iOS
+  plays it with an `AVAssetResourceLoaderDelegate`), `syncLabels`, `tidyServerMoments`, `NotebooksController.setServer`,
+  `setLabelLocked`, `locksChanged`, `Locks`, `LectureSummary.locked`, `Label.locked`, settings `lockCalls`,
+  `lockVoiceMessages`. Android files: `Recording.kt` (`showServerMoments`, `momentsHere`, `audioHere`, `setLocks`),
+  `AndroidAudioPlayer.kt` (`StreamedSource`), `ui/NotebooksScreen.kt`, `ui/ServerScreen.kt`. Strings `server_lock*`,
+  `notebooks_locked`, `notebooks_label_locked*`.

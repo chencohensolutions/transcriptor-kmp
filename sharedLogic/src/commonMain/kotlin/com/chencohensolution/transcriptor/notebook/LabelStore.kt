@@ -29,6 +29,16 @@ class LabelStore(private val place: () -> Place) {
         return label.toLabel()
     }
 
+    /** The label [id], made with [name] when there is none (a label the app keeps, such as Calls). */
+    fun ensure(id: String, name: String, now: Long, locked: Boolean = false): Label {
+        val file = read()
+        file.labels.firstOrNull { it.id == id }?.let { return it.toLabel() }
+        val used = file.labels.map { it.color }.toSet()
+        val label = LabelV1(id, name.trim(), generateSequence(0) { it + 1 }.first { it !in used }, now, locked)
+        write(file.copy(labels = file.labels + label))
+        return label.toLabel()
+    }
+
     fun rename(id: String, name: String) {
         val clean = name.trim()
         if (clean.isEmpty()) return
@@ -40,6 +50,22 @@ class LabelStore(private val place: () -> Place) {
     fun delete(id: String) {
         val file = read()
         write(file.copy(labels = file.labels.filter { it.id != id }))
+    }
+
+    /**
+     * Makes the list [labels], in that order (after merging with the server's, [com.chencohensolution.transcriptor.backup.mergeLabels]):
+     * a label kept keeps when it was made, a new one is made [now].
+     */
+    fun replaceAll(labels: List<Label>, now: Long) {
+        val file = read()
+        val made = file.labels.associate { it.id to it.createdAt }
+        write(file.copy(labels = labels.map { LabelV1(it.id, it.name, it.color, made[it.id] ?: now, it.locked) }))
+    }
+
+    /** Puts the label's moments behind the phone's lock, or takes them out. */
+    fun setLocked(id: String, locked: Boolean) {
+        val file = read()
+        write(file.copy(labels = file.labels.map { if (it.id == id) it.copy(locked = locked) else it }))
     }
 
     /** Adds labels kept elsewhere (the notebooks, as labels) that are not here yet, by id. */
@@ -83,6 +109,6 @@ private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true; prett
 private data class LabelsFileV1(val v: Int = 1, val labels: List<LabelV1> = emptyList())
 
 @Serializable
-private data class LabelV1(val id: String, val name: String, val color: Int, val createdAt: Long) {
-    fun toLabel() = Label(id, name, color)
+private data class LabelV1(val id: String, val name: String, val color: Int, val createdAt: Long, val locked: Boolean = false) {
+    fun toLabel() = Label(id, name, color, locked)
 }

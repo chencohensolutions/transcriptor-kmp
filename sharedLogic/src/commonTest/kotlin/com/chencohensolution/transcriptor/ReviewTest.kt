@@ -26,6 +26,8 @@ private class FakePlayer : AudioPlayer {
     var rate = 1f
     var released = false
     override fun load(file: Path) { loaded = file }
+    var streamed: com.chencohensolution.transcriptor.review.AudioStream? = null
+    override fun load(stream: com.chencohensolution.transcriptor.review.AudioStream) { streamed = stream }
     override fun play() { playing.value = true }
     override fun pause() { playing.value = false }
     override fun seekTo(millis: Long) { positionMillis.value = millis }

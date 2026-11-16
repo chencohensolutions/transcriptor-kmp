@@ -8,10 +8,27 @@ interface AudioPlayer {
     val positionMillis: StateFlow<Long>
     val playing: StateFlow<Boolean>
 
+    /** A streamed recording's first blocks are on their way from the server: the Play button spins. */
+    val loading: StateFlow<Boolean> get() = NotLoading
+
     fun load(file: Path)
+
+    /** Plays [stream] (a recording kept on the server), reading only what is played: no download first. */
+    fun load(stream: AudioStream)
     fun play()
     fun pause()
     fun seekTo(millis: Long)
     fun setSpeed(speed: Float)
     fun release()
 }
+
+private val NotLoading: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+/**
+ * A recording read by ranges as it plays (shed's reader of a file on the server): [size] and [read] may go to the
+ * network, so the player calls them off the main thread.
+ */
+class AudioStream(
+    val size: suspend () -> Long,
+    val read: suspend (position: Long, length: Int) -> ByteArray,
+)

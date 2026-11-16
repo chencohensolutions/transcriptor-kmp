@@ -85,7 +85,8 @@ stops.
   `SettingsStore.speakerTuning`). **Speaker turns**: its note and a **Turn model** row. **After a moment**: Find the
   speakers again after Stop
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Improve automatically (`autoImprove`, off by default). **Models and storage**:
-  Manage models, the moments folder (Choose a folder / Change), and a **Recording format** row whose line sums up the
+  Manage models, the moments folder (Choose a folder / Change), **Server backup** (off, or on to which server; its own
+  page: [server.md](server.md)), and a **Recording format** row whose line sums up the
   choice ("AAC · LC · 64 kbps · Mono · 48 kHz · hardware · while recording"). It opens the Recording format page:
   **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
   under them **Record as WAV, encode afterwards** (greyed out for WAV) with **When the moment ends** or **When charging,

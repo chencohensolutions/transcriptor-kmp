@@ -2,11 +2,17 @@ package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
+import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
+import com.chencohensolution.transcriptor.notebook.INDEX_FILE
+import com.chencohensolution.transcriptor.notebook.ServerPart
+import com.chencohensolution.transcriptor.notebook.Shown
+import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.LabelStore
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.LectureSummary
+import com.chencohensolution.transcriptor.notebook.Locks
 import com.chencohensolution.transcriptor.notebook.NOTEBOOKS_FILE
 import com.chencohensolution.transcriptor.notebook.Note
 import com.chencohensolution.transcriptor.notebook.NotebooksController
@@ -57,6 +63,117 @@ class NotebooksTest {
         fs.write(lectures.audioPath(l)) { writeUtf8("audio of ${l.id}") }
         fs.createDirectories(root / "notebooks" / notebook)
         fs.atomicMove(root / "moments" / l.id, root / "notebooks" / notebook / l.id)
+    }
+
+    @Test
+    fun aTuckedMomentIsKeptMarkedAndNeverFoundBySearch() {
+        lectures.save(lecture("a", 1_000).copy(title = "Secret talk"))
+        lectures.save(lecture("b", 2_000).copy(title = "Secret plan"))
+        val controller = NotebooksController(labels, lectures, now = { 3_000 })
+        assertEquals(listOf("a"), controller.setTucked(listOf("a"), true, busy = { it == "b" }))
+        assertEquals(emptyList(), controller.setTucked(listOf("b"), true, busy = { it == "b" }))
+        assertEquals(true, lectures.load("a")?.tucked)
+        assertEquals(mapOf("a" to true, "b" to false), controller.library.value.moments.associate { it.id to it.tucked })
+        assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
+        controller.setTucked(listOf("a"), false)
+        assertEquals(listOf("b", "a"), controller.search("Secret").map { it.moment.id })
+    }
+
+    @Test
+    fun lockedLabelsAndCallsWaitForThePhonesLockAndSearchNeverFindsThem() {
+        val personal = labels.create("Personal", 1)
+        lectures.save(lecture("a", 1_000).copy(title = "Secret talk", labels = listOf(personal.id)))
+        lectures.save(lecture("b", 2_000).copy(title = "Secret lecture"))
+        lectures.save(lecture("c", 3_000).copy(title = "Secret call", source = "call"))
+        var locks = Locks()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, locks = { locks })
+        controller.reload()
+        assertEquals(mapOf("a" to false, "b" to false, "c" to false), controller.library.value.moments.associate { it.id to it.locked })
+        controller.setLabelLocked(personal.id, true)
+        locks = Locks(calls = true)
+        controller.locksChanged()
+        assertEquals(mapOf("a" to true, "b" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
+        assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
+    }
+
+    @Test
+    fun theCallsLabelOfEarlierBuildsIsDroppedAndCallsAreLockedByTheirType() {
+        labels.ensure(CALLS_LABEL, "Calls", 1)
+        lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
+        lectures.save(lecture("c", 2_000).copy(title = "A call", source = "Call"))
+        var locks = Locks()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, locks = { locks })
+        controller.reload()
+        assertEquals(emptyList(), labels.all().map { it.id })
+        locks = Locks(calls = true)
+        controller.locksChanged()
+        assertEquals(mapOf("a" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
+    }
+
+    @Test
+    fun callsTurnedOffLeaveTheListAndItsSearch() {
+        lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
+        lectures.save(lecture("c", 2_000).copy(title = "A call", source = "call"))
+        var shown = Shown()
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, shown = { shown })
+        controller.reload()
+        assertEquals(listOf("c", "a"), controller.library.value.moments.map { it.id })
+        shown = Shown(calls = false)
+        controller.reload()
+        assertEquals(listOf("a"), controller.library.value.moments.map { it.id })
+        assertEquals(emptyList(), controller.search("call").map { it.moment.id })
+    }
+
+    @Test
+    fun withAServerTheMomentsOnlyHereAreMarkedAndNothingElse() {
+        lectures.save(lecture("here", 1_000))
+        lectures.save(lecture("backed", 2_000))
+        var paired = false
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, onServer = { if (paired) { id -> id == "backed" } else null })
+        controller.reload()
+        assertEquals(mapOf("here" to false, "backed" to false), controller.library.value.moments.associate { it.id to it.notOnServer })
+        paired = true
+        controller.setServer(ServerPart(listOf(lecture("s", 3_000).summary())))
+        assertEquals(mapOf("here" to true, "backed" to false, "s" to false), controller.library.value.moments.associate { it.id to it.notOnServer })
+    }
+
+    @Test
+    fun theListReadsTheIndexAndTheFoldersOnlyWhenAskedAgain() {
+        lectures.save(lecture("a", 1_000).copy(title = "First", serverSha256 = "s".repeat(64)))
+        val controller = NotebooksController(labels, lectures, now = { 4_000 })
+        controller.reload()
+        assertTrue(fs.exists(root / INDEX_FILE))
+        assertEquals(listOf("First"), controller.library.value.moments.map { it.title })
+        assertEquals("a", lectures.idOfServerSha("s".repeat(64)))
+        // Another store (the next start) reads the kept index, not the folders: a folder changed outside the app
+        // shows once they are read again.
+        val next = LectureStore(fs, root, israel)
+        val file = root / "moments" / "a" / "lecture.json"
+        val renamed = fs.read(file) { readUtf8() }.replace("First", "Renamed")
+        fs.write(file) { writeUtf8(renamed) }
+        assertEquals(listOf("First"), next.index().map { it.title })
+        assertEquals(listOf("Renamed"), next.rescan().map { it.title })
+        // Saves and deletes reach it at once.
+        next.save(lecture("b", 2_000).copy(title = "Second"))
+        assertEquals(setOf("a", "b"), next.index().map { it.id }.toSet())
+        next.delete("a")
+        assertEquals(listOf("b"), next.index().map { it.id })
+    }
+
+    @Test
+    fun foldersLeftWithoutTheirDataAreClearedButARecordingStays() {
+        fs.createDirectories(root / "moments" / "empty")
+        fs.createDirectories(root / "moments" / "words")
+        fs.write(root / "moments" / "words" / TRANSCRIPT) { writeUtf8("x") }
+        fs.createDirectories(root / "moments" / "sound")
+        fs.write(root / "moments" / "sound" / "audio.flac") { writeUtf8("x") }
+        lectures.save(lecture("ok", 1_000))
+        assertEquals(setOf("empty", "words", "sound"), lectures.brokenFolders().toSet())
+        assertTrue(lectures.deleteBroken("empty"))
+        assertTrue(lectures.deleteBroken("words"))
+        assertFalse(lectures.deleteBroken("sound"))
+        assertFalse(lectures.deleteBroken("ok"))
+        assertEquals(listOf("sound"), lectures.brokenFolders())
     }
 
     @Test

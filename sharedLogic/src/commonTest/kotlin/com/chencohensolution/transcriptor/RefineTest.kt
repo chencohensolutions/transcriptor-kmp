@@ -115,6 +115,7 @@ class VersionTest {
             override val positionMillis = kotlinx.coroutines.flow.MutableStateFlow(0L)
             override val playing = kotlinx.coroutines.flow.MutableStateFlow(false)
             override fun load(file: okio.Path) {}
+            override fun load(stream: com.chencohensolution.transcriptor.review.AudioStream) {}
             override fun play() {}
             override fun pause() {}
             override fun seekTo(millis: Long) {}

@@ -32,6 +32,13 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
+    var serverOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (serverOpen) {
+        androidx.activity.compose.BackHandler { serverOpen = false }
+        ServerSettings(onBack = { serverOpen = false })
+        return
+    }
+    val server by Recording.backup.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val library by Recording.library.library.collectAsStateWithLifecycle()
     val folder by Recording.folder.collectAsStateWithLifecycle()
@@ -100,6 +107,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
         busy = remember(statuses) { busy() },
+        server = server.paired?.let { p ->
+            val name = com.chencohensolution.transcriptor.ui.isolated(p.server.removePrefix("https://"))
+            if (server.waiting > 0) androidx.compose.ui.res.stringResource(R.string.server_on_waiting, name, server.waiting)
+            else androidx.compose.ui.res.stringResource(R.string.server_on, name)
+        } ?: androidx.compose.ui.res.stringResource(R.string.server_off),
         npuVoiceModels = remember(statuses) {
             // Voice prints and speaker turns with their NPU build here for this phone's chip.
             speakerList.filter { m ->
@@ -145,6 +157,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
             setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
             chooseFolder = chooseFolder,
+            openServer = { serverOpen = true },
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->
                 hub = HubSearch(query, language, kind, npuOnly, searching = true, results = hub.results)

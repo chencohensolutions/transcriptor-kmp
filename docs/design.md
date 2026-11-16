@@ -295,6 +295,66 @@ live and for the refine pass; other phones keep whisper.cpp on the CPU. On a 41-
 fast as the CPU and used about a fifth of the energy. ivrit.ai large-v3 has an NPU build too (Nov 5), for the refine pass only. Its files and the QNN-enabled sherpa-onnx AAR are ours to
 publish (owner: on Hugging Face); not yet. Details and next steps: [npu-plan.md](npu-plan.md).
 
+### Server backup (owner's request, Nov 16, 2026)
+
+Audio Logs works on the phone alone; a server is optional. Paired with the owner's journal server (Settings › Server
+backup, [screens/server.md](screens/server.md)), it backs up each finished moment's audio through **shed**
+([shed-kmp](https://github.com/chencohensolutions/shed-kmp), the submodule `shed/`, `includeBuild`), the storage
+library the journal app will share:
+
+- Audio Logs asks shed to upload; nothing else watches its folders. The audio goes as it is kept (FLAC, AAC, or WAV,
+  which the server keeps as FLAC), as a sound recording (`kind` AUDIO, source `recording`) with the moment's title as
+  its file name, when it started (with the phone's offset) and its length.
+- **The words go too** (owner's request, Nov 16, 2026): once a moment's audio is on the server, its transcript, notes,
+  labels, speakers and title are kept with it there as its note (`setNote`, `{"audioLogs": <lecture.json without word
+  times>}`), sent again whenever they change (`ServerBackup.syncNotes`, a hash of the note in `backup.json`).
+- The app enrolls as its own device, `audio-logs` (journal-server-go from Nov 16, 2026, `serverInfo.deviceApps`): a
+  device of Audio Logs sees sound recordings, which the server hides from other devices by default.
+- What was handed over is in `backup.json` (version 1, in the app's storage): moment id → the audio's sha256 and file.
+  Shed keeps its own queue, cache and the server's list under `files/shed/`; its key is in the Keystore.
+- **The server's recordings in the list, by pages** (owner's request, Nov 16, 2026): the list reads the server's
+  recordings (and calls and voice messages once shown) a page of 50 at a time as the user scrolls, newest first
+  (`recordingsPage`, shed's `page`, `ServerMoments`), never the whole change feed, which would carry every photo too.
+  At most 6 pages are held: scrolling back years lets the newest go, and scrolling up reads them again, so memory
+  stays the same. A recording becomes a moment here only when the user opens or changes it (`ServerBackup.momentHere`),
+  from its note when Audio Logs kept one. Moments made earlier for every recording are let go once
+  (`tidyServerMoments`).
+- **Playing streams** (owner's request, Nov 16, 2026: no download step): a moment whose audio is on the server plays at
+  once, reading only what is played through shed's reader (1 MB blocks kept in its cache; `ServerBackup.streamOf`,
+  `AudioStream`, `AndroidAudioPlayer` on a `MediaDataSource`). The whole file comes only when a pass needs it
+  (transcribing, finding speakers: `Recording.audioHere`).
+- **Each app's own note and data** (owner's call, Nov 16, 2026): the server keeps Audio Logs' note on a file apart from
+  journal's, and Audio Logs' labels (names, colors, locks) as its own data (`appData("labels")`), merged with this
+  phone's at each sync (`mergeLabels`: what either side added, renamed or deleted since the last sync is kept).
+- **Behind the phone's lock** (owner's request, Nov 16, 2026): Settings › Server backup's **Lock calls** and **Lock
+  voice messages**, and a label's **Needs fingerprint**, keep those moments out of the list and search until the
+  phone's lock opens them (`Locks`, `LectureSummary.locked`), as tucked moments are; lectures and concerts stay open.
+- **Free up space** (as in the journal app, manual only; owner's request, Nov 16, 2026): Settings › Server backup
+  removes the audio of finished moments the server holds (everything backed up, older than 3 or 12 months, or all but
+  the newest 10 GB). Each one's audio is hashed again and checked with the server (`/verify`) before it is deleted;
+  the words stay, and opening the moment brings the audio back. Nothing is dropped on its own.
+- **Cache on this phone**: what shed keeps of what it brought from the server, up to a limit the user picks (2, 10,
+  20 or 50 GB; 2 GB by default), the least recently used leaving first. Shed handles the cache for every app using
+  it; Audio Logs only sets the limit (`ServerBackup.setCacheLimit`).
+
+### Calls, tucked and private moments (owner's request, Nov 16, 2026)
+
+- **Calls and voice messages are optional**: the server sends Audio Logs its recordings, and calls and voice messages
+  only once the user turns them on (Settings › Server backup, **What Audio Logs shows from the server**; off by
+  default). The choice is kept on the server for Audio Logs' device only (`setSoundRecordingsShown`), so while it is
+  off they never reach the phone through this app, and journal on the same phone isn't affected.
+- **Tuck away** (as in the journal app, Hebrew מוצנע): a light hiding. A tucked moment leaves the list, a pill under
+  its group ("2 tucked away · Show") shows them after the phone's lock (fingerprint, face or screen lock; at once on
+  a phone with no lock) until the app is opened again, search never finds one, and the server is told for those
+  backed up (`setTucked`). `Lecture.tucked`, kept in `lecture.json`.
+- **Private** (the owner's call: delete the phone's copy once the server has it): the moment's audio is sent if it
+  isn't on the server yet, the server checks it holds it whole (`/verify`), its transcript, notes and labels are kept
+  with it there as its note (`setNote`: `{"audioLogs": <lecture.json without word times>}`,
+  `LectureStore.serverNote`), the server marks it private, and only then is it deleted from the phone. The server never
+  sends a private file to Audio Logs (`audio-logs` devices always withhold private files), so it leaves the app on
+  every phone; journal shows it where private files are allowed. Needs a paired server; nothing is deleted when a step
+  fails. A note larger than the server's 256 KiB (a very long moment) is refused, and the moment stays.
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.

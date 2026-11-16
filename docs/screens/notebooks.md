@@ -22,6 +22,28 @@ The code still calls it `NotebooksScreen`.
   labels, notes and what was said, whatever the case, from two characters. A row per moment, newest first: its title,
   who said the line (or Note:, With, Label:), the text around the match with the match in bold, the line's time and
   how many more places match. Tapping opens the moment at that line (`LectureReview.open(atMillis)`). Back closes it.
+- **Tuck away and private** (Nov 16, 2026; docs/design.md "Calls, tucked and private moments"): the ⋮ of the
+  selection bar has **Tuck away** (**Bring back** when all the selected are tucked) and **Mark private…**. Tucked
+  moments leave the list; a pill under their group ("2 tucked away · Show") asks for the phone's lock, then shows them
+  with a "Tucked away" mark until the app is opened again; search never finds them. Mark private asks first (they are
+  kept on the server with their transcripts and notes, then deleted from the phone, and Audio Logs won't show them
+  again); without a server it says to pair first and offers Settings. A snackbar says how many left the phone, or why
+  the rest stayed.
+- **Moments from the server** (Nov 16, 2026; docs/design.md "Server backup"): a row may carry small marks: **Call** or
+  **Voice message** for what came from the server as one, and **On the server** when its audio is there only (from
+  the server, or freed here). The server's recordings are all listed, from a copy of the server's list kept on the
+  phone (shed's `remote.json`) and brought up to date in the background from the server's change feed of sound
+  recordings only (a spinner at the end only the first time, while nothing is kept yet); opening one plays it at once as it streams. **Locked** marks a moment behind the phone's lock (a
+  locked label's, or a locked call); with the tucked ones they wait behind the group's pill ("3 more behind your lock ·
+  Show"). The label's edit dialog has **Needs fingerprint**. A call shows its call icon; the filter row has a **Calls**
+  chip (by type, when there are calls), and Settings' Lock calls hides them (the Calls label of earlier builds is
+  deleted once). Calls or voice messages turned off in Server backup leave the list and its search, those opened
+  earlier too, and so does the Calls chip (the Journal app still backs calls up). With a server paired, a moment not backed up yet shows a crossed-out cloud; nothing else does. Opening a
+  moment only on the server dims the list under a spinner until its screen opens (tried again for a few seconds), and
+  its Play button spins while the first blocks come. Back from a moment or Settings finds the list where it was.
+  The list reads the moments' index (`moments-index.json` in the app's storage, `LectureStore.index`), not every
+  moment's folder; the folders are read again once each start (`rescan`). The server's list kept on the phone is
+  shown at once on start, before the server answers.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

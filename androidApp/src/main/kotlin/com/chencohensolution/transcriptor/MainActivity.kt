@@ -42,6 +42,8 @@ import com.chencohensolution.transcriptor.ui.LiveLectureActions
 import com.chencohensolution.transcriptor.ui.FolderNotice
 import com.chencohensolution.transcriptor.ui.NotebooksActions
 import com.chencohensolution.transcriptor.ui.NotebooksScreen
+import com.chencohensolution.transcriptor.ui.PrivateOutcome
+import com.chencohensolution.transcriptor.backup.PrivateResult
 import com.chencohensolution.transcriptor.ui.ReviewActions
 import com.chencohensolution.transcriptor.ui.ReviewScreen
 import com.chencohensolution.transcriptor.ui.TranscriptorTheme
@@ -87,6 +89,9 @@ class MainActivity : ComponentActivity() {
     /** Asks to show the moment recording now (a long press on the Quick Settings tile): counted, so each one shows it. */
     private val showRecording = androidx.compose.runtime.mutableIntStateOf(0)
 
+    /** The moment being opened: one only on the server takes a moment to become one here, under a spinner. */
+    private val opening = mutableStateOf<String?>(null)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_SHOW_RECORDING, false)) showRecording.intValue++
@@ -110,6 +115,8 @@ class MainActivity : ComponentActivity() {
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
+                // The list's scroll and lock, kept while a moment or Settings is open, so Back returns to the same place.
+                val notebooksPlace = remember { com.chencohensolution.transcriptor.ui.NotebooksPlace() }
                 LaunchedEffect(showRecording.intValue) { if (showRecording.intValue > 0) { showLive = true; settings = false } }
                 // A new install opens on "Get your models" (FirstRun), until it is answered.
                 var firstRun by rememberSaveable { mutableStateOf<Boolean?>(null) }
@@ -123,12 +130,15 @@ class MainActivity : ComponentActivity() {
                         openLecture(lecture.id)
                     }
                 }
-                // The lists again when a lecture stops, one closes, or a pass on one ends; and finished lectures move
-                // to the lectures folder.
+                // The lists again when a lecture stops, one closes, or a pass on one ends; finished lectures are handed
+                // to the server backup (when paired) and move to the lectures folder.
                 LaunchedEffect(live == null, opened == null, working.keys) {
                     withContext(Dispatchers.IO) {
-                        Recording.migrateLibrary()
+                        // The list from the index first (one small file), then the slower work in the lectures folder.
                         Recording.library.reload()
+                        Recording.migrateLibrary()
+                        Recording.checkIndexOnce()
+                        Recording.backUp(this@MainActivity)
                         runCatching { Recording.archive() }.onFailure { android.util.Log.e("MainActivity", "archiving failed", it) }
                     }
                 }
@@ -251,6 +261,7 @@ class MainActivity : ComponentActivity() {
                         onBackToRecording = { showLive = true },
                         onSettings = { settings = true },
                         chooseFolder = chooseFolder,
+                        place = notebooksPlace,
                     )
                 }
               }
@@ -262,9 +273,10 @@ class MainActivity : ComponentActivity() {
     private fun Notebooks(
         recordingNow: RecordingNow?, working: Map<String, Float>,
         onRecord: (labels: List<String>, language: String, mode: RecordMode) -> Unit, onBackToRecording: () -> Unit, onSettings: () -> Unit,
-        chooseFolder: () -> Unit,
+        chooseFolder: () -> Unit, place: com.chencohensolution.transcriptor.ui.NotebooksPlace,
     ) {
         val library by Recording.library.library.collectAsStateWithLifecycle()
+        val server by Recording.backup.state.collectAsStateWithLifecycle()
         val folder by Recording.folder.collectAsStateWithLifecycle()
         var asked by rememberSaveable { mutableStateOf(Recording.settings.lectureFolderAsked) }
         val notice = when (val f = folder) {
@@ -287,7 +299,7 @@ class MainActivity : ComponentActivity() {
         }
         // The Record bar's Live, After or Only record, as last picked.
         val recordMode = remember { Recording.settings.recordMode }
-        val io = { work: () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
+        val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
             notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode),
             NotebooksActions(
@@ -305,12 +317,51 @@ class MainActivity : ComponentActivity() {
                 setLabels = { ids, add, remove -> io { Recording.setLabels(ids, add, remove) } },
                 renameLabel = { id, name -> io { Recording.library.renameLabel(id, name) } },
                 deleteLabel = { id -> io { Recording.deleteLabel(id) } },
+                setLabelLocked = { id, locked -> io { Recording.setLabelLocked(id, locked) } },
                 settings = onSettings,
                 chooseFolder = chooseFolder,
                 keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
                 delete = { ids -> io { Recording.delete(ids) } },
+                setTucked = { ids, tucked -> lifecycleScope.launch(Dispatchers.IO) { Recording.setTucked(ids, tucked) } },
+                revealTucked = ::askPhoneLock,
+                makePrivate = { ids ->
+                    val (done, failed) = withContext(Dispatchers.IO) { Recording.makePrivate(ids) }
+                    PrivateOutcome(
+                        done, notPaired = failed == PrivateResult.NotPaired,
+                        failed = when (failed) {
+                            is PrivateResult.NotOnServer -> failed.reason
+                            PrivateResult.Busy -> getString(R.string.notebooks_private_busy)
+                            else -> null
+                        },
+                    )
+                },
             ),
             notice,
+            paired = server.paired != null,
+            place = place,
+            opening = opening.value != null,
+        )
+    }
+
+    /**
+     * Asks for the phone's lock (fingerprint, face or the screen lock) before tucked moments are shown, then calls
+     * [onUnlocked]. A phone with no lock shows them at once.
+     */
+    private fun askPhoneLock(onUnlocked: () -> Unit) {
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java)
+        if (keyguard?.isDeviceSecure != true) return onUnlocked()
+        val prompt = android.hardware.biometrics.BiometricPrompt.Builder(this)
+            .setTitle(getString(R.string.notebooks_unlock_tucked))
+            .setAllowedAuthenticators(
+                android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+            .build()
+        prompt.authenticate(
+            android.os.CancellationSignal(), mainExecutor,
+            object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult) = onUnlocked()
+            },
         )
     }
 
@@ -330,11 +381,34 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(send, name))
     }
 
-    /** Opens a recorded moment, under its labels' names. */
+    /**
+     * Opens a recorded moment, under its labels' names. One of the server's recordings becomes a moment here first; its
+     * audio stays on the server and plays as it streams.
+     */
     private fun openLecture(lectureId: String, atMillis: Long? = null) {
-        val library = Recording.library.library.value
-        val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-        Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)
+        if (opening.value != null) return
+        opening.value = lectureId
+        lifecycleScope.launch {
+            try {
+                // A recording only on the server can take a few seconds to become a moment here (the list's page
+                // still on its way): tried again for a while, under the spinner, before saying it failed.
+                var opened = false
+                for (attempt in 0 until 8) {
+                    if (attempt > 0) delay(750)
+                    val id = withContext(Dispatchers.IO) { Recording.momentsHere(listOf(lectureId)) }.first()
+                    val library = Recording.library.library.value
+                    val labels = library.moments.firstOrNull { it.id == id }?.labels.orEmpty()
+                    opened = Recording.review.open(id, labelNames(labels, library.labels), atMillis)
+                    if (opened) break
+                    android.util.Log.w("MainActivity", "opening $lectureId ($id), try ${attempt + 1}: no such moment here yet")
+                }
+                if (!opened) {
+                    Toast.makeText(this@MainActivity, getString(R.string.bring_failed, getString(R.string.bring_not_on_server)), Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                opening.value = null
+            }
+        }
     }
 
     /** Records a moment titled with today's date, with these [labels] (maybe none), in [language]. */

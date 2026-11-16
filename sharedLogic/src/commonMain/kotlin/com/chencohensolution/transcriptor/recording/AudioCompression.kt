@@ -42,7 +42,8 @@ class AudioCompression(
     /** The AAC settings, read when each lecture is encoded. */
     private val aac: () -> AacSettings = { AacSettings() },
 ) {
-    fun pending(): List<Lecture> = store.all().filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
+    fun pending(): List<Lecture> = store.index().filter { it.pendingEncode }.mapNotNull { store.load(it.id) }
+        .filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
 
     fun compress(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
         val toAac = lecture.pendingAac && !lecture.pendingFlac
