@@ -135,6 +135,11 @@ private data class BackupFileV1(
     val moments: Map<String, HandedOver> = emptyMap(),
     /** Recordings of the server the user deleted here: not made moments again. */
     val dismissed: Set<String> = emptySet(),
+    /**
+     * Moments saved since their note was last kept on the server ([LectureStore.onSaved]): only these are read again
+     * by [ServerBackup.syncNotes], not every moment (reading ~900 from the lectures folder took about a minute).
+     */
+    val notesDue: Set<String> = emptySet(),
     /** Most bytes shed's cache keeps of what was read from the server (Settings › Server backup). */
     val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
     /**
@@ -254,6 +259,12 @@ class ServerBackup(
     private var momentShas: Set<String> = emptySet()
 
     /** Connects the shed made with [locator]; before any other call. */
+    /** [store] saved this moment: its note is read again at the next [syncNotes] (kept once, not on every save). */
+    fun momentSaved(id: String) {
+        if (id in kept.notesDue || id !in kept.moments) return
+        save(kept.copy(notesDue = kept.notesDue + id))
+    }
+
     fun attach(shed: Shed, journal: JournalBackend) {
         this.shed = shed
         this.journal = journal
@@ -456,12 +467,17 @@ class ServerBackup(
         var sent = 0
         for ((id, handed) in kept.moments) {
             if (id in busy) continue
+            // Its note kept and the moment not saved since: nothing to read.
+            if (handed.note != null && id !in kept.notesDue) continue
             if (momentState(id, handed) != MomentBackup.BackedUp) continue
             val lecture = store.load(id) ?: continue
             if (lecture.pendingEncode) continue
             val note = noteOf(lecture)
             val hash = note.toString().encodeUtf8().sha256().hex()
-            if (handed.note == hash) continue
+            if (handed.note == hash) {
+                if (id in kept.notesDue) mutex.withLock { save(this.kept.copy(notesDue = this.kept.notesDue - id)) }
+                continue
+            }
             val kept = try {
                 journal.setNote(handed.sha256, note)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -473,7 +489,7 @@ class ServerBackup(
                 false
             }
             if (!kept) continue
-            mutex.withLock { this.kept.moments[id]?.let { save(this.kept.copy(moments = this.kept.moments + (id to it.copy(note = hash)))) } }
+            mutex.withLock { this.kept.moments[id]?.let { save(this.kept.copy(moments = this.kept.moments + (id to it.copy(note = hash)), notesDue = this.kept.notesDue - id)) } }
             sent++
         }
         return sent
