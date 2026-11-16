@@ -317,7 +317,7 @@ class MainActivity : ComponentActivity() {
                 setLabels = { ids, add, remove -> io { Recording.setLabels(ids, add, remove) } },
                 renameLabel = { id, name -> io { Recording.library.renameLabel(id, name) } },
                 deleteLabel = { id -> io { Recording.deleteLabel(id) } },
-                setLabelLocked = { id, locked -> io { Recording.library.setLabelLocked(id, locked) } },
+                setLabelLocked = { id, locked -> io { Recording.setLabelLocked(id, locked) } },
                 settings = onSettings,
                 chooseFolder = chooseFolder,
                 keepInApp = { asked = true; io { Recording.settings.lectureFolderAsked = true } },
@@ -390,11 +390,19 @@ class MainActivity : ComponentActivity() {
         opening.value = lectureId
         lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) { Recording.momentsHere(listOf(lectureId)) }
-                val library = Recording.library.library.value
-                val labels = library.moments.firstOrNull { it.id == lectureId }?.labels.orEmpty()
-                if (!Recording.review.open(lectureId, labelNames(labels, library.labels), atMillis)) {
-                    android.util.Log.w("MainActivity", "opening $lectureId: no such moment here")
+                // A recording only on the server can take a few seconds to become a moment here (the list's page
+                // still on its way): tried again for a while, under the spinner, before saying it failed.
+                var opened = false
+                for (attempt in 0 until 8) {
+                    if (attempt > 0) delay(750)
+                    val id = withContext(Dispatchers.IO) { Recording.momentsHere(listOf(lectureId)) }.first()
+                    val library = Recording.library.library.value
+                    val labels = library.moments.firstOrNull { it.id == id }?.labels.orEmpty()
+                    opened = Recording.review.open(id, labelNames(labels, library.labels), atMillis)
+                    if (opened) break
+                    android.util.Log.w("MainActivity", "opening $lectureId ($id), try ${attempt + 1}: no such moment here yet")
+                }
+                if (!opened) {
                     Toast.makeText(this@MainActivity, getString(R.string.bring_failed, getString(R.string.bring_not_on_server)), Toast.LENGTH_LONG).show()
                 }
             } finally {

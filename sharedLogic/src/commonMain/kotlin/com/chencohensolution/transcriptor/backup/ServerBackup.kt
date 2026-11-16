@@ -112,6 +112,11 @@ private data class BackupFileV1(
      * one of them, with no audio here, were let go once ([tidyServerMoments]).
      */
     val paged: Boolean = false,
+    /**
+     * The moment folders left without their data by an earlier build were cleared once, and their recordings
+     * forgotten here so the server's copy shows again ([forgetBrokenMoments]).
+     */
+    val repaired: Boolean = false,
     /** The labels as they were at the last sync with the server's ([syncLabels]); null before the first. */
     val labelsBase: List<ServerLabel>? = null,
 )
@@ -436,6 +441,20 @@ class ServerBackup(
             mutex.withLock { save(kept.copy(moments = kept.moments - lecture.id)) }
         }
         save(kept.copy(paged = true))
+        refresh()
+    }
+
+    /**
+     * Once: moment folders with no `lecture.json` (a delete cut short by an earlier build) can't be opened, yet their
+     * recordings counted as here and the list left the server's copy out. Empty ones are deleted and every one of them
+     * forgotten here, so the server's recording shows and opens again. Not the [busy] ones. Files: not on the main thread.
+     */
+    suspend fun forgetBrokenMoments(busy: Set<String> = emptySet()) {
+        if (kept.repaired) return
+        val broken = store.brokenFolders().filter { it !in busy }
+        for (name in broken) runCatching { store.deleteBroken(name) }
+        val gone = broken.filter { it in kept.moments && store.load(it) == null }.toSet()
+        mutex.withLock { save(kept.copy(moments = kept.moments - gone, repaired = true)) }
         refresh()
     }
 

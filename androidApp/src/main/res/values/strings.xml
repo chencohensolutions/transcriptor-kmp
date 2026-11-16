@@ -663,6 +663,7 @@
     <string name="notebooks_source_call">Call</string>
     <string name="notebooks_source_voice_message">Voice message</string>
     <string name="notebooks_locked">Locked</string>
+    <string name="label_calls">Calls</string>
     <string name="notebooks_label_locked">Needs fingerprint</string>
     <string name="notebooks_label_locked_note">Moments with this label stay out of the list and search until your fingerprint or screen lock opens them.</string>
     <string name="server_lock">Behind your fingerprint</string>

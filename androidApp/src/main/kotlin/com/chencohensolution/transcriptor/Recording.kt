@@ -77,6 +77,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import okio.FileSystem
@@ -452,8 +453,8 @@ object Recording {
     }
 
     /** Deletes lectures for good (files: not on the main thread), except those recording, open or worked on now. */
-    suspend fun delete(lectureIds: List<String>) {
-        momentsHere(lectureIds)
+    suspend fun delete(ids: List<String>) {
+        val lectureIds = momentsHere(ids)
         val busy = busy()
         backup.dismiss(lectureIds.filter { it !in busy })
         library.delete(lectureIds) { it in busy }
@@ -463,8 +464,8 @@ object Recording {
      * Adds and removes labels on moments (files: not on the main thread), except those recording or worked on now
      * (an open one can't be on the list's screen).
      */
-    suspend fun setLabels(lectureIds: List<String>, add: Set<String>, remove: Set<String>) {
-        momentsHere(lectureIds)
+    suspend fun setLabels(ids: List<String>, add: Set<String>, remove: Set<String>) {
+        val lectureIds = momentsHere(ids)
         val busy = busy()
         library.setLabels(lectureIds, add, remove) { it in busy }
     }
@@ -473,8 +474,8 @@ object Recording {
      * Tucks moments away, or brings them back (files and network: not on the main thread), except those recording or
      * worked on now; the server is told for those backed up.
      */
-    suspend fun setTucked(lectureIds: List<String>, tucked: Boolean) {
-        momentsHere(lectureIds)
+    suspend fun setTucked(ids: List<String>, tucked: Boolean) {
+        val lectureIds = momentsHere(ids)
         val busy = busy()
         val changed = library.setTucked(lectureIds, tucked) { it in busy }
         backup.setTucked(changed, tucked)
@@ -484,8 +485,8 @@ object Recording {
      * Marks moments private: each is kept on the server, then deleted from the phone ([ServerBackup.makePrivate]).
      * Returns how many left the phone, and why the first that didn't stayed. Not on the main thread.
      */
-    suspend fun makePrivate(lectureIds: List<String>): Pair<Int, PrivateResult?> {
-        momentsHere(lectureIds)
+    suspend fun makePrivate(ids: List<String>): Pair<Int, PrivateResult?> {
+        val lectureIds = momentsHere(ids)
         var done = 0
         var failed: PrivateResult? = null
         for (id in lectureIds) {
@@ -646,18 +647,26 @@ object Recording {
         if (backup.waiting() > 0) scheduleUploads(context)
         // The newest page of the server's recordings, the labels, and the moments' words to the server: at most once a minute.
         val now = System.currentTimeMillis()
-        if (backup.state.value.paired != null && now - lastServerSync > 60_000) syncWithServer()
+        // In the app's own scope: leaving a screen must not cut a sync off halfway (notes half sent, a delete half done).
+        if (backup.state.value.paired != null && now - lastServerSync > 60_000) {
+            lastServerSync = now
+            syncScope.launch { syncWithServer() }
+        }
     }
+
+    private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val syncing = kotlinx.coroutines.sync.Mutex()
 
     @Volatile private var lastServerSync = 0L
 
     /** The server's recordings, the labels and the moments' words brought up to date now (after Calls was switched, or Back up now). */
     suspend fun refreshServerMoments() = syncWithServer()
 
-    private suspend fun syncWithServer() {
+    private suspend fun syncWithServer() = syncing.withLock {
         lastServerSync = System.currentTimeMillis()
         runCatching {
             backup.tidyServerMoments(busy())
+            backup.forgetBrokenMoments(busy())
             backup.syncServerList()
             if (backup.syncLabels(labels, System.currentTimeMillis())) library.reload()
             backup.syncNotes(busy())
@@ -687,15 +696,27 @@ object Recording {
      * Makes the server's recordings among [lectureIds] moments here (before they are opened or changed): each from its
      * note, its audio left on the server. Files and network: not on the main thread.
      */
-    suspend fun momentsHere(lectureIds: Collection<String>) {
+    suspend fun momentsHere(lectureIds: Collection<String>): List<String> {
         var made = false
-        for (id in lectureIds) {
-            val file = serverById[id] ?: continue
-            if (store.load(id) != null) continue
-            runCatching { backup.momentHere(file, library.library.value.lastLanguage) }.onSuccess { made = true }
+        val ids = lectureIds.map { id ->
+            if (store.load(id) != null) return@map id
+            val file = serverById[id]
+                ?: backup.serverMoments.window.value.files.firstOrNull { "server-" + it.sha256.take(16) == id }
+                ?: return@map id.also { android.util.Log.w("Recording", "$id: not a moment here, nor in the server's list") }
+            // The moment the recording became: a moment here may already have it under another id.
+            runCatching { backup.momentHere(file, library.library.value.lastLanguage) }
+                .onSuccess { made = true }
                 .onFailure { android.util.Log.w("Recording", "making $id a moment", it) }
+                .getOrNull()?.id ?: id
         }
         if (made) library.reload()
+        return ids
+    }
+
+    /** Puts a label's moments behind the phone's lock, or takes them out; the Calls label is Settings' Lock calls too. */
+    fun setLabelLocked(id: String, locked: Boolean) {
+        if (id == com.chencohensolution.transcriptor.notebook.CALLS_LABEL) settings.lockCalls = locked
+        library.setLabelLocked(id, locked)
     }
 
     /** Whether calls and voice messages are behind the phone's lock (Settings › Server backup). */
@@ -705,7 +726,10 @@ object Recording {
     fun setLocks(locks: com.chencohensolution.transcriptor.notebook.Locks) {
         settings.lockCalls = locks.calls
         settings.lockVoiceMessages = locks.voiceMessages
-        library.locksChanged()
+        // The Calls label's Needs fingerprint is the same switch.
+        if (library.library.value.labels.any { it.id == com.chencohensolution.transcriptor.notebook.CALLS_LABEL }) {
+            library.setLabelLocked(com.chencohensolution.transcriptor.notebook.CALLS_LABEL, locks.calls)
+        } else library.locksChanged()
     }
 
     /** The moment's whole audio on the phone, brought from the server when it is there only: before a pass reads it. */
@@ -743,7 +767,7 @@ object Recording {
         // Notebooks became labels: the app's own storage moves now (quick: one folder rename per moment); the
         // lectures folder with the first list ([migrateLibrary]), off the main thread.
         runCatching { migrateToLabels(store.local, System.currentTimeMillis(), utcOffset, into = store.library ?: store.local) }.onFailure { android.util.Log.e("Recording", "label migration failed", it) }
-        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks)
+        library = NotebooksController(labels, store, System::currentTimeMillis, ::phoneLanguage, ::locks, callsLabel = { app.getString(R.string.label_calls) })
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             backup.serverMoments.window.collect { runCatching { showServerMoments(it) } }
         }

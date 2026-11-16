@@ -2,6 +2,9 @@ package com.chencohensolution.transcriptor
 
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.AUDIO_WAV
+import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
+import com.chencohensolution.transcriptor.notebook.ServerPart
+import com.chencohensolution.transcriptor.notebook.summary
 import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.LabelStore
 import com.chencohensolution.transcriptor.notebook.Lecture
@@ -89,6 +92,39 @@ class NotebooksTest {
         controller.locksChanged()
         assertEquals(mapOf("a" to true, "b" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
         assertEquals(listOf("b"), controller.search("Secret").map { it.moment.id })
+    }
+
+    @Test
+    fun everyCallHasTheCallsLabelWhoseFingerprintHidesThem() {
+        lectures.save(lecture("a", 1_000).copy(title = "Lecture"))
+        lectures.save(lecture("c", 2_000).copy(title = "A call", source = "Call"))
+        val controller = NotebooksController(labels, lectures, now = { 4_000 }, callsLabel = { "Calls" })
+        controller.reload()
+        assertEquals(listOf(CALLS_LABEL), labels.all().map { it.id })
+        assertEquals(mapOf("a" to emptyList(), "c" to listOf(CALLS_LABEL)), controller.library.value.moments.associate { it.id to it.labels })
+        // Never written into the moment itself.
+        assertEquals(emptyList(), lectures.load("c")!!.labels)
+        controller.setLabelLocked(CALLS_LABEL, true)
+        assertEquals(mapOf("a" to false, "c" to true), controller.library.value.moments.associate { it.id to it.locked })
+        // A server's call gets it too.
+        controller.setServer(ServerPart(listOf(lecture("s", 3_000).copy(source = "call").summary())))
+        assertEquals(listOf(CALLS_LABEL), controller.library.value.moments.first { it.id == "s" }.labels)
+    }
+
+    @Test
+    fun foldersLeftWithoutTheirDataAreClearedButARecordingStays() {
+        fs.createDirectories(root / "moments" / "empty")
+        fs.createDirectories(root / "moments" / "words")
+        fs.write(root / "moments" / "words" / TRANSCRIPT) { writeUtf8("x") }
+        fs.createDirectories(root / "moments" / "sound")
+        fs.write(root / "moments" / "sound" / "audio.flac") { writeUtf8("x") }
+        lectures.save(lecture("ok", 1_000))
+        assertEquals(setOf("empty", "words", "sound"), lectures.brokenFolders().toSet())
+        assertTrue(lectures.deleteBroken("empty"))
+        assertTrue(lectures.deleteBroken("words"))
+        assertFalse(lectures.deleteBroken("sound"))
+        assertFalse(lectures.deleteBroken("ok"))
+        assertEquals(listOf("sound"), lectures.brokenFolders())
     }
 
     @Test

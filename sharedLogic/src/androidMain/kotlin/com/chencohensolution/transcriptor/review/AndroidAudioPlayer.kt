@@ -26,6 +26,8 @@ class AndroidAudioPlayer(
     private val running = MutableStateFlow(false)
     override val positionMillis: StateFlow<Long> = position
     override val playing: StateFlow<Boolean> = running
+    private val waiting = MutableStateFlow(false)
+    override val loading: StateFlow<Boolean> = waiting
 
     private var player: MediaPlayer? = null
     private var ticking: Job? = null
@@ -51,6 +53,7 @@ class AndroidAudioPlayer(
     override fun load(stream: AudioStream) {
         release()
         prepared = false
+        waiting.value = true
         playWhenPrepared = false
         seekWhenPrepared = null
         position.value = 0
@@ -60,6 +63,7 @@ class AndroidAudioPlayer(
             setOnPreparedListener { p ->
                 if (player !== p) return@setOnPreparedListener
                 prepared = true
+                waiting.value = false
                 seekWhenPrepared?.let { p.seekTo(it, MediaPlayer.SEEK_CLOSEST) }
                 seekWhenPrepared = null
                 if (playWhenPrepared) play()
@@ -67,6 +71,7 @@ class AndroidAudioPlayer(
             setOnCompletionListener { running.value = false; stopTicking(); position.value = duration.toLong() }
             setOnErrorListener { _, what, extra ->
                 android.util.Log.w("AudioPlayer", "streaming failed: $what/$extra")
+                waiting.value = false
                 running.value = false
                 stopTicking()
                 true
@@ -124,6 +129,7 @@ class AndroidAudioPlayer(
         player?.release()
         player = null
         running.value = false
+        waiting.value = false
     }
 
     private fun stopTicking() {

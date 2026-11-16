@@ -34,7 +34,10 @@ The code still calls it `NotebooksScreen`.
   the server, or freed here). The server's recordings come a page at a time as the list scrolls (a spinner at its end
   while more come); opening one plays it at once as it streams. **Locked** marks a moment behind the phone's lock (a
   locked label's, or a locked call); with the tucked ones they wait behind the group's pill ("3 more behind your lock ·
-  Show"). The label's edit dialog has **Needs fingerprint**.
+  Show"). The label's edit dialog has **Needs fingerprint**. Every call has the **Calls** label (made the first time a
+  call is listed, id `calls`, never written into the moment): its Needs fingerprint is Settings' Lock calls. Opening a
+  moment only on the server dims the list under a spinner until its screen opens (tried again for a few seconds), and
+  its Play button spins while the first blocks come. Back from a moment or Settings finds the list where it was.
 - The **labels sheet** (holding moments selects them; the tag icon in the top bar, or Labels… on one): a checkbox per
   label, a dash when only some of the selected moments have it; a tap sets it on all of them. New label makes one and
   puts it on them; the pencil renames a label or deletes it (its moments stay, without it).

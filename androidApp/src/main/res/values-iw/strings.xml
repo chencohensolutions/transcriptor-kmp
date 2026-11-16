@@ -674,6 +674,7 @@
     <string name="notebooks_source_call">שיחה</string>
     <string name="notebooks_source_voice_message">הודעה קולית</string>
     <string name="notebooks_locked">נעול</string>
+    <string name="label_calls">שיחות</string>
     <string name="notebooks_label_locked">דורש טביעת אצבע</string>
     <string name="notebooks_label_locked_note">רגעים עם התווית הזו לא מופיעים ברשימה ובחיפוש עד שטביעת האצבע או נעילת המסך פותחות אותם.</string>
     <string name="server_lock">מאחורי טביעת האצבע</string>

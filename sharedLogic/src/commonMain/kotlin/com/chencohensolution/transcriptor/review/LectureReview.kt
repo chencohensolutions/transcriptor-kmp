@@ -113,10 +113,10 @@ class LectureReview(
     private val only = MutableStateFlow<String?>(null)
 
     val state: StateFlow<ReviewState?> =
-        combine(open, player.positionMillis, player.playing, passes, only) { o, position, playing, p, onlySpeaker ->
+        combine(open, player.positionMillis, combine(player.playing, player.loading, ::Pair), passes, only) { o, position, (playing, loading), p, onlySpeaker ->
             o?.let {
                 ReviewState(
-                    labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing,
+                    labelNames = it.labelNames, lecture = it.lecture, positionMillis = position, playing = playing, loading = loading,
                     speed = it.speed, refineModels = p.refineModels, refine = p.refine, speakerPass = p.speakers,
                     improveDefault = p.improveDefault, improveToGet = p.improveToGet, speakerCorrections = it.corrections(), power = it.power(),
                     knownNames = it.knownNames(), onlySpeaker = onlySpeaker,

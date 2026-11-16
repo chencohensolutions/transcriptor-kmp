@@ -29,6 +29,16 @@ class LabelStore(private val place: () -> Place) {
         return label.toLabel()
     }
 
+    /** The label [id], made with [name] when there is none (a label the app keeps, such as Calls). */
+    fun ensure(id: String, name: String, now: Long, locked: Boolean = false): Label {
+        val file = read()
+        file.labels.firstOrNull { it.id == id }?.let { return it.toLabel() }
+        val used = file.labels.map { it.color }.toSet()
+        val label = LabelV1(id, name.trim(), generateSequence(0) { it + 1 }.first { it !in used }, now, locked)
+        write(file.copy(labels = file.labels + label))
+        return label.toLabel()
+    }
+
     fun rename(id: String, name: String) {
         val clean = name.trim()
         if (clean.isEmpty()) return

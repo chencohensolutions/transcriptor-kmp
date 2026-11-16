@@ -26,6 +26,8 @@ data class ReviewState(
     val lecture: Lecture,
     val positionMillis: Long,
     val playing: Boolean,
+    /** The recording streams from the server and its first blocks are still on their way. */
+    val loading: Boolean = false,
     val speed: Float,
     /**
      * The models the lecture can be improved with (downloaded, for its language), the large ones first; empty: none.

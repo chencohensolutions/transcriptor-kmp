@@ -260,6 +260,27 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         place.folders(place.moments).mapNotNull { runCatching { read(place, it.name) }.getOrNull() }
     }.distinctBy { it.id }
 
+    /**
+     * Moment folders without their `lecture.json` (a delete or a save cut short), here or in the library: their names.
+     * Nothing can open them.
+     */
+    fun brokenFolders(): List<String> = listOfNotNull(local, library).flatMap { place ->
+        place.folders(place.moments).filter { !place.exists(it / "lecture.json") }.map { it.name }
+    }.distinct()
+
+    /** Deletes the folder [brokenFolders] named when it holds no recording (nothing, or only a transcript). */
+    fun deleteBroken(name: String): Boolean {
+        for (place in listOfNotNull(local, library)) {
+            val folder = place.moments / name
+            if (!place.exists(folder) || place.exists(folder / "lecture.json")) continue
+            val files = place.fileSystem.listOrNull(folder).orEmpty()
+            if (files.any { it.name != TRANSCRIPT && !it.name.endsWith(".tmp") }) return false
+            place.fileSystem.deleteRecursively(folder)
+            return true
+        }
+        return false
+    }
+
     /** The lectures still in the app's own storage. */
     fun localLectures(): List<Lecture> = local.folders(local.moments).mapNotNull { runCatching { read(local, it.name) }.getOrNull() }
 }
