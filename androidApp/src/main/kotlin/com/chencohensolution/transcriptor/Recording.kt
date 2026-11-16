@@ -208,7 +208,7 @@ object Recording {
     val utcOffset = { at: Long -> java.util.TimeZone.getDefault().getOffset(at).toLong() }
 
 
-    /** The models a lecture in [language] can be improved with: the downloaded Whisper models, the large ones first. */
+    /** The models a lecture in [language] can be improved with: the downloaded ones, large Whisper first, the Zipformer last. */
     fun refineModels(language: String): List<SpeechModel> =
         ModelChoices.candidates(modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip), ModelJob.Improve, models::isReady).filter(models::isReady)
 

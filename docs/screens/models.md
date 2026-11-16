@@ -101,7 +101,8 @@ stops.
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).
 - **A language's page** is the one place a model is chosen for a job: **Live transcription**, the models fast enough
-  to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first. Each list has the
+  to keep up; **Improve transcription**, the Whisper models (CPU or NPU), the large ones first, then the Zipformer (CPU or
+  NPU; hen's ask, Nov 16, 2026). Each list has the
   downloaded models to pick (a radio), then the others with their download; a model that does both is offered to get
   once, under Live. A large model that runs live in ~30 s windows (large-v3 on the CPU, `liveWindowSeconds`) is got
   under Improve and, once downloaded, can also be picked under Live, after the line models. One that fails the NPU

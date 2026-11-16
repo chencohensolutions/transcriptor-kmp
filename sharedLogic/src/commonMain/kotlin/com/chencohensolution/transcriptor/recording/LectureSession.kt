@@ -93,10 +93,14 @@ class LectureSession(
         val transcribing: Boolean = false,
         /** A live model is on the phone for its language: transcription can be switched on (read once, at the start). */
         val canTranscribe: Boolean = false,
+        /**
+         * Live transcription's latest output (the grey line, the lag), kept with the lines it made: a line that ends
+         * and the grey line it came from change in the same update, so the screen never shows one without the other.
+         */
+        val live: LiveOutput? = null,
     )
 
     private val recording = MutableStateFlow<Recording?>(null)
-    private val liveOutput = MutableStateFlow<LiveOutput?>(null)
     private var liveModel: LiveModel? = null
     private var wantedInput: MicInput? = null
     private var saving: Job? = null
@@ -125,13 +129,13 @@ class LectureSession(
         following = scope.launch {
             val speakers = live?.state ?: MutableStateFlow(LiveSpeakers.State())
             combine(model.transcriber.output, speakers) { out, found -> out to found }.collect { (out, found) ->
-                liveOutput.value = out
                 val r = recording.value ?: return@collect
                 val (lines, who) = shown(model, out, found)
-                if (lines != r.lecture.segments || who.size != r.lecture.speakers.size) {
-                    recording.update { it?.copy(lecture = it.lecture.copy(segments = lines, speakers = named(who))) }
-                    if (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size) saveNow()
+                val changed = lines != r.lecture.segments || who.size != r.lecture.speakers.size
+                recording.update {
+                    it?.copy(live = out, lecture = if (changed) it.lecture.copy(segments = lines, speakers = named(who)) else it.lecture)
                 }
+                if (changed && (lines.size != r.lecture.segments.size || who.size != r.lecture.speakers.size)) saveNow()
             }
         }
     }
@@ -186,8 +190,9 @@ class LectureSession(
     private var edits: Map<String, String> = emptyMap()
 
     val state: StateFlow<LiveLectureState?> =
-        combine(recording, recorder.positionMillis, recorder.meter, liveOutput, recorder.inputInUse) { r, position, meter, out, input ->
+        combine(recording, recorder.positionMillis, recorder.meter, recorder.inputInUse) { r, position, meter, input ->
             r?.let {
+                val out = it.live
                 LiveLectureState(
                     labelNames = it.labelNames,
                     lecture = it.lecture.copy(durationMillis = if (it.finishing) it.lecture.durationMillis else position),
@@ -464,7 +469,6 @@ class LectureSession(
         )
         save(lecture)
         recording.value = null
-        liveOutput.value = null
         liveModel = null
         feeding = false
         return lecture

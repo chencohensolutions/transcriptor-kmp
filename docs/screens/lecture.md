@@ -134,7 +134,11 @@ starts afresh. Amber from 70%, red from 90%.
   one: everything in view, the grey words too, moves up together in a single ease-in-out tween (320 ms), no spring and
   no line on its own. New words fade in (200 ms) once the move ends; a finished line settles from grey into the text's
   color where the grey line was. The grey is the text's own color, faded (`onSurface` at 60%), so it reads in the
-  light and the dark theme alike. Scrolling back stops following
+  light and the dark theme alike. How far to move is worked out while the list is laid out, before the frame is drawn
+  (`Glide`): measured a frame later, the text jumped up for a frame first, a flicker on every new line (fixed Nov 16).
+  A finished line and the grey line it came from reach the screen in one update (`LectureSession`'s `Recording.live`),
+  never one without the other. A word's fade that is cut off (a word came, the text moved) picks up where it stopped;
+  it used to stay nearly invisible, dark on the dark theme. Scrolling back stops following
   until "Back to live".
 
 ## Code
