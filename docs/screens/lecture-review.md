@@ -24,8 +24,8 @@ bar says "Transcribing · n%". Its notes are listed under the card, and the reco
 ## Who was here?
 
 The people button in the top bar opens a sheet with every voice of the moment, the one who talked most first
-(`ReviewState.people`, `peopleOf`). It also opens by itself once, when a moment just recorded opens after Stop with two
-or more voices and one still unnamed (`askPeople`).
+(`ReviewState.people`, `peopleOf`). It opens only from that button: it used to open by itself after Stop when a voice
+was unnamed, which the owner turned off (Nov 16, 2026).
 
 - **Play**: the voice's longest line, to hear who it is; again pauses it (`LectureReview.playPerson`).
 - **Name**: a field per voice; while it is empty and focused, the voices the app knows are offered as chips

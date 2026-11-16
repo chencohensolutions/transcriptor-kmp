@@ -110,8 +110,6 @@ class MainActivity : ComponentActivity() {
                 val last by Recording.lastLecture.collectAsStateWithLifecycle()
                 val working by Recording.working.collectAsStateWithLifecycle(emptyMap())
                 var openAfterStop by remember { mutableStateOf(false) }
-                // The moment just recorded asks "Who was here?" once when it opens (by its id).
-                var askPeopleOf by remember { mutableStateOf<String?>(null) }
                 // The recording lecture's screen is shown, not Notebooks (with its banner back to it).
                 var showLive by rememberSaveable { mutableStateOf(true) }
                 var settings by rememberSaveable { mutableStateOf(false) }
@@ -126,7 +124,6 @@ class MainActivity : ComponentActivity() {
                     val lecture = last
                     if (openAfterStop && live == null && lecture != null) {
                         openAfterStop = false
-                        askPeopleOf = lecture.id
                         openLecture(lecture.id)
                     }
                 }
@@ -198,7 +195,6 @@ class MainActivity : ComponentActivity() {
                         }
                         ReviewScreen(
                             review,
-                            askPeople = askPeopleOf == review.lecture.id,
                             allLabels = library.labels,
                             actions = ReviewActions(
                                 info = r::info,

@@ -215,7 +215,7 @@ fun ReviewScreen(
     var pickingModel by remember { mutableStateOf(false) }
     var showingVersions by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
-    // "Who was here?": from its button, and by itself once for a moment just recorded with voices still unnamed.
+    // "Who was here?": from its button only. It no longer opens by itself after a recording (hen's ask, Nov 16, 2026).
     var showingPeople by remember(state.lecture.id) { mutableStateOf(askPeople && state.people.size >= 2 && state.people.any { it.name.isEmpty() }) }
     if (showingPeople) PeopleSheet(state, actions, onDismiss = { showingPeople = false })
     var renamingTitle by remember { mutableStateOf(false) }
