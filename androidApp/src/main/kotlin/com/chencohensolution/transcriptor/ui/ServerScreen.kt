@@ -78,7 +78,10 @@ class ServerActions(
     /** Asks another app on the phone that uses shed (by its place in the list) for its pairing. */
     val pairFrom: (Int) -> Unit = {},
     val setWifiOnly: (Boolean) -> Unit = {},
+    /** Sends what waits now, in the app, on the network there is (moments and calls). */
     val backUpNow: () -> Unit = {},
+    /** The phone is on a metered network now: Back up now asks first when Wi-Fi only is on. */
+    val onMeteredNetwork: () -> Boolean = { false },
     val unpair: () -> Unit = {},
     /** Shows the server's recordings in the moments list, or only what Audio Logs recorded. */
     val setShowServer: (Boolean) -> Unit = {},
@@ -173,23 +176,31 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         stringResource(R.string.server_paired, isolated(paired.server.removePrefix("https://")), isolated(paired.user), isolated(paired.deviceName)),
         style = MaterialTheme.typography.bodyMedium,
     )
+    // Moments and calls both: "every moment is on the server" said while calls wait read as all sent (hen, Nov 16, 2026).
+    val calls = if (state.callsFolder != null) state.callsWaiting else 0
     Text(
         when {
+            state.waiting > 0 && calls > 0 -> stringResource(R.string.server_waiting_with_calls, state.waiting, calls, modelsSize(state.bytesLeft + state.callsBytesLeft), state.backedUp)
             state.waiting > 0 -> stringResource(R.string.server_waiting, state.waiting, modelsSize(state.bytesLeft), state.backedUp)
+            calls > 0 -> stringResource(R.string.server_calls_only_waiting, calls, modelsSize(state.callsBytesLeft), state.backedUp)
             state.backedUp > 0 -> stringResource(R.string.server_all_backed_up, state.backedUp)
             else -> stringResource(R.string.server_none_yet)
         },
         style = MaterialTheme.typography.bodyMedium,
     )
+    if (state.uploading) {
+        Text(stringResource(R.string.server_uploading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
     when (state.lastRun) {
-        is RunResult.Offline -> if (state.waiting > 0) Text(stringResource(R.string.server_offline), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        is RunResult.Offline -> if (state.waiting + calls > 0 && !state.uploading) Text(stringResource(R.string.server_offline), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         RunResult.Unauthorized -> Text(stringResource(R.string.server_unauthorized), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         else -> Unit
     }
     state.refused.forEach { (moment, reason) ->
         Text(stringResource(R.string.server_refused, isolated(moment), reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
-    FilledTonalButton(onClick = actions.backUpNow) { Text(stringResource(R.string.server_back_up_now)) }
+    BackUpNowButton(state, actions, if (state.waiting + calls > 0) R.string.server_upload_now else R.string.server_back_up_now)
     Row(
         Modifier.fillMaxWidth().toggleable(value = state.wifiOnly, role = Role.Switch, onValueChange = actions.setWifiOnly).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -277,6 +288,8 @@ private fun CallsSection(state: ServerState, actions: ServerActions) {
         Switch(checked = folder != null, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
     if (folder != null) {
+        // The waiting calls sent now, from here too, where they are counted.
+        if (state.callsReadable && state.callsWaiting > 0) BackUpNowButton(state, actions, R.string.server_calls_upload_now)
         Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = actions.chooseCallsFolder) {
             Text(stringResource(if (state.callsReadable) R.string.server_calls_change else R.string.server_calls_allow))
@@ -376,4 +389,24 @@ private fun FreeUpSection(state: ServerState, actions: ServerActions) {
             }
         },
     ) { Text(stringResource(R.string.server_free_button, modelsSize(p?.bytes ?: 0))) }
+}
+
+/**
+ * Sends what waits now, in the app ([ServerActions.backUpNow]). With Wi-Fi only on and the phone on mobile data, it asks
+ * first, saying how much would go; while a send runs it is off.
+ */
+@Composable
+private fun BackUpNowButton(state: ServerState, actions: ServerActions, label: Int) {
+    var asking by rememberSaveable { mutableStateOf(false) }
+    FilledTonalButton(
+        onClick = { if (state.wifiOnly && actions.onMeteredNetwork()) asking = true else actions.backUpNow() },
+        enabled = !state.uploading,
+    ) { Text(stringResource(label)) }
+    if (asking) AlertDialog(
+        onDismissRequest = { asking = false },
+        title = { Text(stringResource(R.string.server_mobile_title)) },
+        text = { Text(stringResource(R.string.server_mobile_note, modelsSize(state.bytesLeft + state.callsBytesLeft))) },
+        confirmButton = { TextButton(onClick = { asking = false; actions.backUpNow() }) { Text(stringResource(R.string.server_mobile_send)) } },
+        dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.server_cancel)) } },
+    )
 }

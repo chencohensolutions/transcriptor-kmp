@@ -657,6 +657,27 @@ object Recording {
     }
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Back up now, forced: the finished moments and the new calls handed over, then the queue sent here and now on the
+     * network there is, not left to the background work (which may be waiting out a retry, or for Wi-Fi). Then the
+     * background work is scheduled again for what is left.
+     */
+    fun uploadNow(context: android.content.Context) {
+        syncScope.launch {
+            runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
+            if (backup.callsFolder != null) backUpCalls(context)
+            runCatching { backup.runUploads() }.onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+            if (backup.waiting() > 0) scheduleUploads(context)
+            refreshServerMoments()
+        }
+    }
+
+    /** The phone's network now is metered (mobile data, a hotspot): Back up now asks first when Wi-Fi only is on. */
+    fun onMeteredNetwork(context: android.content.Context): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        return cm.activeNetwork != null && cm.isActiveNetworkMetered
+    }
     private val callsRunning = kotlinx.coroutines.sync.Mutex()
 
     /**
