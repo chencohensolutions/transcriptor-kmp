@@ -529,7 +529,7 @@ private fun LabelPills(labels: List<Label>) {
 private fun TuckedPill(count: Int, onShow: () -> Unit) {
     AssistChip(
         onClick = onShow,
-        label = { Text(stringResource(R.string.notebooks_tucked_pill, count)) },
+        label = { Text(pluralStringResource(R.plurals.notebooks_tucked_pill, count, count)) },
         leadingIcon = { Icon(Icons.Filled.VisibilityOff, null, Modifier.size(16.dp)) },
         modifier = Modifier.padding(horizontal = 20.dp),
     )
