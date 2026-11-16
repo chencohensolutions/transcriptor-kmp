@@ -107,6 +107,7 @@ import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.models.Languages
 import com.chencohensolution.transcriptor.notebook.Label
+import com.chencohensolution.transcriptor.notebook.CALLS_LABEL
 import com.chencohensolution.transcriptor.notebook.LectureSummary
 import com.chencohensolution.transcriptor.notebook.NotebooksState
 import com.chencohensolution.transcriptor.notebook.RecordingNow
@@ -265,7 +266,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
     var creating by remember { mutableStateOf(false) }
 
     val guessed = state.guess?.labels.orEmpty().filter { id -> state.labels.any { it.id == id } }
-    val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL }?.let { listOf(it) } ?: guessed)
+    val nextLabels = chosen ?: (filter?.takeIf { it != NO_LABEL && it != CALLS_LABEL }?.let { listOf(it) } ?: guessed)
     val labelsById = state.labels.associateBy { it.id }
     val unlabeled = state.moments.filter { it.labels.isEmpty() }
     fun groupOf(m: LectureSummary): Int {
@@ -419,8 +420,10 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                         }
                                     }
                                     LabelsMenu(
-                                        expanded = choosingLabels, labels = state.labels, checked = nextLabels.toSet(), guessed = guessed.toSet(),
+                                        // Calls is for calls: not a label to record under.
+                                        expanded = choosingLabels, labels = state.labels.filter { it.id != CALLS_LABEL }, checked = nextLabels.toSet(), guessed = guessed.toSet(),
                                         onDismiss = { choosingLabels = false },
+                                        onNone = { chosen = emptyList(); choosingLabels = false },
                                         onToggle = { id -> chosen = if (id in nextLabels) nextLabels - id else nextLabels + id },
                                         onNew = { choosingLabels = false; creating = true },
                                     )
@@ -760,13 +763,19 @@ private fun SearchNote(text: String) {
     Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
 }
 
-/** The labels for the next moment, as a menu of checkboxes: the guessed ones marked ✦, then New label. */
+/** The labels for the next moment, as a menu of checkboxes: No labels, the guessed ones marked ✦, then New label. */
 @Composable
 private fun LabelsMenu(
     expanded: Boolean, labels: List<Label>, checked: Set<String>, guessed: Set<String>,
-    onDismiss: () -> Unit, onToggle: (String) -> Unit, onNew: () -> Unit,
+    onDismiss: () -> Unit, onToggle: (String) -> Unit, onNew: () -> Unit, onNone: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.notebooks_no_labels)) },
+            leadingIcon = { androidx.compose.material3.RadioButton(selected = checked.isEmpty(), onClick = null) },
+            onClick = onNone,
+        )
+        HorizontalDivider()
         labels.sortedByDescending { it.id in guessed }.forEach { l ->
             DropdownMenuItem(
                 text = { Text(l.name) },
