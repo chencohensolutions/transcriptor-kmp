@@ -36,7 +36,10 @@ class InstalledModels(private val fileSystem: FileSystem, private val root: Path
     /** The NPU model being loaded now ([NpuLoadGuard]); still set at start, its load got the app killed. */
     fun loading(): String? = read().loading
 
-    fun setLoading(id: String?) = read().let { f -> write(f.copy(loading = id)) }
+    /** When [loading]'s load started (epoch ms); null when not known. */
+    fun loadingSince(): Long? = read().loadingSince
+
+    fun setLoading(id: String?, since: Long? = null) = read().let { f -> write(f.copy(loading = id, loadingSince = since.takeIf { id != null })) }
 
     private fun read(): ModelsFileV1 =
         if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else ModelsFileV1()
@@ -78,6 +81,8 @@ private data class ModelsFileV1(
     val npu: Map<String, NpuV1> = emptyMap(),
     /** The NPU model being loaded ([NpuLoadGuard]). */
     val loading: String? = null,
+    /** When that load started (epoch ms); null in a file from before it was kept. */
+    val loadingSince: Long? = null,
 )
 
 @Serializable
@@ -130,7 +135,13 @@ private data class InstalledV1(
  *   ([ModelLibrary.forLanguage]) and the pick falls back to the next model that works. Nothing retries it on its
  *   own; [reenable] does, when the user asks.
  */
-class NpuLoadGuard(private val installed: InstalledModels, private val log: (String) -> Unit = {}, private val freeBytes: () -> Long) {
+class NpuLoadGuard(
+    private val installed: InstalledModels,
+    private val log: (String) -> Unit = {},
+    /** The clock (epoch ms), kept with a load so [recover] can tell an update from a crash. */
+    private val clock: () -> Long = { 0L },
+    private val freeBytes: () -> Long,
+) {
     /** A load refused: [now] when only for want of free memory at the moment (not disabled), else the model is disabled. */
     class Refused(message: String, val now: Boolean = false) : Exception(message)
 
@@ -151,11 +162,20 @@ class NpuLoadGuard(private val installed: InstalledModels, private val log: (Str
         return Pick(ready.firstOrNull { it.id != first.id && fitsNow(it) }, skipped = first)
     }
 
-    /** At start: disables the model whose load was running when the app was last killed; its id, or null. */
-    fun recover(): String? {
+    /**
+     * At start: disables the model whose load was running when the app was last killed; its id, or null. Not when the
+     * app was updated ([updatedAtMillis], epoch ms) after that load started: an install closes the app whatever it is
+     * doing, which says nothing about the model (Nov 17, 2026: an install mid-load disabled the live Zipformer).
+     */
+    fun recover(updatedAtMillis: Long? = null): String? {
         val id = installed.loading() ?: return null
-        installed.setNpu(id, NpuResult(runs = false, reason = KILLED))
+        val since = installed.loadingSince()
         installed.setLoading(null)
+        if (updatedAtMillis != null && since != null && updatedAtMillis >= since) {
+            log("$id was loading when the app was updated: not disabled")
+            return null
+        }
+        installed.setNpu(id, NpuResult(runs = false, reason = KILLED))
         return id
     }
 
@@ -166,7 +186,7 @@ class NpuLoadGuard(private val installed: InstalledModels, private val log: (Str
         val free = freeBytes()
         // Not enough free memory right now: refused this time only. Closing other apps may be enough.
         if (need > free) throw Refused("Not enough free memory now: needs about ${gb(need)} GB, ${gb(free)} GB free. Close other apps and try again.", now = true)
-        installed.setLoading(model.id)
+        installed.setLoading(model.id, clock())
         try {
             // The free memory before and after: what the load really keeps, to set [SpeechModel.npuPeakBytes] from.
             return load().also { log("${model.id} loaded: ${gb(free)} GB free before, ${gb(freeBytes())} GB after (guard asked ${gb(need)} GB)") }

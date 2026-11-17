@@ -144,4 +144,20 @@ class NpuGuardTest {
         assertFailsWith<IllegalStateException> { guard.load(turbo) { error("QNN error") } }
         assertNull(installed.loading())
     }
+
+    @Test
+    fun anUpdateDuringALoadDoesNotDisableTheModel() {
+        val fs = okio.fakefilesystem.FakeFileSystem()
+        val installed = com.chencohensolution.transcriptor.models.InstalledModels(fs, okio.Path.Companion.run { "/m".toPath() })
+        installed.setLoading("zipformer-npu", since = 1_000)
+        val guard = com.chencohensolution.transcriptor.models.NpuLoadGuard(installed, clock = { 5_000 }) { Long.MAX_VALUE }
+        // The app was installed again at 2,000, after the load began: not the model's doing.
+        kotlin.test.assertNull(guard.recover(updatedAtMillis = 2_000))
+        kotlin.test.assertNull(installed.npu("zipformer-npu"))
+        kotlin.test.assertNull(installed.loading())
+        // Killed with no update since: disabled, as before.
+        installed.setLoading("zipformer-npu", since = 3_000)
+        kotlin.test.assertEquals("zipformer-npu", guard.recover(updatedAtMillis = 2_000))
+        kotlin.test.assertEquals(false, installed.npu("zipformer-npu")?.runs)
+    }
 }
