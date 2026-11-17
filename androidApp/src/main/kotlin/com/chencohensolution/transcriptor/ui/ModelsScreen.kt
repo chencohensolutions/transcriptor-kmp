@@ -167,6 +167,8 @@ data class ModelsState(
     val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
     val advancedMode: Boolean = false,
+    /** Settings › Advanced › Location, for its line. */
+    val location: com.chencohensolution.transcriptor.location.LocationSettings = com.chencohensolution.transcriptor.location.LocationSettings(),
     val folder: Recording.Folder = Recording.Folder.NotSet,
     /** Settings › Server backup's line: off, or on to which server and how many moments wait. */
     val server: String = "",
@@ -300,6 +302,8 @@ class ModelsActions(
     val stopMicTest: () -> Unit = {},
     val chooseFolder: () -> Unit = {},
     val openServer: () -> Unit = {},
+    /** Settings › Advanced › Location's page (its own state and permissions), with its back. */
+    val locationPage: @Composable (onBack: () -> Unit) -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
     val addLanguage: (String) -> Unit = {},
     /** Searches Hugging Face, in a language (null: any), of a kind (null: all), and only this phone's NPU builds. */
@@ -335,6 +339,8 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
     var formatPage by rememberSaveable { mutableStateOf<FormatPage?>(null) }
     /** Settings › Advanced is open (the speaker pages and the model library open from it, and return to it). */
     var advanced by rememberSaveable { mutableStateOf(false) }
+    /** Settings › Advanced › Location is open (over Advanced). */
+    var location by rememberSaveable { mutableStateOf(false) }
     val openCatalog = { l: String? -> if (l != null) shown = l; page = 1 }
     when {
         page == 2 -> {
@@ -364,9 +370,13 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
             BackHandler { speakerJob = null }
             SpeakerPage(state, actions, speakerJob!!, onFindMore = { speakerHub = true }) { speakerJob = null }
         }
+        advanced && location -> {
+            BackHandler { location = false }
+            actions.locationPage { location = false }
+        }
         advanced -> {
             BackHandler { advanced = false }
-            AdvancedPage(state, actions, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) }) { advanced = false }
+            AdvancedPage(state, actions, openSpeakers = { speakerJob = it }, openCatalog = { openCatalog(null) }, openLocation = { location = true }) { advanced = false }
         }
         else -> SettingsPage(state, actions, openLanguage = { language = it }, openAdvanced = { advanced = true }, openFormat = { formatPage = FormatPage.Format })
     }
@@ -479,7 +489,7 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit, onBack: () -> Unit) {
+private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeakers: (HubKind) -> Unit, openCatalog: () -> Unit, openLocation: () -> Unit, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -494,6 +504,7 @@ private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeaker
                 stringResource(if (state.advancedMode) R.string.settings_advanced_mode_on else R.string.settings_advanced_mode_off),
                 state.advancedMode, actions.setAdvancedMode,
             )
+            NavRow(stringResource(R.string.location_title), locationLine(state.location), openLocation)
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_recognition))
             PageNote(stringResource(R.string.settings_recognition_note))
@@ -788,12 +799,12 @@ private fun ChoiceText(model: SpeechModel, state: ModelsState, modifier: Modifie
 }
 
 @Composable
-private fun PageNote(text: String) {
+internal fun PageNote(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
 }
 
 @Composable
-private fun SwitchRow(title: String, note: String, on: Boolean, set: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, note: String, on: Boolean, set: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, role = Role.Switch, onValueChange = set).padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -807,7 +818,7 @@ private fun SwitchRow(title: String, note: String, on: Boolean, set: (Boolean) -
 }
 
 @Composable
-private fun NavRow(title: String, note: String, onClick: () -> Unit) {
+internal fun NavRow(title: String, note: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -818,7 +829,7 @@ private fun NavRow(title: String, note: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 4.dp),

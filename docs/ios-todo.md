@@ -279,3 +279,14 @@ anything left to decide. Remove an entry once it is built.
   should read 24 bit as floats when `flac.bitDepth` is 24 and hand 16 bits to live transcription (`PcmConvert`,
   `PcmReducer(bits = 24)`). UI: `ui/RecordingFormat.kt` (`Presets`, `FlacFormatPart`), strings `rec_preset_*`,
   `rec_format_depth*`, `rec_format_flac_*`.
+
+## Stop by place and the moment's path (Nov 17, 2026)
+
+- Shared: `location/` (`GeoPoint`, `Fix`, `FixSource`, `SavedPlace`, `StopDevice`, `PlaceWatch` with its `State`s,
+  `StopReason`, `MomentPath`, `PathBuilder`, `DrivingSwitch`, `LocationSettings`, `PathPrecision`, `KeepUntil`),
+  `SettingsStore.location` / `updateLocation`, `ProfileSettings.stopByPlace` / `savePath`, `Lecture.placeStop` /
+  `hasPath`, `LectureStore.savePath` / `loadPath`.
+- iOS: Core Location while recording (`allowsBackgroundLocationUpdates` with the audio background mode); passive
+  precision maps to significant-change or `kCLLocationAccuracyReduced`, the precise levels to `kCLLocationAccuracyBest`
+  at 1 Hz; the device trigger to the car's Bluetooth (CarPlay or audio route change).
+

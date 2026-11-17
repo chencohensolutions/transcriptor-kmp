@@ -106,7 +106,17 @@ data class Lecture(
     val serverSha256: String? = null,
     /** Where the server says the recording came from (`call`, `recording`, `folder:whatsapp`); null for one recorded here. */
     val source: String? = null,
+    /** It stopped by itself (Settings › Advanced › Location): why, and where in the recording the trigger fired. */
+    val placeStop: PlaceStop? = null,
+    /** It has a path (`path.json`, [com.chencohensolution.transcriptor.location.MomentPath]). */
+    val hasPath: Boolean = false,
 )
+
+/**
+ * A recording stopped by stop by place: [reason] ([com.chencohensolution.transcriptor.location.StopReason.key]) at
+ * [atMillis] in the recording (the countdown ran from there), and the saved place's name when it arrived at one.
+ */
+data class PlaceStop(val reason: String, val atMillis: Long, val placeName: String? = null)
 
 /**
  * Live transcription switched off while recording, from [fromMillis] to [toMillis] of the audio (null while it still

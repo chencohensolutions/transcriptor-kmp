@@ -119,3 +119,10 @@ permission the tap opens the app, whose Record asks for it. A long press opens t
 
 Record is red (Nov 17, 2026, hen's ask) and morphs into the recording screen's red Stop (`sharedRecordButton`, a shared element in MainActivity's `SharedTransitionLayout`/`AnimatedContent` screen switch, which also cross-fades the screens); going back, Stop morphs into the banner's red Back to the moment. While going to the recording screen the Record bar stays (no banner) so the button can morph.
 With Music picked (Nov 17, 2026), the advanced rows show Music's encoder in a line instead of the quality chips, and Processing sets Music's own mode (`NotebooksState.musicChoice`, `musicPowerSaving`).
+
+**Stop by place and Path on the Record bar** (Nov 17, 2026): with Advanced mode on and Settings › Advanced › Location's
+stop by place or path saving on, the Record bar's rows add **Stop by place** and **Path** switches, kept in the profile
+shown (Music's own with Music), and the summary paragraph ends with "It stops after leaving the place." / "The path is
+saved." While recording, both recording screens show a line under the top bar ("Stops when leaving, 250 m from here ·
+Path") that opens Set the place again here / Cancel for this recording, and during the countdown a banner with its
+seconds, Keep recording and Stop now.

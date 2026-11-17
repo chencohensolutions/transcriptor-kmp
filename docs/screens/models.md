@@ -100,7 +100,15 @@ stops.
   (`AndroidAudioInputs.deepCapture`; the S25's own microphones don't, a USB one may), else FLAC records 16 bit.
   The **FLAC** page: the shared sound and its size an hour (`SettingsStore.flac`, `FlacFormat`), and the compression effort, 0 (faster) to 8 (smaller file) (`SettingsStore.flacLevel`).
   Both pages say when they encode, when it is afterwards. **Advanced**: first **Advanced mode** (off by default): on, the main screen's Record bar also shows Quality and Battery
-  ([notebooks.md](notebooks.md)). Processor meters while recording, one of Off (the default),
+  ([notebooks.md](notebooks.md)). Then **Location** (מיקום, `LocationPage` in `ui/LocationScreen.kt`, fed by `LocationSettingsPage.kt`;
+  Nov 17, 2026), its line saying what is on. Two main switches, both off by default; turning either on asks for location
+  (precise or approximate; never "all the time"), and nothing about location shows anywhere else while both are off.
+  **Stop by place**: stop when leaving the place (100, 250 or 500 m), stop when arriving at a saved place, **Saved
+  places** (Add the current place takes one fix and a name; no map), stop when the phone connects to the car (picks
+  a paired Bluetooth device; asks for Bluetooth only then). **Save the recording's path**: precision (Only when GPS is
+  already on, the default; Economical; Precise while moving, a slow walk too; Precise), keep saving after stopping (until a saved
+  place, 30 minutes, an hour or two hours), and, when paired, sync location with the server. With approximate location
+  only, stopping is at 500 m and the precise levels are disabled. Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).

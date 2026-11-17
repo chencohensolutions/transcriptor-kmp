@@ -355,6 +355,45 @@ library the journal app will share:
   every phone; journal shows it where private files are allowed. Needs a paired server; nothing is deleted when a step
   fails. A note larger than the server's 256 KiB (a very long moment) is refused, and the moment stays.
 
+### Stop by place and the moment's path (owner's request, Nov 17, 2026)
+
+Optional, all of it under Settings › Advanced › Location; nothing shows elsewhere and no location permission is asked
+for while both switches are off. Plan: [Stop by place and path saving](https://claude.ai/artifact/DmzMfxNwjLyut2jp6pZS7i).
+Location comes from Android's own `LocationManager` (no Play services) and never leaves the phone except with its
+moment, under the backup's settings.
+
+- **Stop by place** (`location/PlaceWatch`): the recording stops after a one minute countdown that the user can cancel
+  ("Keep recording" disarms that trigger for the rest of the recording) when it moves away from where it started
+  (100, 250 or 500 m; two good fixes beyond it a minute apart), arrives at a saved place it was seen outside of (two
+  good fixes inside, a minute apart), or the chosen Bluetooth device connects. A fix is good when its accuracy is within
+  half the stop distance. Per recording profile (`ProfileSettings.stopByPlace`; Music starts off). The moment keeps why
+  and where in the recording it fired (`Lecture.placeStop`, `lecture.json` `placeStop`).
+- **Path** (`location/MomentPath`, `PathBuilder`): `path.json` (version 1, one line, the points as columns: time in the
+  recording, lat, lon, accuracy, speed, bearing, source), `Lecture.hasPath`. Every fix is kept (owner's call, Nov 17, 2026: once
+  the phone has a fix, keeping it costs next to nothing); only the same fix heard by two listeners is left out. Precision (`PathPrecision`): by default only the fixes
+  other apps already ask for (passive, no GPS of our own); economical adds one a minute; precise while moving adds GPS
+  every second from the first steps, a slow walk too (`MovingSwitch`: measured speed of 1.4 km/h or more, 15 m moved, or
+  Android's significant-motion sensor, which costs nothing while standing; off two minutes after it last moved); precise,
+  GPS every second. It may go on after the audio stops
+  (`KeepUntil`), the points then past `audioEndMs`.
+- **Server**: with Sync location on, the path goes up with its moment, never live: inside the moment's note
+  (`LectureStore.serverNote(lecture, path)`, `pathNote`, `location/PathNoteV1`: whole numbers, each the change from the
+  point before, about 100 KB an hour at a point a second, thinned until it fits 160 KB of the note's 256 KiB). A phone
+  that brings the moment back from the server restores `path.json` (`ServerBackup.momentHere`). Turning the switch on
+  or off sends every backed-up moment's note again (`ServerBackup.syncPathChanged`).
+- **While recording** (`location/MomentLocation`, Android `LocationFeed` in `RecordingService`): the recording's
+  service adds the location type; the passive provider always, plus GPS until the first fix, then a fix a minute
+  (GPS-quality for a 100 m stop, else balanced), or GPS every second for the precise levels. Fixes older than the start
+  are left out. The countdown is a vibrating notification on its own channel (`place-stop`) and a banner on the
+  recording screens (`PlaceStatusBar`); the moment gets a mark where it fired. After Stop with Keep saving the path,
+  the service stays (location type, "Saving the path" with Stop) until the time or a saved place, then saves
+  `path.json` with the moment.
+- **Moment info**: Stopped by itself (why, when), and Path: distance, top speed, points, a line drawing (the part
+  after the audio dashed) and a driving-speed graph; tapping either seeks the audio. **Show on map** (owner's request,
+  Nov 17, 2026) opens the path full screen on a MapLibre map (`ui/PathMap.kt`, `org.maplibre.gl:android-sdk`, about
+  2.5 MB) with OpenFreeMap's style (OpenStreetMap data, free, no key): only the map's tiles are fetched, only while it
+  is open; the path itself never leaves the phone. Tapping near the path plays the audio from there.
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.

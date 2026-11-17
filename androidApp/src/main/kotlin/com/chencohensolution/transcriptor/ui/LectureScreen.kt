@@ -137,12 +137,17 @@ class LiveLectureActions(
  * under the top bar, or a chip at the transcript's top end that opens a sheet (`ProcessorMetersView.kt`).
  */
 @Composable
-fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInTranscript: Boolean = false) {
+fun LectureScreen(
+    state: LiveLectureState, actions: LiveLectureActions, startInTranscript: Boolean = false,
+    /** Stop by place and the path for this moment (Settings › Advanced › Location); null when neither is on. */
+    place: com.chencohensolution.transcriptor.location.MomentLocation.Status? = null,
+    placeActions: PlaceActions = PlaceActions(),
+) {
     // It opens at a glance (RecordingGlance): the clock, who is talking, Mark. The transcript is one tap from there,
     // and Back returns to the glance.
     var transcript by rememberSaveable { mutableStateOf(startInTranscript) }
     if (!transcript) {
-        RecordingGlance(state, actions, onTranscript = { transcript = true })
+        RecordingGlance(state, actions, onTranscript = { transcript = true }, place = place, placeActions = placeActions)
         return
     }
     BackHandler { transcript = false }
@@ -237,6 +242,7 @@ fun LectureScreen(state: LiveLectureState, actions: LiveLectureActions, startInT
                     ProcessorMeterStyle.Graphs -> MetersGraphs(meters, state.meterHistory)
                     else -> {}
                 }
+                if (place != null && !state.finishing) PlaceStatusBar(place, state.elapsedMillis, placeActions)
             }
         }
 

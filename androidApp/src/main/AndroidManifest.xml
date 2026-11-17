@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <!-- Settings › Advanced › Location (off by default): stop by place and the moment's path, while recording only. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- EncodeJob is kept across a restart (encode when charging). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -31,7 +36,7 @@
         <service
             android:name=".RecordingService"
             android:exported="false"
-            android:foregroundServiceType="microphone|mediaProcessing" />
+            android:foregroundServiceType="microphone|mediaProcessing|location" />
         <!-- The Quick Settings tile: Record, and Stop while recording. -->
         <service
             android:name=".RecordTileService"

@@ -68,7 +68,10 @@ import kotlinx.coroutines.delay
  * typed notes are one tap away ([onTranscript]).
  */
 @Composable
-internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureActions, onTranscript: () -> Unit) {
+internal fun RecordingGlance(
+    state: LiveLectureState, actions: LiveLectureActions, onTranscript: () -> Unit,
+    place: com.chencohensolution.transcriptor.location.MomentLocation.Status? = null, placeActions: PlaceActions = PlaceActions(),
+) {
     val colors = LocalTranscriptorColors.current
     // "Marked at 12:20", for a moment after the tap.
     var marked by remember { mutableStateOf<Long?>(null) }
@@ -88,6 +91,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                 if (state.labelNames.isNotEmpty()) Text(state.labelNames, style = MaterialTheme.typography.bodySmall, color = colors.time, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        if (place != null && !state.finishing) PlaceStatusBar(place, state.elapsedMillis, placeActions)
         Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text(
                 formatClock(state.elapsedMillis), fontSize = 76.sp, fontWeight = FontWeight.SemiBold,

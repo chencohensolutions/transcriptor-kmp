@@ -81,6 +81,7 @@ dependencies {
     implementation(files(sherpaOnnx))
     // The calls folder looked at now and then for new calls (CallsWorker).
     implementation(libs.androidx.work.runtime)
+    implementation(libs.maplibre.android)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

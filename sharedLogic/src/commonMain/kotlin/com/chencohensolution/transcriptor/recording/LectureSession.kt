@@ -431,10 +431,13 @@ class LectureSession(
      * A mark at this second of the recording: a note without words ([Note.isMark]), made with one tap when typing
      * isn't possible. Returns its time; null when nothing is recording. Words can be added after, on the moment.
      */
-    fun mark(): Long? {
+    fun mark(): Long? = markAt(null)
+
+    /** A mark at [atMillis] of the recording (an earlier moment, as stop by place's countdown start); null: now. */
+    fun markAt(atMillis: Long?): Long? {
         val r = recording.value ?: return null
         if (r.finishing) return null
-        val at = recorder.positionMillis.value
+        val at = (atMillis ?: recorder.positionMillis.value).coerceIn(0, recorder.positionMillis.value)
         recording.update { rec ->
             val notes = rec?.lecture?.notes ?: return@update rec
             val id = "n${(notes.maxOfOrNull { it.id.removePrefix("n").toIntOrNull() ?: 0 } ?: 0) + 1}"
@@ -444,12 +447,15 @@ class LectureSession(
         return at
     }
 
+    /** The position in the recording now (ms); what a clock time is turned into while recording. */
+    val positionMillis: Long get() = recorder.positionMillis.value
+
     /**
-     * Ends the lecture: the recording stops at once, then live transcription finishes the lines still waiting
+     * Ends the lecture ([placeStop] when stop by place ended it, [hasPath] when its path is saved beside it): the recording stops at once, then live transcription finishes the lines still waiting
      * ([LiveLectureState.finishing] meanwhile). With "WAV, then FLAC" or "WAV, then AAC" it is saved as [Lecture.pendingFlac] or [Lecture.pendingAac] for
      * [AudioCompression].
      */
-    suspend fun stop(): Lecture? {
+    suspend fun stop(placeStop: com.chencohensolution.transcriptor.notebook.PlaceStop? = null, hasPath: Boolean = false): Lecture? {
         val r = recording.value ?: return null
         if (r.finishing) return null
         saving?.cancel()
@@ -496,6 +502,7 @@ class LectureSession(
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && startFormat == AudioFormat.WavThenFlac,
             pendingAac = r.lecture.audioFile == AUDIO_WAV && startFormat == AudioFormat.WavThenAac,
             pendingCodec = com.chencohensolution.transcriptor.settings.Codec.of(startFormat).takeIf { r.lecture.audioFile == AUDIO_WAV && startFormat.wavFirst && it.other }?.key,
+            placeStop = placeStop, hasPath = hasPath,
         )
         save(lecture)
         recording.value = null

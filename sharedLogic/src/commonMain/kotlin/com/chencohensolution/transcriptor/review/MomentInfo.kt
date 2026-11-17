@@ -14,4 +14,6 @@ data class MomentInfo(
     val audioBytes: Long?,
     val recording: PowerReport?,
     val encoding: PowerReport?,
+    /** Where it was recorded (Settings › Advanced › Location); null without a path. */
+    val path: com.chencohensolution.transcriptor.location.MomentPath? = null,
 )
