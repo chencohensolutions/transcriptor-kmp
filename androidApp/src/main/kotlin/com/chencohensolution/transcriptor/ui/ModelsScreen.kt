@@ -175,6 +175,10 @@ data class ModelsState(
     val micInputs: List<com.chencohensolution.transcriptor.recording.MicInput> = emptyList(),
     /** What the phone says about its own microphones (positions, directionality), for the picker's drawing. */
     val micDetails: List<com.chencohensolution.transcriptor.recording.MicDetail> = emptyList(),
+    /** Settings › Microphone's test: the picked microphone's levels while its page is open. */
+    val micMeter: com.chencohensolution.transcriptor.recording.StereoMeterState = com.chencohensolution.transcriptor.recording.StereoMeterState(),
+    /** The test can't listen: a moment is recording, or the microphone permission isn't given. */
+    val micTestOff: Boolean = false,
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
@@ -271,6 +275,9 @@ class ModelsActions(
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
     val setLevelMeter: (LevelMeterStyle) -> Unit = {},
     val setMicInput: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
+    /** Settings › Microphone's test listens to this microphone (null: the phone's own) until [stopMicTest]. */
+    val startMicTest: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
+    val stopMicTest: () -> Unit = {},
     val chooseFolder: () -> Unit = {},
     val openServer: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
@@ -1342,8 +1349,7 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
  * The one picked stays picked while it is away ("not connected"): the phone's own records until it is back.
  */
 @Composable
-internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
+internal fun MicrophoneRow(state: ModelsState, open: () -> Unit) {
     val picked = state.micInput
     val connected = picked == null || state.micInputs.any { it.key == picked.key }
     NavRow(
@@ -1353,56 +1359,12 @@ internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
             connected -> micName(picked.name, picked.kind)
             else -> stringResource(R.string.settings_mic_away, micName(picked.name, picked.kind))
         },
-    ) { open = true }
-    if (!open) return
-    val choices = buildList {
-        add(null)
-        if (picked != null && !connected) add(picked)
-        addAll(state.micInputs)
-    }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = { open = false },
-        title = { Text(stringResource(R.string.settings_mic)) },
-        text = {
-            Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
-                // Where the phone's own microphones are, the picked one highlighted.
-                if (state.micInputs.any { it.kind == MicInput.Kind.BuiltIn }) PhoneMicMap(
-                    state.micInputs.filter { it.kind == MicInput.Kind.BuiltIn }.map { it.name }, state.micDetails,
-                    picked?.takeIf { it.kind == MicInput.Kind.BuiltIn }?.name,
-                )
-                choices.forEach { input ->
-                    val selected = input?.key == picked?.key
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton) { set(input); open = false }.padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected, onClick = null)
-                        Column(Modifier.padding(start = 16.dp)) {
-                            Text(if (input == null) stringResource(R.string.settings_mic_phone) else micName(input.name, input.kind), style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                when {
-                                    input == null -> stringResource(R.string.settings_mic_phone_note)
-                                    state.micInputs.none { it.key == input.key } -> stringResource(R.string.settings_mic_not_connected)
-                                    input.kind == MicInput.Kind.BuiltIn -> micPlaceNote(input.name, state.micDetails.firstOrNull { it.address == input.name })
-                                    else -> stringResource(micKind(input.kind))
-                                },
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                if (state.micInputs.isEmpty()) Text(
-                    stringResource(R.string.settings_mic_none), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.settings_mic_close)) } },
+        open,
     )
 }
 
 /** What kind of microphone [kind] is, and what to expect from it. */
-private fun micKind(kind: MicInput.Kind) = when (kind) {
+internal fun micKind(kind: MicInput.Kind) = when (kind) {
     MicInput.Kind.Bluetooth -> R.string.settings_mic_bluetooth
     MicInput.Kind.BluetoothLe -> R.string.settings_mic_bluetooth_le
     MicInput.Kind.Wired -> R.string.settings_mic_wired

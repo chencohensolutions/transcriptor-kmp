@@ -769,4 +769,7 @@
     <string name="settings_mic_cardioid">hears mostly in front of it</string>
     <string name="settings_mic_bidirectional">hears front and back</string>
     <string name="settings_mic_max_spl">clips above %1$d dB</string>
+    <string name="settings_mic_test">Test</string>
+    <string name="settings_mic_test_note">Scratch or tap gently near a microphone: the bars show what the picked one hears, left and right.</string>
+    <string name="settings_mic_test_off">The test listens when nothing is recording and the app may use the microphone.</string>
 </resources>

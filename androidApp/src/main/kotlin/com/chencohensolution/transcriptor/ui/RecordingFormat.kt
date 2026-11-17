@@ -59,7 +59,7 @@ import com.chencohensolution.transcriptor.settings.QualityPreset
 import kotlin.math.roundToInt
 
 /** Settings' recording-format pages, opened from its Recording format row. */
-enum class FormatPage { Format, Aac, Flac }
+enum class FormatPage { Format, Aac, Flac, Mic }
 
 /** The codec a format records to in the end. */
 private fun codecOf(format: AudioFormat) = when (format) {
@@ -80,6 +80,7 @@ fun RecordingFormatPages(page: FormatPage, state: ModelsState, actions: ModelsAc
     when (page) {
         FormatPage.Format -> FormatList(state, actions, open, back)
         FormatPage.Aac, FormatPage.Flac -> CodecPage(state, actions, aac = page == FormatPage.Aac, back)
+        FormatPage.Mic -> MicrophonePage(state, actions, back)
     }
 }
 
@@ -150,7 +151,7 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
     Scaffold(topBar = { FormatTopBar(stringResource(R.string.rec_format_format), back) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).selectableGroup()) {
             // The microphone first: what it gives decides what is offered below (24 bit only from one that gives it).
-            MicrophoneRow(state, actions.setMicInput)
+            MicrophoneRow(state) { open(FormatPage.Mic) }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             Presets(state, actions)
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))

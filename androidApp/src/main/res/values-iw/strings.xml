@@ -780,4 +780,7 @@
     <string name="settings_mic_cardioid">שומע בעיקר מלפניו</string>
     <string name="settings_mic_bidirectional">שומע מלפנים ומאחור</string>
     <string name="settings_mic_max_spl">נחתך מעל %1$d dB</string>
+    <string name="settings_mic_test">בדיקה</string>
+    <string name="settings_mic_test_note">גרדו או הקישו בעדינות ליד מיקרופון: הפסים מראים מה שומע המיקרופון שנבחר, שמאל וימין.</string>
+    <string name="settings_mic_test_off">הבדיקה מקשיבה כשלא מוקלט כלום והאפליקציה רשאית להשתמש במיקרופון.</string>
 </resources>
