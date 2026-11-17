@@ -64,8 +64,9 @@ The code still calls it `NotebooksScreen`.
   note; the Quick Settings tile follows the mode. The source used is in the moment's power details.
 - With **Advanced mode** on (Settings › Advanced, `SettingsStore.advancedMode`, off by default; owner's request, Nov 17,
   2026), a row under them: Quality **High**, **Normal**, **Low** and Battery **Save**, **Now**, the presets of Settings ›
-  Recording format (`NotebooksState.recordingChoice`, `RecordingChoice.with`); settings matching no preset leave that
-  group's chips unselected.
+  Recording format (`NotebooksState.recordingChoice`, `RecordingChoice.with`); each row has its name and a line saying what the
+  choice does (the quality's codec, sound and bitrate; what the battery does). With **Music** picked the rows give
+  way to one line: Music records with its own profile and timing (Settings › Recording settings › Music).
   One line beside them says which. (The "Usually … on Monday" line is gone: the guessed labels keep their ✦.)
   A moment waiting for its transcript says **Not transcribed yet** in the list.
 - While a moment records, a red banner replaces the bar: its clock and labels, and **Back to it**. That moment is not
@@ -117,3 +118,4 @@ permission the tap opens the app, whose Record asks for it. A long press opens t
 - [Round 3 (Nov 7, 2026)](../ux-history/notebooks/2026-11-07-labels.md): labels instead of notebooks: a — chips on top, labels on the Record bar (picked); b — labels after, one list; c — a side drawer.
 
 Record is red (Nov 17, 2026, hen's ask) and morphs into the recording screen's red Stop (`sharedRecordButton`, a shared element in MainActivity's `SharedTransitionLayout`/`AnimatedContent` screen switch, which also cross-fades the screens); going back, Stop morphs into the banner's red Back to the moment. While going to the recording screen the Record bar stays (no banner) so the button can morph.
+With Music picked (Nov 17, 2026), the advanced rows show Music's encoder in a line instead of the quality chips, and Processing sets Music's own mode (`NotebooksState.musicChoice`, `musicPowerSaving`).

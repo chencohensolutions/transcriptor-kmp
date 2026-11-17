@@ -65,10 +65,12 @@ class FlacFormatRoundTripTest {
 
     private fun checkAudio(file: File, what: String) {
         val all = readBack(file)
-        assertTrue("$what: ${all.size} samples", abs(all.size - seconds * 16_000) < 16_000 * 0.1)
+        // AAC adds its priming and a last whole frame (as in AacRoundTripTest): a fifth of a second.
+        assertTrue("$what: ${all.size} samples", abs(all.size - seconds * 16_000) < 16_000 * 0.2)
         val rms = sqrt(all.copyOfRange(16_000, 32_000).map { it * it.toDouble() }.average())
-        // A sine at 0.4: RMS about 0.28.
-        assertTrue("$what: rms $rms", rms in 0.2..0.36)
+        // A sine at 0.4: RMS about 0.28. xHE-AAC's decoder evens out loudness (to -24 LKFS, part of the codec), so quieter.
+        val xhe = what.startsWith("Xhe")
+        assertTrue("$what: rms $rms", rms in (if (xhe) 0.05 else 0.2)..0.36)
         val player = MediaPlayer().apply { setDataSource(file.path); prepare() }
         val duration = player.duration
         player.release()
@@ -103,12 +105,71 @@ class FlacFormatRoundTripTest {
         val flac = File(dir, "test24-from-wav.flac")
         val frames = androidFlacEncode.encode(wav.toOkioPath(), flac.toOkioPath(), 8, FlacFormat(24_000, 1, 16)) {}
         assertEquals(seconds * 48_000L, frames)
-        // The WAV's bit depth wins over the setting's.
-        assertEquals(listOf(24_000L, 1L, 24L, seconds * 24_000L), streamInfo(flac))
+        // The WAV's sound wins over the setting's: 48 kHz stereo 24 bit, as it was recorded.
+        assertEquals(listOf(48_000L, 2L, 24L, seconds * 48_000L), streamInfo(flac))
         checkAudio(flac, "FLAC from 24-bit WAV")
 
         val aac = File(dir, "test24-from-wav.aac")
         assertEquals(seconds * 48_000L, androidAacEncode.encode(wav.toOkioPath(), aac.toOkioPath(), AacSettings()) {})
         checkAudio(aac, "AAC from 24-bit WAV")
+    }
+
+    /** A WAV at the shared sound (24 kHz mono, 16 and 24 bit) reads back, and encodes to FLAC and AAC at its own rate. */
+    @Test
+    fun aReducedWavReadsAndEncodes() {
+        for (bits in FlacFormat.DEPTHS) {
+            val wav = File(dir, "test-24k-mono-$bits.wav")
+            val sink = com.chencohensolution.transcriptor.recording.ReducingSink(
+                com.chencohensolution.transcriptor.recording.PcmReducer(24_000, 1, bits),
+                WavWriter(FileSystem.SYSTEM, wav.toOkioPath(), 24_000, 1, bits),
+            )
+            chunks(bits) { b, n -> sink.write(b, n) }
+            sink.close()
+            val info = WavWriter.read(FileSystem.SYSTEM, wav.toOkioPath())
+            assertEquals(listOf(24_000, 1, bits), listOf(info.sampleRate, info.channels, info.bitsPerSample))
+            assertEquals(seconds * 24_000L, info.frames)
+            checkAudio(wav, "24 kHz mono $bits-bit WAV")
+            val part = RecordingAudio.range({ android.os.ParcelFileDescriptor.open(wav, android.os.ParcelFileDescriptor.MODE_READ_ONLY) }, true, 1_000, 2_000)
+            assertTrue("range ${part.size}", abs(part.size - 16_000) < 100)
+
+            val flac = File(dir, "test-24k-mono-$bits.flac")
+            assertEquals(seconds * 24_000L, androidFlacEncode.encode(wav.toOkioPath(), flac.toOkioPath(), 5, FlacFormat(48_000, 2, 16)) {})
+            assertEquals(listOf(24_000L, 1L, bits.toLong(), seconds * 24_000L), streamInfo(flac))
+            checkAudio(flac, "FLAC from 24 kHz mono $bits-bit WAV")
+
+            val aac = File(dir, "test-24k-mono-$bits.aac")
+            assertEquals(seconds * 24_000L, androidAacEncode.encode(wav.toOkioPath(), aac.toOkioPath(), AacSettings(sampleRate = 24_000, channels = 1, bitrateKbps = 48)) {})
+            checkAudio(aac, "AAC from 24 kHz mono $bits-bit WAV")
+        }
+    }
+
+    /** Every other codec the device encodes (Opus, xHE-AAC, AMR-WB, AMR-NB): live from the mic's PCM, and from a WAV. */
+    @Test
+    fun theOtherCodecs() {
+        val available = com.chencohensolution.transcriptor.recording.OtherEncoders.available
+        Log.i("FlacFormat", "other codecs here: $available")
+        assertTrue("Opus at least", com.chencohensolution.transcriptor.settings.Codec.Opus in available)
+        for (codec in available) {
+            val profile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal.defaults
+            val spec = profile.other(codec)!!
+            val file = File(dir, "test-other." + codec.file.substringAfterLast('.'))
+            val encoder = com.chencohensolution.transcriptor.recording.OtherEncoder(file, spec)
+            chunks(16) { b, n -> encoder.write(b, n) }
+            encoder.close()
+            Log.i("FlacFormat", "$spec on ${encoder.encoderName}: ${file.length()} bytes")
+            assertEquals(seconds * 48_000L, encoder.framesIn)
+            checkAudio(file, "$codec live")
+
+            val wav = File(dir, "test-other-${codec.key}.wav")
+            val sink = com.chencohensolution.transcriptor.recording.ReducingSink(
+                com.chencohensolution.transcriptor.recording.PcmReducer(spec.sampleRate, spec.channels, 16),
+                WavWriter(FileSystem.SYSTEM, wav.toOkioPath(), spec.sampleRate, spec.channels, 16),
+            )
+            chunks(16) { b, n -> sink.write(b, n) }
+            sink.close()
+            val out = File(dir, "test-other-from-wav." + codec.file.substringAfterLast('.'))
+            assertEquals(seconds.toLong() * spec.sampleRate, com.chencohensolution.transcriptor.recording.androidOtherEncode.encode(wav.toOkioPath(), out.toOkioPath(), spec) {})
+            checkAudio(out, "$codec from WAV")
+        }
     }
 }

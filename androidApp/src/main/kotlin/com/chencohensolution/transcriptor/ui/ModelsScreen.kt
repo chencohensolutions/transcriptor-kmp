@@ -153,6 +153,18 @@ data class ModelsState(
     val stopTwice: Boolean = false,
     /** The microphone in use gives more than 16 bits (a USB one may; the phone's own don't): 24 bit is offered. */
     val deepCapture: Boolean = false,
+    /** The recording profile shown on Recording settings (its settings are [audioFormat], [aac], [flac], [flacLevel], [micInput]). */
+    val profile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
+    /** The shown profile's settings in full (the other codecs' bitrates). */
+    val profileSettings: com.chencohensolution.transcriptor.settings.ProfileSettings = com.chencohensolution.transcriptor.settings.QualityProfile.Normal.defaults,
+    /** The other codecs this phone encodes (Opus, xHE-AAC, AMR-WB, AMR-NB). */
+    val codecs: Set<com.chencohensolution.transcriptor.settings.Codec> = emptySet(),
+    /** Compressing saves battery, for the shown profile (Music's own, else the shared mode). */
+    val powerSaving: Boolean = false,
+    /** "After" moments are transcribed on the charger. */
+    val transcribeSaving: Boolean = false,
+    /** The profile moments record with (High, Normal or Low). */
+    val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
     val advancedMode: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
@@ -261,8 +273,14 @@ class ModelsActions(
     val setFlacLevel: (Int) -> Unit = {},
     val setAac: (AacSettings) -> Unit = {},
     val setFlac: (com.chencohensolution.transcriptor.settings.FlacFormat) -> Unit = {},
-    /** Applies a quality preset (codec and its settings). */
-    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    /** The shared sound: sample rate and channels for AAC and FLAC, bit depth for FLAC and WAV. */
+    val setSound: (rate: Int, channels: Int, bits: Int) -> Unit = { _, _, _ -> },
+    /** Shows a recording profile to edit; High, Normal or Low also becomes the one moments record with. */
+    val showProfile: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
+    /** Sets one of the other codecs' bitrate (bits a second) in the shown profile. */
+    val setBitrate: (com.chencohensolution.transcriptor.settings.Codec, Int) -> Unit = { _, _ -> },
+    /** Puts the shown profile back to its defaults. */
+    val resetProfile: () -> Unit = {},
     /** Applies a power preset (when encoding and "After" transcription run). */
     val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val setEncodeAfter: (EncodeAfter) -> Unit = {},

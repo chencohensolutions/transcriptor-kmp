@@ -333,14 +333,35 @@ class MainActivity : ComponentActivity() {
         // Advanced mode: the Record bar also offers the quality and battery presets.
         val advanced = remember { Recording.settings.advancedMode }
         var choice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice else null) }
+        var active by remember { mutableStateOf(Recording.settings.activeProfile) }
+        val musicKey = com.chencohensolution.transcriptor.settings.QualityProfile.Music
+        var musicChoice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice(musicKey) else null) }
+        var saving by remember { mutableStateOf(Recording.settings.powerSaving) }
+        var musicSaving by remember { mutableStateOf(Recording.settings.savingFor(musicKey)) }
+        var transcribeSaving by remember { mutableStateOf(Recording.settings.transcribeSaving) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving,
+                activeSettings = choice?.let { Recording.settings.profile(active) }, musicSettings = musicChoice?.let { Recording.settings.profile(musicKey) }),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
-                setQuality = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
-                setPower = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
+                setQuality = { profile ->
+                    Recording.settings.activeProfile = profile
+                    active = profile
+                    choice = Recording.settings.recordingChoice
+                },
+                setTranscribeSaving = { on -> Recording.settings.transcribeSaving = on; transcribeSaving = on },
+                setPower = { preset, music ->
+                    val on = preset == com.chencohensolution.transcriptor.settings.PowerPreset.Low
+                    // Music's own mode with Music picked, else the shared one.
+                    if (music) Recording.settings.setProfile(musicKey, Recording.settings.profile(musicKey).copy(wavFirst = on))
+                    else Recording.settings.powerSaving = on
+                    saving = Recording.settings.powerSaving
+                    musicSaving = Recording.settings.savingFor(musicKey)
+                    choice = Recording.settings.recordingChoice
+                    musicChoice = Recording.settings.recordingChoice(musicKey)
+                },
                 openLectureAt = { id, at -> openLecture(id, at) },
                 search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
                 record = { labels, language, mode ->
@@ -468,7 +489,8 @@ private fun CompressPending() {
         if (pending.isEmpty() || Recording.compressing.value != null) return@LaunchedEffect
         val (percent, charging) = Recording.battery(context)
         // "Encode when charging": the job runs once the phone is on the charger, the app open or not.
-        if (Recording.settings.encodeAfter.allows(charging, percent)) RecordingService.compressPending(context) else EncodeJob.schedule(context)
+        // Moments wait by their own profile's mode (Music has its own): any that may go now starts the service.
+        if (pending.any { Recording.settings.encodeAllowed(it, charging, percent) }) RecordingService.compressPending(context) else EncodeJob.schedule(context)
     }
 }
 
