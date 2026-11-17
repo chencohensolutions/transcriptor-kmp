@@ -171,8 +171,10 @@ class MainActivity : ComponentActivity() {
                     transitionSpec = {
                         val ease = androidx.compose.animation.core.FastOutSlowInEasing
                         val millis = com.chencohensolution.transcriptor.ui.MORPH_MILLIS
+                        // The screen going away stays whole underneath while the new one fades in over it: no moment
+                        // where both are half see-through (the window showing between them: a blink).
                         (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(millis, easing = ease)) togetherWith
-                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(millis, easing = ease)))
+                            androidx.compose.animation.ExitTransition.KeepUntilTransitionsFinished)
                             .using(androidx.compose.animation.SizeTransform(clip = false) { _, _ -> androidx.compose.animation.core.tween(millis, easing = ease) })
                     },
                 ) { shown ->
