@@ -118,3 +118,4 @@ permission the tap opens the app, whose Record asks for it. A long press opens t
 - [Round 3 (Nov 7, 2026)](../ux-history/notebooks/2026-11-07-labels.md): labels instead of notebooks: a — chips on top, labels on the Record bar (picked); b — labels after, one list; c — a side drawer.
 
 Record is red (Nov 17, 2026, hen's ask) and morphs into the recording screen's red Stop (`sharedRecordButton`, a shared element in MainActivity's `SharedTransitionLayout`/`AnimatedContent` screen switch, which also cross-fades the screens); going back, Stop morphs into the banner's red Back to the moment. While going to the recording screen the Record bar stays (no banner) so the button can morph.
+With Music picked (Nov 17, 2026), the advanced rows show Music's encoder in a line instead of the quality chips, and Processing sets Music's own mode (`NotebooksState.musicChoice`, `musicPowerSaving`).

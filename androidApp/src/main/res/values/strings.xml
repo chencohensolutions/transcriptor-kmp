@@ -801,5 +801,7 @@
     <string name="notebooks_power_low_note">Compresses the audio and transcribes once the phone charges: saves battery.</string>
     <string name="notebooks_power_normal_note">Compresses the audio and transcribes right after the moment.</string>
     <string name="notebooks_power_custom_note">Your own timing (Settings › Recording settings).</string>
-    <string name="notebooks_presets_music">Music records with its own settings and timing: Settings › Recording settings › Music.</string>
+    <string name="notebooks_presets_music">Music\'s own settings: Settings › Recording settings › Music.</string>
+    <string name="rec_preset_power_low_music">Saves battery: records a plain WAV, compressed to the chosen codec once the phone charges with 30% or more.</string>
+    <string name="rec_preset_power_normal_music">Compresses while recording. Uses the battery then.</string>
 </resources>

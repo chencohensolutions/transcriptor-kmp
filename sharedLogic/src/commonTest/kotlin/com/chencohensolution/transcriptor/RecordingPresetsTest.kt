@@ -83,6 +83,22 @@ class RecordingPresetsTest {
     }
 
     @Test
+    fun timingIsOneOfTwoModes() {
+        val fs = FakeFileSystem()
+        fs.createDirectories("/s".toPath())
+        // From before: WAV first, encode after Stop, transcribe on the charger: mostly waiting, so save battery.
+        fs.write("/s/settings.json".toPath()) { writeUtf8("""{"v":1,"audioFormat":"wav-then-aac","encodeAfter":"stop","transcribeWhen":"charging"}""") }
+        val store = SettingsStore(fs, "/s".toPath())
+        assertEquals(true, store.powerSaving)
+        assertEquals(EncodeAfter.Charging, store.encodeAfter)
+        assertEquals(PowerPreset.Low, store.recordingChoice.power)
+        store.powerSaving = false
+        assertEquals(AudioFormat.AacLive, store.audioFormat)
+        assertEquals(EncodeAfter.Stop, store.transcribeWhen)
+        assertEquals(PowerPreset.Normal, store.recordingChoice.power)
+    }
+
+    @Test
     fun musicModeIsKeptAndWinsOverTheOthers() {
         val fs = FakeFileSystem()
         val store = SettingsStore(fs, "/s".toPath())
