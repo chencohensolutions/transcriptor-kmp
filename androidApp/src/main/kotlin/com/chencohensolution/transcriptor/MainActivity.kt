@@ -296,12 +296,17 @@ class MainActivity : ComponentActivity() {
         }
         // The Record bar's Live, After or Only record, as last picked.
         val recordMode = remember { Recording.settings.recordMode }
+        // Advanced mode: the Record bar also offers the quality and battery presets.
+        val advanced = remember { Recording.settings.advancedMode }
+        var choice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice else null) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
+                setQuality = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
+                setPower = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
                 openLectureAt = { id, at -> openLecture(id, at) },
                 search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
                 record = { labels, language, mode ->

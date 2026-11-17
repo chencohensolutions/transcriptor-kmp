@@ -182,21 +182,27 @@ class AacEncoder(file: File, settings: AacSettings) : PcmSink {
     }
 }
 
-/** [AacEncode] with [AacEncoder]: the WAV's PCM (48 kHz stereo) in 64 KB pieces; returns the WAV frames taken in. */
+/**
+ * [AacEncode] with [AacEncoder]: the WAV's PCM (48 kHz stereo; a 24-bit one brought to 16) in 64 KB pieces; returns the
+ * WAV frames taken in.
+ */
 val androidAacEncode = AacEncode { wav, aac, settings, progress ->
     val encoder = AacEncoder(aac.toFile(), settings)
+    val bits = WavWriter.read(okio.FileSystem.SYSTEM, wav).bitsPerSample
+    val frame = WavWriter.CHANNELS * bits / 8
+    val narrow = if (bits == 24) ByteArray(64 * 1024) else null
     var frames = 0L
     java.io.RandomAccessFile(wav.toFile(), "r").use { input ->
         val total = input.length() - WavWriter.HEADER_SIZE
         input.seek(WavWriter.HEADER_SIZE)
-        val buffer = ByteArray(64 * 1024)
+        val buffer = ByteArray(64 * 1024 / frame * frame)
         var done = 0L
         while (done < total) {
             val n = input.read(buffer, 0, minOf(buffer.size.toLong(), total - done).toInt())
             if (n <= 0) break
-            val whole = n - n % (WavWriter.CHANNELS * 2)
-            encoder.write(buffer, whole)
-            frames += whole / (WavWriter.CHANNELS * 2)
+            val whole = n - n % frame
+            if (narrow != null) encoder.write(narrow, PcmConvert.pcm24To16(buffer, whole, narrow)) else encoder.write(buffer, whole)
+            frames += whole / frame
             done += n
             progress(done.toFloat() / total)
         }

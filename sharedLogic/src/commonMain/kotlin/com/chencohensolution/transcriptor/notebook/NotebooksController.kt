@@ -78,6 +78,8 @@ data class NotebooksState(
     val working: Map<String, Float> = emptyMap(),
     /** The Record bar's Live, After or Only record, as the settings keep it ([com.chencohensolution.transcriptor.settings.SettingsStore.recordMode]). */
     val recordMode: RecordMode = RecordMode.After,
+    /** The recording presets for the Record bar's extra row; null unless advanced mode is on. */
+    val recordingChoice: com.chencohensolution.transcriptor.settings.RecordingChoice? = null,
     /** The list can read older recordings from the server as it nears its end ([Library.serverOlder]). */
     val serverOlder: Boolean = false,
     /** The list can read newer recordings again as it nears its top ([Library.serverNewer]). */

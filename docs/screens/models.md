@@ -44,7 +44,7 @@ A new install starts as the owner's S25 was set that day (read from its `setting
 
 ## Microphone (Nov 15, 2026)
 
-hen's ask: pick the microphone, Bluetooth too. Settings › Recordings › **Microphone** (`SettingsStore.micInput`, a
+hen's ask: pick the microphone, Bluetooth too. Settings › Recording format › **Microphone** (at the top since Nov 17, 2026: it decides which settings are offered). Since Nov 17, 2026 it also lists the phone's own microphones one by one, as the phone names them by place (`MicInput.Kind.BuiltIn`, key `builtin:<address>`: on the S25 "bottom" and "back"; the stereo pair is the default, The phone's microphones). Microphone is its own page (`FormatPage.Mic`, `MicrophonePage` in `ui/MicMap.kt`; hen's ask, Nov 17, 2026), with a **Test**: while the page is open it listens to the picked microphone (`MicProbe`; not while a moment records, nothing kept) and shows both channels' levels, and the picked dot on the drawing glows with what it hears, so scratching near a microphone shows which one it is. The page draws the phone from the front with its own microphones on it (`PhoneMicMap` in `ui/MicMap.kt`: filled dot on an edge or the front, a ring on the back, the picked one in the accent color), from the positions Android gives (`AudioManager.getMicrophones`, `MicDetail`), else from each one's place name; each built-in row says what that microphone is for and, when the phone says, how it hears (omni or directional, the level it clips at) (`SettingsStore.micInput`, a
 `MicInput`; null, the default: the phone's own microphones, stereo 48 kHz) opens a list: the phone's own, then every
 input connected now besides it (`AndroidAudioInputs`, refreshed as devices come and go): Bluetooth headsets (hands-free,
 mono, phone-call quality), Bluetooth LE Audio earbuds, wired headsets, USB microphones. The one picked stays picked
@@ -87,16 +87,27 @@ stops.
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Transcribe again automatically (`autoImprove`, off by default). **Models and storage**:
   Manage models, the moments folder (Choose a folder / Change), **Server backup** (off, or on to which server; its own
   page: [server.md](server.md)), and a **Recording format** row whose line sums up the
-  choice ("AAC · LC · 64 kbps · Mono · 48 kHz · hardware · while recording"). It opens the Recording format page:
-  **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
+  choice: the presets ("Normal quality · Right away") and under them the codec ("AAC · LC · 64 kbps · Mono · 48 kHz ·
+  hardware · while recording"). It opens the Recording format page. At its top, **Quality**: High (FLAC, 48 kHz stereo,
+  16 bit: the S25 gives its own microphones only as 16 bit), Normal (AAC-LC, 48 kHz stereo, 256 kbps), Low (AAC-LC, 24 kHz mono, 48 kbps), with a fourth, Custom,
+  shown selected only while the settings match none; picking a preset keeps "WAV first" and the AAC encoder. Then
+  **Battery**: Save battery (WAV first; encoding and After transcription on the charger at 30% or more) or Right away
+  (encoding and After transcription right after Stop), Custom likewise (`QualityPreset`, `PowerPreset`,
+  `RecordingChoice`, `SettingsStore.recordingChoice`). Under Quality, about how many hours fit in the free space (`megabytesPerHourWhileRecording`: the WAV when it records as WAV first). Under Battery, **Transcribe moments recorded with After**: right after or when charging (`transcribeWhen`; moved here from Settings › After a moment, Nov 17, 2026). Then **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
   under them **Record as WAV, encode afterwards** (greyed out for WAV) with **When the moment ends** or **When charging,
   with 30% battery or more** (`SettingsStore.audioFormat`: `wav`, `aac-live`, `wav-then-aac`, `flac-live`,
   `wav-then-flac`; `SettingsStore.encodeAfter`). The **AAC** page: AAC profile (LC, HE, HE v2), sample rate (16, 24,
   48 kHz; HE needs 24 or 48), channels (mono, stereo; HE v2 is stereo only), bitrate as chips from 16 to 320 kbps with
   the size an hour (a note above 64 kbps for HE), and the encoder: Automatic (hardware first) or any of the phone's AAC
   encoders, with the one that runs and whether it is hardware (`SettingsStore.aac`, `AacSettings`, `AacEncoders`).
-  The **FLAC** page: the compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`).
-  Both pages say when they encode, when it is afterwards. **Advanced**: Processor meters while recording, one of Off (the default),
+  Only what the phone supports is shown: AAC profiles and bitrates some encoder takes, sample rates and channels the
+  profile allows; FLAC's **Bit depth** row only when the microphone in use lists a deeper encoding than 16 bit
+  (`AndroidAudioInputs.deepCapture`; the S25's own microphones don't, a USB one may), else FLAC records 16 bit.
+  The **FLAC** page: sample rate (16, 24, 48 kHz) with the size an hour, channels (mono, stereo), bit depth (16, 24;
+  24 reads the microphone in floating point and keeps 24 bits in the WAV and FLAC) (`SettingsStore.flac`,
+  `FlacFormat`), and the compression effort, 0 (faster) to 8 (smaller file) (`SettingsStore.flacLevel`).
+  Both pages say when they encode, when it is afterwards. **Advanced**: first **Advanced mode** (off by default): on, the main screen's Record bar also shows Quality and Battery
+  ([notebooks.md](notebooks.md)). Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).

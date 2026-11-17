@@ -2,6 +2,7 @@ package com.chencohensolution.transcriptor.speech
 
 import android.media.MediaCodec
 import android.media.MediaExtractor
+import com.chencohensolution.transcriptor.recording.PcmConvert
 import com.chencohensolution.transcriptor.recording.WavWriter
 import android.os.ParcelFileDescriptor
 import java.io.File
@@ -23,6 +24,9 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     private val pending = FloatBuilder()
     private val input = FileInputStream(fd.fileDescriptor)
     private val wav = if (isWav) input.channel.apply { position(WavWriter.HEADER_SIZE) } else null
+    /** A WAV's bit depth (16, or 24 brought to 16 as it is read), from its header. */
+    private val wavBits = wav?.let { bitsOf(it) } ?: 16
+    private val narrow = ByteArray(64 * 1024)
     private val extractor = if (wav == null) MediaExtractor().apply { setDataSource(fd.fileDescriptor); selectTrack(0) } else null
     private val codec = extractor?.let { e ->
         val format = e.getTrackFormat(0)
@@ -47,6 +51,12 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     /** The next PCM bytes (whole frames); null at the end. */
     private fun nextPcm(): ByteArray? {
         wav?.let { f ->
+            if (wavBits == 24) {
+                val n = f.read(ByteBuffer.wrap(buffer, 0, buffer.size / 6 * 6))
+                if (n <= 0) return null
+                val m = PcmConvert.pcm24To16(buffer, n - n % 6, narrow)
+                return narrow.copyOf(m)
+            }
             val n = f.read(ByteBuffer.wrap(buffer))
             return if (n <= 0) null else buffer.copyOf(n - n % 4)
         }
@@ -92,6 +102,13 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     companion object {
         private const val PRE_ROLL_MILLIS = 100L
 
+        /** The bits per sample in a WAV header (at byte 34); the channel is left where it was. */
+        private fun bitsOf(f: java.nio.channels.FileChannel): Int {
+            val b = ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            f.read(b, 34)
+            return if (b.position() == 2) b.getShort(0).toInt() else 16
+        }
+
         /**
          * [startMillis] to [endMillis] of a recording, 16 kHz mono (from the nearest earlier frame, for FLAC); [open]
          * opens it (and it is closed after).
@@ -101,9 +118,14 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
             if (isWav) {
                 open().use { fd ->
                     FileInputStream(fd.fileDescriptor).channel.use { f ->
-                        f.position(WavWriter.HEADER_SIZE + startMillis * 48 * 4)
-                        val bytes = ByteArray(want * 3 * 4)
+                        val frame = 2 * bitsOf(f) / 8
+                        f.position(WavWriter.HEADER_SIZE + startMillis * 48 * frame)
+                        val bytes = ByteArray(want * 3 * frame)
                         val n = f.read(ByteBuffer.wrap(bytes)).coerceAtLeast(0)
+                        if (frame == 6) {
+                            val narrow = ByteArray(want * 3 * 4)
+                            return Downsampler().process(narrow, PcmConvert.pcm24To16(bytes, n - n % 6, narrow))
+                        }
                         return Downsampler().process(bytes, n - n % 4)
                     }
                 }

@@ -7,10 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +43,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -128,6 +133,10 @@ class NotebooksActions(
     val record: (labels: List<String>, language: String, mode: RecordMode) -> Unit = { _, _, _ -> },
     /** Keeps the Record bar's Live or After for next time. */
     val setRecordMode: (mode: RecordMode) -> Unit = {},
+    /** Advanced mode's Record bar: applies a quality preset (Settings › Recording format). */
+    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    /** Advanced mode's Record bar: applies a battery preset. */
+    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -173,7 +182,7 @@ sealed interface FolderNotice {
  * a sheet with a checkbox per label (some selected moments have it: a dash), where labels are also made, renamed and
  * deleted.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 /**
  * What the list keeps while a moment or Settings is open, held by the screen that shows it: where it was scrolled,
  * and whether the phone's lock opened it. Not saved: a restart starts at the top, locked.
@@ -431,31 +440,35 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }
-                            // Live, After or Only record: transcribed while it records, after it stops (easier on the
-                            // battery), or not until asked. The guessed labels keep their ✦ on the chips above.
-                            Row(Modifier.padding(top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    stringResource(
-                                        when (recordMode) {
-                                            RecordMode.Live -> R.string.notebooks_record_live_note
-                                            RecordMode.After -> R.string.notebooks_record_after_note
-                                            RecordMode.Only -> R.string.notebooks_record_only_note
-                                        },
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
-                                )
+                            // Live, After, Only record or Music: transcribed while it records, after it stops (easier on
+                            // the battery), not until asked, or a concert (FLAC, no voice processing, no transcript). The
+                            // guessed labels keep their ✦ on the chips above.
+                            Text(
+                                stringResource(
+                                    when (recordMode) {
+                                        RecordMode.Live -> R.string.notebooks_record_live_note
+                                        RecordMode.After -> R.string.notebooks_record_after_note
+                                        RecordMode.Only -> R.string.notebooks_record_only_note
+                                        RecordMode.Music -> R.string.notebooks_record_music_note
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp),
+                            )
+                            FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
                                     RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
-                                    RecordMode.Only to R.string.notebooks_record_only,
+                                    RecordMode.Only to R.string.notebooks_record_only, RecordMode.Music to R.string.notebooks_record_music,
                                 ).forEach { (mode, label) ->
                                     FilterChip(
                                         selected = recordMode == mode, onClick = { recordMode = mode; actions.setRecordMode(mode) },
-                                        label = { Text(stringResource(label)) }, modifier = Modifier.padding(start = 6.dp),
+                                        label = { Text(stringResource(label)) },
+                                        leadingIcon = if (mode == RecordMode.Music) ({ Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) }) else null,
                                     )
                                 }
                             }
+                            state.recordingChoice?.let { choice -> RecordPresets(choice, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1041,5 +1054,35 @@ internal fun shortModelName(name: String): String {
         "whisper" in n && "turbo" in n -> "Whisper turbo"
         "whisper" in n -> "Whisper"
         else -> name
+    }
+}
+
+/**
+ * Advanced mode's extra row on the Record bar: Quality (High, Normal, Low) and Battery (Save, Now), the presets of
+ * Settings › Recording format. A setting that matches no preset leaves none of its chips selected; a tap applies one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecordPresets(choice: com.chencohensolution.transcriptor.settings.RecordingChoice, actions: NotebooksActions) {
+    val quality = choice.quality
+    val power = choice.power
+    FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
+        listOf(
+            com.chencohensolution.transcriptor.settings.QualityPreset.High to R.string.notebooks_quality_high,
+            com.chencohensolution.transcriptor.settings.QualityPreset.Normal to R.string.notebooks_quality_normal,
+            com.chencohensolution.transcriptor.settings.QualityPreset.Low to R.string.notebooks_quality_low,
+        ).forEach { (p, label) ->
+            FilterChip(selected = quality == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
+        }
+        Spacer(Modifier.width(6.dp))
+        listOf(
+            com.chencohensolution.transcriptor.settings.PowerPreset.Low to R.string.notebooks_power_low,
+            com.chencohensolution.transcriptor.settings.PowerPreset.Normal to R.string.notebooks_power_normal,
+        ).forEach { (p, label) ->
+            FilterChip(
+                selected = power == p, onClick = { actions.setPower(p) }, label = { Text(stringResource(label)) },
+                leadingIcon = if (p == com.chencohensolution.transcriptor.settings.PowerPreset.Low) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
+            )
+        }
     }
 }

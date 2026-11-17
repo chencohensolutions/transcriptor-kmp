@@ -6,15 +6,20 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * The microphone's PCM (48 kHz stereo 16 bit, interleaved) brought down to [sampleRate] (48, 24 or 16 kHz: a whole
- * fraction of 48) and [channels] (1 averages the two), 16 bit interleaved, for an encoder that takes less. Below 48 kHz
- * a low-pass filter (31 taps) runs first, so nothing folds back. Keeps its history between calls (whole frames).
+ * The microphone's PCM (48 kHz stereo, [bits] 16 or 24, interleaved) brought down to [sampleRate] (48, 24 or 16 kHz: a
+ * whole fraction of 48) and [channels] (1 averages the two), at the same bit depth, for an encoder that takes less.
+ * Below 48 kHz a low-pass filter (31 taps) runs first, so nothing folds back. Keeps its history between calls (whole
+ * frames).
  */
-class PcmReducer(val sampleRate: Int, val channels: Int) {
+class PcmReducer(val sampleRate: Int, val channels: Int, val bits: Int = 16) {
     init {
         require(IN_RATE % sampleRate == 0) { "$sampleRate Hz isn't a whole fraction of $IN_RATE" }
         require(channels == 1 || channels == 2)
+        require(bits == 16 || bits == 24)
     }
+
+    private val bytes = bits / 8
+    private val max = if (bits == 24) 8_388_607 else 32_767
 
     private val step = IN_RATE / sampleRate
     /** Nothing to do: 48 kHz stereo passes as it is. */
@@ -28,14 +33,21 @@ class PcmReducer(val sampleRate: Int, val channels: Int) {
     /** The reduced PCM of [pcm]'s first [size] bytes; the returned array is reused by the next call, [Result.size] long. */
     fun process(pcm: ByteArray, size: Int): Result {
         if (passThrough) return Result(pcm, size)
-        val frames = size / 4
-        val need = (frames / step + 1) * channels * 2
+        val frames = size / (2 * bytes)
+        val need = (frames / step + 1) * channels * bytes
         if (out.size < need) out = ByteArray(need)
         var n = 0
         for (f in 0 until frames) {
-            val i = f * 4
-            val left = ((pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)).toFloat()
-            val right = ((pcm[i + 2].toInt() and 0xFF) or (pcm[i + 3].toInt() shl 8)).toFloat()
+            val left: Float
+            val right: Float
+            if (bytes == 3) {
+                left = PcmConvert.read24(pcm, 2 * f).toFloat()
+                right = PcmConvert.read24(pcm, 2 * f + 1).toFloat()
+            } else {
+                val i = f * 4
+                left = ((pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)).toFloat()
+                right = ((pcm[i + 2].toInt() and 0xFF) or (pcm[i + 3].toInt() shl 8)).toFloat()
+            }
             if (channels == 1) history[0][head] = (left + right) / 2 else { history[0][head] = left; history[1][head] = right }
             head = (head + 1) % taps.size
             if (phase == 0) {
@@ -47,9 +59,10 @@ class PcmReducer(val sampleRate: Int, val channels: Int) {
                         sum += taps[t] * h[k]
                         k = (k + 1) % taps.size
                     }
-                    val s = sum.roundToInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                    val s = sum.roundToInt().coerceIn(-max - 1, max)
                     out[n++] = s.toByte()
                     out[n++] = (s shr 8).toByte()
+                    if (bytes == 3) out[n++] = (s shr 16).toByte()
                 }
             }
             phase = (phase + 1) % step

@@ -173,3 +173,5 @@ starts afresh. Amber from 70%, red from 90%.
 - [Round 2 (Nov 6, 2026)](../ux-history/lecture/2026-11-06-fix-while-recording.md): fixing a line while recording, and motion: a2 — in place, above the keyboard, lines glide up, words fade in (picked); a, b — in a sheet, c — words fade in, d — letter by letter.
 - [Round 3 (Nov 7, 2026)](../ux-history/lecture/2026-11-07-processor-meters.md): processor meters: a — three bars,
   b — a chip and a sheet, c — the last minute as graphs; all three promoted, one picked in Settings › Advanced.
+
+Clipping (Nov 17, 2026): when a sample hits full scale, the recording screen says in red "Too loud: the sound is clipping" for about three seconds after (`StereoMeterState.clipping`, checked on every buffer in `MeterAnalyzer.feed`); Settings › Microphone's test says the same.

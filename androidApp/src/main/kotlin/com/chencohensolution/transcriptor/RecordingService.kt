@@ -65,7 +65,7 @@ class RecordingService : Service() {
             ACTION_START -> if (!session.isRecording) {
                 quiet = Recording.settings.quietRecording
                 val mode = RecordMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: RecordMode.Live.name)
-                onlyRecord = mode == RecordMode.Only
+                onlyRecord = mode == RecordMode.Only || mode == RecordMode.Music
                 try {
                     startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 } catch (e: RuntimeException) {
@@ -84,7 +84,7 @@ class RecordingService : Service() {
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
-                    transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord,
+                    transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord, music = mode == RecordMode.Music,
                 )
             }
             ACTION_PAUSE -> session.pauseOrResume()

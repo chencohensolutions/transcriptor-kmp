@@ -133,6 +133,8 @@ data class ModelsState(
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How AAC records, and what "WAV, then AAC" encodes to. */
     val aac: AacSettings = AacSettings(),
+    /** FLAC's rate, channels and bit depth (the bit depth also the WAV's before it). */
+    val flac: com.chencohensolution.transcriptor.settings.FlacFormat = com.chencohensolution.transcriptor.settings.FlacFormat(),
     /** When "Record as WAV, encode afterwards" encodes. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** When moments recorded with "After" are transcribed. */
@@ -149,6 +151,10 @@ data class ModelsState(
     val quietRecording: Boolean = false,
     /** Stop asks for a second tap, in the app and on the tile ([com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
     val stopTwice: Boolean = false,
+    /** The microphone in use gives more than 16 bits (a USB one may; the phone's own don't): 24 bit is offered. */
+    val deepCapture: Boolean = false,
+    /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
+    val advancedMode: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
     /** Settings › Server backup's line: off, or on to which server and how many moments wait. */
     val server: String = "",
@@ -167,6 +173,14 @@ data class ModelsState(
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** The microphones connected now besides the phone's own. */
     val micInputs: List<com.chencohensolution.transcriptor.recording.MicInput> = emptyList(),
+    /** What the phone says about its own microphones (positions, directionality), for the picker's drawing. */
+    val micDetails: List<com.chencohensolution.transcriptor.recording.MicDetail> = emptyList(),
+    /** Settings › Microphone's test: the picked microphone's levels while its page is open. */
+    val micMeter: com.chencohensolution.transcriptor.recording.StereoMeterState = com.chencohensolution.transcriptor.recording.StereoMeterState(),
+    /** Free space where moments record (the app's storage), for "about N hours fit". */
+    val freeBytes: Long = 0,
+    /** The test can't listen: a moment is recording, or the microphone permission isn't given. */
+    val micTestOff: Boolean = false,
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
@@ -246,17 +260,26 @@ class ModelsActions(
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFlacLevel: (Int) -> Unit = {},
     val setAac: (AacSettings) -> Unit = {},
+    val setFlac: (com.chencohensolution.transcriptor.settings.FlacFormat) -> Unit = {},
+    /** Applies a quality preset (codec and its settings). */
+    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    /** Applies a power preset (when encoding and "After" transcription run). */
+    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val setEncodeAfter: (EncodeAfter) -> Unit = {},
     val setTranscribeWhen: (EncodeAfter) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
     val setAutoImprove: (Boolean) -> Unit = {},
     val setQuietRecording: (Boolean) -> Unit = {},
     val setStopTwice: (Boolean) -> Unit = {},
+    val setAdvancedMode: (Boolean) -> Unit = {},
     /** Opens the phone's notification settings for the app, where its notifications can be turned off altogether. */
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
     val setLevelMeter: (LevelMeterStyle) -> Unit = {},
     val setMicInput: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
+    /** Settings › Microphone's test listens to this microphone (null: the phone's own) until [stopMicTest]. */
+    val startMicTest: (com.chencohensolution.transcriptor.recording.MicInput?) -> Unit = {},
+    val stopMicTest: () -> Unit = {},
     val chooseFolder: () -> Unit = {},
     val openServer: () -> Unit = {},
     /** Shows a language in the catalog, beside the ones in use. */
@@ -333,6 +356,9 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
 
 private const val SPEAKERS = "speakers"
 
+/** The presets' view of these settings. */
+val ModelsState.recordingChoice get() = com.chencohensolution.transcriptor.settings.RecordingChoice(audioFormat, aac, flac, encodeAfter, transcribeWhen)
+
 /** The version of Qualcomm's runtime the app ships (sherpa-onnx's qnn-libs-2.40.0.251030): NPU builds must match it. */
 const val APP_QNN = "2.40"
 
@@ -398,23 +424,6 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_after))
-            Column(Modifier.selectableGroup()) {
-                Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
-                PageNote(stringResource(R.string.settings_transcribe_when_note))
-                listOf(
-                    EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
-                    EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
-                ).forEach { (option, label) ->
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = state.transcribeWhen == option, onClick = null)
-                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
             SwitchRow(
                 stringResource(R.string.settings_auto_improve),
                 stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),
@@ -426,7 +435,6 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             LecturesFolder(state.folder, actions.chooseFolder)
             NavRow(stringResource(R.string.server_title), state.server, actions.openServer)
             NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
-            MicrophoneRow(state, actions.setMicInput)
             SwitchRow(
                 stringResource(R.string.settings_quiet), stringResource(if (state.quietRecording) R.string.settings_quiet_on else R.string.settings_quiet_off),
                 state.quietRecording, actions.setQuietRecording,
@@ -463,6 +471,12 @@ private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeaker
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            SwitchRow(
+                stringResource(R.string.settings_advanced_mode),
+                stringResource(if (state.advancedMode) R.string.settings_advanced_mode_on else R.string.settings_advanced_mode_off),
+                state.advancedMode, actions.setAdvancedMode,
+            )
+            HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_recognition))
             PageNote(stringResource(R.string.settings_recognition_note))
             val voice = state.voice
@@ -1320,63 +1334,40 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
  * The one picked stays picked while it is away ("not connected"): the phone's own records until it is back.
  */
 @Composable
-private fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
+internal fun MicrophoneRow(state: ModelsState, open: () -> Unit) {
     val picked = state.micInput
     val connected = picked == null || state.micInputs.any { it.key == picked.key }
     NavRow(
         stringResource(R.string.settings_mic),
         when {
             picked == null -> stringResource(R.string.settings_mic_phone)
-            connected -> isolated(picked.name)
-            else -> stringResource(R.string.settings_mic_away, isolated(picked.name))
+            connected -> micName(picked.name, picked.kind)
+            else -> stringResource(R.string.settings_mic_away, micName(picked.name, picked.kind))
         },
-    ) { open = true }
-    if (!open) return
-    val choices = buildList {
-        add(null)
-        if (picked != null && !connected) add(picked)
-        addAll(state.micInputs)
-    }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = { open = false },
-        title = { Text(stringResource(R.string.settings_mic)) },
-        text = {
-            Column(Modifier.selectableGroup()) {
-                choices.forEach { input ->
-                    val selected = input?.key == picked?.key
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton) { set(input); open = false }.padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected, onClick = null)
-                        Column(Modifier.padding(start = 16.dp)) {
-                            Text(if (input == null) stringResource(R.string.settings_mic_phone) else isolated(input.name), style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                when {
-                                    input == null -> stringResource(R.string.settings_mic_phone_note)
-                                    state.micInputs.none { it.key == input.key } -> stringResource(R.string.settings_mic_not_connected)
-                                    else -> stringResource(micKind(input.kind))
-                                },
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                if (state.micInputs.isEmpty()) Text(
-                    stringResource(R.string.settings_mic_none), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = { open = false }) { Text(stringResource(R.string.settings_mic_close)) } },
+        open,
     )
 }
 
 /** What kind of microphone [kind] is, and what to expect from it. */
-private fun micKind(kind: MicInput.Kind) = when (kind) {
+internal fun micKind(kind: MicInput.Kind) = when (kind) {
     MicInput.Kind.Bluetooth -> R.string.settings_mic_bluetooth
     MicInput.Kind.BluetoothLe -> R.string.settings_mic_bluetooth_le
     MicInput.Kind.Wired -> R.string.settings_mic_wired
     MicInput.Kind.Usb -> R.string.settings_mic_usb
+    MicInput.Kind.BuiltIn -> R.string.settings_mic_builtin
+}
+
+/**
+ * A microphone's name as the screens show it: the phone's own by where they are ("bottom" is the bottom microphone),
+ * others as the phone names them. [kind] null: a name alone (a built-in one is known by its place).
+ */
+@Composable
+internal fun micName(name: String, kind: MicInput.Kind?): String {
+    if (kind != null && kind != MicInput.Kind.BuiltIn) return isolated(name)
+    return when (name) {
+        "bottom" -> stringResource(R.string.settings_mic_bottom)
+        "back" -> stringResource(R.string.settings_mic_back)
+        "top", "front" -> stringResource(R.string.settings_mic_top)
+        else -> if (kind == MicInput.Kind.BuiltIn) stringResource(R.string.settings_mic_builtin_named, isolated(name)) else isolated(name)
+    }
 }

@@ -4,12 +4,15 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
+import com.chencohensolution.transcriptor.settings.FlacFormat
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 
 /**
- * PCM (16 bit, interleaved) to a .flac file, with Android's built-in FLAC encoder. The encoder hands out the stream's
+ * PCM (48 kHz stereo, interleaved, at [format]'s bit depth: 16, or 24 packed) to a .flac file at [format]'s rate and
+ * channels ([PcmReducer] first), with Android's built-in FLAC encoder; 24 bits go in as floats, which the encoder
+ * keeps as 24-bit FLAC. The encoder hands out the stream's
  * header first (`fLaC` and STREAMINFO, maybe more metadata after it); this writes `fLaC` and STREAMINFO alone, marked
  * as the last metadata block, then the frames, and on [close] puts the total sample count into STREAMINFO.
  * [level] is FLAC's compression level, 0 (fastest) to 8 (smallest).
@@ -17,15 +20,21 @@ import java.nio.ByteBuffer
 class FlacEncoder(
     file: File,
     private val level: Int = FLAC_DEFAULT_LEVEL,
-    private val sampleRate: Int = WavWriter.SAMPLE_RATE,
-    private val channels: Int = WavWriter.CHANNELS,
+    format: FlacFormat = FlacFormat(),
 ) : PcmSink {
+    private val sampleRate = format.valid().sampleRate
+    private val channels = format.valid().channels
+    private val bits = format.valid().bitDepth
+    private val reducer = PcmReducer(sampleRate, channels, bits)
+    private var floats = FloatArray(0)
+    private var floatBytes = ByteArray(0)
     private val out = RandomAccessFile(file, "rw").apply { setLength(0) }
     private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_FLAC).apply {
         configure(
             MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_FLAC, sampleRate, channels).apply {
                 setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, level.coerceIn(FLAC_LEVELS))
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, INPUT_SIZE)
+                if (bits == 24) setInteger(MediaFormat.KEY_PCM_ENCODING, android.media.AudioFormat.ENCODING_PCM_FLOAT)
             },
             null, null, MediaCodec.CONFIGURE_FLAG_ENCODE,
         )
@@ -37,21 +46,38 @@ class FlacEncoder(
     private val header = java.io.ByteArrayOutputStream()
     private var headerWritten = false
 
-    /** Frames (samples per channel) given to the encoder. */
-    var frames = 0L
+    /** Frames (samples per channel) given to the encoder, at its rate. */
+    private var frames = 0L
+
+    /** Frames taken in (48 kHz, before [PcmReducer]). */
+    var framesIn = 0L
         private set
 
     override fun write(pcm: ByteArray, size: Int) {
+        framesIn += size / (2 * bits / 8)
+        val reduced = reducer.process(pcm, size)
+        if (bits == 24) {
+            if (floats.size < reduced.size / 3) { floats = FloatArray(reduced.size / 3); floatBytes = ByteArray(floats.size * 4) }
+            val n = PcmConvert.pcm24ToFloat(reduced.pcm, reduced.size, floats)
+            ByteBuffer.wrap(floatBytes).order(java.nio.ByteOrder.LITTLE_ENDIAN).asFloatBuffer().put(floats, 0, n)
+            queue(floatBytes, n * 4, bytesPerFrame = channels * 4)
+        } else {
+            queue(reduced.pcm, reduced.size, bytesPerFrame = channels * 2)
+        }
+    }
+
+    private fun queue(pcm: ByteArray, size: Int, bytesPerFrame: Int) {
         var offset = 0
         while (offset < size) {
             val index = codec.dequeueInputBuffer(TIMEOUT_US)
             if (index < 0) { drain(endOfStream = false); continue }
             val input = codec.getInputBuffer(index)!!
             input.clear()
-            val n = minOf(size - offset, input.remaining())
+            val room = input.remaining() - input.remaining() % bytesPerFrame
+            val n = minOf(size - offset, room)
             input.put(pcm, offset, n)
             codec.queueInputBuffer(index, 0, n, frames * 1_000_000 / sampleRate, 0)
-            frames += n / (channels * 2)
+            frames += n / bytesPerFrame
             offset += n
             drain(endOfStream = false)
         }
@@ -126,7 +152,7 @@ class FlacEncoder(
         val b = ByteBuffer.allocate(34)
         b.putShort(16).putShort(65535.toShort())
         b.put(ByteArray(6))
-        val packed = (sampleRate.toLong() shl 44) or ((channels - 1).toLong() shl 41) or (15L shl 36)
+        val packed = (sampleRate.toLong() shl 44) or ((channels - 1).toLong() shl 41) or ((bits - 1).toLong() shl 36)
         b.putLong(packed)
         return b.array()
     }
@@ -147,23 +173,26 @@ class FlacEncoder(
     }
 }
 
-/** [FlacEncode] with [FlacEncoder]: the WAV's PCM in 64 KB pieces. */
-val androidFlacEncode = FlacEncode { wav, flac, level, progress ->
+/** [FlacEncode] with [FlacEncoder]: the WAV's PCM (48 kHz stereo, 16 or 24 bit) in 64 KB pieces. */
+val androidFlacEncode = FlacEncode { wav, flac, level, format, progress ->
     val wavFile = wav.toFile()
-    val encoder = FlacEncoder(flac.toFile(), level)
+    val bits = WavWriter.read(okio.FileSystem.SYSTEM, wav).bitsPerSample
+    val encoder = FlacEncoder(flac.toFile(), level, format.copy(bitDepth = bits))
+    val frame = WavWriter.CHANNELS * bits / 8
     RandomAccessFile(wavFile, "r").use { input ->
         val total = input.length() - WavWriter.HEADER_SIZE
         input.seek(WavWriter.HEADER_SIZE)
-        val buffer = ByteArray(64 * 1024)
+        // 64 KB in whole frames (6 bytes a frame at 24 bits).
+        val buffer = ByteArray(64 * 1024 / frame * frame)
         var done = 0L
         while (done < total) {
             val n = input.read(buffer, 0, minOf(buffer.size.toLong(), total - done).toInt())
             if (n <= 0) break
-            encoder.write(buffer, n - n % (WavWriter.CHANNELS * 2))
+            encoder.write(buffer, n - n % frame)
             done += n
             progress(done.toFloat() / total)
         }
     }
     encoder.close()
-    encoder.frames
+    encoder.framesIn
 }

@@ -117,6 +117,8 @@ private data class SettingsFileV1(
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
     val aac: AacSettings = AacSettings(),
+    /** FLAC's sample rate, channels and bit depth (the bit depth also for the WAV kept before FLAC, and plain WAV). */
+    val flac: FlacFormat = FlacFormat(),
     /** When "WAV, then FLAC" and "WAV, then AAC" encode. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** The live model chosen per language (BCP-47 tag to model id). */
@@ -145,6 +147,8 @@ private data class SettingsFileV1(
     val recordLive: Boolean = true,
     /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
     val recordOnly: Boolean = false,
+    /** The Record bar's Music (owner's request, Nov 17, 2026): FLAC, no voice processing, no transcript; wins over the two above. */
+    val recordMusic: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
     val quietRecording: Boolean = true,
     /** The microphone picked to record from ([MicInput]); null: the phone's own. */
@@ -175,6 +179,8 @@ private data class SettingsFileV1(
     val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
+    /** Advanced mode: the Record bar also shows the quality and battery presets (owner's request, Nov 17, 2026). */
+    val advancedMode: Boolean = false,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -190,6 +196,19 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var flacLevel: Int
         get() = read().flacLevel.coerceIn(FLAC_LEVELS)
         set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
+
+    /** FLAC's sample rate, channels and bit depth ([FlacFormat.valid] on the way in and out). */
+    var flac: FlacFormat
+        get() = read().flac.valid()
+        set(value) = write(read().copy(flac = value.valid()))
+
+    /** The presets' settings as one value ([RecordingChoice]). */
+    var recordingChoice: RecordingChoice
+        get() = read().let { RecordingChoice(it.audioFormat, it.aac.valid(), it.flac.valid(), it.encodeAfter, it.transcribeWhen) }
+        set(value) = write(read().copy(
+            audioFormat = value.audioFormat, aac = value.aac.valid(), flac = value.flac.valid(),
+            encodeAfter = value.encodeAfter, transcribeWhen = value.transcribeWhen,
+        ))
 
     /** When a WAV waiting for FLAC or AAC is encoded: after Stop, or on the charger above [ENCODE_MIN_BATTERY]%. */
     var encodeAfter: EncodeAfter
@@ -236,8 +255,8 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     /** The Record bar's choice, also what the Quick Settings tile records with: Live, After or Only record. */
     var recordMode: RecordMode
-        get() = read().let { if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
-        set(value) = write(read().copy(recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
+        get() = read().let { if (it.recordMusic) RecordMode.Music else if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
+        set(value) = write(read().copy(recordMusic = value == RecordMode.Music, recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
 
     /**
      * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
@@ -332,6 +351,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         it.copy(speakerTuning = it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
     })
 
+    /** Advanced mode (Settings › Advanced): the main screen's Record bar also shows Quality and Battery; off by default. */
+    var advancedMode: Boolean
+        get() = read().advancedMode
+        set(value) = write(read().copy(advancedMode = value))
+
     /** First run's "Get your models" was answered: it isn't offered again ([DefaultModels.offerFirstRun]). */
     var firstRunDone: Boolean
         get() = read().firstRunDone
@@ -395,4 +419,10 @@ enum class RecordMode {
     After,
     /** Recorded only: it waits for "Transcribe now" on the moment. */
     Only,
+
+    /**
+     * A concert: FLAC as it records ([com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC], whatever the
+     * format settings), the microphone without voice processing, and no transcript (like [Only]).
+     */
+    Music,
 }

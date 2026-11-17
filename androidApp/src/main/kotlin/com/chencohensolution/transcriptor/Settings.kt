@@ -18,6 +18,7 @@ import com.chencohensolution.transcriptor.speech.SherpaNpuWhisperEngine
 import com.chencohensolution.transcriptor.ui.ModelsActions
 import com.chencohensolution.transcriptor.ui.ModelsScreen
 import com.chencohensolution.transcriptor.ui.ModelsState
+import com.chencohensolution.transcriptor.ui.recordingChoice
 import com.chencohensolution.transcriptor.ui.NpuCheck
 import com.chencohensolution.transcriptor.ui.speakerModels
 import kotlinx.coroutines.Dispatchers
@@ -46,17 +47,24 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var format by remember { mutableStateOf(Recording.settings.audioFormat) }
     var flacLevel by remember { mutableStateOf(Recording.settings.flacLevel) }
     var aac by remember { mutableStateOf(Recording.settings.aac) }
+    var flac by remember { mutableStateOf(Recording.settings.flac) }
     var encodeAfter by remember { mutableStateOf(Recording.settings.encodeAfter) }
     var speakers by remember { mutableStateOf(Recording.settings.findSpeakersOnStop) }
     var auto by remember { mutableStateOf(Recording.settings.autoImprove) }
     var transcribeWhen by remember { mutableStateOf(Recording.settings.transcribeWhen) }
     var quiet by remember { mutableStateOf(Recording.settings.quietRecording) }
     var stopTwice by remember { mutableStateOf(Recording.settings.stopTwice) }
+    var advancedMode by remember { mutableStateOf(Recording.settings.advancedMode) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
     var micInput by remember { mutableStateOf(Recording.settings.micInput) }
     var micInputs by remember { mutableStateOf(Recording.audioInputs.connected()) }
+    // Settings › Microphone's test: listens only while that page is open, never while a moment records.
+    val probe = remember { com.chencohensolution.transcriptor.recording.MicProbe(Recording.audioInputs) }
+    val micMeter by probe.meter.collectAsStateWithLifecycle()
+    var micTestOff by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { probe.stop() } }
     androidx.compose.runtime.DisposableEffect(Unit) {
         val stop = Recording.audioInputs.watch { micInputs = it }
         onDispose { stop() }
@@ -101,8 +109,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
+        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, encodeAfter = encodeAfter,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, deepCapture = remember(micInput, micInputs) { Recording.audioInputs.deepCapture(micInput) }, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs, micDetails = remember { Recording.audioInputs.builtInDetails() }, micMeter = micMeter, micTestOff = micTestOff, freeBytes = remember { runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(0L) },
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -141,12 +149,24 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setAac = { aac = it.valid(); io { Recording.settings.aac = it } },
+            setFlac = { flac = it.valid(); io { Recording.settings.flac = it } },
+            setQuality = { preset ->
+                val next = state.recordingChoice.with(preset)
+                format = next.audioFormat; aac = next.aac; flac = next.flac
+                io { Recording.settings.recordingChoice = next }
+            },
+            setPower = { preset ->
+                val next = state.recordingChoice.with(preset)
+                format = next.audioFormat; encodeAfter = next.encodeAfter; transcribeWhen = next.transcribeWhen
+                io { Recording.settings.recordingChoice = next }
+            },
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },
             setTranscribeWhen = { transcribeWhen = it; io { Recording.settings.transcribeWhen = it } },
             setFindSpeakersOnStop = { speakers = it; io { Recording.settings.findSpeakersOnStop = it } },
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             setQuietRecording = { quiet = it; io { Recording.settings.quietRecording = it } },
             setStopTwice = { stopTwice = it; io { Recording.settings.stopTwice = it } },
+            setAdvancedMode = { advancedMode = it; io { Recording.settings.advancedMode = it } },
             openNotificationSettings = {
                 context.startActivity(
                     android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -156,6 +176,12 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
             setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
+            startMicTest = { input ->
+                val allowed = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                micTestOff = !allowed || Recording.session.isRecording || !probe.start(input)
+            },
+            stopMicTest = { probe.stop() },
             chooseFolder = chooseFolder,
             openServer = { serverOpen = true },
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },

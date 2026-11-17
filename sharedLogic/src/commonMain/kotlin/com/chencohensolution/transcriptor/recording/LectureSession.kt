@@ -230,10 +230,13 @@ class LectureSession(
     fun start(
         labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true,
         transcribeAfter: Boolean = true,
+        /** Music mode ([com.chencohensolution.transcriptor.settings.RecordMode.Music]): FLAC at the High preset, no voice processing. */
+        music: Boolean = false,
     ): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
-        val format = settings.audioFormat
+        musicNow = music
+        val format = if (music) AudioFormat.FlacLive else settings.audioFormat
         val fresh = Lecture(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
@@ -266,6 +269,10 @@ class LectureSession(
             settings.flacLevel,
             settings.aac,
             settings.micInput,
+            // The WAV kept before AAC is 16 bit: AAC keeps no more.
+            if (music) com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC
+            else settings.flac.let { if (format == AudioFormat.WavThenAac) it.copy(bitDepth = 16) else it },
+            music,
         )
         wantedInput = settings.micInput
         recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter, transcribing = liveModel != null, canTranscribe = liveModel != null || liveAvailable(language))
@@ -319,17 +326,22 @@ class LectureSession(
     }
 
     /** The models this lecture used and where, for its power report. */
+    /** The moment recording now is in Music mode. */
+    private var musicNow = false
+
+    private fun flacDetails() = (if (musicNow) com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC else settings.flac).let { "${it.bitDepth} bit · ${if (it.channels == 1) "mono" else "stereo"} · ${it.sampleRate / 1000} kHz" }
+
     /** The audio's format and encoder for the power report, from the setting it was recorded with and the recorder. */
     private fun audioInUse(file: String): PowerAudio {
-        val format = settings.audioFormat
+        val format = if (musicNow) AudioFormat.FlacLive else settings.audioFormat
         val codec = file.substringAfterLast('.')
         val aac = settings.aac
         val details = when (codec) {
             "aac" -> "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
-            "flac" -> "level ${settings.flacLevel}"
+            "flac" -> "level ${settings.flacLevel} · ${flacDetails()}" + if (musicNow) " · music, ${recorder.sourceName ?: "mic"} source" else ""
             else -> when (format) {
                 AudioFormat.WavThenAac -> "then AAC ${aac.profile.name} · ${aac.bitrateKbps} kbps, ${settings.encodeAfter.name.lowercase()}"
-                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel}, ${settings.encodeAfter.name.lowercase()}"
+                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel} · ${flacDetails()}, ${settings.encodeAfter.name.lowercase()}"
                 else -> ""
             }
         }

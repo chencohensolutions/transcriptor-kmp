@@ -8,15 +8,16 @@ import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.pendingEncode
 import com.chencohensolution.transcriptor.settings.AacSettings
 import com.chencohensolution.transcriptor.settings.FLAC_DEFAULT_LEVEL
+import com.chencohensolution.transcriptor.settings.FlacFormat
 import okio.FileSystem
 import okio.Path
 
 /**
- * Encodes a WAV file to FLAC at [level] (0 the fastest, 8 the smallest), reporting progress 0..1, and returns the
- * number of frames (samples per channel) written.
+ * Encodes a WAV file to FLAC at [level] (0 the fastest, 8 the smallest) and [format]'s rate and channels (the bit depth
+ * is the WAV's), reporting progress 0..1, and returns the number of the WAV's frames (samples per channel) it took in.
  */
 fun interface FlacEncode {
-    fun encode(wav: Path, flac: Path, level: Int, progress: (Float) -> Unit): Long
+    fun encode(wav: Path, flac: Path, level: Int, format: FlacFormat, progress: (Float) -> Unit): Long
 }
 
 /**
@@ -41,6 +42,8 @@ class AudioCompression(
     private val aacEncoder: AacEncode? = null,
     /** The AAC settings, read when each lecture is encoded. */
     private val aac: () -> AacSettings = { AacSettings() },
+    /** FLAC's rate and channels, read when each lecture is encoded. */
+    private val flac: () -> FlacFormat = { FlacFormat() },
 ) {
     fun pending(): List<Lecture> = store.index().filter { it.pendingEncode }.mapNotNull { store.load(it.id) }
         .filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
@@ -55,7 +58,7 @@ class AudioCompression(
         WavWriter.repair(fileSystem, wav)
         val expected = WavWriter.read(fileSystem, wav).frames
         val written = if (toAac) checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac().valid(), progress)
-        else encoder.encode(wav, temp, level(), progress)
+        else encoder.encode(wav, temp, level(), flac().valid(), progress)
         check(written == expected) { "${if (toAac) "AAC" else "FLAC"} took $written frames, the WAV has $expected" }
         fileSystem.atomicMove(temp, out)
         val done = lecture.copy(audioFile = name, pendingFlac = false, pendingAac = false)
