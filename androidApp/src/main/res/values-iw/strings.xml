@@ -598,6 +598,9 @@
     <string name="server_wifi">רק ב־Wi‑Fi</string>
     <string name="server_wifi_on">רגעים נשלחים רק ב־Wi‑Fi</string>
     <string name="server_wifi_off">רגעים נשלחים בכל רשת, גם בחבילת הגלישה</string>
+    <string name="server_charging">רק בזמן טעינה</string>
+    <string name="server_charging_on">נשלחים כשהטלפון בטעינה והסוללה ב־%1$d%% לפחות. ״להעלות עכשיו״ שולח בכל מקרה.</string>
+    <string name="server_charging_off">נשלחים בכל פעם שיש רשת, בטעינה או בלי</string>
     <string name="server_back_up_now">גיבוי עכשיו</string>
     <string name="server_on_server">בשרת</string>
     <string name="server_on_server_none">כל הקלטה בשרת היא רגע כאן.</string>

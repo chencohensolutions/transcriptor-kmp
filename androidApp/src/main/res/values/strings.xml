@@ -592,6 +592,9 @@
     <string name="server_wifi">Wi‑Fi only</string>
     <string name="server_wifi_on">Moments are sent on Wi‑Fi only</string>
     <string name="server_wifi_off">Moments are sent on any network, mobile data too</string>
+    <string name="server_charging">Only while charging</string>
+    <string name="server_charging_on">Sent on the charger, once the battery is at %1$d%% or more. Upload now sends anyway.</string>
+    <string name="server_charging_off">Sent whenever there is a network, charging or not</string>
     <string name="server_back_up_now">Back up now</string>
     <string name="server_on_server">On the server</string>
     <string name="server_on_server_none">Every recording on the server is a moment here.</string>

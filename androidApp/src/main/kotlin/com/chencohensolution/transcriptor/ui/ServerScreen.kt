@@ -78,6 +78,8 @@ class ServerActions(
     /** Asks another app on the phone that uses shed (by its place in the list) for its pairing. */
     val pairFrom: (Int) -> Unit = {},
     val setWifiOnly: (Boolean) -> Unit = {},
+    /** Background sending waits for the charger and 30% battery, or goes whenever the network allows. */
+    val setChargingOnly: (Boolean) -> Unit = {},
     /** Sends what waits now, in the app, on the network there is (moments and calls). */
     val backUpNow: () -> Unit = {},
     /** The phone is on a metered network now: Back up now asks first when Wi-Fi only is on. */
@@ -227,6 +229,21 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
             )
         }
         Switch(checked = state.wifiOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+    }
+    // Like compressing and transcribing on the charger: only with 30% battery or more (hen, Nov 17, 2026).
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = state.chargingOnly, role = Role.Switch, onValueChange = actions.setChargingOnly).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.server_charging), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (state.chargingOnly) stringResource(R.string.server_charging_on, com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY)
+                else stringResource(R.string.server_charging_off),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = state.chargingOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
     CallsSection(state, actions)
     HorizontalDivider()

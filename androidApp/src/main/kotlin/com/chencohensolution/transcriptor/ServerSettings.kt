@@ -111,7 +111,13 @@ fun ServerSettings(onBack: () -> Unit) {
                 scope.launch(Dispatchers.IO) {
                     Recording.backup.setWifiOnly(on)
                     // The work waiting is scheduled again with the new network rule.
-                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context)
+                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context, rulesChanged = true)
+                }
+            },
+            setChargingOnly = { on ->
+                scope.launch(Dispatchers.IO) {
+                    Recording.backup.setChargingOnly(on)
+                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context, rulesChanged = true)
                 }
             },
             backUpNow = { Recording.uploadNow(context) },
