@@ -66,6 +66,11 @@ data class ProfileSettings(
     val flac: FlacFormat,
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
+    /**
+     * Music's own "Record as WAV, encode afterwards" (owner's request, Nov 17, 2026: optional for Music, off by
+     * default); the other profiles share [SettingsStore.wavFirst].
+     */
+    val wavFirst: Boolean = false,
 ) {
     fun valid() = copy(aac = aac.valid(), flac = flac.valid(), flacLevel = flacLevel.coerceIn(FLAC_LEVELS))
 }
@@ -85,7 +90,7 @@ enum class QualityProfile(val key: String) {
     /** AAC-LC, 24 kHz mono, 48 kbps: speech only, about 22 MB an hour. */
     Low("low"),
 
-    /** The Music mode: FLAC 48 kHz stereo, always encoded as it records; the microphone opened without voice processing. */
+    /** The Music mode: FLAC 48 kHz stereo, encoded as it records unless its own WAV first is on; the microphone opened without voice processing. */
     Music("music");
 
     /** What this profile starts as, and goes back to on Reset. */

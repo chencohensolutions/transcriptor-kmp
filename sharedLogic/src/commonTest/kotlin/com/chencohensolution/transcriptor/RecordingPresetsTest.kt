@@ -72,6 +72,17 @@ class RecordingPresetsTest {
     }
 
     @Test
+    fun musicHasItsOwnWavFirst() {
+        val store = SettingsStore(FakeFileSystem(), "/s".toPath())
+        store.wavFirst = true
+        assertEquals(AudioFormat.FlacLive, store.recordingChoice(QualityProfile.Music).audioFormat)
+        store.setProfile(QualityProfile.Music, store.profile(QualityProfile.Music).copy(wavFirst = true))
+        store.wavFirst = false
+        assertEquals(AudioFormat.WavThenFlac, store.recordingChoice(QualityProfile.Music).audioFormat)
+        assertEquals(false, store.wavFirstFor(QualityProfile.High))
+    }
+
+    @Test
     fun musicModeIsKeptAndWinsOverTheOthers() {
         val fs = FakeFileSystem()
         val store = SettingsStore(fs, "/s".toPath())

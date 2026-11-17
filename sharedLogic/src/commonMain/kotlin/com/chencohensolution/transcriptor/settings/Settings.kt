@@ -235,7 +235,10 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
             if (value != QualityProfile.Music) write(profiled(read()).copy(activeProfile = value.key))
         }
 
-    /** Record as WAV first and encode afterwards, for every profile (Music excepted: it encodes as it records). */
+    /** WAV first for [profile]: Music's own, else the shared [wavFirst]. */
+    fun wavFirstFor(profile: QualityProfile) = if (profile == QualityProfile.Music) profile(profile).wavFirst else wavFirst
+
+    /** Record as WAV first and encode afterwards, for High, Normal and Low (Music has its own, [ProfileSettings.wavFirst]). */
     var wavFirst: Boolean
         get() = profiled(read()).wavFirst == true
         set(value) = write(profiled(read()).copy(wavFirst = value))
@@ -265,9 +268,9 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         get() = profile(activeProfile).aac
         set(value) = update { it.copy(aac = value.valid()) }
 
-    /** [profile]'s settings with the timing, as one value ([RecordingChoice]); Music's always as it records. */
+    /** [profile]'s settings with the timing, as one value ([RecordingChoice]). */
     fun recordingChoice(profile: QualityProfile = activeProfile): RecordingChoice = profile(profile).let { p ->
-        read().let { RecordingChoice(p.codec.format(wavFirst && profile != QualityProfile.Music), p.aac, p.flac, it.encodeAfter, it.transcribeWhen) }
+        read().let { RecordingChoice(p.codec.format(wavFirstFor(profile)), p.aac, p.flac, it.encodeAfter, it.transcribeWhen) }
     }
 
     /** The active profile and timing as one value; setting it keeps [RecordingChoice]'s codec, sound and timing. */
@@ -494,7 +497,7 @@ enum class RecordMode {
     Only,
 
     /**
-     * A concert: the [QualityProfile.Music] profile, encoded as it records (FLAC by default; its own settings, not the active
+     * A concert: the [QualityProfile.Music] profile (FLAC by default, as it records unless its WAV first is on; its own settings, not the active
      * profile's), the microphone without voice processing, and no transcript (like [Only]).
      */
     Music,

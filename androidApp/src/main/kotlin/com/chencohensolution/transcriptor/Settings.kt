@@ -164,10 +164,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             retryNpu = { m -> io { Recording.npuGuard.reenable(m.id) } },
             // Every recording setting goes into the shown profile; WAV first and the timing are for all.
             setAudioFormat = { f ->
-                edit { it.copy(codec = com.chencohensolution.transcriptor.settings.Codec.of(f)) }
-                if (f != com.chencohensolution.transcriptor.settings.AudioFormat.Wav && shown != com.chencohensolution.transcriptor.settings.QualityProfile.Music) {
-                    store.wavFirst = f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac
-                }
+                val first = f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac
+                val music = shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music
+                // Music keeps its own WAV first; the others share one (not changed by picking WAV).
+                edit { it.copy(codec = com.chencohensolution.transcriptor.settings.Codec.of(f), wavFirst = if (music && f != com.chencohensolution.transcriptor.settings.AudioFormat.Wav) first else it.wavFirst) }
+                if (!music && f != com.chencohensolution.transcriptor.settings.AudioFormat.Wav) store.wavFirst = first
                 load()
             },
             setFlacLevel = { level -> edit { it.copy(flacLevel = level) } },
@@ -188,6 +189,10 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
                 val wavFirst = if (format == com.chencohensolution.transcriptor.settings.AudioFormat.Wav || shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music) store.wavFirst
                     else next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac
                 store.setTiming(wavFirst, next.encodeAfter, next.transcribeWhen)
+                // Shown on Music, the battery's WAV first is Music's own.
+                if (shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music && format != com.chencohensolution.transcriptor.settings.AudioFormat.Wav) {
+                    edit { it.copy(wavFirst = next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac) }
+                }
                 load()
             },
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },

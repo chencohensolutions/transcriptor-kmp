@@ -184,9 +184,8 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
                 open(FormatPage.Flac)
             }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            // Music always encodes as it records; WAV first is for the other profiles.
-            if (state.profile == QualityProfile.Music) FormatPageNote(stringResource(R.string.rec_profile_music_live))
-            else EncodeLater(state, actions)
+            // WAV first: Music's own, the shared one for the others.
+            EncodeLater(state, actions)
         }
     }
 }

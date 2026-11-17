@@ -781,5 +781,4 @@
     <string name="rec_profile_note">Moments record with this one. Changes below are kept in it.</string>
     <string name="rec_profile_music_note">Used by Music on the Record bar and the tile. Changes below are kept in it.</string>
     <string name="rec_profile_reset">Reset</string>
-    <string name="rec_profile_music_live">Music is always encoded as it records.</string>
 </resources>

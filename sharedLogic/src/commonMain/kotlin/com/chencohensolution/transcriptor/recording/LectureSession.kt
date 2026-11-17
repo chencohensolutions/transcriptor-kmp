@@ -237,10 +237,10 @@ class LectureSession(
         check(recording.value == null) { "A lecture is already being recorded" }
         val startedAt = now()
         musicNow = music
-        // The profile it records with: Music's for the Music mode (encoded as it records), else the one picked.
+        // The profile it records with: Music's for the Music mode, else the one picked.
         val profileKey = if (music) QualityProfile.Music else settings.activeProfile
         val profile = settings.profile(profileKey)
-        val format = profile.codec.format(wavFirst = !music && settings.wavFirst)
+        val format = profile.codec.format(settings.wavFirstFor(profileKey))
         startFormat = format
         startProfile = profileKey
         val fresh = Lecture(
