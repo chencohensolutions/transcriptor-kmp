@@ -175,3 +175,9 @@ starts afresh. Amber from 70%, red from 90%.
   b — a chip and a sheet, c — the last minute as graphs; all three promoted, one picked in Settings › Advanced.
 
 Clipping (Nov 17, 2026): when a sample hits full scale, the recording screen says in red "Too loud: the sound is clipping" for about three seconds after (`StereoMeterState.clipping`, checked on every buffer in `MeterAnalyzer.feed`); Settings › Microphone's test says the same.
+
+Graceful live text (Nov 17, 2026, hen's ask): the glance's last words are one running text (the last three lines and the
+words being heard, grey) in a window three rows high that eases up to the newest words (`RunningWords`), never cut with
+"…"; its speaker chip shows the last speaker found. In the transcript, a speaker found for lines already shown (labels
+come a line or more late) opens its place between the lines and fades in (`AnimatedVisibility` in `SpeechRow`), and a
+changed speaker cross-fades. The UI lab's growing lecture labels each line a line late, to show it.

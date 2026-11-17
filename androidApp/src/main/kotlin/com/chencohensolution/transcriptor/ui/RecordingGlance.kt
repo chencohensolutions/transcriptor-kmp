@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -139,11 +143,13 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
             }
             if (problem != null) Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
 
-            // Who is talking, and their last words: the line being heard, else the last one finished.
+            // Who is talking, and their last words: the last lines finished and the one being heard, as one running text
+            // in a window of three rows that scrolls up smoothly as words come in (the newest at the bottom).
             val last = state.lecture.segments.lastOrNull()
-            val words = state.partial ?: last?.text
+            val words = (state.lecture.segments.takeLast(3).map { it.text } + listOfNotNull(state.partial)).joinToString(" ").ifBlank { null }
             if (!state.recordOnly && words != null) {
-                val speaker = last?.speakerId?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } }
+                // The last speaker found: a new line's speaker comes a moment later, so the chip doesn't blink away.
+                val speaker = state.lecture.segments.lastOrNull { it.speakerId != null }?.speakerId?.let { id -> state.lecture.speakers.firstOrNull { it.id == id } }
                 Column(
                     Modifier.padding(top = 28.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onTranscript)
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(16.dp),
@@ -158,10 +164,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                         )
                     }
                     CompositionLocalProvider(LocalLayoutDirection provides layoutDirectionOf(state.lecture.language)) {
-                        Text(
-                            words, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                            color = if (state.partial != null) colors.partial else MaterialTheme.colorScheme.onSurface, modifier = Modifier.fillMaxWidth(),
-                        )
+                        RunningWords(state, colors.partial)
                     }
                 }
             }
@@ -196,5 +199,35 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
         TextButton(onClick = onTranscript, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, bottom = 8.dp)) {
             Text(stringResource(if (state.recordOnly) R.string.glance_open_notes else R.string.glance_open_transcript))
         }
+    }
+}
+
+/**
+ * The glance's last words: the last lines finished (in the text's color) and the one being heard (grey), in a window
+ * three rows high that eases up to the newest words as they come, never cut with "…" (owner's request, Nov 17, 2026).
+ */
+@Composable
+private fun RunningWords(state: LiveLectureState, partialColor: Color) {
+    val style = MaterialTheme.typography.titleMedium
+    val finished = state.lecture.segments.takeLast(3).joinToString(" ") { it.text }
+    val partial = state.partial.orEmpty()
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        append(finished)
+        if (partial.isNotBlank()) {
+            if (finished.isNotEmpty()) append(" ")
+            withStyle(androidx.compose.ui.text.SpanStyle(color = partialColor)) { append(partial) }
+        }
+    }
+    val scroll = androidx.compose.foundation.rememberScrollState()
+    val rows = with(androidx.compose.ui.platform.LocalDensity.current) { style.lineHeight.toDp() * 3 }
+    // Each change eases the window to the bottom; a new line scrolls in from below instead of the text jumping.
+    LaunchedEffect(text.length, scroll.maxValue) {
+        scroll.animateScrollTo(scroll.maxValue, androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    Box(Modifier.fillMaxWidth().height(rows).clipToBounds()) {
+        Text(
+            text, style = style, color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth().verticalScroll(scroll, enabled = false),
+        )
     }
 }
