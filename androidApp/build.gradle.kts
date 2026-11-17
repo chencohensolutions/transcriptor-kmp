@@ -123,11 +123,22 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
+    // The release key, given by the environment (the release workflow has it in the repository's secrets): without it,
+    // a release build is signed with the debug key, fine to sideload but not an update of a release-signed install.
+    val releaseKeystore = System.getenv("RELEASE_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }?.let(::file)
+    if (releaseKeystore != null) {
+        signingConfigs.create("release") {
+            storeFile = releaseKeystore
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         // The UI Lab app (scripts/ui-lab.sh): the debug build under its own id and name that only opens the lab, so it
