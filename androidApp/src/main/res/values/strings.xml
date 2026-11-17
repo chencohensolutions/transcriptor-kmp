@@ -774,4 +774,12 @@
     <string name="settings_mic_test_off">The test listens when nothing is recording and the app may use the microphone.</string>
     <string name="glance_clipping">Too loud: the sound is clipping. Move away from the source, or try the back microphone.</string>
     <string name="rec_preset_hours_left">About %1$d hours of recording fit on the phone (%2$d GB free).</string>
+    <plurals name="server_compressing">
+        <item quantity="one">Compressing 1 moment, then sending…</item>
+        <item quantity="other">Compressing %d moments, then sending…</item>
+    </plurals>
+    <plurals name="server_awaiting_encode">
+        <item quantity="one">1 moment waits to be compressed (when charging, or Upload now), then it is sent.</item>
+        <item quantity="other">%d moments wait to be compressed (when charging, or Upload now), then they are sent.</item>
+    </plurals>
 </resources>

@@ -194,8 +194,16 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
             style = MaterialTheme.typography.bodyMedium,
         )
     }
+    // Recorded as WAV and compressed later (on the charger): not sent until then, said so (hen, Nov 17, 2026).
+    if (state.awaitingEncode > 0) Text(
+        pluralStringResource(R.plurals.server_awaiting_encode, state.awaitingEncode, state.awaitingEncode),
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     if (state.uploading) {
-        Text(stringResource(R.string.server_uploading), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            if (state.compressing > 0) pluralStringResource(R.plurals.server_compressing, state.compressing, state.compressing) else stringResource(R.string.server_uploading),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+        )
         LinearProgressIndicator(Modifier.fillMaxWidth())
     }
     when (state.lastRun) {
@@ -206,7 +214,7 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
     state.refused.forEach { (moment, reason) ->
         Text(stringResource(R.string.server_refused, isolated(moment), reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
-    BackUpNowButton(state, actions, if (state.waiting + calls > 0) R.string.server_upload_now else R.string.server_back_up_now)
+    BackUpNowButton(state, actions, if (state.waiting + calls + state.awaitingEncode > 0) R.string.server_upload_now else R.string.server_back_up_now)
     Row(
         Modifier.fillMaxWidth().toggleable(value = state.wifiOnly, role = Role.Switch, onValueChange = actions.setWifiOnly).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
