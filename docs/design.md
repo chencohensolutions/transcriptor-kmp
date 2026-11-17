@@ -371,8 +371,10 @@ moment, under the backup's settings.
 - **Path** (`location/MomentPath`, `PathBuilder`): `path.json` (version 1, one line, the points as columns: time in the
   recording, lat, lon, accuracy, speed, bearing, source), `Lecture.hasPath`. At most a point a second; a point that
   didn't move less than a minute after the last is left out. Precision (`PathPrecision`): by default only the fixes
-  other apps already ask for (passive, no GPS of our own); economical adds one a minute; while driving adds GPS every
-  second above about 15 km/h (`DrivingSwitch`); precise, GPS every second. It may go on after the audio stops
+  other apps already ask for (passive, no GPS of our own); economical adds one a minute; precise while moving adds GPS
+  every second from the first steps, a slow walk too (`MovingSwitch`: measured speed of 1.4 km/h or more, 15 m moved, or
+  Android's significant-motion sensor, which costs nothing while standing; off two minutes after it last moved); precise,
+  GPS every second. While moving, every point is kept (at most one a second), not only those 5 m apart. It may go on after the audio stops
   (`KeepUntil`), the points then past `audioEndMs`.
 - **Server**: with Sync location on, the path goes up with its moment, never live: inside the moment's note
   (`LectureStore.serverNote(lecture, path)`, `pathNote`, `location/PathNoteV1`: whole numbers, each the change from the

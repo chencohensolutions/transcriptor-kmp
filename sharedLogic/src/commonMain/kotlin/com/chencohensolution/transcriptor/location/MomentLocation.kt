@@ -19,6 +19,8 @@ class MomentLocation(
     stopOn: Boolean,
     /** The path is saved for this moment. */
     pathOn: Boolean,
+    /** The phone has a motion sensor that will call [motion] (precise while moving waits on it, at no cost). */
+    private val motionSensor: Boolean = false,
     /** When the recording started (epoch ms): a fix from before it (a cached one) is left out. */
     private val startedAtMillis: Long = 0,
     private val toRecording: (Long) -> Long,
@@ -59,7 +61,7 @@ class MomentLocation(
     /** A clock time in the recording's time: past the audio's end once it stopped. */
     private fun time(clock: Long): Long = keeping?.let { it.audioEndMillis + (clock - it.stoppedAtClock) } ?: toRecording(clock)
     private val precision = settings.pathPrecision
-    private val driving = DrivingSwitch()
+    private val moving = MovingSwitch()
     private var lastGood: Fix? = null
     private var lastFixAt: Long? = null
 
@@ -85,11 +87,20 @@ class MomentLocation(
         lastFixAt = fix.atMillis
         if (fix.accuracyM <= 50f) lastGood = fix
         path?.add(fix)
-        if (precision == PathPrecision.WhileDriving) driving.update(fix)
+        if (precision == PathPrecision.WhileMoving) moving.update(fix)
         val k = keeping
         if (k != null) k.arrival?.fix(fix) else watch.fix(fix)
         return publish(fix.atMillis)
     }
+
+    /** The phone's motion sensor felt it start moving: precise while moving turns GPS on. */
+    fun motion(nowMillis: Long): Status {
+        moving.motion(nowMillis)
+        return publish(nowMillis)
+    }
+
+    /** Precise while moving is the path's precision: the platform arms the motion sensor. */
+    val wantsMotion get() = precision == PathPrecision.WhileMoving && path != null
 
     fun deviceConnected(nowMillis: Long): Status {
         watch.deviceConnected(nowMillis)
@@ -180,7 +191,9 @@ class MomentLocation(
     private fun pathRequest(nowMillis: Long): Request = when {
         path == null -> Request.None
         precision == PathPrecision.Precise -> Request.EverySecond
-        precision == PathPrecision.WhileDriving && driving.on(nowMillis) -> Request.EverySecond
+        precision == PathPrecision.WhileMoving && moving.on(nowMillis) -> Request.EverySecond
+        // Standing: the motion sensor wakes it at the first steps; without one, a fix a minute notices the walk.
+        precision == PathPrecision.WhileMoving -> if (motionSensor) Request.None else Request.Minute
         precision == PathPrecision.Economical -> Request.Minute
         else -> Request.None
     }

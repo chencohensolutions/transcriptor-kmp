@@ -89,8 +89,30 @@ class LocationFeed(
         }.onFailure { android.util.Log.w("LocationFeed", "location request refused", it) }
     }
 
+    private val sensors = context.getSystemService(android.hardware.SensorManager::class.java)
+    private val significantMotion = sensors?.getDefaultSensor(android.hardware.Sensor.TYPE_SIGNIFICANT_MOTION)
+    private var motionListener: android.hardware.TriggerEventListener? = null
+
+    /**
+     * Calls [onMotion] each time the phone starts moving (Android's significant-motion sensor: a low-power chip that
+     * wakes on the first steps; it fires once, so it is armed again after each).
+     */
+    fun watchMotion(onMotion: () -> Unit) {
+        val sensor = significantMotion ?: return
+        val l = object : android.hardware.TriggerEventListener() {
+            override fun onTrigger(event: android.hardware.TriggerEvent?) {
+                executor.execute { onMotion() }
+                if (motionListener === this) sensors?.requestTriggerSensor(this, sensor)
+            }
+        }
+        motionListener = l
+        sensors?.requestTriggerSensor(l, sensor)
+    }
+
     /** Stops listening to everything. */
     fun stop() {
+        motionListener?.let { l -> significantMotion?.let { sensors?.cancelTriggerSensor(l, it) } }
+        motionListener = null
         passive?.let { manager?.removeUpdates(it) }
         own?.let { manager?.removeUpdates(it) }
         passive = null

@@ -857,8 +857,8 @@
     <string name="location_precision_passive_note">Uses locations other apps ask for, like navigation. No extra battery.</string>
     <string name="location_precision_economical">Economical</string>
     <string name="location_precision_economical_note">Adds a point about once a minute</string>
-    <string name="location_precision_driving">Precise while driving</string>
-    <string name="location_precision_driving_note">GPS every second while moving faster than 15 km/h</string>
+    <string name="location_precision_driving">Precise while moving</string>
+    <string name="location_precision_driving_note">GPS every second while the phone moves, a slow walk too. The motion sensor wakes it, so standing still costs nothing.</string>
     <string name="location_precision_precise">Precise</string>
     <string name="location_precision_precise_note">GPS every second, always. Uses the most battery.</string>
     <string name="location_keep">Keep saving the path after stopping</string>

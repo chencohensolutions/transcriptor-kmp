@@ -177,7 +177,7 @@ fun LocationPage(ui: LocationUi, actions: LocationActions, onBack: () -> Unit) {
                     listOf(
                         PathPrecision.Passive to (R.string.location_precision_passive to R.string.location_precision_passive_note),
                         PathPrecision.Economical to (R.string.location_precision_economical to R.string.location_precision_economical_note),
-                        PathPrecision.WhileDriving to (R.string.location_precision_driving to R.string.location_precision_driving_note),
+                        PathPrecision.WhileMoving to (R.string.location_precision_driving to R.string.location_precision_driving_note),
                         PathPrecision.Precise to (R.string.location_precision_precise to R.string.location_precision_precise_note),
                     ).forEach { (option, labels) ->
                         val allowed = ui.access != LocationAccess.Approximate || option == PathPrecision.Passive || option == PathPrecision.Economical

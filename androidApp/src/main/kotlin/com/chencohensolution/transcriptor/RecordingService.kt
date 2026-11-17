@@ -355,6 +355,7 @@ class RecordingService : Service() {
         val m = com.chencohensolution.transcriptor.location.MomentLocation(
             location.copy(stopWhenLeaving = location.stopWhenLeaving && canLocate, stopOnArrive = location.stopOnArrive && canLocate),
             stopOn = stopOn, pathOn = profile.savePath && canLocate,
+            motionSensor = getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_SIGNIFICANT_MOTION) != null,
             startedAtMillis = System.currentTimeMillis(),
             toRecording = { clock -> (Recording.session.positionMillis - (System.currentTimeMillis() - clock)).coerceAtLeast(0) },
         )
@@ -371,6 +372,8 @@ class RecordingService : Service() {
         feed = f
         f.start(p.needsFixes, Recording.settings.location.device?.takeIf { Recording.settings.location.stopOnDevice })
         f.request(p.status.value.request, p.minutePrecise)
+        // Precise while moving: the motion sensor turns GPS on at the first steps.
+        if (p.wantsMotion) f.watchMotion { onPlace(p.motion(System.currentTimeMillis())) }
         placeTicker = scope.launch {
             while (true) {
                 kotlinx.coroutines.delay(1_000)
