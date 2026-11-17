@@ -445,7 +445,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                             // Live, After, Only record or Music: transcribed while it records, after it stops (easier on
                             // the battery), not until asked, or a concert (FLAC, no voice processing, no transcript). The
                             // guessed labels keep their ✦ on the chips above.
-                            Text(
+                            if (state.recordingChoice == null) Text(
                                 stringResource(
                                     when (recordMode) {
                                         RecordMode.Live -> R.string.notebooks_record_live_note
@@ -1063,10 +1063,10 @@ internal fun shortModelName(name: String): String {
 }
 
 /**
- * Advanced mode's rows on the Record bar, each with its name and what the choice does (owner's requests, Nov 17,
- * 2026): **Quality** (Low, Normal, High: the profile moments record with, its encoder in a line) and **Processing**
- * (save battery or right away). With Music picked, Quality shows Music's own encoder line instead of the chips, and
- * Processing sets Music's own mode.
+ * Advanced mode's rows on the Record bar (owner's requests, Nov 17, 2026): **Quality** (Low, Normal, High; with Music
+ * picked, Music's encoder instead), **Compress** (on the charger or right away; Music's own with Music) and, with After,
+ * **Transcribe** (on the charger or right away). Under them, one paragraph says it all: what records and at how many
+ * kbps, when it is compressed, when it is transcribed.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1075,18 +1075,14 @@ private fun RecordPresets(
     mode: RecordMode, actions: NotebooksActions,
 ) {
     val music = mode == RecordMode.Music
-    val note = MaterialTheme.colorScheme.onSurfaceVariant
     val saving = if (music) state.musicPowerSaving else state.powerSaving
-    val power = if (saving) com.chencohensolution.transcriptor.settings.PowerPreset.Low else com.chencohensolution.transcriptor.settings.PowerPreset.Normal
+    val shown = if (music) state.musicChoice ?: choice else choice
+    val settings = if (music) state.musicSettings else state.activeSettings
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.notebooks_presets_quality), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
             if (music) {
-                // Music records with its own profile: its encoder in a line, set in Settings › Recording settings › Music.
-                Text(
-                    state.musicChoice?.let { qualityLine(it) }.orEmpty(), style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 10.dp),
-                )
+                Text(stringResource(R.string.notebooks_presets_music), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 10.dp))
             } else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
@@ -1097,60 +1093,67 @@ private fun RecordPresets(
                 }
             }
         }
-        Text(
-            if (music) stringResource(R.string.notebooks_presets_music) else qualityLine(choice),
-            style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-            Text(stringResource(R.string.notebooks_presets_battery), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(
-                    com.chencohensolution.transcriptor.settings.PowerPreset.Low to R.string.notebooks_power_low,
-                    com.chencohensolution.transcriptor.settings.PowerPreset.Normal to R.string.notebooks_power_normal,
-                ).forEach { (p, label) ->
-                    FilterChip(
-                        selected = power == p, onClick = { actions.setPower(p, music) }, label = { Text(stringResource(label)) },
-                        leadingIcon = if (p == com.chencohensolution.transcriptor.settings.PowerPreset.Low) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
-                    )
-                }
-            }
+        WhenRow(stringResource(R.string.notebooks_presets_battery), saving) { on ->
+            actions.setPower(if (on) com.chencohensolution.transcriptor.settings.PowerPreset.Low else com.chencohensolution.transcriptor.settings.PowerPreset.Normal, music)
         }
+        if (mode == RecordMode.After) WhenRow(stringResource(R.string.notebooks_presets_transcribe), state.transcribeSaving, actions.setTranscribeSaving)
+        // All of it in one paragraph, right above Record.
+        val compress = when {
+            com.chencohensolution.transcriptor.settings.Codec.of(shown.audioFormat) == com.chencohensolution.transcriptor.settings.Codec.Wav -> stringResource(R.string.notebooks_summary_wav)
+            saving -> stringResource(R.string.notebooks_summary_compress_charger)
+            else -> stringResource(R.string.notebooks_summary_compress_now)
+        }
+        val transcribe = stringResource(when (mode) {
+            RecordMode.Live -> R.string.notebooks_summary_transcribe_live
+            RecordMode.After -> if (state.transcribeSaving) R.string.notebooks_summary_transcribe_charger else R.string.notebooks_summary_transcribe_now
+            else -> R.string.notebooks_summary_transcribe_none
+        })
         Text(
-            stringResource(when {
-                music && saving -> R.string.rec_preset_power_low_music
-                music -> R.string.rec_preset_power_normal_music
-                saving -> R.string.notebooks_power_low_note
-                else -> R.string.notebooks_power_normal_note
-            }),
-            style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
+            // The codec's line kept in the chrome's direction as a whole, so the sentence's period lands after it.
+            stringResource(
+                R.string.notebooks_summary,
+                qualityLine(shown, settings).let { if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "\u2067$it\u2069" else "\u2066$it\u2069" },
+                compress, transcribe,
+            ),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp),
         )
-        // Transcribing has its own when: shown with After, the mode it is for.
-        if (mode == RecordMode.After) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                Text(stringResource(R.string.notebooks_presets_transcribe), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(true to R.string.notebooks_power_low, false to R.string.notebooks_power_normal).forEach { (on, label) ->
-                        FilterChip(
-                            selected = state.transcribeSaving == on, onClick = { actions.setTranscribeSaving(on) }, label = { Text(stringResource(label)) },
-                            leadingIcon = if (on) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
-                        )
-                    }
-                }
+    }
+}
+
+/** One when-row: its name, then On the charger (saves battery) and Right away. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WhenRow(title: String, saving: Boolean, set: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(true to R.string.notebooks_power_low, false to R.string.notebooks_power_normal).forEach { (on, label) ->
+                FilterChip(
+                    selected = saving == on, onClick = { set(on) }, label = { Text(stringResource(label)) },
+                    leadingIcon = if (on) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
+                )
             }
-            Text(
-                stringResource(if (state.transcribeSaving) R.string.rec_transcribe_low_note else R.string.rec_transcribe_normal_note),
-                style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
-            )
         }
     }
 }
 
 /** The quality picked in one line: the codec, its bitrate (lossy) or "lossless", channels and rate. */
 @Composable
-private fun qualityLine(choice: com.chencohensolution.transcriptor.settings.RecordingChoice): String {
+private fun qualityLine(choice: com.chencohensolution.transcriptor.settings.RecordingChoice, settings: com.chencohensolution.transcriptor.settings.ProfileSettings? = null): String {
     val codec = com.chencohensolution.transcriptor.settings.Codec.of(choice.audioFormat)
+    val fixed = codec.fixedRate
+    val rate = fixed ?: choice.sampleRate
+    val ch = if (fixed != null) 1 else choice.channels
+    // The bitrate as it is kept: AAC's and the other codecs' as set; WAV's exactly; FLAC's about (it varies with the sound).
+    val kbps = when (codec) {
+        com.chencohensolution.transcriptor.settings.Codec.Aac -> "${choice.aac.bitrateKbps} kbps"
+        com.chencohensolution.transcriptor.settings.Codec.Wav -> "${rate.toLong() * ch * choice.flac.bitDepth / 1000} kbps"
+        com.chencohensolution.transcriptor.settings.Codec.Flac -> "~${choice.flac.copy(sampleRate = rate, channels = ch).megabytesPerHour * 8000 / 3600} kbps"
+        else -> settings?.bitrate(codec)?.let { b -> (if (b % 1000 == 0) "${b / 1000}" else "%.2f".format(java.util.Locale.ROOT, b / 1000.0).trimEnd('0')) + " kbps" }.orEmpty()
+    }
     val name = when (codec) {
-        com.chencohensolution.transcriptor.settings.Codec.Aac -> "AAC ${choice.aac.bitrateKbps} kbps"
+        com.chencohensolution.transcriptor.settings.Codec.Aac -> "AAC"
         com.chencohensolution.transcriptor.settings.Codec.Flac -> "FLAC"
         com.chencohensolution.transcriptor.settings.Codec.Wav -> "WAV"
         com.chencohensolution.transcriptor.settings.Codec.Opus -> "Opus"
@@ -1158,8 +1161,7 @@ private fun qualityLine(choice: com.chencohensolution.transcriptor.settings.Reco
         com.chencohensolution.transcriptor.settings.Codec.AmrWb -> "AMR-WB"
         com.chencohensolution.transcriptor.settings.Codec.AmrNb -> "AMR-NB"
     }
-    val fixed = codec.fixedRate
-    val channels = stringResource(if ((if (fixed != null) 1 else choice.channels) == 1) R.string.rec_format_mono else R.string.rec_format_stereo)
+    val channels = stringResource(if (ch == 1) R.string.rec_format_mono else R.string.rec_format_stereo)
     // Each piece kept whole in Hebrew (Latin names and numbers isolated), in the chrome's order.
-    return listOf(isolated(name), channels, stringResource(R.string.rec_format_khz, (fixed ?: choice.sampleRate) / 1000)).joinToString(" · ")
+    return listOf(isolated("$name $kbps".trim()), channels, stringResource(R.string.rec_format_khz, rate / 1000)).joinToString(" · ")
 }

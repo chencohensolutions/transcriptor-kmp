@@ -813,4 +813,12 @@
     <string name="rec_transcribe_low_note">Saves battery: transcribed once the phone charges with 30% or more.</string>
     <string name="rec_transcribe_normal_note">Transcribed as soon as the moment ends. Uses the battery then.</string>
     <string name="notebooks_presets_transcribe">Transcribe</string>
+    <string name="notebooks_summary">Records %1$s. %2$s. %3$s.</string>
+    <string name="notebooks_summary_wav">Kept as WAV, nothing to compress</string>
+    <string name="notebooks_summary_compress_charger">Recorded as WAV and compressed on the charger</string>
+    <string name="notebooks_summary_compress_now">Compressed while recording</string>
+    <string name="notebooks_summary_transcribe_live">Transcribed live, as you talk</string>
+    <string name="notebooks_summary_transcribe_charger">Transcribed on the charger</string>
+    <string name="notebooks_summary_transcribe_now">Transcribed right after the moment</string>
+    <string name="notebooks_summary_transcribe_none">Not transcribed</string>
 </resources>

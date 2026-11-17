@@ -341,7 +341,8 @@ class MainActivity : ComponentActivity() {
         var transcribeSaving by remember { mutableStateOf(Recording.settings.transcribeSaving) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving,
+                activeSettings = choice?.let { Recording.settings.profile(active) }, musicSettings = musicChoice?.let { Recording.settings.profile(musicKey) }),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
