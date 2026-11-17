@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.layout.offset
@@ -417,7 +418,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                         fun openPanel(open: Boolean) { panelOpen = open; prefs.edit().putBoolean("open", open).apply() }
                         Column(Modifier.animateContentSize()) {
                             Box(
-                                Modifier.fillMaxWidth().height(28.dp)
+                                Modifier.fillMaxWidth().height(20.dp)
                                     .clickable(onClickLabel = stringResource(if (panelOpen) R.string.notebooks_panel_fold else R.string.notebooks_panel_open)) { openPanel(!panelOpen) }
                                     .draggable(
                                         rememberDraggableState { },
@@ -429,7 +430,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 Icon(
                                     if (panelOpen) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowUp,
                                     stringResource(if (panelOpen) R.string.notebooks_panel_fold else R.string.notebooks_panel_open),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp),
                                 )
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -468,6 +469,25 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                         onNew = { choosingLabels = false; creating = true },
                                     )
                                 }
+                                // Folded: the mode is one chip with a menu, on this row (one row instead of two).
+                                if (!panelOpen) Box {
+                                    var modeMenu by remember { mutableStateOf(false) }
+                                    AssistChip(
+                                        onClick = { modeMenu = true },
+                                        label = { Text(stringResource(modeLabel(recordMode)), maxLines = 1) },
+                                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
+                                        modifier = Modifier.padding(start = 8.dp),
+                                    )
+                                    DropdownMenu(expanded = modeMenu, onDismissRequest = { modeMenu = false }) {
+                                        RecordMode.entries.forEach { mode ->
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(modeLabel(mode))) },
+                                                onClick = { modeMenu = false; recordMode = mode; actions.setRecordMode(mode) },
+                                                leadingIcon = if (mode == recordMode) ({ Icon(Icons.Filled.Check, null) }) else null,
+                                            )
+                                        }
+                                    }
+                                }
                                 AssistChip(
                                     onClick = { choosingLanguage = true },
                                     label = { Text(languageName(language), maxLines = 1) },
@@ -493,7 +513,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                             )
                             // Dense rows (owner's call, Nov 17, 2026): chips without the 48 dp touch margin around them.
                             CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
-                            FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (panelOpen) FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(
                                     RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
                                     RecordMode.Only to R.string.notebooks_record_only, RecordMode.Music to R.string.notebooks_record_music,
@@ -512,7 +532,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 // Red, like the recording screen's Stop it turns into.
                                 colors = ButtonDefaults.buttonColors(containerColor = LocalTranscriptorColors.current.recording, contentColor = Color.White),
                                 // Room above it, apart from the rows of choices (owner's ask, Nov 17, 2026).
-                                modifier = Modifier.padding(top = 16.dp).sharedRecordButton().fillMaxWidth().height(56.dp),
+                                modifier = Modifier.padding(top = if (panelOpen) 16.dp else 10.dp).sharedRecordButton().fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
                                 Text(stringResource(R.string.notebooks_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
@@ -1246,3 +1266,11 @@ private fun recordChipColors() = androidx.compose.material3.FilterChipDefaults.f
     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
     selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
 )
+
+/** The name of a recording mode on its chip. */
+private fun modeLabel(mode: RecordMode) = when (mode) {
+    RecordMode.Live -> R.string.notebooks_record_live
+    RecordMode.After -> R.string.notebooks_record_after
+    RecordMode.Only -> R.string.notebooks_record_only
+    RecordMode.Music -> R.string.notebooks_record_music
+}
