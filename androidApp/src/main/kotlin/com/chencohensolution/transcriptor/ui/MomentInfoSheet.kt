@@ -15,6 +15,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -102,6 +104,9 @@ fun MomentInfoSheet(info: MomentInfo, seek: (Long) -> Unit = {}, onDismiss: () -
                     Note(stringResource(R.string.info_path_after))
                 }
                 PathDrawing(path, seek, Modifier.padding(vertical = 8.dp))
+                var onMap by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+                androidx.compose.material3.OutlinedButton(onClick = { onMap = true }) { Text(stringResource(R.string.info_path_map)) }
+                if (onMap) PathMapDialog(path, seek) { onMap = false }
                 SpeedGraph(path, seek, stringResource(R.string.info_path_speed), Modifier.padding(vertical = 8.dp))
             }
 
