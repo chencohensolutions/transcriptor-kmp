@@ -17,6 +17,7 @@ import com.chencohensolution.shed.journal.PairingException
 import com.chencohensolution.transcriptor.ui.PairingUi
 import com.chencohensolution.transcriptor.ui.ServerActions
 import com.chencohensolution.transcriptor.ui.ServerScreen
+import com.chencohensolution.transcriptor.ui.WifiUi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,6 +83,36 @@ fun ServerSettings(onBack: () -> Unit) {
     val pickCalls = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
         if (tree != null) scope.launch(Dispatchers.IO) { runCatching { Recording.chooseCallsFolder(context, tree) } }
     }
+    // The Wi‑Fi network the phone is on, for "Add this network" (its name needs location), and whether the background
+    // work may read it too (location "all the time").
+    fun granted(p: String) = androidx.core.content.ContextCompat.checkSelfPermission(context, p) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    var wifi by remember { mutableStateOf(WifiUi()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            wifi = withContext(Dispatchers.IO) {
+                WifiUi(
+                    current = com.chencohensolution.shed.android.WifiName.current(context),
+                    location = granted(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                    background = granted(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                )
+            }
+            delay(2_000)
+        }
+    }
+    fun setNetworks(names: Set<String>) = scope.launch(Dispatchers.IO) {
+        Recording.backup.setWifiNetworks(names)
+        if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context, rulesChanged = true)
+    }
+    // Asked for first, then the network is added once its name can be read.
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val name = com.chencohensolution.shed.android.WifiName.current(context)
+        wifi = wifi.copy(current = name, location = granted(android.Manifest.permission.ACCESS_FINE_LOCATION))
+        if (name != null) setNetworks(Recording.backup.wifiNetworks + name)
+    }
+    // Android 11 and later: opens the app's location page, where "Allow all the time" is.
+    val askBackground = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        wifi = wifi.copy(background = it)
+    }
     ServerScreen(
         state, pairing, Recording.shed.defaultDeviceName,
         ServerActions(
@@ -111,9 +142,22 @@ fun ServerSettings(onBack: () -> Unit) {
                 scope.launch(Dispatchers.IO) {
                     Recording.backup.setWifiOnly(on)
                     // The work waiting is scheduled again with the new network rule.
-                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context)
+                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context, rulesChanged = true)
                 }
             },
+            setChargingOnly = { on ->
+                scope.launch(Dispatchers.IO) {
+                    Recording.backup.setChargingOnly(on)
+                    if (Recording.backup.waiting() > 0) Recording.scheduleUploads(context, rulesChanged = true)
+                }
+            },
+            addThisNetwork = {
+                val name = com.chencohensolution.shed.android.WifiName.current(context)
+                if (name != null) setNetworks(Recording.backup.wifiNetworks + name)
+                else askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+            },
+            removeNetwork = { name -> setNetworks(Recording.backup.wifiNetworks - name) },
+            allowBackgroundLocation = { askBackground.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
             backUpNow = { Recording.uploadNow(context) },
             onMeteredNetwork = { Recording.onMeteredNetwork(context) },
             setShowServer = { on -> scope.launch(Dispatchers.IO) { Recording.backup.setShowServer(on) } },
@@ -141,5 +185,6 @@ fun ServerSettings(onBack: () -> Unit) {
         ),
         siblings.map { it.label },
         locks,
+        wifi,
     )
 }

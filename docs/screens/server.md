@@ -34,7 +34,14 @@ without a server.
   those, in the app at once (`Recording.uploadNow`, `ServerBackup.runUploads`), not left to
   the background work, which may be waiting out a retry or for Wi‑Fi; with Wi‑Fi only on and the phone on mobile data
   it asks first, with how much would go;
-  **Wi‑Fi only** (on by default); **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
+  **Wi‑Fi only** (on by default); **Only while charging** (off by default; hen, Nov 17, 2026): the background
+  sending waits for the charger and starts only once the battery is at 30% or more (`ENCODE_MIN_BATTERY`, the same rule
+  as compressing and transcribing on the charger); Upload now sends anyway; **Wi‑Fi networks** (hen, Nov 17, 2026):
+  none means any network; **Add this network: <name>** adds the one the phone is on (asking for location first, since
+  Android hides the name without it), a chip per network removes it; with networks chosen the background work sends
+  only on them (`ShedUploads.schedule(wifiNetworks)`, checked when it starts, again every 15 minutes), and while
+  location isn't allowed "all the time" a red line says the work can't read the name with the app closed, with
+  **Allow location all the time**; Upload now sends anyway; **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
   choice of this phone kept in `backup.json`; off, the moments list and search show only what was recorded in Audio
   Logs, nothing from the server or other phones, and backup goes on; Nov 16, 2026), then, while it is on, **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
@@ -66,7 +73,9 @@ without a server.
 - Each time the moments' list reloads (a moment stops, one closes, a pass ends, the app opens) the finished moments
   not handed over yet go to shed: not the one recording or open, not one with a pass running, not one waiting to be
   encoded. Shed hashes the audio once (`backup.json` in the app's storage keeps which), queues it and sends it with
-  WorkManager when the network allows (Wi‑Fi only, or any), resuming where it stopped. A moment that moved to the
+  WorkManager when the network allows (Wi‑Fi only, or any) and, with Only while charging, on the charger with 30%
+  battery or more (`ShedUploads.schedule(chargingMinBattery)`: the work asks for the charger and checks the battery
+  when it starts, again every 15 minutes while low), resuming where it stopped. A moment that moved to the
   moments folder since is found there by its id.
 - The page refreshes every second while open, and fetches the server's list of recordings when it opens (which also
   turns new ones into moments).

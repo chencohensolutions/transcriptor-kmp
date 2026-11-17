@@ -12,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -70,6 +72,9 @@ sealed interface PairingUi {
     data class Failed(val message: String) : PairingUi
 }
 
+/** The Wi‑Fi network the phone is on (null: not on Wi‑Fi, or its name can't be read), and the location access it needs. */
+data class WifiUi(val current: String? = null, val location: Boolean = false, val background: Boolean = false)
+
 class ServerActions(
     val back: () -> Unit = {},
     /** Asks the server who the link in the text is for, without using its code. */
@@ -78,6 +83,13 @@ class ServerActions(
     /** Asks another app on the phone that uses shed (by its place in the list) for its pairing. */
     val pairFrom: (Int) -> Unit = {},
     val setWifiOnly: (Boolean) -> Unit = {},
+    /** Background sending waits for the charger and 30% battery, or goes whenever the network allows. */
+    val setChargingOnly: (Boolean) -> Unit = {},
+    /** Adds the Wi‑Fi network the phone is on to those uploads are kept to (asks for location first if needed). */
+    val addThisNetwork: () -> Unit = {},
+    val removeNetwork: (String) -> Unit = {},
+    /** Asks for location "all the time", so the background work can read the network's name. */
+    val allowBackgroundLocation: () -> Unit = {},
     /** Sends what waits now, in the app, on the network there is (moments and calls). */
     val backUpNow: () -> Unit = {},
     /** The phone is on a metered network now: Back up now asks first when Wi-Fi only is on. */
@@ -111,6 +123,7 @@ class ServerActions(
 fun ServerScreen(
     state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions, siblings: List<String> = emptyList(),
     locks: com.chencohensolution.transcriptor.notebook.Locks = com.chencohensolution.transcriptor.notebook.Locks(),
+    wifi: WifiUi = WifiUi(),
 ) {
     Scaffold(
         topBar = {
@@ -125,7 +138,7 @@ fun ServerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val paired = state.paired
-            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions, locks)
+            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions, locks, wifi)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -169,7 +182,7 @@ private fun NotPaired(pairing: PairingUi, defaultDeviceName: String, siblings: L
 }
 
 @Composable
-private fun Paired(state: ServerState, actions: ServerActions, locks: com.chencohensolution.transcriptor.notebook.Locks) {
+private fun Paired(state: ServerState, actions: ServerActions, locks: com.chencohensolution.transcriptor.notebook.Locks, wifi: WifiUi = WifiUi()) {
     val paired = state.paired ?: return
     var unpairing by rememberSaveable { mutableStateOf(false) }
     Text(
@@ -227,6 +240,22 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
             )
         }
         Switch(checked = state.wifiOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
+    }
+    WifiNetworks(state, wifi, actions)
+    // Like compressing and transcribing on the charger: only with 30% battery or more (hen, Nov 17, 2026).
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = state.chargingOnly, role = Role.Switch, onValueChange = actions.setChargingOnly).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.server_charging), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (state.chargingOnly) stringResource(R.string.server_charging_on, com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY)
+                else stringResource(R.string.server_charging_off),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = state.chargingOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
     CallsSection(state, actions)
     HorizontalDivider()
@@ -421,4 +450,47 @@ private fun BackUpNowButton(state: ServerState, actions: ServerActions, label: I
         confirmButton = { TextButton(onClick = { asking = false; actions.backUpNow() }) { Text(stringResource(R.string.server_mobile_send)) } },
         dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(R.string.server_cancel)) } },
     )
+}
+
+/**
+ * The Wi‑Fi networks uploads are kept to (hen, Nov 17, 2026): none means any network the rest allows. Added from the
+ * network the phone is on; Android shows its name only with location, and to the background work only "all the time".
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun WifiNetworks(state: ServerState, wifi: WifiUi, actions: ServerActions) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.server_networks), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            if (state.wifiNetworks.isEmpty()) stringResource(R.string.server_networks_any) else stringResource(R.string.server_networks_only),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (state.wifiNetworks.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            state.wifiNetworks.sorted().forEach { name ->
+                FilterChip(
+                    selected = true, onClick = { actions.removeNetwork(name) },
+                    label = { Text(isolated(name)) },
+                    trailingIcon = {
+                        Icon(
+                            Icons.Filled.Close, stringResource(R.string.server_networks_remove, name),
+                            Modifier.size(16.dp),
+                        )
+                    },
+                )
+            }
+        }
+        val current = wifi.current
+        when {
+            current != null && current !in state.wifiNetworks ->
+                TextButton(onClick = actions.addThisNetwork) { Text(stringResource(R.string.server_networks_add_this, isolated(current))) }
+            current == null && !wifi.location ->
+                TextButton(onClick = actions.addThisNetwork) { Text(stringResource(R.string.server_networks_add)) }
+            current == null && state.wifiNetworks.isEmpty() ->
+                Text(stringResource(R.string.server_networks_not_on_wifi), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (state.wifiNetworks.isNotEmpty() && !wifi.background) {
+            Text(stringResource(R.string.server_networks_background), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = actions.allowBackgroundLocation) { Text(stringResource(R.string.server_networks_allow)) }
+        }
+    }
 }

@@ -884,7 +884,17 @@ object Recording {
 
     fun freeUpPlan(rule: com.chencohensolution.transcriptor.backup.FreeUpRule) = backup.freeUpPlan(rule, System.currentTimeMillis(), busy())
 
-    fun scheduleUploads(context: android.content.Context) = ShedUploads.schedule(context, backup.wifiOnly)
+    /**
+     * The background sending of what waits, by Settings › Server: Wi‑Fi only, and "While charging" (the charger and
+     * [com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY]% battery, like compressing and transcribing).
+     * The Wi‑Fi networks chosen, if any. [rulesChanged]: the user changed one of them, so work waiting under the old rules is replaced.
+     */
+    fun scheduleUploads(context: android.content.Context, rulesChanged: Boolean = false) = ShedUploads.schedule(
+        context, backup.wifiOnly,
+        chargingMinBattery = com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY.takeIf { backup.chargingOnly },
+        rulesChanged = rulesChanged,
+        wifiNetworks = backup.wifiNetworks,
+    )
 
     fun init(app: Application) {
         val root = app.filesDir.toOkioPath()

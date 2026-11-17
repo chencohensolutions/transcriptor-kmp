@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Settings › Server › Wi‑Fi networks: Android shows the network's name only with location, "all the time" for
+         the background upload work. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- EncodeJob is kept across a restart (encode when charging). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

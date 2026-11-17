@@ -66,6 +66,10 @@ data class ServerState(
     /** Null when not paired: the app works as it always did, on the phone only. */
     val paired: JournalState.Paired? = null,
     val wifiOnly: Boolean = true,
+    /** The background sending waits for the charger and [com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY]% battery. */
+    val chargingOnly: Boolean = false,
+    /** Wi‑Fi networks (names) the background sending is kept to; empty: any network the rest allows. */
+    val wifiNetworks: Set<String> = emptySet(),
     /** Moments waiting to be sent, and bytes left of them. */
     val waiting: Int = 0,
     val bytesLeft: Long = 0,
@@ -131,6 +135,10 @@ sealed interface PrivateResult {
 private data class BackupFileV1(
     val v: Int = 1,
     val wifiOnly: Boolean = true,
+    /** Sent in the background only on the charger with enough battery (hen, Nov 17, 2026); Upload now sends anyway. */
+    val chargingOnly: Boolean = false,
+    /** Wi‑Fi networks (names) the background sending is kept to; empty: any network the rest allows. */
+    val wifiNetworks: Set<String> = emptySet(),
     /** Moments handed to shed: id to the sha256 of its audio, and which audio file it was. */
     val moments: Map<String, HandedOver> = emptyMap(),
     /** Recordings of the server the user deleted here: not made moments again. */
@@ -222,7 +230,7 @@ class ServerBackup(
     private var kept: BackupFileV1 = load()
     private lateinit var shed: Shed
     private lateinit var journal: JournalBackend
-    private val _state = MutableStateFlow(ServerState(wifiOnly = kept.wifiOnly, showServer = kept.showServer))
+    private val _state = MutableStateFlow(ServerState(wifiOnly = kept.wifiOnly, chargingOnly = kept.chargingOnly, wifiNetworks = kept.wifiNetworks, showServer = kept.showServer))
     val state: StateFlow<ServerState> = _state.asStateFlow()
 
     /** Finds a handed-over moment's audio wherever the moment is now: shed asks when it sends it. */
@@ -279,6 +287,22 @@ class ServerBackup(
 
     fun setWifiOnly(on: Boolean) {
         save(kept.copy(wifiOnly = on))
+        refresh()
+    }
+
+    val chargingOnly: Boolean get() = kept.chargingOnly
+
+    /** Background sending waits for the charger and enough battery, or goes whenever the network allows. */
+    fun setChargingOnly(on: Boolean) {
+        save(kept.copy(chargingOnly = on))
+        refresh()
+    }
+
+    val wifiNetworks: Set<String> get() = kept.wifiNetworks
+
+    /** Keeps the background sending to these Wi‑Fi networks (hen, Nov 17, 2026); empty lifts it. */
+    fun setWifiNetworks(names: Set<String>) {
+        save(kept.copy(wifiNetworks = names.map { it.trim() }.filter { it.isNotEmpty() }.toSet()))
         refresh()
     }
 
@@ -879,6 +903,8 @@ class ServerBackup(
         _state.value = ServerState(
             paired = paired,
             wifiOnly = kept.wifiOnly,
+            chargingOnly = kept.chargingOnly,
+            wifiNetworks = kept.wifiNetworks,
             waiting = waiting.size,
             bytesLeft = waiting.sumOf { it.size - it.sent },
             backedUp = byMoment.values.count { it == MomentBackup.BackedUp },
