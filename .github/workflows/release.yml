@@ -44,7 +44,7 @@ jobs:
         run: |
           sdkmanager=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
           yes | "$sdkmanager" --licenses >/dev/null || true
-          "$sdkmanager" "platforms;android-37" "ndk;30.0.16248370" "cmake;3.22.1" >/dev/null
+          "$sdkmanager" "platforms;android-37.0" "ndk;30.0.16248370" "cmake;3.22.1" >/dev/null
 
       - name: Release key
         env:
