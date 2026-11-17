@@ -886,7 +886,7 @@ object Recording {
             speakerPassReady = { canFindSpeakers },
             power = PowerMeter(AndroidPowerProbe(app).also { powerProbe = it }),
         )
-        compression = AudioCompression(FileSystem.SYSTEM, store, androidFlacEncode, { settings.flacLevel }, androidAacEncode, { settings.aac })
+        compression = AudioCompression(FileSystem.SYSTEM, store, androidFlacEncode, { settings.flacLevel }, androidAacEncode, { settings.aac }, { settings.flac })
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

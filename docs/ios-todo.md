@@ -274,3 +274,8 @@ anything left to decide. Remove an entry once it is built.
   `lockVoiceMessages`. Android files: `Recording.kt` (`showServerMoments`, `momentsHere`, `audioHere`, `setLocks`),
   `AndroidAudioPlayer.kt` (`StreamedSource`), `ui/NotebooksScreen.kt`, `ui/ServerScreen.kt`. Strings `server_lock*`,
   `notebooks_locked`, `notebooks_label_locked*`.
+- Recording presets (Nov 17, 2026): `QualityPreset`, `PowerPreset`, `RecordingChoice` (`SettingsStore.recordingChoice`),
+  `FlacFormat` (`SettingsStore.flac`: FLAC's rate, channels, 16/24 bit; the bit depth also the WAV's). iOS's recorder
+  should read 24 bit as floats when `flac.bitDepth` is 24 and hand 16 bits to live transcription (`PcmConvert`,
+  `PcmReducer(bits = 24)`). UI: `ui/RecordingFormat.kt` (`Presets`, `FlacFormatPart`), strings `rec_preset_*`,
+  `rec_format_depth*`, `rec_format_flac_*`.

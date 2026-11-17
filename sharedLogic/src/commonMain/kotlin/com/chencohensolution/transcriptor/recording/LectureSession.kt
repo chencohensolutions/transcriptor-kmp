@@ -266,6 +266,8 @@ class LectureSession(
             settings.flacLevel,
             settings.aac,
             settings.micInput,
+            // The WAV kept before AAC is 16 bit: AAC keeps no more.
+            settings.flac.let { if (format == AudioFormat.WavThenAac) it.copy(bitDepth = 16) else it },
         )
         wantedInput = settings.micInput
         recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter, transcribing = liveModel != null, canTranscribe = liveModel != null || liveAvailable(language))
@@ -319,6 +321,8 @@ class LectureSession(
     }
 
     /** The models this lecture used and where, for its power report. */
+    private fun flacDetails() = settings.flac.let { "${it.bitDepth} bit · ${if (it.channels == 1) "mono" else "stereo"} · ${it.sampleRate / 1000} kHz" }
+
     /** The audio's format and encoder for the power report, from the setting it was recorded with and the recorder. */
     private fun audioInUse(file: String): PowerAudio {
         val format = settings.audioFormat
@@ -326,10 +330,10 @@ class LectureSession(
         val aac = settings.aac
         val details = when (codec) {
             "aac" -> "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
-            "flac" -> "level ${settings.flacLevel}"
+            "flac" -> "level ${settings.flacLevel} · ${flacDetails()}"
             else -> when (format) {
                 AudioFormat.WavThenAac -> "then AAC ${aac.profile.name} · ${aac.bitrateKbps} kbps, ${settings.encodeAfter.name.lowercase()}"
-                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel}, ${settings.encodeAfter.name.lowercase()}"
+                AudioFormat.WavThenFlac -> "then FLAC level ${settings.flacLevel} · ${flacDetails()}, ${settings.encodeAfter.name.lowercase()}"
                 else -> ""
             }
         }

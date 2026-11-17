@@ -87,15 +87,24 @@ stops.
   (`SettingsStore.findSpeakersOnStop`, off by default since speakers are found live), Transcribe again automatically (`autoImprove`, off by default). **Models and storage**:
   Manage models, the moments folder (Choose a folder / Change), **Server backup** (off, or on to which server; its own
   page: [server.md](server.md)), and a **Recording format** row whose line sums up the
-  choice ("AAC · LC · 64 kbps · Mono · 48 kHz · hardware · while recording"). It opens the Recording format page:
-  **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
+  choice: the presets ("Normal quality · Right away") and under them the codec ("AAC · LC · 64 kbps · Mono · 48 kHz ·
+  hardware · while recording"). It opens the Recording format page. At its top, **Quality**: High (FLAC, 48 kHz stereo,
+  24 bit), Normal (AAC-LC, 48 kHz stereo, 256 kbps), Low (AAC-LC, 24 kHz mono, 48 kbps), with a fourth, Custom,
+  shown selected only while the settings match none; picking a preset keeps "WAV first" and the AAC encoder. Then
+  **Battery**: Save battery (WAV first; encoding and After transcription on the charger at 30% or more) or Right away
+  (encoding and After transcription right after Stop), Custom likewise (`QualityPreset`, `PowerPreset`,
+  `RecordingChoice`, `SettingsStore.recordingChoice`; the battery preset also sets Settings › After a moment's
+  `transcribeWhen`). Then **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
   under them **Record as WAV, encode afterwards** (greyed out for WAV) with **When the moment ends** or **When charging,
   with 30% battery or more** (`SettingsStore.audioFormat`: `wav`, `aac-live`, `wav-then-aac`, `flac-live`,
   `wav-then-flac`; `SettingsStore.encodeAfter`). The **AAC** page: AAC profile (LC, HE, HE v2), sample rate (16, 24,
   48 kHz; HE needs 24 or 48), channels (mono, stereo; HE v2 is stereo only), bitrate as chips from 16 to 320 kbps with
   the size an hour (a note above 64 kbps for HE), and the encoder: Automatic (hardware first) or any of the phone's AAC
   encoders, with the one that runs and whether it is hardware (`SettingsStore.aac`, `AacSettings`, `AacEncoders`).
-  The **FLAC** page: the compression effort, 0 (faster) to 8 (smaller file), 5 by default (`SettingsStore.flacLevel`).
+  The AAC page also shows **Bit depth** with 16 fixed (AAC keeps none of its own; 24 bit is FLAC's).
+  The **FLAC** page: sample rate (16, 24, 48 kHz) with the size an hour, channels (mono, stereo), bit depth (16, 24;
+  24 reads the microphone in floating point and keeps 24 bits in the WAV and FLAC) (`SettingsStore.flac`,
+  `FlacFormat`), and the compression effort, 0 (faster) to 8 (smaller file) (`SettingsStore.flacLevel`).
   Both pages say when they encode, when it is afterwards. **Advanced**: Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See

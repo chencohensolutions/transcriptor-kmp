@@ -7,7 +7,7 @@ import okio.Path
 import okio.use
 
 /**
- * A WAV file (PCM, 16 bit) written as the PCM arrives. Its header's sizes are only right after [checkpoint] or
+ * A WAV file (PCM, 16 or 24 bit) written as the PCM arrives. Its header's sizes are only right after [checkpoint] or
  * [close]; [repair] fixes them from the file's length after a crash.
  */
 class WavWriter(
@@ -15,13 +15,14 @@ class WavWriter(
     path: Path,
     private val sampleRate: Int = SAMPLE_RATE,
     private val channels: Int = CHANNELS,
+    private val bits: Int = 16,
 ) : PcmSink {
     private val handle: FileHandle = fileSystem.openReadWrite(path)
     private var dataBytes = 0L
 
     init {
         handle.resize(0)
-        val header = header(sampleRate, channels, 0)
+        val header = header(sampleRate, channels, 0, bits)
         handle.write(0, header, 0, header.size)
     }
 
@@ -42,7 +43,8 @@ class WavWriter(
 
     /** What a WAV file's header says. */
     data class Info(val sampleRate: Int, val channels: Int, val bitsPerSample: Int, val dataBytes: Long) {
-        val frames get() = dataBytes / (channels * bitsPerSample / 8)
+        val blockAlign get() = channels * bitsPerSample / 8
+        val frames get() = dataBytes / blockAlign
     }
 
     companion object {
@@ -50,12 +52,12 @@ class WavWriter(
         const val CHANNELS = 2
         const val HEADER_SIZE = 44L
 
-        fun header(sampleRate: Int, channels: Int, dataBytes: Long): ByteArray {
-            val blockAlign = channels * 2
+        fun header(sampleRate: Int, channels: Int, dataBytes: Long, bits: Int = 16): ByteArray {
+            val blockAlign = channels * bits / 8
             return Buffer()
                 .writeUtf8("RIFF").writeIntLe((36 + dataBytes).toInt()).writeUtf8("WAVE")
                 .writeUtf8("fmt ").writeIntLe(16).writeShortLe(1).writeShortLe(channels)
-                .writeIntLe(sampleRate).writeIntLe(sampleRate * blockAlign).writeShortLe(blockAlign).writeShortLe(16)
+                .writeIntLe(sampleRate).writeIntLe(sampleRate * blockAlign).writeShortLe(blockAlign).writeShortLe(bits)
                 .writeUtf8("data").writeIntLe(dataBytes.toInt())
                 .readByteArray()
         }

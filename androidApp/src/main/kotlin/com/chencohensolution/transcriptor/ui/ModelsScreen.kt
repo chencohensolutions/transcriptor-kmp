@@ -133,6 +133,8 @@ data class ModelsState(
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How AAC records, and what "WAV, then AAC" encodes to. */
     val aac: AacSettings = AacSettings(),
+    /** FLAC's rate, channels and bit depth (the bit depth also the WAV's before it). */
+    val flac: com.chencohensolution.transcriptor.settings.FlacFormat = com.chencohensolution.transcriptor.settings.FlacFormat(),
     /** When "Record as WAV, encode afterwards" encodes. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** When moments recorded with "After" are transcribed. */
@@ -246,6 +248,11 @@ class ModelsActions(
     val setAudioFormat: (AudioFormat) -> Unit = {},
     val setFlacLevel: (Int) -> Unit = {},
     val setAac: (AacSettings) -> Unit = {},
+    val setFlac: (com.chencohensolution.transcriptor.settings.FlacFormat) -> Unit = {},
+    /** Applies a quality preset (codec and its settings). */
+    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    /** Applies a power preset (when encoding and "After" transcription run). */
+    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val setEncodeAfter: (EncodeAfter) -> Unit = {},
     val setTranscribeWhen: (EncodeAfter) -> Unit = {},
     val setFindSpeakersOnStop: (Boolean) -> Unit = {},
@@ -332,6 +339,9 @@ fun ModelsScreen(state: ModelsState, actions: ModelsActions, hub: HubSearch) {
 }
 
 private const val SPEAKERS = "speakers"
+
+/** The presets' view of these settings. */
+val ModelsState.recordingChoice get() = com.chencohensolution.transcriptor.settings.RecordingChoice(audioFormat, aac, flac, encodeAfter, transcribeWhen)
 
 /** The version of Qualcomm's runtime the app ships (sherpa-onnx's qnn-libs-2.40.0.251030): NPU builds must match it. */
 const val APP_QNN = "2.40"

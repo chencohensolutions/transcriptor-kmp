@@ -43,12 +43,14 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var format: AudioFileFormat? = null
     var flacLevel: Int? = null
     var aac: com.chencohensolution.transcriptor.settings.AacSettings? = null
+    var flac: com.chencohensolution.transcriptor.settings.FlacFormat? = null
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?, flac: com.chencohensolution.transcriptor.settings.FlacFormat) {
         this.input = input
+        this.flac = flac
         this.file = file
         this.format = format
         this.flacLevel = flacLevel
@@ -323,7 +325,7 @@ class RecordingTest {
         assertTrue(stopped.pendingFlac)
         settings.flacLevel = 7
         var level: Int? = null
-        val compression = AudioCompression(fs, store, { _, flac, l, progress ->
+        val compression = AudioCompression(fs, store, { _, flac, l, _, progress ->
             level = l
             fs.write(flac) { writeUtf8("fLaC") }
             progress(1f)
@@ -350,7 +352,7 @@ class RecordingTest {
         assertTrue(stopped.pendingAac)
         assertFalse(stopped.pendingFlac)
         var kbps: Int? = null
-        val compression = AudioCompression(fs, store, { _, _, _, _ -> error("not FLAC") }, aacEncoder = { _, aac, s, _ ->
+        val compression = AudioCompression(fs, store, { _, _, _, _, _ -> error("not FLAC") }, aacEncoder = { _, aac, s, _ ->
             kbps = s.bitrateKbps
             fs.write(aac) { writeUtf8("aac") }
             96_000
@@ -383,7 +385,7 @@ class RecordingTest {
         session.start(listOf("psych"), "פסיכולוגיה", "he", "t")
         recorder.advance(1_000)
         val stopped = assertNotNull(session.stop())
-        val compression = AudioCompression(fs, store, { _, flac, _, _ -> fs.write(flac) {}; 10 })
+        val compression = AudioCompression(fs, store, { _, flac, _, _, _ -> fs.write(flac) {}; 10 })
         assertFailsWith<IllegalStateException> { compression.compress(stopped) }
         assertTrue(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
         assertEquals(true, store.load(stopped.id)?.pendingFlac)

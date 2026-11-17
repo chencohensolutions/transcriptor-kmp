@@ -732,4 +732,27 @@
         <item quantity="one">שיחה אחת</item>
         <item quantity="other">%d שיחות</item>
     </plurals>
+    <string name="rec_preset_quality">איכות</string>
+    <string name="rec_preset_high">גבוהה</string>
+    <string name="rec_preset_normal">רגילה</string>
+    <string name="rec_preset_low">נמוכה</string>
+    <string name="rec_preset_custom">מותאמת</string>
+    <string name="rec_preset_high_note">FLAC, ‏48 קילוהרץ סטריאו, 24 ביט: בלי אובדן, למוזיקה ולהופעות. כ־700 MB לשעה.</string>
+    <string name="rec_preset_normal_note">AAC, ‏48 קילוהרץ סטריאו, 256 קילוביט: נשמע כמו החדר. כ־115 MB לשעה.</string>
+    <string name="rec_preset_low_note">AAC, ‏24 קילוהרץ מונו, 48 קילוביט: דיבור ברור, הכי קטן. כ־22 MB לשעה.</string>
+    <string name="rec_preset_custom_note">ההגדרות שלך, למטה. בחירת הגדרה מוכנה מחליפה אותן.</string>
+    <string name="rec_preset_power">סוללה</string>
+    <string name="rec_preset_power_low">חיסכון בסוללה</string>
+    <string name="rec_preset_power_normal">מיד</string>
+    <string name="rec_preset_power_low_note">מקליט WAV בלי מקודד פועל; מקודד ומתמלל רגעים שהוקלטו ב״אחרי״ כשהטלפון בטעינה עם 30% ומעלה.</string>
+    <string name="rec_preset_power_normal_note">מקודד בזמן ההקלטה או מיד אחרי עצירה, ומתמלל רגעים שהוקלטו ב״אחרי״ ברגע שהם נגמרים.</string>
+    <string name="rec_preset_power_custom_note">תזמון משלך: הקידוד למטה, התמלול בהגדרות › אחרי רגע.</string>
+    <string name="rec_preset_summary">איכות %1$s · %2$s</string>
+    <string name="rec_format_depth">עומק סיביות</string>
+    <string name="rec_format_bits">%1$d ביט</string>
+    <string name="rec_format_depth_note">‏24 ביט שומר על הפרדה בין קטעים שקטים לשיאים חזקים (מוזיקה, הופעה); הקובץ גדול בערך בחצי. לדיבור מספיק 16.</string>
+    <string name="rec_format_depth_aac">ל־AAC אין עומק סיביות משלו: המקודד מקבל את 16 הביט של המיקרופון. ל־24 ביט, FLAC.</string>
+    <string name="rec_format_flac_rate_note">‏48 קילוהרץ שומר כל מה שהמיקרופון שומע. 24 ו־16 קילוהרץ לדיבור בלבד; המודלים מקשיבים ב־16.</string>
+    <string name="rec_format_flac_channels_note">מונו בחצי הגודל; סטריאו שומר מאיפה הגיע הצליל.</string>
+    <string name="rec_format_flac_format">%1$d ביט · %2$s · %3$d קילוהרץ</string>
 </resources>

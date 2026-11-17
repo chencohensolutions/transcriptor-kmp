@@ -117,6 +117,8 @@ private data class SettingsFileV1(
     val flacLevel: Int = FLAC_DEFAULT_LEVEL,
     /** How "AAC live" records, and what "WAV, then AAC" encodes to. */
     val aac: AacSettings = AacSettings(),
+    /** FLAC's sample rate, channels and bit depth (the bit depth also for the WAV kept before FLAC, and plain WAV). */
+    val flac: FlacFormat = FlacFormat(),
     /** When "WAV, then FLAC" and "WAV, then AAC" encode. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** The live model chosen per language (BCP-47 tag to model id). */
@@ -190,6 +192,19 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var flacLevel: Int
         get() = read().flacLevel.coerceIn(FLAC_LEVELS)
         set(value) = write(read().copy(flacLevel = value.coerceIn(FLAC_LEVELS)))
+
+    /** FLAC's sample rate, channels and bit depth ([FlacFormat.valid] on the way in and out). */
+    var flac: FlacFormat
+        get() = read().flac.valid()
+        set(value) = write(read().copy(flac = value.valid()))
+
+    /** The presets' settings as one value ([RecordingChoice]). */
+    var recordingChoice: RecordingChoice
+        get() = read().let { RecordingChoice(it.audioFormat, it.aac.valid(), it.flac.valid(), it.encodeAfter, it.transcribeWhen) }
+        set(value) = write(read().copy(
+            audioFormat = value.audioFormat, aac = value.aac.valid(), flac = value.flac.valid(),
+            encodeAfter = value.encodeAfter, transcribeWhen = value.transcribeWhen,
+        ))
 
     /** When a WAV waiting for FLAC or AAC is encoded: after Stop, or on the charger above [ENCODE_MIN_BATTERY]%. */
     var encodeAfter: EncodeAfter
