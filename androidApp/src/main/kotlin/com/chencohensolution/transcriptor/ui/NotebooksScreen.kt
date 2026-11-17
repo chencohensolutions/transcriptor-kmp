@@ -468,7 +468,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 ).forEach { (mode, label) ->
                                     FilterChip(
                                         selected = recordMode == mode, onClick = { recordMode = mode; actions.setRecordMode(mode) },
-                                        label = { Text(stringResource(label)) },
+                                        label = { Text(stringResource(label)) }, colors = recordChipColors(),
                                         leadingIcon = if (mode == RecordMode.Music) ({ Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) }) else null,
                                     )
                                 }
@@ -1093,7 +1093,7 @@ private fun RecordPresets(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
                     com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
                 ).forEach { (p, label) ->
-                    FilterChip(selected = state.activeProfile == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
+                    FilterChip(selected = state.activeProfile == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) }, colors = recordChipColors())
                 }
             }
         }
@@ -1136,6 +1136,7 @@ private fun WhenRow(title: String, saving: Boolean, set: (Boolean) -> Unit) {
             listOf(true to R.string.notebooks_power_low, false to R.string.notebooks_power_normal).forEach { (on, label) ->
                 FilterChip(
                     selected = saving == on, onClick = { set(on) }, label = { Text(stringResource(label)) },
+                    colors = recordChipColors(),
                     leadingIcon = if (on) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
                 )
             }
@@ -1170,3 +1171,11 @@ private fun qualityLine(choice: com.chencohensolution.transcriptor.settings.Reco
     // Each piece kept whole in Hebrew (Latin names and numbers isolated), in the chrome's order.
     return listOf(isolated("$name $kbps".trim()), channels, stringResource(R.string.rec_format_khz, rate / 1000)).joinToString(" · ")
 }
+
+/** The Record bar's chips: the picked one filled with the accent color, so it stands out on the panel (owner's ask, Nov 17, 2026). */
+@Composable
+private fun recordChipColors() = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.primary,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+)
