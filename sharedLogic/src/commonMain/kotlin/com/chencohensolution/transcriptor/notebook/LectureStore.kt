@@ -117,6 +117,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
     /** The lecture is in the app's own storage, not (yet) in the library. */
     fun isLocal(lecture: Lecture) = placeOf(lecture.id) == local
 
+    /** Called after every [save], with the moment's id (the server backup marks its note to send again). */
+    var onSaved: ((String) -> Unit)? = null
+
     fun save(lecture: Lecture) {
         val place = placeOf(lecture.id)
         val fs = place.fileSystem
@@ -129,6 +132,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         fs.write(transcript) { writeUtf8(transcriptMarkdown(lecture, utcOffset(lecture.startedAtMillis))) }
         fs.atomicMove(transcript, folder / TRANSCRIPT)
         indexNow(lecture.id, lecture)
+        onSaved?.invoke(lecture.id)
     }
 
     /** Tucks the moment away, or brings it back, and returns it. Not while it is being recorded or a pass runs on it. */

@@ -97,6 +97,10 @@ data class ServerState(
     /** Moments recorded in Audio Logs that are on the phone now, and how many of them are uploaded. */
     val onPhone: Int = 0,
     val uploaded: Int = 0,
+    /** Of them, still WAV waiting to be compressed (on the charger, as Settings has it): sent once they are. */
+    val awaitingEncode: Int = 0,
+    /** Upload now is compressing this many WAV moments before it sends them. */
+    val compressing: Int = 0,
     /** Bytes of the waiting calls not sent yet. */
     val callsBytesLeft: Long = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
@@ -131,6 +135,11 @@ private data class BackupFileV1(
     val moments: Map<String, HandedOver> = emptyMap(),
     /** Recordings of the server the user deleted here: not made moments again. */
     val dismissed: Set<String> = emptySet(),
+    /**
+     * Moments saved since their note was last kept on the server ([LectureStore.onSaved]): only these are read again
+     * by [ServerBackup.syncNotes], not every moment (reading ~900 from the lectures folder took about a minute).
+     */
+    val notesDue: Set<String> = emptySet(),
     /** Most bytes shed's cache keeps of what was read from the server (Settings › Server backup). */
     val cacheLimitBytes: Long = Shed.DEFAULT_CACHE_LIMIT,
     /**
@@ -250,6 +259,12 @@ class ServerBackup(
     private var momentShas: Set<String> = emptySet()
 
     /** Connects the shed made with [locator]; before any other call. */
+    /** [store] saved this moment: its note is read again at the next [syncNotes] (kept once, not on every save). */
+    fun momentSaved(id: String) {
+        if (id in kept.notesDue || id !in kept.moments) return
+        save(kept.copy(notesDue = kept.notesDue + id))
+    }
+
     fun attach(shed: Shed, journal: JournalBackend) {
         this.shed = shed
         this.journal = journal
@@ -452,12 +467,17 @@ class ServerBackup(
         var sent = 0
         for ((id, handed) in kept.moments) {
             if (id in busy) continue
+            // Its note kept and the moment not saved since: nothing to read.
+            if (handed.note != null && id !in kept.notesDue) continue
             if (momentState(id, handed) != MomentBackup.BackedUp) continue
             val lecture = store.load(id) ?: continue
             if (lecture.pendingEncode) continue
             val note = noteOf(lecture)
             val hash = note.toString().encodeUtf8().sha256().hex()
-            if (handed.note == hash) continue
+            if (handed.note == hash) {
+                if (id in kept.notesDue) mutex.withLock { save(this.kept.copy(notesDue = this.kept.notesDue - id)) }
+                continue
+            }
             val kept = try {
                 journal.setNote(handed.sha256, note)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -469,7 +489,7 @@ class ServerBackup(
                 false
             }
             if (!kept) continue
-            mutex.withLock { this.kept.moments[id]?.let { save(this.kept.copy(moments = this.kept.moments + (id to it.copy(note = hash)))) } }
+            mutex.withLock { this.kept.moments[id]?.let { save(this.kept.copy(moments = this.kept.moments + (id to it.copy(note = hash)), notesDue = this.kept.notesDue - id)) } }
             sent++
         }
         return sent
@@ -753,10 +773,22 @@ class ServerBackup(
         if (moments.isEmpty() && calls.isEmpty()) return
         val held = mutableSetOf<String>()
         val missing = mutableSetOf<String>()
-        for (sha in (moments.values.map { it.sha256 } + calls.values.map { it.sha256 }).toSet()) {
-            val there = try { shed.verify(sha) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; return }
-            if (there) held += sha else missing += sha
+        // The moments recorded here first (what the backup screen counts), then the rest. Asked by size, which the
+        // server answers from its index at once: verify re-reads the whole file there, about 14 s a call on the owner's
+        // server, hours for a thousand.
+        val here = runCatching { store.index().filter { it.source == null }.map { it.id }.toSet() }.getOrDefault(emptySet())
+        val order = (moments.filterKeys { it in here }.values.map { it.sha256 } + moments.values.map { it.sha256 } + calls.values.map { it.sha256 }).distinct()
+        val sizes = moments.values.associate { it.sha256 to null as Long? } + calls.values.associate { it.sha256 to it.size }
+        for ((i, sha) in order.withIndex()) {
+            val size = try { shed.backend.size(sha) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; break }
+            val expected = sizes[sha]
+            if (size != null && (expected == null || size == expected)) held += sha else missing += sha
+            // Kept as it goes, so the screen counts up and a cut-off pass doesn't ask again.
+            if (i % 25 == 24 || i == order.lastIndex) mark(held, missing)
         }
+    }
+
+    private suspend fun mark(held: Set<String>, missing: Set<String>) {
         mutex.withLock {
             save(kept.copy(
                 moments = kept.moments.mapValues { (_, h) -> if (h.sha256 in held) h.copy(uploaded = true) else h }
@@ -799,6 +831,15 @@ class ServerBackup(
     @kotlin.concurrent.Volatile
     private var uploading = false
 
+    @kotlin.concurrent.Volatile
+    private var compressing = 0
+
+    /** Upload now is compressing [count] moments first (0: done). */
+    fun markCompressing(count: Int) {
+        compressing = count
+        refresh()
+    }
+
     /** Upload now is running in the app (from the tap until it ends): the screen says so at once. */
     fun markUploading(on: Boolean) {
         uploading = on
@@ -838,8 +879,10 @@ class ServerBackup(
             callsWaiting = shed.uploads.value.count { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING },
             onPhone = here.size,
             uploaded = here.count { byMoment[it.id] == MomentBackup.BackedUp },
+            awaitingEncode = here.count { it.pendingEncode && byMoment[it.id] != MomentBackup.BackedUp },
             callsBytesLeft = shed.uploads.value.filter { it.ref?.startsWith(CALL_REF) == true && it.state == UploadState.WAITING }.sumOf { it.size - it.sent },
             uploading = uploading,
+            compressing = compressing,
             showServer = kept.showServer,
         )
     }
