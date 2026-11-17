@@ -862,6 +862,7 @@ object Recording {
         shed = AndroidShed(app, "audio-logs", AndroidShed.AUDIO_ONLY, backup.locator, listedKinds = setOf(com.chencohensolution.shed.FileKind.AUDIO))
         backup.attach(shed.shed, shed.journal)
         store.onSaved = { id -> runCatching { backup.momentSaved(id) } }
+        backup.syncPath = { runCatching { settings.location.syncLocation }.getOrDefault(false) }
         // The resolver first: the calls folder is read through it.
         resolver = app.contentResolver
         openCallsFolder()

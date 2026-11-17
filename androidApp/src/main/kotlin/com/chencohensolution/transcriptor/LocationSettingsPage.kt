@@ -63,8 +63,11 @@ fun LocationSettingsPage(onBack: () -> Unit) {
     val paired = server.paired != null
 
     fun change(f: (LocationSettings) -> LocationSettings) {
+        val before = store.location.syncLocation
         store.updateLocation(f)
         settings = store.location
+        // Paths go into (or leave) the moments' notes on the server at the next sync.
+        if (settings.syncLocation != before) runCatching { Recording.backup.syncPathChanged() }
     }
 
     /** Turns on what [pending] says once location is allowed. */

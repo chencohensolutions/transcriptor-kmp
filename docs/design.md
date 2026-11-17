@@ -374,8 +374,20 @@ moment, under the backup's settings.
   other apps already ask for (passive, no GPS of our own); economical adds one a minute; while driving adds GPS every
   second above about 15 km/h (`DrivingSwitch`); precise, GPS every second. It may go on after the audio stops
   (`KeepUntil`), the points then past `audioEndMs`.
-- **Server**: with Sync location on, the path goes up with its moment, never live. The note is limited to 256 KiB, so
-  a long path goes as its own file through shed.
+- **Server**: with Sync location on, the path goes up with its moment, never live: inside the moment's note
+  (`LectureStore.serverNote(lecture, path)`, `pathNote`, `location/PathNoteV1`: whole numbers, each the change from the
+  point before, about 100 KB an hour at a point a second, thinned until it fits 160 KB of the note's 256 KiB). A phone
+  that brings the moment back from the server restores `path.json` (`ServerBackup.momentHere`). Turning the switch on
+  or off sends every backed-up moment's note again (`ServerBackup.syncPathChanged`).
+- **While recording** (`location/MomentLocation`, Android `LocationFeed` in `RecordingService`): the recording's
+  service adds the location type; the passive provider always, plus GPS until the first fix, then a fix a minute
+  (GPS-quality for a 100 m stop, else balanced), or GPS every second for the precise levels. Fixes older than the start
+  are left out. The countdown is a vibrating notification on its own channel (`place-stop`) and a banner on the
+  recording screens (`PlaceStatusBar`); the moment gets a mark where it fired. After Stop with Keep saving the path,
+  the service stays (location type, "Saving the path" with Stop) until the time or a saved place, then saves
+  `path.json` with the moment.
+- **Moment info**: Stopped by itself (why, when), and Path: distance, top speed, points, a line drawing (no map; the
+  part after the audio dashed) and a driving-speed graph; tapping either seeks the audio.
 
 ## Screens
 

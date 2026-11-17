@@ -361,7 +361,7 @@ class ServerBackup(
                 return PrivateResult.NotOnServer(it.refused ?: "refused")
             }
             if (!shed.verify(sha)) return PrivateResult.NotOnServer("not whole on the server yet")
-            val note = buildJsonObject { put("audioLogs", json.parseToJsonElement(store.serverNote(lecture)).jsonObject) }
+            val note = buildJsonObject { put("audioLogs", noteOf(lecture)) }
             if (!journal.setNote(sha, note)) return PrivateResult.NotOnServer("its notes weren't kept")
             journal.setPrivate(listOf(sha), true)
             store.delete(lectureId)
@@ -496,7 +496,20 @@ class ServerBackup(
     }
 
     /** The moment's note on the server: Audio Logs' own (the server keeps each app's note apart). */
-    private fun noteOf(lecture: Lecture): JsonObject = json.parseToJsonElement(store.serverNote(lecture)).jsonObject
+    private fun noteOf(lecture: Lecture): JsonObject = json.parseToJsonElement(store.serverNote(lecture, pathFor(lecture))).jsonObject
+
+    /**
+     * Settings › Advanced › Location's Sync location: the moment's path goes in its note (never live; it goes when the
+     * note does, under the backup's own settings). Set by the app.
+     */
+    var syncPath: () -> Boolean = { false }
+
+    private fun pathFor(lecture: Lecture) = if (lecture.hasPath && syncPath()) runCatching { store.loadPath(lecture) }.getOrNull() else null
+
+    /** Sync location was turned on or off: every backed-up moment's note is read again at the next [syncNotes]. */
+    fun syncPathChanged() {
+        save(kept.copy(notesDue = kept.notesDue + kept.moments.keys))
+    }
 
     /**
      * Makes the server's recording [file] a moment here, when the user opens it (or changes it) from the list: from its
@@ -508,6 +521,8 @@ class ServerBackup(
         val lecture = momentOf(file, defaultLanguage)
         store.load(lecture.id)?.let { return it }
         store.save(lecture)
+        // Its path, when the note brought one (Sync location on the phone that recorded it).
+        if (lecture.hasPath) noteText(file)?.let(store::pathFromServerNote)?.let { runCatching { store.savePath(lecture, it) } }
         mutex.withLock {
             save(kept.copy(moments = kept.moments + (lecture.id to HandedOver(file.sha256, lecture.audioFile, noteOf(lecture).toString().encodeUtf8().sha256().hex()))))
         }
@@ -572,6 +587,11 @@ class ServerBackup(
     private fun legacyNoteHash(lecture: Lecture): String =
         buildJsonObject { put("audioLogs", noteOf(lecture)) }.toString().encodeUtf8().sha256().hex()
 
+    /** Audio Logs' own note on the server for [file]; one sent before each app had its own is wrapped in "audioLogs". */
+    private fun noteText(file: RemoteFile): String? = file.note
+        ?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+        ?.let { (it["audioLogs"] as? JsonObject ?: it).toString() }
+
     /** The server's recording [file] as the moments list shows it, before it is a moment here: its audio on the server. */
     fun summaryOf(file: RemoteFile, defaultLanguage: String): com.chencohensolution.transcriptor.notebook.LectureSummary =
         momentOf(file, defaultLanguage).summary().copy(audioOnServer = true)
@@ -580,11 +600,7 @@ class ServerBackup(
     @OptIn(kotlin.time.ExperimentalTime::class)
     internal fun momentOf(file: RemoteFile, defaultLanguage: String): Lecture {
         val extension = file.about.fileName.substringAfterLast('.', "").lowercase().takeIf { it.length in 2..5 && it.all(Char::isLetterOrDigit) } ?: "m4a"
-        // Audio Logs' own note on the server; one sent before each app had its own is wrapped in "audioLogs".
-        val restored = file.note
-            ?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
-            ?.let { (it["audioLogs"] as? JsonObject ?: it).toString() }
-            ?.let(store::fromServerNote)
+        val restored = noteText(file)?.let(store::fromServerNote)
         if (restored != null) {
             return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, pendingCodec = null, source = restored.source ?: sourceOf(file))
         }

@@ -8,6 +8,7 @@ import com.chencohensolution.transcriptor.location.KeepUntil
 import com.chencohensolution.transcriptor.location.LocationSettings
 import com.chencohensolution.transcriptor.location.MomentLocation
 import com.chencohensolution.transcriptor.location.MomentPath
+import com.chencohensolution.transcriptor.location.PathNoteV1
 import com.chencohensolution.transcriptor.location.PathPrecision
 import com.chencohensolution.transcriptor.location.PathBuilder
 import com.chencohensolution.transcriptor.location.PathPoint
@@ -261,5 +262,43 @@ class StopByPlaceTest {
         assertFalse(m.keepingDone(29 * 60_000))
         assertTrue(m.keepingDone(30 * 60_000))
         assertFalse(MomentLocation(LocationSettings(), stopOn = false, pathOn = false) { it }.keepGoing(0, 0, KeepUntil.Hour1, emptyList()))
+    }
+
+    /** [n] points a second apart, heading north at 20 m/s. */
+    private fun drive(n: Int) = MomentPath(
+        (0 until n).map { i -> PathPoint(i * 1000L, north(i * 20.0), 4f, 20f, 0f, FixSource.Gps) },
+        audioEndMillis = n * 1000L,
+    )
+
+    @Test
+    fun thePathRidesInTheServerNoteCompactly() {
+        val path = drive(3600) // an hour, a point a second
+        val note = PathNoteV1.of(path)
+        assertEquals(3600, note.t.size) // fits whole
+        val back = note.toPath()
+        assertEquals(path.audioEndMillis, back.audioEndMillis)
+        path.points.zip(back.points).forEach { (a, b) ->
+            assertEquals(a.atMillis, b.atMillis)
+            assertTrue(abs(a.point.lat - b.point.lat) < 1e-6 && abs(a.point.lon - b.point.lon) < 1e-6)
+            assertEquals(a.speedMps, b.speedMps)
+        }
+        val size = kotlinx.serialization.json.Json.encodeToString(note).length
+        assertTrue(size < PathNoteV1.MAX_BYTES, "an hour takes $size bytes")
+        // Ten hours don't fit whole: thinned, first and last kept.
+        val long = PathNoteV1.of(drive(36_000))
+        assertTrue(long.t.size < 36_000)
+        assertTrue(kotlinx.serialization.json.Json.encodeToString(long).length <= PathNoteV1.MAX_BYTES)
+        assertEquals(35_999_000L, long.toPath().points.last().atMillis)
+    }
+
+    @Test
+    fun theServerNoteCarriesThePathOnlyWhenGiven() {
+        val store = LectureStore(FakeFileSystem(), "/data".toPath())
+        val lecture = Lecture("m", "מפגש", "he", 1, 60_000, emptyList(), emptyList(), hasPath = true)
+        val without = store.serverNote(lecture)
+        assertNull(store.pathFromServerNote(without))
+        val with = store.serverNote(lecture, drive(10))
+        assertEquals(10, store.pathFromServerNote(with)?.points?.size)
+        assertEquals(lecture.copy(segments = emptyList()), store.fromServerNote(with))
     }
 }

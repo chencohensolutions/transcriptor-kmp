@@ -401,6 +401,8 @@ class RecordingService : Service() {
         val path = place?.keptPath()
         keepingFor = null
         if (path != null && !path.isEmpty) runCatching { Recording.store.load(id)?.let { Recording.store.savePath(it, path) } }
+        // Its note on the server carries the path (Sync location): sent again at the next sync.
+        runCatching { Recording.backup.momentSaved(id) }
         stopPlace()
         getSystemService(NotificationManager::class.java).cancel(PATH_ID)
         finish()

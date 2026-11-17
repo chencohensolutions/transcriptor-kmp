@@ -143,11 +143,18 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      * The moment's data as the server keeps it beside its audio (a note, `setNote`): `lecture.json` without each line's
      * word times (the largest part, rebuilt by transcribing again), as a JSON text.
      */
-    fun serverNote(lecture: Lecture): String =
-        json.encodeToString(LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) }, serverSha256 = null)))
+    fun serverNote(lecture: Lecture, path: com.chencohensolution.transcriptor.location.MomentPath? = null): String =
+        json.encodeToString(
+            LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) }, serverSha256 = null))
+                .copy(pathNote = path?.takeIf { !it.isEmpty }?.let { com.chencohensolution.transcriptor.location.PathNoteV1.of(it) }),
+        )
 
     /** A moment from what [serverNote] wrote (the server's note's `audioLogs`); null when it isn't one. */
     fun fromServerNote(text: String): Lecture? = runCatching { json.decodeFromString<LectureFileV1>(text).toLecture() }.getOrNull()
+
+    /** The path in what [serverNote] wrote (Sync location); null without one. */
+    fun pathFromServerNote(text: String): com.chencohensolution.transcriptor.location.MomentPath? =
+        runCatching { json.decodeFromString<LectureFileV1>(text).pathNote?.toPath() }.getOrNull()
 
     /** Whether the moment's audio is on the phone (here or in the library), not only on the server. */
     fun hasAudio(lecture: Lecture): Boolean = runCatching { fileSystemOf(lecture.id).exists(audioPath(lecture)) }.getOrDefault(false)
@@ -435,6 +442,8 @@ private data class LectureFileV1(
     val placeStop: PlaceStopV1? = null,
     /** [Lecture.hasPath]. */
     val path: Boolean = false,
+    /** Only in the server's note, with Sync location on: the path itself ([com.chencohensolution.transcriptor.location.PathNoteV1]). */
+    val pathNote: com.chencohensolution.transcriptor.location.PathNoteV1? = null,
 ) {
     @OptIn(ExperimentalTime::class)
     fun toLecture() = Lecture(
