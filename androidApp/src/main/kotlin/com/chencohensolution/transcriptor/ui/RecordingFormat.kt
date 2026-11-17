@@ -126,6 +126,8 @@ private fun powerName(preset: PowerPreset) = stringResource(when (preset) {
 fun recordingFormatSummary(state: ModelsState): String {
     val choice = state.recordingChoice
     val presets = stringResource(R.string.rec_preset_summary, qualityName(choice.quality), powerName(choice.power))
+        // The microphone moved here (it decides what is supported): its name when it isn't the phone's own.
+        .let { line -> state.micInput?.let { line + " · " + isolated(it.name) } ?: line }
     return presets + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
         AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)
@@ -147,6 +149,9 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
     val codec = codecOf(state.audioFormat)
     Scaffold(topBar = { FormatTopBar(stringResource(R.string.rec_format_format), back) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).selectableGroup()) {
+            // The microphone first: what it gives decides what is offered below (24 bit only from one that gives it).
+            MicrophoneRow(state, actions.setMicInput)
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             Presets(state, actions)
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             FormatPageNote(stringResource(R.string.rec_format_format_note))

@@ -441,7 +441,6 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             LecturesFolder(state.folder, actions.chooseFolder)
             NavRow(stringResource(R.string.server_title), state.server, actions.openServer)
             NavRow(stringResource(R.string.rec_format_format), recordingFormatSummary(state), openFormat)
-            MicrophoneRow(state, actions.setMicInput)
             SwitchRow(
                 stringResource(R.string.settings_quiet), stringResource(if (state.quietRecording) R.string.settings_quiet_on else R.string.settings_quiet_off),
                 state.quietRecording, actions.setQuietRecording,
@@ -1341,7 +1340,8 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
  * The one picked stays picked while it is away ("not connected"): the phone's own records until it is back.
  */
 @Composable
-private fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
+/** The microphone row and its picker; on Settings › Recording format, since the microphone decides what is supported there. */
+internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val picked = state.micInput
     val connected = picked == null || state.micInputs.any { it.key == picked.key }

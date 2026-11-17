@@ -44,7 +44,7 @@ A new install starts as the owner's S25 was set that day (read from its `setting
 
 ## Microphone (Nov 15, 2026)
 
-hen's ask: pick the microphone, Bluetooth too. Settings › Recordings › **Microphone** (`SettingsStore.micInput`, a
+hen's ask: pick the microphone, Bluetooth too. Settings › Recording format › **Microphone** (at the top since Nov 17, 2026: it decides which settings are offered) (`SettingsStore.micInput`, a
 `MicInput`; null, the default: the phone's own microphones, stereo 48 kHz) opens a list: the phone's own, then every
 input connected now besides it (`AndroidAudioInputs`, refreshed as devices come and go): Bluetooth headsets (hands-free,
 mono, phone-call quality), Bluetooth LE Audio earbuds, wired headsets, USB microphones. The one picked stays picked
