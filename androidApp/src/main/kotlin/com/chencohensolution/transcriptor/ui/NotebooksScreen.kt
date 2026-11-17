@@ -1067,9 +1067,9 @@ private fun RecordPresets(choice: com.chencohensolution.transcriptor.settings.Re
     val power = choice.power
     FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
         listOf(
-            com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
-            com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
             com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
+            com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
+            com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
         ).forEach { (p, label) ->
             FilterChip(selected = quality == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
         }

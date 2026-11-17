@@ -131,14 +131,15 @@ data class ProfileSettings(
  * and keeps what the user changes in it.
  */
 enum class QualityProfile(val key: String) {
-    /** FLAC, 48 kHz stereo, 16 bit: lossless. 16 bit: the owner's S25 gives its own microphones as 16-bit PCM only. */
-    High("high"),
+    // From low to high (owner's order, Nov 17, 2026): Music above High.
+    /** AAC-LC, 24 kHz mono, 48 kbps: speech only, about 22 MB an hour. */
+    Low("low"),
 
     /** AAC-LC, 48 kHz stereo, 256 kbps: about 115 MB an hour (the owner's settings, Nov 15, 2026). */
     Normal("normal"),
 
-    /** AAC-LC, 24 kHz mono, 48 kbps: speech only, about 22 MB an hour. */
-    Low("low"),
+    /** FLAC, 48 kHz stereo, 16 bit: lossless. 16 bit: the owner's S25 gives its own microphones as 16-bit PCM only. */
+    High("high"),
 
     /** The Music mode: FLAC 48 kHz stereo, encoded as it records unless its own WAV first is on; the microphone opened without voice processing. */
     Music("music");
@@ -160,7 +161,7 @@ enum class QualityProfile(val key: String) {
         fun of(key: String?) = entries.firstOrNull { it.key == key }
 
         /** The profiles moments record with (not Music). */
-        val forMoments = listOf(High, Normal, Low)
+        val forMoments = listOf(Low, Normal, High)
     }
 }
 
