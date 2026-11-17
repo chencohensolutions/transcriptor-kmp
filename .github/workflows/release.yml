@@ -1,0 +1,82 @@
+# A release of the Android app when main is merged into the `releases` branch: scripts/release.sh ci picks the version
+# (version.properties, or the next free patch), builds the APK signed with the release key, tags v<version> and
+# publishes the GitHub release. A pull request that changes the release files builds it without publishing.
+#
+# Secrets: RELEASE_KEYSTORE_BASE64 (the keystore, base64), RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS,
+# RELEASE_KEY_PASSWORD.
+name: Release
+
+on:
+  push:
+    branches: [releases]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release.sh
+      - androidApp/build.gradle.kts
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android SDK pieces
+        run: |
+          sdkmanager=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" "platforms;android-37.0" "ndk;30.0.16248370" "cmake;3.22.1" >/dev/null
+
+      - name: Release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            if [ "${{ github.event_name }}" = pull_request ]; then echo "No release key: the dry run signs with the debug key"; exit 0; fi
+            echo "::error::The RELEASE_KEYSTORE_BASE64 secret is missing: no release without the release key"; exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build, tag and publish
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          ./scripts/release.sh ci
+
+      - name: The APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: build/release/*.apk
+          if-no-files-found: ignore
+
+      - name: Forget the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

@@ -85,6 +85,11 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 ./scripts/release.sh publish                         # on main: tag v<version>, build the release APK, GitHub release
 ```
 
+Releases: merge main into the `releases` branch. `.github/workflows/release.yml` runs `release.sh ci`: the version
+from version.properties (or the next free patch, if it was released already), the APK signed with the release key
+(repository secrets `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
+`RELEASE_KEY_PASSWORD`), the tag and the GitHub release. Local builds and `publish` without the key sign with the debug key.
+
 ## Gotchas
 
 - Right after `am start -S` the screen can still be the splash: wait about 10 seconds before a screenshot.
