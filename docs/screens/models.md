@@ -89,7 +89,7 @@ stops.
   page: [server.md](server.md)), and a **Recording format** row whose line sums up the
   choice: the presets ("Normal quality · Right away") and under them the codec ("AAC · LC · 64 kbps · Mono · 48 kHz ·
   hardware · while recording"). It opens the Recording format page. At its top, **Quality**: High (FLAC, 48 kHz stereo,
-  24 bit), Normal (AAC-LC, 48 kHz stereo, 256 kbps), Low (AAC-LC, 24 kHz mono, 48 kbps), with a fourth, Custom,
+  16 bit: the S25 gives its own microphones only as 16 bit), Normal (AAC-LC, 48 kHz stereo, 256 kbps), Low (AAC-LC, 24 kHz mono, 48 kbps), with a fourth, Custom,
   shown selected only while the settings match none; picking a preset keeps "WAV first" and the AAC encoder. Then
   **Battery**: Save battery (WAV first; encoding and After transcription on the charger at 30% or more) or Right away
   (encoding and After transcription right after Stop), Custom likewise (`QualityPreset`, `PowerPreset`,

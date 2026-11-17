@@ -36,7 +36,10 @@ data class FlacFormat(
  * as [Custom]. Whether it records as WAV first is the power preset's ([PowerPreset]), and is kept.
  */
 enum class QualityPreset {
-    /** FLAC, 48 kHz stereo, 24 bit: lossless, for music (a concert). About 700 MB an hour. */
+    /**
+     * FLAC, 48 kHz stereo, 16 bit: lossless, for music (a concert). About 400 MB an hour. 16 bit because the owner's S25
+     * gives its built-in microphones to apps only as 16-bit PCM (its audio policy, Nov 17, 2026): 24 bit would only pad.
+     */
     High,
 
     /** AAC-LC, 48 kHz stereo, 256 kbps: about 115 MB an hour (the owner's settings, Nov 15, 2026). */
@@ -49,7 +52,7 @@ enum class QualityPreset {
     Custom;
 
     companion object {
-        val HIGH_FLAC = FlacFormat(48_000, 2, 24)
+        val HIGH_FLAC = FlacFormat(48_000, 2, 16)
         val NORMAL_AAC = AacSettings(AacProfile.Lc, 48_000, 2, 256)
         val LOW_AAC = AacSettings(AacProfile.Lc, 24_000, 1, 48)
     }

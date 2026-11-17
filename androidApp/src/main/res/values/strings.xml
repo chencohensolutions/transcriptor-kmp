@@ -726,7 +726,7 @@
     <string name="rec_preset_normal">Normal</string>
     <string name="rec_preset_low">Low</string>
     <string name="rec_preset_custom">Custom</string>
-    <string name="rec_preset_high_note">FLAC, 48 kHz stereo, 24 bit: lossless, for music and concerts. About 700 MB an hour.</string>
+    <string name="rec_preset_high_note">FLAC, 48 kHz stereo, 16 bit: lossless, for music and concerts. About 400 MB an hour.</string>
     <string name="rec_preset_normal_note">AAC, 48 kHz stereo, 256 kbps: sounds like the room. About 115 MB an hour.</string>
     <string name="rec_preset_low_note">AAC, 24 kHz mono, 48 kbps: clear speech, the smallest. About 22 MB an hour.</string>
     <string name="rec_preset_custom_note">Your own settings, below. Pick a preset to replace them.</string>
@@ -739,7 +739,7 @@
     <string name="rec_preset_summary">%1$s quality · %2$s</string>
     <string name="rec_format_depth">Bit depth</string>
     <string name="rec_format_bits">%1$d bit</string>
-    <string name="rec_format_depth_note">24 bit keeps quiet passages and loud peaks apart (music, a concert); the file is about half again as large. Speech needs 16.</string>
+    <string name="rec_format_depth_note">24 bit only helps with a USB microphone that gives it: the phone\'s own microphones give 16 bits, so 24 just makes the file half again as large.</string>
     <string name="rec_format_depth_aac">AAC keeps no bit depth of its own: the encoder takes the microphone\'s 16 bits. For 24 bit, use FLAC.</string>
     <string name="rec_format_flac_rate_note">48 kHz keeps everything the microphone hears. 24 and 16 kHz are for speech only; the models listen at 16.</string>
     <string name="rec_format_flac_channels_note">Mono is half the size; stereo keeps where the sound came from.</string>

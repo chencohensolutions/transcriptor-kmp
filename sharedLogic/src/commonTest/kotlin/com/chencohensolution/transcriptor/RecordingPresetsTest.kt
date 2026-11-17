@@ -25,10 +25,10 @@ class RecordingPresetsTest {
     }
 
     @Test
-    fun highIsFlac24StereoAndKeepsWavFirst() {
+    fun highIsFlacStereoAndKeepsWavFirst() {
         val high = owner.with(QualityPreset.High)
         assertEquals(AudioFormat.WavThenFlac, high.audioFormat)
-        assertEquals(FlacFormat(48_000, 2, 24), high.flac)
+        assertEquals(FlacFormat(48_000, 2, 16), high.flac)
         assertEquals(QualityPreset.High, high.quality)
         assertEquals(QualityPreset.Custom, high.copy(flac = high.flac.copy(channels = 1)).quality)
     }
@@ -65,7 +65,7 @@ class RecordingPresetsTest {
         val back = SettingsStore(fs, "/s".toPath()).recordingChoice
         assertEquals(QualityPreset.High, back.quality)
         assertEquals(PowerPreset.Low, back.power)
-        assertEquals(24, store.flac.bitDepth)
+        assertEquals(16, store.flac.bitDepth)
     }
 
     @Test
