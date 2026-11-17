@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 class SharedScopes(val shared: SharedTransitionScope, val animated: AnimatedVisibilityScope)
 
 /** How long Record takes to become Stop, and the screens to cross-fade. */
-const val MORPH_MILLIS = 700
+const val MORPH_MILLIS = 550
 
 /** Set by MainActivity around each screen; null in previews and the UI lab (no morph there). */
 val LocalSharedScopes = compositionLocalOf<SharedScopes?> { null }
