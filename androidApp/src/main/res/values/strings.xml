@@ -744,4 +744,12 @@
     <string name="rec_format_flac_rate_note">48 kHz keeps everything the microphone hears. 24 and 16 kHz are for speech only; the models listen at 16.</string>
     <string name="rec_format_flac_channels_note">Mono is half the size; stereo keeps where the sound came from.</string>
     <string name="rec_format_flac_format">%1$d bit · %2$s · %3$d kHz</string>
+    <string name="settings_advanced_mode">Advanced mode</string>
+    <string name="settings_advanced_mode_on">The main screen shows Quality (High, Normal, Low) and Battery (Save, Now) above Record</string>
+    <string name="settings_advanced_mode_off">Off: the main screen shows only Live, After and No transcript</string>
+    <string name="notebooks_quality_high">High</string>
+    <string name="notebooks_quality_normal">Normal</string>
+    <string name="notebooks_quality_low">Low</string>
+    <string name="notebooks_power_low">Save</string>
+    <string name="notebooks_power_normal">Now</string>
 </resources>

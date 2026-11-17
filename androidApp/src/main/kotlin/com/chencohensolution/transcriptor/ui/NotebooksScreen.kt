@@ -7,10 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +43,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -128,6 +132,10 @@ class NotebooksActions(
     val record: (labels: List<String>, language: String, mode: RecordMode) -> Unit = { _, _, _ -> },
     /** Keeps the Record bar's Live or After for next time. */
     val setRecordMode: (mode: RecordMode) -> Unit = {},
+    /** Advanced mode's Record bar: applies a quality preset (Settings › Recording format). */
+    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    /** Advanced mode's Record bar: applies a battery preset. */
+    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -456,6 +464,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     )
                                 }
                             }
+                            state.recordingChoice?.let { choice -> RecordPresets(choice, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1041,5 +1050,35 @@ internal fun shortModelName(name: String): String {
         "whisper" in n && "turbo" in n -> "Whisper turbo"
         "whisper" in n -> "Whisper"
         else -> name
+    }
+}
+
+/**
+ * Advanced mode's extra row on the Record bar: Quality (High, Normal, Low) and Battery (Save, Now), the presets of
+ * Settings › Recording format. A setting that matches no preset leaves none of its chips selected; a tap applies one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecordPresets(choice: com.chencohensolution.transcriptor.settings.RecordingChoice, actions: NotebooksActions) {
+    val quality = choice.quality
+    val power = choice.power
+    FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
+        listOf(
+            com.chencohensolution.transcriptor.settings.QualityPreset.High to R.string.notebooks_quality_high,
+            com.chencohensolution.transcriptor.settings.QualityPreset.Normal to R.string.notebooks_quality_normal,
+            com.chencohensolution.transcriptor.settings.QualityPreset.Low to R.string.notebooks_quality_low,
+        ).forEach { (p, label) ->
+            FilterChip(selected = quality == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
+        }
+        Spacer(Modifier.width(6.dp))
+        listOf(
+            com.chencohensolution.transcriptor.settings.PowerPreset.Low to R.string.notebooks_power_low,
+            com.chencohensolution.transcriptor.settings.PowerPreset.Normal to R.string.notebooks_power_normal,
+        ).forEach { (p, label) ->
+            FilterChip(
+                selected = power == p, onClick = { actions.setPower(p) }, label = { Text(stringResource(label)) },
+                leadingIcon = if (p == com.chencohensolution.transcriptor.settings.PowerPreset.Low) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
+            )
+        }
     }
 }

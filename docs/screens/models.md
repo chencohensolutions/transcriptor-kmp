@@ -105,7 +105,8 @@ stops.
   The **FLAC** page: sample rate (16, 24, 48 kHz) with the size an hour, channels (mono, stereo), bit depth (16, 24;
   24 reads the microphone in floating point and keeps 24 bits in the WAV and FLAC) (`SettingsStore.flac`,
   `FlacFormat`), and the compression effort, 0 (faster) to 8 (smaller file) (`SettingsStore.flacLevel`).
-  Both pages say when they encode, when it is afterwards. **Advanced**: Processor meters while recording, one of Off (the default),
+  Both pages say when they encode, when it is afterwards. **Advanced**: first **Advanced mode** (off by default): on, the main screen's Record bar also shows Quality and Battery
+  ([notebooks.md](notebooks.md)). Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs
   (`SettingsStore.processorMeters`, `ProcessorMeterStyle`); its note says what each meter counts. See
   [lecture.md](lecture.md#processor-meters).

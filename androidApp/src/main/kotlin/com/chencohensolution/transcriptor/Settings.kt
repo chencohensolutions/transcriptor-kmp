@@ -54,6 +54,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     var transcribeWhen by remember { mutableStateOf(Recording.settings.transcribeWhen) }
     var quiet by remember { mutableStateOf(Recording.settings.quietRecording) }
     var stopTwice by remember { mutableStateOf(Recording.settings.stopTwice) }
+    var advancedMode by remember { mutableStateOf(Recording.settings.advancedMode) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
@@ -104,7 +105,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs,
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -160,6 +161,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setAutoImprove = { auto = it; io { Recording.settings.autoImprove = it } },
             setQuietRecording = { quiet = it; io { Recording.settings.quietRecording = it } },
             setStopTwice = { stopTwice = it; io { Recording.settings.stopTwice = it } },
+            setAdvancedMode = { advancedMode = it; io { Recording.settings.advancedMode = it } },
             openNotificationSettings = {
                 context.startActivity(
                     android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)

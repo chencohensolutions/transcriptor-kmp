@@ -151,6 +151,8 @@ data class ModelsState(
     val quietRecording: Boolean = false,
     /** Stop asks for a second tap, in the app and on the tile ([com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
     val stopTwice: Boolean = false,
+    /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
+    val advancedMode: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,
     /** Settings › Server backup's line: off, or on to which server and how many moments wait. */
     val server: String = "",
@@ -259,6 +261,7 @@ class ModelsActions(
     val setAutoImprove: (Boolean) -> Unit = {},
     val setQuietRecording: (Boolean) -> Unit = {},
     val setStopTwice: (Boolean) -> Unit = {},
+    val setAdvancedMode: (Boolean) -> Unit = {},
     /** Opens the phone's notification settings for the app, where its notifications can be turned off altogether. */
     val openNotificationSettings: () -> Unit = {},
     val setProcessorMeters: (ProcessorMeterStyle) -> Unit = {},
@@ -473,6 +476,12 @@ private fun AdvancedPage(state: ModelsState, actions: ModelsActions, openSpeaker
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            SwitchRow(
+                stringResource(R.string.settings_advanced_mode),
+                stringResource(if (state.advancedMode) R.string.settings_advanced_mode_on else R.string.settings_advanced_mode_off),
+                state.advancedMode, actions.setAdvancedMode,
+            )
+            HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_recognition))
             PageNote(stringResource(R.string.settings_recognition_note))
             val voice = state.voice

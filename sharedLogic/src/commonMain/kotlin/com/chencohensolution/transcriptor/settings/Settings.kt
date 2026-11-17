@@ -177,6 +177,8 @@ private data class SettingsFileV1(
     val levelMeter: String = LevelMeterStyle.Bars.key,
     /** First run's "Get your models" was answered (downloaded or Later); it isn't offered again. */
     val firstRunDone: Boolean = false,
+    /** Advanced mode: the Record bar also shows the quality and battery presets (owner's request, Nov 17, 2026). */
+    val advancedMode: Boolean = false,
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -346,6 +348,11 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         // Kept even at 0: a model with a default of its own ([DEFAULT_SPEAKER_TUNING]) can be set back to the middle.
         it.copy(speakerTuning = it.speakerTuning + (modelId to more.coerceIn(-1f, 1f)))
     })
+
+    /** Advanced mode (Settings › Advanced): the main screen's Record bar also shows Quality and Battery; off by default. */
+    var advancedMode: Boolean
+        get() = read().advancedMode
+        set(value) = write(read().copy(advancedMode = value))
 
     /** First run's "Get your models" was answered: it isn't offered again ([DefaultModels.offerFirstRun]). */
     var firstRunDone: Boolean

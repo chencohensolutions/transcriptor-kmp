@@ -58,6 +58,10 @@ The code still calls it `NotebooksScreen`.
 - Under the chips, **Live**, **After** or **No transcript** (kept in the settings, `SettingsStore.recordMode`): Live
   transcribes as the moment records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026));
   No transcript (owner's request, Nov 15, 2026) records it and transcribes nothing until "Transcribe now" on the moment.
+- With **Advanced mode** on (Settings › Advanced, `SettingsStore.advancedMode`, off by default; owner's request, Nov 17,
+  2026), a row under them: Quality **High**, **Normal**, **Low** and Battery **Save**, **Now**, the presets of Settings ›
+  Recording format (`NotebooksState.recordingChoice`, `RecordingChoice.with`); settings matching no preset leave that
+  group's chips unselected.
   One line beside them says which. (The "Usually … on Monday" line is gone: the guessed labels keep their ✦.)
   A moment waiting for its transcript says **Not transcribed yet** in the list.
 - While a moment records, a red banner replaces the bar: its clock and labels, and **Back to it**. That moment is not

@@ -755,4 +755,12 @@
     <string name="rec_format_flac_rate_note">‏48 קילוהרץ שומר כל מה שהמיקרופון שומע. 24 ו־16 קילוהרץ לדיבור בלבד; המודלים מקשיבים ב־16.</string>
     <string name="rec_format_flac_channels_note">מונו בחצי הגודל; סטריאו שומר מאיפה הגיע הצליל.</string>
     <string name="rec_format_flac_format">%1$d ביט · %2$s · %3$d קילוהרץ</string>
+    <string name="settings_advanced_mode">מצב מתקדם</string>
+    <string name="settings_advanced_mode_on">המסך הראשי מציג איכות (גבוהה, רגילה, נמוכה) וסוללה (חיסכון, מיד) מעל הקלטה</string>
+    <string name="settings_advanced_mode_off">כבוי: המסך הראשי מציג רק חי, אחר כך ובלי תמלול</string>
+    <string name="notebooks_quality_high">גבוהה</string>
+    <string name="notebooks_quality_normal">רגילה</string>
+    <string name="notebooks_quality_low">נמוכה</string>
+    <string name="notebooks_power_low">חיסכון</string>
+    <string name="notebooks_power_normal">מיד</string>
 </resources>
