@@ -28,11 +28,12 @@ interface AudioRecorder {
     /**
      * Starts recording to [file]; a FLAC is encoded at [flacLevel] (0 the fastest, 8 the smallest), an AAC as [aac]
      * says. From [input] when it is connected, else from the phone's own microphones. [flac] is a FLAC's rate, channels
-     * and bit depth; its bit depth is also a WAV's (24: the microphone is read in floating point).
+     * and bit depth; its bit depth is also a WAV's (24: the microphone is read in floating point, when it gives more
+     * than 16 bits). [music] records the microphone without voice processing where the phone allows it.
      */
     fun start(
         file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings = AacSettings(), input: MicInput? = null,
-        flac: FlacFormat = FlacFormat(),
+        flac: FlacFormat = FlacFormat(), music: Boolean = false,
     )
     fun pause()
     fun resume()
@@ -46,6 +47,9 @@ interface AudioRecorder {
 
     /** The encoder the recording runs on (MediaCodec's name); null for WAV, or before [start]. */
     val encoderName: String? get() = null
+
+    /** The microphone source the recording was opened with ("mic", "unprocessed", "camcorder"…); null before [start]. */
+    val sourceName: String? get() = null
 
     /** [encoderName] runs on dedicated hardware rather than the CPU. */
     val encoderHardware: Boolean get() = false

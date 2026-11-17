@@ -49,11 +49,14 @@ class AndroidRecorder(
         private set
     @Volatile override var encoderHardware: Boolean = false
         private set
+    @Volatile override var sourceName: String? = null
+        private set
 
     @SuppressLint("MissingPermission")
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings, input: MicInput?, flac: FlacFormat) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings, input: MicInput?, flac: FlacFormat, music: Boolean) {
         check(record == null) { "Already recording" }
-        val lossless = flac.valid()
+        // 24 bit only from a microphone that gives it (the phone's own give 16): else 16, the same sound in a smaller file.
+        val lossless = flac.valid().let { if (it.bitDepth == 24 && inputs?.deepCapture(input) != true) it.copy(bitDepth = 16) else it }
         bits = if (format == AudioFileFormat.Aac) 16 else lossless.bitDepth
         sink = when (format) {
             AudioFileFormat.Wav -> WavWriter(fileSystem, file, bits = bits)
@@ -75,7 +78,13 @@ class AndroidRecorder(
         val bluetooth = device != null && AndroidAudioInputs.kindOf(device.type).let { it == MicInput.Kind.Bluetooth || it == MicInput.Kind.BluetoothLe }
         communication = bluetooth && inputs?.useForCommunication(device!!) == true
         record = AudioRecord(
-            if (communication) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.MIC,
+            when {
+                communication -> MediaRecorder.AudioSource.VOICE_COMMUNICATION.also { sourceName = "voice communication" }
+                // Music: the microphone without the voice processing (gain control, noise suppression) that flattens it.
+                music && inputs?.unprocessed == true -> MediaRecorder.AudioSource.UNPROCESSED.also { sourceName = "unprocessed" }
+                music -> MediaRecorder.AudioSource.CAMCORDER.also { sourceName = "camcorder" }
+                else -> MediaRecorder.AudioSource.MIC.also { sourceName = "mic" }
+            },
             RATE, AudioFormat.CHANNEL_IN_STEREO, encoding,
             maxOf(minimum * 4, RATE * BYTES_PER_FRAME * (if (bits == 24) 2 else 1) / 2),
         ).apply {

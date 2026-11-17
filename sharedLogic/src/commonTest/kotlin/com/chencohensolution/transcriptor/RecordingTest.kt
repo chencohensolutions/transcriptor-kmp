@@ -44,11 +44,13 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var flacLevel: Int? = null
     var aac: com.chencohensolution.transcriptor.settings.AacSettings? = null
     var flac: com.chencohensolution.transcriptor.settings.FlacFormat? = null
+    var music = false
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?, flac: com.chencohensolution.transcriptor.settings.FlacFormat) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?, flac: com.chencohensolution.transcriptor.settings.FlacFormat, music: Boolean) {
+        this.music = music
         this.input = input
         this.flac = flac
         this.file = file
@@ -132,6 +134,16 @@ class RecordingTest {
         assertEquals(listOf("l1", "l2"), SettingsStore(fs, root).improvePending)
         settings.removeImprovePending("l1")
         assertEquals(listOf("l2"), SettingsStore(fs, root).improvePending)
+    }
+
+    @Test
+    fun musicRecordsFlacAtTheHighPresetWhateverTheFormat() = runTest {
+        wav()
+        val lecture = session().start(emptyList(), "", "he", "הופעה", transcribeLive = false, transcribeAfter = false, music = true)
+        assertEquals(AudioFileFormat.Flac, recorder.format)
+        assertEquals(com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC, recorder.flac)
+        assertTrue(recorder.music)
+        assertEquals(com.chencohensolution.transcriptor.notebook.AUDIO_FLAC, store.load(lecture.id)?.audioFile)
     }
 
     @Test

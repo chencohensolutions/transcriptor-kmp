@@ -151,6 +151,8 @@ data class ModelsState(
     val quietRecording: Boolean = false,
     /** Stop asks for a second tap, in the app and on the tile ([com.chencohensolution.transcriptor.settings.SettingsStore.stopTwice]). */
     val stopTwice: Boolean = false,
+    /** The microphone in use gives more than 16 bits (a USB one may; the phone's own don't): 24 bit is offered. */
+    val deepCapture: Boolean = false,
     /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
     val advancedMode: Boolean = false,
     val folder: Recording.Folder = Recording.Folder.NotSet,

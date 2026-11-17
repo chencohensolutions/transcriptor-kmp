@@ -41,7 +41,23 @@ class AndroidAudioInputs(context: Context) {
 
     fun clearCommunication() = audio.clearCommunicationDevice()
 
+    /**
+     * [input] (or, null or not connected, the phone's own microphone) gives more than 16 bits: one of its encodings is
+     * 24 bit, 32 bit or floating point. The S25's own microphones list 16 bit only; a USB microphone lists what it has.
+     */
+    fun deepCapture(input: MicInput?): Boolean {
+        val device = input?.let { find(it) } ?: audio.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+        return device?.encodings?.any { it in DEEP } == true
+    }
+
+    /** The phone records [android.media.MediaRecorder.AudioSource.UNPROCESSED]: the microphone without voice processing. */
+    val unprocessed: Boolean get() = audio.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true"
+
     companion object {
+        private val DEEP = setOf(
+            android.media.AudioFormat.ENCODING_PCM_24BIT_PACKED, android.media.AudioFormat.ENCODING_PCM_32BIT,
+            android.media.AudioFormat.ENCODING_PCM_FLOAT,
+        )
         /** [AudioDeviceInfo] as an input the user may pick; null for the phone's own and for what isn't a microphone. */
         fun AudioDeviceInfo.toInput(): MicInput? {
             if (!isSource) return null

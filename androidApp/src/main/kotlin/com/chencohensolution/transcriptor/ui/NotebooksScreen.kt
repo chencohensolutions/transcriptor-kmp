@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -181,7 +182,7 @@ sealed interface FolderNotice {
  * a sheet with a checkbox per label (some selected moments have it: a dash), where labels are also made, renamed and
  * deleted.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 /**
  * What the list keeps while a moment or Settings is open, held by the screen that shows it: where it was scrolled,
  * and whether the phone's lock opened it. Not saved: a restart starts at the top, locked.
@@ -439,28 +440,31 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     modifier = Modifier.padding(start = 8.dp),
                                 )
                             }
-                            // Live, After or Only record: transcribed while it records, after it stops (easier on the
-                            // battery), or not until asked. The guessed labels keep their ✦ on the chips above.
-                            Row(Modifier.padding(top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    stringResource(
-                                        when (recordMode) {
-                                            RecordMode.Live -> R.string.notebooks_record_live_note
-                                            RecordMode.After -> R.string.notebooks_record_after_note
-                                            RecordMode.Only -> R.string.notebooks_record_only_note
-                                        },
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.weight(1f).padding(start = 4.dp, end = 8.dp),
-                                )
+                            // Live, After, Only record or Music: transcribed while it records, after it stops (easier on
+                            // the battery), not until asked, or a concert (FLAC, no voice processing, no transcript). The
+                            // guessed labels keep their ✦ on the chips above.
+                            Text(
+                                stringResource(
+                                    when (recordMode) {
+                                        RecordMode.Live -> R.string.notebooks_record_live_note
+                                        RecordMode.After -> R.string.notebooks_record_after_note
+                                        RecordMode.Only -> R.string.notebooks_record_only_note
+                                        RecordMode.Music -> R.string.notebooks_record_music_note
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp),
+                            )
+                            FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 listOf(
                                     RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
-                                    RecordMode.Only to R.string.notebooks_record_only,
+                                    RecordMode.Only to R.string.notebooks_record_only, RecordMode.Music to R.string.notebooks_record_music,
                                 ).forEach { (mode, label) ->
                                     FilterChip(
                                         selected = recordMode == mode, onClick = { recordMode = mode; actions.setRecordMode(mode) },
-                                        label = { Text(stringResource(label)) }, modifier = Modifier.padding(start = 6.dp),
+                                        label = { Text(stringResource(label)) },
+                                        leadingIcon = if (mode == RecordMode.Music) ({ Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) }) else null,
                                     )
                                 }
                             }

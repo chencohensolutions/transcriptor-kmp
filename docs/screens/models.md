@@ -101,7 +101,9 @@ stops.
   48 kHz; HE needs 24 or 48), channels (mono, stereo; HE v2 is stereo only), bitrate as chips from 16 to 320 kbps with
   the size an hour (a note above 64 kbps for HE), and the encoder: Automatic (hardware first) or any of the phone's AAC
   encoders, with the one that runs and whether it is hardware (`SettingsStore.aac`, `AacSettings`, `AacEncoders`).
-  The AAC page also shows **Bit depth** with 16 fixed (AAC keeps none of its own; 24 bit is FLAC's).
+  Only what the phone supports is shown: AAC profiles and bitrates some encoder takes, sample rates and channels the
+  profile allows; FLAC's **Bit depth** row only when the microphone in use lists a deeper encoding than 16 bit
+  (`AndroidAudioInputs.deepCapture`; the S25's own microphones don't, a USB one may), else FLAC records 16 bit.
   The **FLAC** page: sample rate (16, 24, 48 kHz) with the size an hour, channels (mono, stereo), bit depth (16, 24;
   24 reads the microphone in floating point and keeps 24 bits in the WAV and FLAC) (`SettingsStore.flac`,
   `FlacFormat`), and the compression effort, 0 (faster) to 8 (smaller file) (`SettingsStore.flacLevel`).

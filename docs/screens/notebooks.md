@@ -58,6 +58,10 @@ The code still calls it `NotebooksScreen`.
 - Under the chips, **Live**, **After** or **No transcript** (kept in the settings, `SettingsStore.recordMode`): Live
   transcribes as the moment records; After only records it, and it is transcribed after it stops ([design.md](../design.md#record-now-transcribe-after-owners-request-nov-15-2026));
   No transcript (owner's request, Nov 15, 2026) records it and transcribes nothing until "Transcribe now" on the moment.
+- **Music** (owner's request, Nov 17, 2026; `RecordMode.Music`, `recordMusic`): a concert. FLAC as it records at the High
+  preset (48 kHz stereo 16 bit) whatever Recording format says, the microphone opened as `UNPROCESSED` where the phone
+  supports it (else `CAMCORDER`), no transcript (like No transcript). The chips sit on their own line under the mode's
+  note; the Quick Settings tile follows the mode. The source used is in the moment's power details.
 - With **Advanced mode** on (Settings › Advanced, `SettingsStore.advancedMode`, off by default; owner's request, Nov 17,
   2026), a row under them: Quality **High**, **Normal**, **Low** and Battery **Save**, **Now**, the presets of Settings ›
   Recording format (`NotebooksState.recordingChoice`, `RecordingChoice.with`); settings matching no preset leave that

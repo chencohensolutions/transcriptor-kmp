@@ -69,6 +69,16 @@ class RecordingPresetsTest {
     }
 
     @Test
+    fun musicModeIsKeptAndWinsOverTheOthers() {
+        val fs = FakeFileSystem()
+        val store = SettingsStore(fs, "/s".toPath())
+        store.recordMode = com.chencohensolution.transcriptor.settings.RecordMode.Music
+        assertEquals(com.chencohensolution.transcriptor.settings.RecordMode.Music, SettingsStore(fs, "/s".toPath()).recordMode)
+        store.recordMode = com.chencohensolution.transcriptor.settings.RecordMode.Live
+        assertEquals(com.chencohensolution.transcriptor.settings.RecordMode.Live, store.recordMode)
+    }
+
+    @Test
     fun pcm24RoundTrips() {
         val floats = floatArrayOf(0f, 0.5f, -0.5f, 1f, -1f, 0.25f)
         val wide = ByteArray(18)

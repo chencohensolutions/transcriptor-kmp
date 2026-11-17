@@ -103,6 +103,9 @@ private fun encodeLine(state: ModelsState): String = when (state.audioFormat) {
 private fun flacLine(flac: FlacFormat): String =
     stringResource(R.string.rec_format_flac_format, flac.bitDepth, stringResource(if (flac.channels == 1) R.string.rec_format_mono else R.string.rec_format_stereo), flac.sampleRate / 1000)
 
+/** FLAC as it records: 16 bit when the microphone gives no more, whatever the setting. */
+private val ModelsState.recordedFlac get() = if (deepCapture) flac else flac.copy(bitDepth = 16)
+
 @Composable
 private fun qualityName(preset: QualityPreset) = stringResource(when (preset) {
     QualityPreset.High -> R.string.rec_preset_high
@@ -125,7 +128,7 @@ fun recordingFormatSummary(state: ModelsState): String {
     val presets = stringResource(R.string.rec_preset_summary, qualityName(choice.quality), powerName(choice.power))
     return presets + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
-        AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.flac) + " · " + encodeLine(state)
+        AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)
         else -> stringResource(R.string.rec_format_summary_wav)
     }
 }
@@ -157,7 +160,7 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
                 open(FormatPage.Aac)
             }
             CodecRow(codec == AudioFormat.FlacLive, stringResource(R.string.rec_format_codec_flac),
-                if (codec == AudioFormat.FlacLive) flacLine(state.flac) + " · " + stringResource(R.string.rec_format_flac_line, state.flacLevel, FLAC_LEVELS.last) + " · " + encodeLine(state)
+                if (codec == AudioFormat.FlacLive) flacLine(state.recordedFlac) + " · " + stringResource(R.string.rec_format_flac_line, state.flacLevel, FLAC_LEVELS.last) + " · " + encodeLine(state)
                 else stringResource(R.string.rec_format_flac_short), page = true) {
                 if (codec != AudioFormat.FlacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenAac) AudioFormat.WavThenFlac else AudioFormat.FlacLive)
                 open(FormatPage.Flac)
@@ -296,7 +299,7 @@ private fun CodecPage(state: ModelsState, actions: ModelsActions, aac: Boolean, 
             if (state.audioFormat == later) FormatPageNote(stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_here_stop else R.string.rec_format_later_here_charging))
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
             if (aac) AacSettingsPart(state, actions) else {
-                FlacFormatPart(state.flac, actions.setFlac)
+                FlacFormatPart(state.flac, state.deepCapture, actions.setFlac)
                 FlacEffortPart(state.flacLevel, if (state.audioFormat == AudioFormat.WavThenFlac) state.audioFormat else AudioFormat.FlacLive, actions.setFlacLevel)
             }
         }
@@ -313,7 +316,10 @@ private fun AacSettingsPart(state: ModelsState, actions: ModelsActions) {
     val aac = state.aac
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         FormatLabel(stringResource(R.string.rec_format_profile))
+        // Only the profiles one of the phone's encoders takes.
+        val offered = state.aacEncoders.flatMap { it.profiles }.toSet().ifEmpty { setOf(AacProfile.Lc) }
         val profiles = listOf(AacProfile.Lc to R.string.rec_format_profile_lc, AacProfile.He to R.string.rec_format_profile_he, AacProfile.HeV2 to R.string.rec_format_profile_he2)
+            .filter { it.first in offered }
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             profiles.forEachIndexed { i, (p, label) ->
                 SegmentedButton(
@@ -329,46 +335,36 @@ private fun AacSettingsPart(state: ModelsState, actions: ModelsActions) {
         }))
 
         FormatLabel(stringResource(R.string.rec_format_rate))
-        val rates = listOf(16_000, 24_000, 48_000)
+        val rates = aac.sampleRates
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             rates.forEachIndexed { i, r ->
                 SegmentedButton(
                     selected = aac.sampleRate == r, onClick = { actions.setAac(aac.copy(sampleRate = r).valid()) },
-                    enabled = r in aac.sampleRates, shape = SegmentedButtonDefaults.itemShape(i, rates.size),
+                    shape = SegmentedButtonDefaults.itemShape(i, rates.size),
                 ) { Text(stringResource(R.string.rec_format_khz, r / 1000)) }
             }
         }
         FormatNote(stringResource(R.string.rec_format_rate_note))
 
         FormatLabel(stringResource(R.string.rec_format_channels))
-        val channels = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo)
+        val channels = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo).filter { it.first in aac.channelCounts }
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             channels.forEachIndexed { i, (c, label) ->
                 SegmentedButton(
                     selected = aac.channels == c, onClick = { actions.setAac(aac.copy(channels = c).valid()) },
-                    enabled = c in aac.channelCounts, shape = SegmentedButtonDefaults.itemShape(i, channels.size),
+                    shape = SegmentedButtonDefaults.itemShape(i, channels.size),
                 ) { Text(stringResource(label)) }
             }
         }
         FormatNote(stringResource(R.string.rec_format_channels_note))
-
-        FormatLabel(stringResource(R.string.rec_format_depth))
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            FlacFormat.DEPTHS.forEachIndexed { i, bits ->
-                SegmentedButton(
-                    selected = bits == 16, onClick = {}, enabled = bits == 16,
-                    shape = SegmentedButtonDefaults.itemShape(i, FlacFormat.DEPTHS.size),
-                ) { Text(stringResource(R.string.rec_format_bits, bits)) }
-            }
-        }
-        FormatNote(stringResource(R.string.rec_format_depth_aac))
 
         Row(Modifier.padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.rec_format_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Text(stringResource(R.string.rec_format_size, aac.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            aac.bitrates.forEach { kbps ->
+            // Only the bitrates an encoder that takes this profile takes.
+            aac.bitrates.filter { kbps -> state.aacEncoders.isEmpty() || state.aacEncoders.any { aac.profile in it.profiles && kbps * 1000 in it.bitrates } }.forEach { kbps ->
                 FilterChip(
                     selected = aac.bitrateKbps == kbps, onClick = { actions.setAac(aac.copy(bitrateKbps = kbps)) },
                     label = { Text(stringResource(R.string.rec_format_kbps, kbps)) },
@@ -441,7 +437,9 @@ private fun AacEncoderPicker(state: ModelsState, actions: ModelsActions) {
 /** FLAC's sample rate, channels and bit depth, with the size an hour. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FlacFormatPart(flac: FlacFormat, set: (FlacFormat) -> Unit) {
+private fun FlacFormatPart(stored: FlacFormat, deep: Boolean, set: (FlacFormat) -> Unit) {
+    // 24 bit is offered only when the microphone gives it; otherwise what records is 16.
+    val flac = if (deep) stored else stored.copy(bitDepth = 16)
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.rec_format_rate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -470,6 +468,7 @@ private fun FlacFormatPart(flac: FlacFormat, set: (FlacFormat) -> Unit) {
         }
         FormatNote(stringResource(R.string.rec_format_flac_channels_note))
 
+        if (deep) {
         FormatLabel(stringResource(R.string.rec_format_depth))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             FlacFormat.DEPTHS.forEachIndexed { i, bits ->
@@ -480,6 +479,7 @@ private fun FlacFormatPart(flac: FlacFormat, set: (FlacFormat) -> Unit) {
             }
         }
         FormatNote(stringResource(R.string.rec_format_depth_note))
+        }
         HorizontalDivider(Modifier.padding(top = 16.dp))
     }
 }

@@ -751,7 +751,6 @@
     <string name="rec_format_depth">עומק סיביות</string>
     <string name="rec_format_bits">%1$d ביט</string>
     <string name="rec_format_depth_note">‏24 ביט עוזר רק עם מיקרופון USB שנותן אותו: המיקרופונים של הטלפון נותנים 16 ביט, אז 24 רק מגדיל את הקובץ בחצי.</string>
-    <string name="rec_format_depth_aac">ל־AAC אין עומק סיביות משלו: המקודד מקבל את 16 הביט של המיקרופון. ל־24 ביט, FLAC.</string>
     <string name="rec_format_flac_rate_note">‏48 קילוהרץ שומר כל מה שהמיקרופון שומע. 24 ו־16 קילוהרץ לדיבור בלבד; המודלים מקשיבים ב־16.</string>
     <string name="rec_format_flac_channels_note">מונו בחצי הגודל; סטריאו שומר מאיפה הגיע הצליל.</string>
     <string name="rec_format_flac_format">%1$d ביט · %2$s · %3$d קילוהרץ</string>
@@ -763,4 +762,6 @@
     <string name="notebooks_quality_low">נמוכה</string>
     <string name="notebooks_power_low">חיסכון</string>
     <string name="notebooks_power_normal">מיד</string>
+    <string name="notebooks_record_music">מוזיקה</string>
+    <string name="notebooks_record_music_note">הופעה: FLAC בלי אובדן, המיקרופון בלי עיבוד קול, בלי תמלול.</string>
 </resources>

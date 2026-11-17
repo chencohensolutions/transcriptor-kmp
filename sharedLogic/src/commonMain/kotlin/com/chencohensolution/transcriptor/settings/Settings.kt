@@ -147,6 +147,8 @@ private data class SettingsFileV1(
     val recordLive: Boolean = true,
     /** The Record bar's Only record (owner's request, Nov 15, 2026): no transcript at all until the user asks; wins over [recordLive]. */
     val recordOnly: Boolean = false,
+    /** The Record bar's Music (owner's request, Nov 17, 2026): FLAC, no voice processing, no transcript; wins over the two above. */
+    val recordMusic: Boolean = false,
     /** While recording, the notification says nothing about it: silent, hidden on the lock screen, no buttons. */
     val quietRecording: Boolean = true,
     /** The microphone picked to record from ([MicInput]); null: the phone's own. */
@@ -253,8 +255,8 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     /** The Record bar's choice, also what the Quick Settings tile records with: Live, After or Only record. */
     var recordMode: RecordMode
-        get() = read().let { if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
-        set(value) = write(read().copy(recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
+        get() = read().let { if (it.recordMusic) RecordMode.Music else if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
+        set(value) = write(read().copy(recordMusic = value == RecordMode.Music, recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
 
     /**
      * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
@@ -417,4 +419,10 @@ enum class RecordMode {
     After,
     /** Recorded only: it waits for "Transcribe now" on the moment. */
     Only,
+
+    /**
+     * A concert: FLAC as it records ([com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC], whatever the
+     * format settings), the microphone without voice processing, and no transcript (like [Only]).
+     */
+    Music,
 }
