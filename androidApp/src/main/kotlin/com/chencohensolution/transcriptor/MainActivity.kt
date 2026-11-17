@@ -304,9 +304,10 @@ class MainActivity : ComponentActivity() {
         var musicChoice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice(musicKey) else null) }
         var saving by remember { mutableStateOf(Recording.settings.powerSaving) }
         var musicSaving by remember { mutableStateOf(Recording.settings.savingFor(musicKey)) }
+        var transcribeSaving by remember { mutableStateOf(Recording.settings.transcribeSaving) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
@@ -315,6 +316,7 @@ class MainActivity : ComponentActivity() {
                     active = profile
                     choice = Recording.settings.recordingChoice
                 },
+                setTranscribeSaving = { on -> Recording.settings.transcribeSaving = on; transcribeSaving = on },
                 setPower = { preset, music ->
                     val on = preset == com.chencohensolution.transcriptor.settings.PowerPreset.Low
                     // Music's own mode with Music picked, else the shared one.

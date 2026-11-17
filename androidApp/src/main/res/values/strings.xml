@@ -724,7 +724,7 @@
     <string name="rec_preset_normal">Normal</string>
     <string name="rec_preset_low">Low</string>
     <string name="rec_preset_custom">Custom</string>
-    <string name="rec_preset_power">When to encode and transcribe</string>
+    <string name="rec_preset_power">When to compress</string>
     <string name="rec_preset_power_low">On the charger</string>
     <string name="rec_preset_power_normal">Right away</string>
     <string name="rec_preset_power_low_note">Saves battery: records a plain WAV (nothing compressing it while you record), then compresses it to the chosen codec and transcribes moments recorded with After once the phone is charging with 30% or more.</string>
@@ -797,9 +797,9 @@
     <string name="rec_format_amr_sound">Always %1$d kHz mono, whatever the sound setting.</string>
     <string name="rec_format_other_sound">At the profile\'s sound: %1$s, %2$d kHz (Recording settings).</string>
     <string name="notebooks_presets_quality">Quality</string>
-    <string name="notebooks_presets_battery">Processing</string>
-    <string name="notebooks_power_low_note">Compresses the audio and transcribes once the phone charges: saves battery.</string>
-    <string name="notebooks_power_normal_note">Compresses the audio and transcribes right after the moment.</string>
+    <string name="notebooks_presets_battery">Compress</string>
+    <string name="notebooks_power_low_note">Records WAV, compressed on the charger: saves battery.</string>
+    <string name="notebooks_power_normal_note">Compressed while recording.</string>
     <string name="notebooks_power_custom_note">Your own timing (Settings › Recording settings).</string>
     <string name="notebooks_presets_music">Music\'s own settings: Settings › Recording settings › Music.</string>
     <string name="rec_preset_power_low_music">Saves battery: records a plain WAV, compressed to the chosen codec once the phone charges with 30% or more.</string>
@@ -807,4 +807,10 @@
     <string name="rec_format_codec">Codec</string>
     <string name="rec_format_wav_line">Uncompressed: the largest, nothing to encode.</string>
     <string name="rec_format_flac_lossless">Lossless: every bit of the sound kept, about half of WAV.</string>
+    <string name="rec_encode_low_note">Saves battery: records a plain WAV (nothing compressing while you record), compressed to the chosen codec once the phone charges with 30% or more.</string>
+    <string name="rec_encode_normal_note">Compresses while recording. Uses the battery then.</string>
+    <string name="rec_transcribe_title">When to transcribe moments recorded with After</string>
+    <string name="rec_transcribe_low_note">Saves battery: transcribed once the phone charges with 30% or more.</string>
+    <string name="rec_transcribe_normal_note">Transcribed as soon as the moment ends. Uses the battery then.</string>
+    <string name="notebooks_presets_transcribe">Transcribe</string>
 </resources>

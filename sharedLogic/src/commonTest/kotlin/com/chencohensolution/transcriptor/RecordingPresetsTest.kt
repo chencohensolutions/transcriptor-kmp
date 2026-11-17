@@ -94,6 +94,9 @@ class RecordingPresetsTest {
         assertEquals(PowerPreset.Low, store.recordingChoice.power)
         store.powerSaving = false
         assertEquals(AudioFormat.AacLive, store.audioFormat)
+        // Transcribing has its own choice: still on the charger, as it was.
+        assertEquals(EncodeAfter.Charging, store.transcribeWhen)
+        store.transcribeSaving = false
         assertEquals(EncodeAfter.Stop, store.transcribeWhen)
         assertEquals(PowerPreset.Normal, store.recordingChoice.power)
     }

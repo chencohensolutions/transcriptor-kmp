@@ -274,28 +274,42 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
 @Composable
 private fun TimingPart(state: ModelsState, actions: ModelsActions) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        // When to compress and transcribe: two modes, no mix (owner's call, Nov 17, 2026). Music has its own (it isn't
-        // transcribed: only when it is compressed).
-        FormatLabel(stringResource(R.string.rec_preset_power))
+        // Compressing and transcribing, each on the charger or right away (owner's calls, Nov 17, 2026). Music has
+        // its own compressing and isn't transcribed.
         val music = state.profile == QualityProfile.Music
-        val power = listOf(PowerPreset.Low, PowerPreset.Normal)
-        val picked = if (state.powerSaving) PowerPreset.Low else PowerPreset.Normal
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            power.forEachIndexed { i, p ->
-                SegmentedButton(
-                    selected = picked == p, onClick = { actions.setPower(p) },
-                    shape = SegmentedButtonDefaults.itemShape(i, power.size),
-                ) { Text(powerName(p)) }
-            }
-        }
-        FormatNote(stringResource(when {
-            music && state.powerSaving -> R.string.rec_preset_power_low_music
-            music -> R.string.rec_preset_power_normal_music
-            state.powerSaving -> R.string.rec_preset_power_low_note
-            else -> R.string.rec_preset_power_normal_note
-        }))
+        TwoModes(
+            stringResource(R.string.rec_preset_power), state.powerSaving, actions.setPower,
+            stringResource(when {
+                music && state.powerSaving -> R.string.rec_preset_power_low_music
+                music -> R.string.rec_preset_power_normal_music
+                state.powerSaving -> R.string.rec_encode_low_note
+                else -> R.string.rec_encode_normal_note
+            }),
+        )
+        if (!music) TwoModes(
+            stringResource(R.string.rec_transcribe_title), state.transcribeSaving,
+            { p -> actions.setTranscribeWhen(if (p == PowerPreset.Low) EncodeAfter.Charging else EncodeAfter.Stop) },
+            stringResource(if (state.transcribeSaving) R.string.rec_transcribe_low_note else R.string.rec_transcribe_normal_note),
+        )
         Spacer(Modifier.height(16.dp))
     }
+}
+
+/** A when-choice: on the charger (saves battery) or right away, with what the choice does. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TwoModes(title: String, saving: Boolean, set: (PowerPreset) -> Unit, note: String) {
+    FormatLabel(title)
+    val modes = listOf(PowerPreset.Low, PowerPreset.Normal)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        modes.forEachIndexed { i, p ->
+            SegmentedButton(
+                selected = (p == PowerPreset.Low) == saving, onClick = { set(p) },
+                shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+            ) { Text(powerName(p)) }
+        }
+    }
+    FormatNote(note)
 }
 
 @Composable

@@ -159,8 +159,10 @@ data class ModelsState(
     val profileSettings: com.chencohensolution.transcriptor.settings.ProfileSettings = com.chencohensolution.transcriptor.settings.QualityProfile.Normal.defaults,
     /** The other codecs this phone encodes (Opus, xHE-AAC, AMR-WB, AMR-NB). */
     val codecs: Set<com.chencohensolution.transcriptor.settings.Codec> = emptySet(),
-    /** Save battery, for the shown profile (Music's own, else the shared mode). */
+    /** Compressing saves battery, for the shown profile (Music's own, else the shared mode). */
     val powerSaving: Boolean = false,
+    /** "After" moments are transcribed on the charger. */
+    val transcribeSaving: Boolean = false,
     /** The profile moments record with (High, Normal or Low). */
     val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */

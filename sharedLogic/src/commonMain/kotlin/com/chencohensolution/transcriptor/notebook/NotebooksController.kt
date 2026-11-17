@@ -85,6 +85,8 @@ data class NotebooksState(
     /** Save battery: the shared mode, and Music's own. */
     val powerSaving: Boolean = false,
     val musicPowerSaving: Boolean = false,
+    /** "After" moments are transcribed on the charger. */
+    val transcribeSaving: Boolean = false,
     /** The profile moments record with, for the same row. */
     val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** The list can read older recordings from the server as it nears its end ([Library.serverOlder]). */

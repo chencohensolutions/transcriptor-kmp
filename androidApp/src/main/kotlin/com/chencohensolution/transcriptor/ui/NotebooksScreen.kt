@@ -137,6 +137,8 @@ class NotebooksActions(
     val setQuality: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
     /** Advanced mode's Record bar: applies a battery preset. */
     val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset, music: Boolean) -> Unit = { _, _ -> },
+    /** Advanced mode's Record bar: "After" moments transcribed on the charger, or right after. */
+    val setTranscribeSaving: (Boolean) -> Unit = {},
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -468,7 +470,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     )
                                 }
                             }
-                            state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode == RecordMode.Music, actions) }
+                            state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1067,8 +1069,9 @@ internal fun shortModelName(name: String): String {
 @Composable
 private fun RecordPresets(
     choice: com.chencohensolution.transcriptor.settings.RecordingChoice, state: NotebooksState,
-    music: Boolean, actions: NotebooksActions,
+    mode: RecordMode, actions: NotebooksActions,
 ) {
+    val music = mode == RecordMode.Music
     val note = MaterialTheme.colorScheme.onSurfaceVariant
     val saving = if (music) state.musicPowerSaving else state.powerSaving
     val power = if (saving) com.chencohensolution.transcriptor.settings.PowerPreset.Low else com.chencohensolution.transcriptor.settings.PowerPreset.Normal
@@ -1118,6 +1121,24 @@ private fun RecordPresets(
             }),
             style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
         )
+        // Transcribing has its own when: shown with After, the mode it is for.
+        if (mode == RecordMode.After) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                Text(stringResource(R.string.notebooks_presets_transcribe), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(true to R.string.notebooks_power_low, false to R.string.notebooks_power_normal).forEach { (on, label) ->
+                        FilterChip(
+                            selected = state.transcribeSaving == on, onClick = { actions.setTranscribeSaving(on) }, label = { Text(stringResource(label)) },
+                            leadingIcon = if (on) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
+                        )
+                    }
+                }
+            }
+            Text(
+                stringResource(if (state.transcribeSaving) R.string.rec_transcribe_low_note else R.string.rec_transcribe_normal_note),
+                style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
+            )
+        }
     }
 }
 
