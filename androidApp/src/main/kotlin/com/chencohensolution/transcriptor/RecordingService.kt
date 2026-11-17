@@ -341,7 +341,9 @@ class RecordingService : Service() {
         val m = com.chencohensolution.transcriptor.location.MomentLocation(
             location.copy(stopWhenLeaving = location.stopWhenLeaving && canLocate, stopOnArrive = location.stopOnArrive && canLocate),
             stopOn = stopOn, pathOn = profile.savePath && canLocate,
-        ) { clock -> (Recording.session.positionMillis - (System.currentTimeMillis() - clock)).coerceAtLeast(0) }
+            startedAtMillis = System.currentTimeMillis(),
+            toRecording = { clock -> (Recording.session.positionMillis - (System.currentTimeMillis() - clock)).coerceAtLeast(0) },
+        )
         place = m.takeIf { it.active }
         return place?.takeIf { it.needsFixes }
     }
@@ -354,7 +356,7 @@ class RecordingService : Service() {
         val f = LocationFeed(this, onFix = { fix -> onPlace(p.fix(fix)) }, onDevice = { onPlace(p.deviceConnected(System.currentTimeMillis())) })
         feed = f
         f.start(p.needsFixes, Recording.settings.location.device?.takeIf { Recording.settings.location.stopOnDevice })
-        f.request(p.status.value.request)
+        f.request(p.status.value.request, p.minutePrecise)
         placeTicker = scope.launch {
             while (true) {
                 kotlinx.coroutines.delay(1_000)
@@ -366,7 +368,7 @@ class RecordingService : Service() {
     /** Acts on stop by place's state: the countdown's notification and mark, the stop when it runs out. */
     private fun onPlace(status: com.chencohensolution.transcriptor.location.MomentLocation.Status) {
         Recording.placeStatus.value = status
-        feed?.request(status.request)
+        feed?.request(status.request, place?.minutePrecise == true)
         when (val w = status.watch) {
             is com.chencohensolution.transcriptor.location.PlaceWatch.State.Counting -> {
                 if (!countdownMarked) {

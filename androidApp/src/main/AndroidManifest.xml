@@ -36,7 +36,7 @@
         <service
             android:name=".RecordingService"
             android:exported="false"
-            android:foregroundServiceType="microphone|mediaProcessing" />
+            android:foregroundServiceType="microphone|mediaProcessing|location" />
         <!-- The Quick Settings tile: Record, and Stop while recording. -->
         <service
             android:name=".RecordTileService"

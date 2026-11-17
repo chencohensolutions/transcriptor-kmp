@@ -20,6 +20,8 @@ class MomentLocation(
     /** The path is saved for this moment. */
     pathOn: Boolean,
     private val toRecording: (Long) -> Long,
+    /** When the recording started (epoch ms): a fix from before it (a cached one) never anchors or triggers. */
+    private val startedAtMillis: Long = 0,
 ) {
     /** What the app asks the phone for, on top of the fixes other apps ask for (always listened to). */
     enum class Request {
@@ -54,6 +56,12 @@ class MomentLocation(
     private var lastGood: Fix? = null
     private var lastFixAt: Long? = null
 
+    /**
+     * The minute's fix should be a precise one (GPS waking once a minute) rather than Wi-Fi's: a 100 m stop needs
+     * fixes good to 50 m, which Wi-Fi often isn't.
+     */
+    val minutePrecise = (config.leaveMeters ?: Int.MAX_VALUE) <= 100
+
     /** Anything to do at all: when false the platform listens to nothing. */
     val active = config.anything || path != null
 
@@ -65,6 +73,8 @@ class MomentLocation(
 
     /** Feeds one fix; returns the status after it. */
     fun fix(fix: Fix): Status {
+        // A cached fix from before the recording (another place, maybe hours ago) is neither its place nor its path.
+        if (fix.atMillis < startedAtMillis - FRESH_MILLIS) return _status.value
         lastFixAt = fix.atMillis
         if (fix.accuracyM <= 50f) lastGood = fix
         path?.add(fix)
@@ -139,5 +149,10 @@ class MomentLocation(
             else -> Request.Minute
         }
         return maxOf(forPath, forWatch)
+    }
+
+    companion object {
+        /** A fix up to this long before the start still counts (the phone's last one, taken as the user pressed Record). */
+        const val FRESH_MILLIS = 15_000L
     }
 }

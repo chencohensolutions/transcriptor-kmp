@@ -147,7 +147,7 @@ fun LectureScreen(
     // and Back returns to the glance.
     var transcript by rememberSaveable { mutableStateOf(startInTranscript) }
     if (!transcript) {
-        RecordingGlance(state, actions, onTranscript = { transcript = true })
+        RecordingGlance(state, actions, onTranscript = { transcript = true }, place = place, placeActions = placeActions)
         return
     }
     BackHandler { transcript = false }

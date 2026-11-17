@@ -65,7 +65,7 @@ class LocationFeed(
 
     /** Asks the phone for [request] on top of the passive fixes (a change re-registers; the same does nothing). */
     @SuppressLint("MissingPermission")
-    fun request(request: MomentLocation.Request) {
+    fun request(request: MomentLocation.Request, minutePrecise: Boolean = false) {
         if (request == ownRequest || manager == null) return
         own?.let { manager.removeUpdates(it) }
         own = null
@@ -76,7 +76,9 @@ class LocationFeed(
         }
         val built = when (request) {
             MomentLocation.Request.EverySecond -> LocationRequest.Builder(1_000).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build()
-            else -> LocationRequest.Builder(60_000).setQuality(LocationRequest.QUALITY_BALANCED_POWER_ACCURACY).setMinUpdateIntervalMillis(30_000).build()
+            else -> LocationRequest.Builder(60_000)
+                .setQuality(if (minutePrecise) LocationRequest.QUALITY_HIGH_ACCURACY else LocationRequest.QUALITY_BALANCED_POWER_ACCURACY)
+                .setMinUpdateIntervalMillis(30_000).build()
         }
         runCatching {
             manager.requestLocationUpdates(bestProvider(manager), built, executor, l)
@@ -95,8 +97,9 @@ class LocationFeed(
         receiver = null
     }
 
+    // By its age, not its own clock: a fix's time comes from GPS or the network and may be off from the phone's.
     private fun Location.toFix(source: FixSource) = Fix(
-        atMillis = time,
+        atMillis = System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / 1_000_000,
         point = GeoPoint(latitude, longitude),
         accuracyM = if (hasAccuracy()) accuracy else 1_000f,
         speedMps = speed.takeIf { hasSpeed() },
