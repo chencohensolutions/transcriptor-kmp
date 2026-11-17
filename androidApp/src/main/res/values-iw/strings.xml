@@ -824,4 +824,12 @@
     <string name="rec_transcribe_low_note">חוסך סוללה: מתומלל כשהטלפון בטעינה עם 30% ומעלה.</string>
     <string name="rec_transcribe_normal_note">מתומלל ברגע שהרגע נגמר. משתמש בסוללה אז.</string>
     <string name="notebooks_presets_transcribe">תמלול</string>
+    <string name="notebooks_summary">מקליט %1$s. %2$s. %3$s.</string>
+    <string name="notebooks_summary_wav">נשמר כ־WAV, בלי דחיסה</string>
+    <string name="notebooks_summary_compress_charger">מוקלט כ־WAV ונדחס בזמן טעינה</string>
+    <string name="notebooks_summary_compress_now">נדחס בזמן ההקלטה</string>
+    <string name="notebooks_summary_transcribe_live">מתומלל בזמן אמת, תוך כדי דיבור</string>
+    <string name="notebooks_summary_transcribe_charger">מתומלל בזמן טעינה</string>
+    <string name="notebooks_summary_transcribe_now">מתומלל מיד אחרי הרגע</string>
+    <string name="notebooks_summary_transcribe_none">לא מתומלל</string>
 </resources>
