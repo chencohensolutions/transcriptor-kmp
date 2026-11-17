@@ -169,6 +169,10 @@ class MainActivity : ComponentActivity() {
                     screen, label = "screen",
                     // Eased cross-fade, no spring anywhere (the default size change springs: a bounce).
                     transitionSpec = {
+                        // Only the first screen and the recording screen fade into each other (Record becomes Stop);
+                        // every other change is immediate, as before.
+                        val recording = setOf(initialState, targetState) == setOf("notebooks", "live")
+                        if (!recording) return@AnimatedContent androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
                         val ease = androidx.compose.animation.core.FastOutSlowInEasing
                         val millis = com.chencohensolution.transcriptor.ui.MORPH_MILLIS
                         // The screen going away stays whole underneath while the new one fades in over it: no moment
