@@ -735,12 +735,12 @@
     <string name="rec_preset_normal">רגילה</string>
     <string name="rec_preset_low">נמוכה</string>
     <string name="rec_preset_custom">מותאמת</string>
-    <string name="rec_preset_power">סוללה</string>
-    <string name="rec_preset_power_low">חיסכון בסוללה</string>
+    <string name="rec_preset_power">מתי לקודד ולתמלל</string>
+    <string name="rec_preset_power_low">בזמן טעינה</string>
     <string name="rec_preset_power_normal">מיד</string>
-    <string name="rec_preset_power_low_note">מקליט WAV בלי מקודד פועל; מקודד ומתמלל רגעים שהוקלטו ב״אחרי״ כשהטלפון בטעינה עם 30% ומעלה.</string>
-    <string name="rec_preset_power_normal_note">מקודד בזמן ההקלטה או מיד אחרי עצירה, ומתמלל רגעים שהוקלטו ב״אחרי״ ברגע שהם נגמרים.</string>
-    <string name="rec_preset_power_custom_note">תזמון משלך: התמלול למטה, הקידוד תחת ״להקליט כ־WAV״.</string>
+    <string name="rec_preset_power_low_note">חוסך סוללה: מקליט WAV פשוט (שום דבר לא דוחס בזמן ההקלטה), ואז דוחס לקידוד שנבחר ומתמלל רגעים שהוקלטו ב״אחר כך״ כשהטלפון בטעינה עם 30% ומעלה.</string>
+    <string name="rec_preset_power_normal_note">דוחס בזמן ההקלטה (או מיד אחרי עצירה) ומתמלל רגעים שהוקלטו ב״אחר כך״ ברגע שהם נגמרים. משתמש בסוללה אז.</string>
+    <string name="rec_preset_power_custom_note">שילוב של השניים: מתי לתמלל נקבע למטה, מתי לדחוס תחת ״להקליט כ־WAV ולקודד אחר כך״.</string>
     <string name="rec_preset_summary">איכות %1$s · %2$s</string>
     <string name="rec_format_depth">עומק סיביות</string>
     <string name="rec_format_bits">%1$d ביט</string>
@@ -754,7 +754,7 @@
     <string name="notebooks_quality_high">גבוהה</string>
     <string name="notebooks_quality_normal">רגילה</string>
     <string name="notebooks_quality_low">נמוכה</string>
-    <string name="notebooks_power_low">חיסכון בסוללה</string>
+    <string name="notebooks_power_low">בטעינה</string>
     <string name="notebooks_power_normal">מיד</string>
     <string name="notebooks_record_music">מוזיקה</string>
     <string name="notebooks_record_music_note">הופעה: הגדרות המוזיקה, המיקרופון בלי עיבוד קול, בלי תמלול.</string>
@@ -808,9 +808,9 @@
     <string name="rec_format_amr_sound">תמיד %1$d קילוהרץ מונו, מה שלא תהיה הגדרת הצליל.</string>
     <string name="rec_format_other_sound">בצליל של הפרופיל: %1$s, ‏%2$d קילוהרץ (הגדרות הקלטה).</string>
     <string name="notebooks_presets_quality">איכות</string>
-    <string name="notebooks_presets_battery">סוללה</string>
-    <string name="notebooks_power_low_note">מקליט WAV; מקודד ומתמלל בזמן טעינה.</string>
-    <string name="notebooks_power_normal_note">מקודד ומתמלל מיד אחרי הרגע.</string>
+    <string name="notebooks_presets_battery">×¢××××</string>
+    <string name="notebooks_power_low_note">דוחס את השמע ומתמלל כשהטלפון בטעינה: חוסך סוללה.</string>
+    <string name="notebooks_power_normal_note">דוחס את השמע ומתמלל מיד אחרי הרגע.</string>
     <string name="notebooks_power_custom_note">תזמון משלך (הגדרות › הגדרות הקלטה).</string>
     <string name="notebooks_presets_music">מוזיקה מוקלטת בהגדרות ובתזמון משלה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
 </resources>

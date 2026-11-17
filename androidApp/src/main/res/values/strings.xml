@@ -724,12 +724,12 @@
     <string name="rec_preset_normal">Normal</string>
     <string name="rec_preset_low">Low</string>
     <string name="rec_preset_custom">Custom</string>
-    <string name="rec_preset_power">Battery</string>
-    <string name="rec_preset_power_low">Save battery</string>
+    <string name="rec_preset_power">When to encode and transcribe</string>
+    <string name="rec_preset_power_low">On the charger</string>
     <string name="rec_preset_power_normal">Right away</string>
-    <string name="rec_preset_power_low_note">Records as WAV with no encoder running; encodes and transcribes moments recorded with After once the phone charges with 30% or more.</string>
-    <string name="rec_preset_power_normal_note">Encodes while recording or right after Stop, and transcribes moments recorded with After as soon as they end.</string>
-    <string name="rec_preset_power_custom_note">Your own timing: transcribing below, encoding under Record as WAV.</string>
+    <string name="rec_preset_power_low_note">Saves battery: records a plain WAV (nothing compressing it while you record), then compresses it to the chosen codec and transcribes moments recorded with After once the phone is charging with 30% or more.</string>
+    <string name="rec_preset_power_normal_note">Compresses while recording (or right after Stop) and transcribes moments recorded with After as soon as they end. Uses the battery then.</string>
+    <string name="rec_preset_power_custom_note">A mix of the two: when to transcribe is set below, when to compress under Record as WAV, encode afterwards.</string>
     <string name="rec_preset_summary">%1$s quality · %2$s</string>
     <string name="rec_format_depth">Bit depth</string>
     <string name="rec_format_bits">%1$d bit</string>
@@ -743,7 +743,7 @@
     <string name="notebooks_quality_high">High</string>
     <string name="notebooks_quality_normal">Normal</string>
     <string name="notebooks_quality_low">Low</string>
-    <string name="notebooks_power_low">Save battery</string>
+    <string name="notebooks_power_low">On charger</string>
     <string name="notebooks_power_normal">Right away</string>
     <string name="notebooks_record_music">Music</string>
     <string name="notebooks_record_music_note">A concert: the Music settings, the mic without voice processing, no transcript.</string>
@@ -797,9 +797,9 @@
     <string name="rec_format_amr_sound">Always %1$d kHz mono, whatever the sound setting.</string>
     <string name="rec_format_other_sound">At the profile\'s sound: %1$s, %2$d kHz (Recording settings).</string>
     <string name="notebooks_presets_quality">Quality</string>
-    <string name="notebooks_presets_battery">Battery</string>
-    <string name="notebooks_power_low_note">Records WAV; encodes and transcribes on the charger.</string>
-    <string name="notebooks_power_normal_note">Encodes and transcribes right after the moment.</string>
+    <string name="notebooks_presets_battery">Processing</string>
+    <string name="notebooks_power_low_note">Compresses the audio and transcribes once the phone charges: saves battery.</string>
+    <string name="notebooks_power_normal_note">Compresses the audio and transcribes right after the moment.</string>
     <string name="notebooks_power_custom_note">Your own timing (Settings › Recording settings).</string>
     <string name="notebooks_presets_music">Music records with its own settings and timing: Settings › Recording settings › Music.</string>
 </resources>
