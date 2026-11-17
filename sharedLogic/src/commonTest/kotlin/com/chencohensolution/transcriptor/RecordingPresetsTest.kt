@@ -83,6 +83,8 @@ class RecordingPresetsTest {
         assertEquals(691, owner.megabytesPerHourWhileRecording)
         assertEquals(115, owner.copy(audioFormat = AudioFormat.AacLive).megabytesPerHourWhileRecording)
         assertEquals(1036, owner.copy(audioFormat = AudioFormat.WavThenFlac, flac = FlacFormat(bitDepth = 24)).megabytesPerHourWhileRecording)
+        // A mono 24 kHz WAV is a quarter of the size.
+        assertEquals(172, owner.withSound(24_000, 1).megabytesPerHourWhileRecording)
     }
 
     @Test

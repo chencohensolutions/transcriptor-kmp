@@ -109,8 +109,9 @@ data class RecordingChoice(
     val megabytesPerHourWhileRecording: Int
         get() {
             val wavBits = if (audioFormat == AudioFormat.WavThenAac) 16 else flac.valid().bitDepth
+            // The WAV is at the shared sound too (rate and channels).
             return when {
-                audioFormat == AudioFormat.Wav || audioFormat.wavFirst -> (48_000L * 2 * wavBits / 8 * 3600 / 1_000_000).toInt()
+                audioFormat == AudioFormat.Wav || audioFormat.wavFirst -> (sampleRate.toLong() * channels * wavBits / 8 * 3600 / 1_000_000).toInt()
                 audioFormat.isAac -> aac.valid().megabytesPerHour
                 else -> flac.valid().megabytesPerHour
             }

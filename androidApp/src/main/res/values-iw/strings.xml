@@ -368,7 +368,7 @@
     <string name="rec_format_summary_software">תוכנה</string>
     <string name="rec_format_summary_wav">WAV, בלי דחיסה</string>
     <string name="rec_format_use">להשתמש בזה</string>
-    <string name="rec_format_wav_short">בלי דחיסה: הכי גדול, בערך \u2066690 MB\u2069 לשעה, בלי שום קידוד.</string>
+    <string name="rec_format_wav_short">בלי דחיסה: הכי גדול, בערך %1$d MB לשעה, בלי שום קידוד.</string>
     <string name="rec_format_while_recording_short">בזמן ההקלטה</string>
     <string name="lecture_record_only">מקליט בלבד. הרגע יתומלל אחרי העצירה.</string>
     <string name="transcribing">מתמלל את הרגע…</string>
@@ -791,5 +791,6 @@
         <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלח.</item>
         <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלחו.</item>
     </plurals>
-    <string name="rec_sound_note">ל־AAC ול־FLAC כאחד. WAV תמיד 48 קילוהרץ סטריאו.</string>
+    <string name="rec_sound_note">ל־AAC, ל־FLAC ול־WAV כאחד.</string>
+    <string name="rec_format_depth_fixed">המקסימום שהמיקרופון הזה נותן. מיקרופון USB שמקליט 24 ביט יציע כאן 24.</string>
 </resources>

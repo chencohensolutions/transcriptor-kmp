@@ -24,8 +24,19 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     private val pending = FloatBuilder()
     private val input = FileInputStream(fd.fileDescriptor)
     private val wav = if (isWav) input.channel.apply { position(WavWriter.HEADER_SIZE) } else null
-    /** A WAV's bit depth (16, or 24 brought to 16 as it is read), from its header. */
-    private val wavBits = wav?.let { bitsOf(it) } ?: 16
+    /** A WAV's bit depth (16, or 24 brought to 16 as it is read), rate and channels, from its header. */
+    private val wavFormat = wav?.let { formatOf(it) }
+    private val wavBits = wavFormat?.bits ?: 16
+
+    init {
+        wavFormat?.let { f ->
+            if (f.rate != outRate || f.channels != outChannels) {
+                outRate = f.rate
+                outChannels = f.channels
+                downsampler = Downsampler(f.rate, f.channels)
+            }
+        }
+    }
     private val narrow = ByteArray(64 * 1024)
     private val extractor = if (wav == null) MediaExtractor().apply { setDataSource(fd.fileDescriptor); selectTrack(0) } else null
     private val codec = extractor?.let { e ->
@@ -52,13 +63,14 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     private fun nextPcm(): ByteArray? {
         wav?.let { f ->
             if (wavBits == 24) {
-                val n = f.read(ByteBuffer.wrap(buffer, 0, buffer.size / 6 * 6))
+                val frame = 3 * outChannels
+                val n = f.read(ByteBuffer.wrap(buffer, 0, buffer.size / frame * frame))
                 if (n <= 0) return null
-                val m = PcmConvert.pcm24To16(buffer, n - n % 6, narrow)
+                val m = PcmConvert.pcm24To16(buffer, n - n % frame, narrow)
                 return narrow.copyOf(m)
             }
             val n = f.read(ByteBuffer.wrap(buffer))
-            return if (n <= 0) null else buffer.copyOf(n - n % 4)
+            return if (n <= 0) null else buffer.copyOf(n - n % (2 * outChannels))
         }
         val codec = codec!!
         while (true) {
@@ -102,11 +114,16 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
     companion object {
         private const val PRE_ROLL_MILLIS = 100L
 
-        /** The bits per sample in a WAV header (at byte 34); the channel is left where it was. */
-        private fun bitsOf(f: java.nio.channels.FileChannel): Int {
-            val b = ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-            f.read(b, 34)
-            return if (b.position() == 2) b.getShort(0).toInt() else 16
+        private class WavFormat(val rate: Int, val channels: Int, val bits: Int) {
+            val blockAlign get() = channels * bits / 8
+        }
+
+        /** A WAV header's channels (byte 22), rate (24) and bits per sample (34); the channel is left where it was. */
+        private fun formatOf(f: java.nio.channels.FileChannel): WavFormat {
+            val b = ByteBuffer.allocate(14).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            f.read(b, 22)
+            if (b.position() < 14) return WavFormat(48_000, 2, 16)
+            return WavFormat(b.getInt(2), b.getShort(0).toInt(), b.getShort(12).toInt())
         }
 
         /**
@@ -118,15 +135,18 @@ class RecordingAudio(private val fd: ParcelFileDescriptor, isWav: Boolean) : Aud
             if (isWav) {
                 open().use { fd ->
                     FileInputStream(fd.fileDescriptor).channel.use { f ->
-                        val frame = 2 * bitsOf(f) / 8
-                        f.position(WavWriter.HEADER_SIZE + startMillis * 48 * frame)
-                        val bytes = ByteArray(want * 3 * frame)
+                        val w = formatOf(f)
+                        val frame = w.blockAlign
+                        f.position(WavWriter.HEADER_SIZE + startMillis * w.rate / 1000 * frame)
+                        // [want] samples at 16 kHz: want * rate / 16000 frames of the WAV.
+                        val bytes = ByteArray((want.toLong() * w.rate / 16_000 * frame).toInt())
                         val n = f.read(ByteBuffer.wrap(bytes)).coerceAtLeast(0)
-                        if (frame == 6) {
-                            val narrow = ByteArray(want * 3 * 4)
-                            return Downsampler().process(narrow, PcmConvert.pcm24To16(bytes, n - n % 6, narrow))
+                        val down = Downsampler(w.rate, w.channels)
+                        if (w.bits == 24) {
+                            val narrow = ByteArray(bytes.size / 3 * 2)
+                            return down.process(narrow, PcmConvert.pcm24To16(bytes, n - n % frame, narrow))
                         }
-                        return Downsampler().process(bytes, n - n % 4)
+                        return down.process(bytes, n - n % frame)
                     }
                 }
             }

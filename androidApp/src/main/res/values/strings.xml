@@ -368,7 +368,7 @@
     <string name="rec_format_summary_software">software</string>
     <string name="rec_format_summary_wav">WAV, uncompressed</string>
     <string name="rec_format_use">Use this</string>
-    <string name="rec_format_wav_short">Uncompressed: the largest, about 690 MB an hour, with nothing to encode.</string>
+    <string name="rec_format_wav_short">Uncompressed: the largest, about %1$d MB an hour, with nothing to encode.</string>
     <string name="rec_format_while_recording_short">while recording</string>
     <string name="lecture_record_only">Recording only. This moment is transcribed after you stop.</string>
     <string name="transcribing">Transcribing the moment…</string>
@@ -780,5 +780,6 @@
         <item quantity="one">1 moment waits to be compressed (when charging, or Upload now), then it is sent.</item>
         <item quantity="other">%d moments wait to be compressed (when charging, or Upload now), then they are sent.</item>
     </plurals>
-    <string name="rec_sound_note">For AAC and FLAC alike. WAV is always 48 kHz stereo.</string>
+    <string name="rec_sound_note">For AAC, FLAC and WAV alike.</string>
+    <string name="rec_format_depth_fixed">The most this microphone gives. A USB microphone that records 24 bit offers 24 here.</string>
 </resources>

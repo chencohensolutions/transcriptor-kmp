@@ -160,7 +160,7 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             FormatPageNote(stringResource(R.string.rec_format_format_note))
             // WAV: chosen here. AAC and FLAC: chosen and their page opened (the previous way they recorded is kept).
-            CodecRow(codec == AudioFormat.Wav, stringResource(R.string.rec_format_codec_wav), stringResource(R.string.rec_format_wav_short), page = false) {
+            CodecRow(codec == AudioFormat.Wav, stringResource(R.string.rec_format_codec_wav), stringResource(R.string.rec_format_wav_short, state.recordingChoice.copy(audioFormat = AudioFormat.Wav, flac = state.recordedFlac).megabytesPerHourWhileRecording), page = false) {
                 actions.setAudioFormat(AudioFormat.Wav)
             }
             CodecRow(codec == AudioFormat.AacLive, stringResource(R.string.rec_format_codec_aac),
@@ -503,6 +503,11 @@ private fun SoundPart(state: ModelsState, actions: ModelsActions) {
                 }
             }
             FormatNote(stringResource(R.string.rec_format_depth_note))
+        } else {
+            // Not a choice with this microphone, but said: it records 16 bit.
+            FormatLabel(stringResource(R.string.rec_format_depth))
+            Text(stringResource(R.string.rec_format_bits, 16), style = MaterialTheme.typography.bodyMedium)
+            FormatNote(stringResource(R.string.rec_format_depth_fixed))
         }
         FormatNote(stringResource(R.string.rec_sound_note))
         Spacer(Modifier.height(8.dp))

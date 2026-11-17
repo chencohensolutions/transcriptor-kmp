@@ -271,7 +271,7 @@ class LectureSession(
             settings.micInput,
             // The WAV kept before AAC is 16 bit: AAC keeps no more.
             if (music) com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC
-            else settings.flac.let { if (format == AudioFormat.WavThenAac) it.copy(bitDepth = 16) else it },
+            else settings.flac.let { if (format == AudioFormat.WavThenAac) it.copy(bitDepth = 16, sampleRate = settings.aac.sampleRate, channels = settings.aac.channels) else it },
             music,
         )
         wantedInput = settings.micInput

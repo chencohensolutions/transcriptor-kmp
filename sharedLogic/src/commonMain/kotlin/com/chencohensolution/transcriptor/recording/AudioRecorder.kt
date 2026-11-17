@@ -28,7 +28,7 @@ interface AudioRecorder {
     /**
      * Starts recording to [file]; a FLAC is encoded at [flacLevel] (0 the fastest, 8 the smallest), an AAC as [aac]
      * says. From [input] when it is connected, else from the phone's own microphones. [flac] is a FLAC's rate, channels
-     * and bit depth; its bit depth is also a WAV's (24: the microphone is read in floating point, when it gives more
+     * and bit depth, also a WAV's (the WAV kept before AAC is 16 bit). Its bit depth (24: the microphone is read in floating point, when it gives more
      * than 16 bits). [music] records the microphone without voice processing where the phone allows it.
      */
     fun start(

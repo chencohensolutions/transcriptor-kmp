@@ -21,11 +21,14 @@ class FlacEncoder(
     file: File,
     private val level: Int = FLAC_DEFAULT_LEVEL,
     format: FlacFormat = FlacFormat(),
+    /** The PCM's rate and channels as it comes in: the microphone's, or a WAV's already reduced. */
+    private val inRate: Int = WavWriter.SAMPLE_RATE,
+    private val inChannels: Int = WavWriter.CHANNELS,
 ) : PcmSink {
     private val sampleRate = format.valid().sampleRate
     private val channels = format.valid().channels
     private val bits = format.valid().bitDepth
-    private val reducer = PcmReducer(sampleRate, channels, bits)
+    private val reducer = PcmReducer(sampleRate, channels, bits, inRate, inChannels)
     private var floats = FloatArray(0)
     private var floatBytes = ByteArray(0)
     private val out = RandomAccessFile(file, "rw").apply { setLength(0) }
@@ -54,7 +57,7 @@ class FlacEncoder(
         private set
 
     override fun write(pcm: ByteArray, size: Int) {
-        framesIn += size / (2 * bits / 8)
+        framesIn += size / (inChannels * bits / 8)
         val reduced = reducer.process(pcm, size)
         if (bits == 24) {
             if (floats.size < reduced.size / 3) { floats = FloatArray(reduced.size / 3); floatBytes = ByteArray(floats.size * 4) }
@@ -176,9 +179,13 @@ class FlacEncoder(
 /** [FlacEncode] with [FlacEncoder]: the WAV's PCM (48 kHz stereo, 16 or 24 bit) in 64 KB pieces. */
 val androidFlacEncode = FlacEncode { wav, flac, level, format, progress ->
     val wavFile = wav.toFile()
-    val bits = WavWriter.read(okio.FileSystem.SYSTEM, wav).bitsPerSample
-    val encoder = FlacEncoder(flac.toFile(), level, format.copy(bitDepth = bits))
-    val frame = WavWriter.CHANNELS * bits / 8
+    val info = WavWriter.read(okio.FileSystem.SYSTEM, wav)
+    val bits = info.bitsPerSample
+    // The WAV's own rate and channels come in; FLAC can't be finer than the WAV (a 24 kHz WAV stays 24 kHz).
+    val out = format.copy(bitDepth = bits, sampleRate = minOf(format.sampleRate, info.sampleRate), channels = minOf(format.channels, info.channels))
+        .let { if (info.sampleRate % it.sampleRate == 0) it else it.copy(sampleRate = info.sampleRate) }
+    val encoder = FlacEncoder(flac.toFile(), level, out, info.sampleRate, info.channels)
+    val frame = info.blockAlign
     RandomAccessFile(wavFile, "r").use { input ->
         val total = input.length() - WavWriter.HEADER_SIZE
         input.seek(WavWriter.HEADER_SIZE)

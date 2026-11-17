@@ -61,7 +61,11 @@ class AndroidRecorder(
         val lossless = flac.valid().let { if (it.bitDepth == 24 && inputs?.deepCapture(input) != true) it.copy(bitDepth = 16) else it }
         bits = if (format == AudioFileFormat.Aac) 16 else lossless.bitDepth
         sink = when (format) {
-            AudioFileFormat.Wav -> WavWriter(fileSystem, file, bits = bits)
+            // A WAV at the shared sound: 48 kHz stereo, or brought down as FLAC and AAC are.
+            AudioFileFormat.Wav -> ReducingSink(
+                PcmReducer(lossless.sampleRate, lossless.channels, bits),
+                WavWriter(fileSystem, file, lossless.sampleRate, lossless.channels, bits),
+            )
             AudioFileFormat.Flac -> FlacEncoder(file.toFile(), flacLevel, lossless)
             AudioFileFormat.Aac -> AacEncoder(file.toFile(), aac)
         }
