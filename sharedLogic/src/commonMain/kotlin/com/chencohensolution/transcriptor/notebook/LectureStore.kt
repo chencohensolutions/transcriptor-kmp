@@ -268,6 +268,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     private val compact = Json { encodeDefaults = false; ignoreUnknownKeys = true }
 
+    /** One line, with its version: a path is thousands of numbers. */
+    private val pathJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+
     /** Keeps how much power recording [lecture] took (`power.json`, version 1), beside its audio. */
     fun savePower(lecture: Lecture, report: PowerReport) {
         val place = placeOf(lecture.id)
@@ -277,6 +280,24 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         val temp = folder / "$name.tmp"
         place.fileSystem.write(temp) { writeUtf8(json.encodeToString(report)) }
         place.fileSystem.atomicMove(temp, folder / name)
+    }
+
+    /** Keeps [lecture]'s path (`path.json`, version 1) beside its audio; a temp file, then renamed. */
+    fun savePath(lecture: Lecture, path: com.chencohensolution.transcriptor.location.MomentPath) {
+        val place = placeOf(lecture.id)
+        val folder = place.folder(lecture.id)
+        place.fileSystem.createDirectories(folder)
+        val temp = folder / "$PATH_FILE.tmp"
+        place.fileSystem.write(temp) { writeUtf8(pathJson.encodeToString(com.chencohensolution.transcriptor.location.PathFileV1.of(path))) }
+        place.fileSystem.atomicMove(temp, folder / PATH_FILE)
+    }
+
+    /** [savePath]'s path; null when the moment has none. */
+    fun loadPath(lecture: Lecture): com.chencohensolution.transcriptor.location.MomentPath? {
+        val place = placeOf(lecture.id)
+        val file = place.folder(lecture.id) / PATH_FILE
+        if (!place.exists(file)) return null
+        return runCatching { pathJson.decodeFromString<com.chencohensolution.transcriptor.location.PathFileV1>(place.fileSystem.read(file) { readUtf8() }).toPath() }.getOrNull()
     }
 
     /** [savePower]'s report; null for a lecture recorded before it existed. */
@@ -369,6 +390,12 @@ const val INDEX_FILE = "moments-index.json"
 /** The readable transcript beside the audio. */
 const val TRANSCRIPT = "transcript.md"
 
+/** A moment's path ([LectureStore.savePath]). */
+const val PATH_FILE = "path.json"
+
+@Serializable
+private data class PlaceStopV1(val reason: String, val atMs: Long, val place: String? = null)
+
 @Serializable
 private data class LectureFileV1(
     val v: Int = 1,
@@ -404,6 +431,10 @@ private data class LectureFileV1(
     val server: String? = null,
     /** Where the server says it came from (`call`, `recording`, …). */
     val source: String? = null,
+    /** [Lecture.placeStop]. */
+    val placeStop: PlaceStopV1? = null,
+    /** [Lecture.hasPath]. */
+    val path: Boolean = false,
 ) {
     @OptIn(ExperimentalTime::class)
     fun toLecture() = Lecture(
@@ -417,6 +448,7 @@ private data class LectureFileV1(
         pauses = pauses.map { Pause(it.atMs, it.pausedAt, it.resumedAt) },
         liveOff = liveOff.map { LiveOff(it.fromMs, it.toMs, it.offAt, it.onAt) },
         tucked = tucked, serverSha256 = server, source = source,
+        placeStop = placeStop?.let { PlaceStop(it.reason, it.atMs, it.place) }, hasPath = path,
     )
 
     companion object {
@@ -437,6 +469,7 @@ private data class LectureFileV1(
             pauses = lecture.pauses.map { PauseV1(it.atMillis, it.pausedAtMillis, it.resumedAtMillis) },
             liveOff = lecture.liveOff.map { LiveOffV1(it.fromMillis, it.toMillis, it.offAtMillis, it.onAtMillis) },
             tucked = lecture.tucked, server = lecture.serverSha256, source = lecture.source,
+            placeStop = lecture.placeStop?.let { PlaceStopV1(it.reason, it.atMillis, it.placeName) }, path = lecture.hasPath,
         )
     }
 }

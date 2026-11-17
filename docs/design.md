@@ -355,6 +355,28 @@ library the journal app will share:
   every phone; journal shows it where private files are allowed. Needs a paired server; nothing is deleted when a step
   fails. A note larger than the server's 256 KiB (a very long moment) is refused, and the moment stays.
 
+### Stop by place and the moment's path (owner's request, Nov 17, 2026)
+
+Optional, all of it under Settings › Advanced › Location; nothing shows elsewhere and no location permission is asked
+for while both switches are off. Plan: [Stop by place and path saving](https://claude.ai/artifact/DmzMfxNwjLyut2jp6pZS7i).
+Location comes from Android's own `LocationManager` (no Play services) and never leaves the phone except with its
+moment, under the backup's settings.
+
+- **Stop by place** (`location/PlaceWatch`): the recording stops after a one minute countdown that the user can cancel
+  ("Keep recording" disarms that trigger for the rest of the recording) when it moves away from where it started
+  (100, 250 or 500 m; two good fixes beyond it a minute apart), arrives at a saved place it was seen outside of (two
+  good fixes inside, a minute apart), or the chosen Bluetooth device connects. A fix is good when its accuracy is within
+  half the stop distance. Per recording profile (`ProfileSettings.stopByPlace`; Music starts off). The moment keeps why
+  and where in the recording it fired (`Lecture.placeStop`, `lecture.json` `placeStop`).
+- **Path** (`location/MomentPath`, `PathBuilder`): `path.json` (version 1, one line, the points as columns: time in the
+  recording, lat, lon, accuracy, speed, bearing, source), `Lecture.hasPath`. At most a point a second; a point that
+  didn't move less than a minute after the last is left out. Precision (`PathPrecision`): by default only the fixes
+  other apps already ask for (passive, no GPS of our own); economical adds one a minute; while driving adds GPS every
+  second above about 15 km/h (`DrivingSwitch`); precise, GPS every second. It may go on after the audio stops
+  (`KeepUntil`), the points then past `audioEndMs`.
+- **Server**: with Sync location on, the path goes up with its moment, never live. The note is limited to 256 KiB, so
+  a long path goes as its own file through shed.
+
 ## Screens
 
 See [screens/](screens/README.md). Designed in the UI lab first, one screen at a time.

@@ -104,6 +104,13 @@ data class ProfileSettings(
     val wavFirst: Boolean = false,
     /** The other codecs' bitrates (bits a second), by [Codec.key]; a codec without one: its default. */
     val bitrates: Map<String, Int> = emptyMap(),
+    /**
+     * Stop by place for moments of this profile, when it is on in Settings › Advanced › Location (owner's call, Nov 17,
+     * 2026: per profile, so a gathering stops when leaving and a concert doesn't); Music starts off.
+     */
+    val stopByPlace: Boolean = true,
+    /** Save the path for moments of this profile, when path saving is on in Settings › Advanced › Location. */
+    val savePath: Boolean = true,
 ) {
     fun valid() = copy(aac = aac.valid(), flac = flac.valid(), flacLevel = flacLevel.coerceIn(FLAC_LEVELS))
 
@@ -147,7 +154,8 @@ enum class QualityProfile(val key: String) {
     /** What this profile starts as, and goes back to on Reset. */
     val defaults: ProfileSettings
         get() = when (this) {
-            High, Music -> ProfileSettings(Codec.Flac, NORMAL_AAC, HIGH_FLAC)
+            High -> ProfileSettings(Codec.Flac, NORMAL_AAC, HIGH_FLAC)
+            Music -> ProfileSettings(Codec.Flac, NORMAL_AAC, HIGH_FLAC, stopByPlace = false)
             Normal -> ProfileSettings(Codec.Aac, NORMAL_AAC, FlacFormat(48_000, 2, 16))
             Low -> ProfileSettings(Codec.Aac, LOW_AAC, FlacFormat(24_000, 1, 16))
         }

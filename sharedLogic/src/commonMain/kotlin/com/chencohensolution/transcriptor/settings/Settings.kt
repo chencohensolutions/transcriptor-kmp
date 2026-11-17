@@ -212,6 +212,8 @@ private data class SettingsFileV1(
     val firstRunDone: Boolean = false,
     /** Advanced mode: the Record bar also shows the quality and battery presets (owner's request, Nov 17, 2026). */
     val advancedMode: Boolean = false,
+    /** Settings › Advanced › Location: stop by place and the moment's path (owner's request, Nov 17, 2026). */
+    val location: com.chencohensolution.transcriptor.location.LocationSettings = com.chencohensolution.transcriptor.location.LocationSettings(),
 )
 
 /** The app's settings, in `settings.json` under [root]. */
@@ -484,6 +486,15 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     var advancedMode: Boolean
         get() = read().advancedMode
         set(value) = write(read().copy(advancedMode = value))
+
+    /** Settings › Advanced › Location. */
+    var location: com.chencohensolution.transcriptor.location.LocationSettings
+        get() = read().location
+        set(value) = write(read().copy(location = value))
+
+    /** Changes the location settings in one read and write. */
+    fun updateLocation(change: (com.chencohensolution.transcriptor.location.LocationSettings) -> com.chencohensolution.transcriptor.location.LocationSettings) =
+        write(read().let { it.copy(location = change(it.location)) })
 
     /** First run's "Get your models" was answered: it isn't offered again ([DefaultModels.offerFirstRun]). */
     var firstRunDone: Boolean
