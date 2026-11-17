@@ -206,6 +206,16 @@ class StopByPlaceTest {
     }
 
     @Test
+    fun aCachedFixFromBeforeTheStartIsLeftOut() {
+        val m = MomentLocation(LocationSettings(stopByPlace = true, savePath = true), stopOn = true, pathOn = true, startedAtMillis = 1_000_000) { it }
+        m.fix(Fix(900_000, north(5000.0), 5f)) // an hour-old fix from elsewhere
+        assertEquals(PlaceWatch.State.NoFix, m.status.value.watch)
+        assertEquals(0, m.status.value.points)
+        m.fix(Fix(995_000, home, 5f)) // taken as Record was pressed
+        assertEquals(PlaceWatch.State.Watching(home), m.status.value.watch)
+    }
+
+    @Test
     fun passivePathAsksForNothingAndDrivingOnlyWhenFast() {
         val passive = MomentLocation(LocationSettings(savePath = true), stopOn = false, pathOn = true) { it }
         assertTrue(passive.active)

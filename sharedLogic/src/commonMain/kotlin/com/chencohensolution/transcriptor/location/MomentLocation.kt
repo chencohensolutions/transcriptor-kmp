@@ -19,9 +19,9 @@ class MomentLocation(
     stopOn: Boolean,
     /** The path is saved for this moment. */
     pathOn: Boolean,
-    private val toRecording: (Long) -> Long,
-    /** When the recording started (epoch ms): a fix from before it (a cached one) never anchors or triggers. */
+    /** When the recording started (epoch ms): a fix from before it (a cached one) is left out. */
     private val startedAtMillis: Long = 0,
+    private val toRecording: (Long) -> Long,
 ) {
     /** What the app asks the phone for, on top of the fixes other apps ask for (always listened to). */
     enum class Request {
