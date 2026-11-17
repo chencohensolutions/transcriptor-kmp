@@ -808,7 +808,7 @@
     <string name="rec_format_amr_sound">תמיד %1$d קילוהרץ מונו, מה שלא תהיה הגדרת הצליל.</string>
     <string name="rec_format_other_sound">בצליל של הפרופיל: %1$s, ‏%2$d קילוהרץ (הגדרות הקלטה).</string>
     <string name="notebooks_presets_quality">איכות</string>
-    <string name="notebooks_presets_battery">×¢××××</string>
+    <string name="notebooks_presets_battery">עיבוד</string>
     <string name="notebooks_power_low_note">דוחס את השמע ומתמלל כשהטלפון בטעינה: חוסך סוללה.</string>
     <string name="notebooks_power_normal_note">דוחס את השמע ומתמלל מיד אחרי הרגע.</string>
     <string name="notebooks_power_custom_note">תזמון משלך (הגדרות › הגדרות הקלטה).</string>
