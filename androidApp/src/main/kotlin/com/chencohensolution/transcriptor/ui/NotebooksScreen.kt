@@ -416,7 +416,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                         val prefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("record-panel", android.content.Context.MODE_PRIVATE)
                         var panelOpen by rememberSaveable { mutableStateOf(prefs.getBoolean("open", true)) }
                         fun openPanel(open: Boolean) { panelOpen = open; prefs.edit().putBoolean("open", open).apply() }
-                        Column(Modifier.animateContentSize()) {
+                        // Grows and shrinks from the bottom: Record stays where it is (hen, Nov 17, 2026).
+                        Column(Modifier.animateContentSize(alignment = Alignment.BottomCenter)) {
                             Box(
                                 Modifier.fillMaxWidth().height(20.dp)
                                     .clickable(onClickLabel = stringResource(if (panelOpen) R.string.notebooks_panel_fold else R.string.notebooks_panel_open)) { openPanel(!panelOpen) }
