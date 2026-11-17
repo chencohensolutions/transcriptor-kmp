@@ -39,6 +39,8 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         ServerSettings(onBack = { serverOpen = false })
         return
     }
+    // Settings › Advanced › Location's line, read again when its page closes.
+    var location by remember { mutableStateOf(Recording.settings.location) }
     val server by Recording.backup.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -127,7 +129,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
         npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, profile = shown, activeProfile = active, powerSaving = remember(format, shown) { store.savingFor(shown) }, transcribeSaving = transcribeWhen == com.chencohensolution.transcriptor.settings.EncodeAfter.Charging, profileSettings = profileSettings, codecs = remember { com.chencohensolution.transcriptor.recording.OtherEncoders.available }, encodeAfter = encodeAfter,
-        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, deepCapture = remember(micInput, micInputs) { Recording.audioInputs.deepCapture(micInput) }, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs, micDetails = remember { Recording.audioInputs.builtInDetails() }, micMeter = micMeter, micTestOff = micTestOff, freeBytes = remember { runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(0L) },
+        aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, location = location, deepCapture = remember(micInput, micInputs) { Recording.audioInputs.deepCapture(micInput) }, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs, micDetails = remember { Recording.audioInputs.builtInDetails() }, micMeter = micMeter, micTestOff = micTestOff, freeBytes = remember { runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(0L) },
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
         speakerTuning = remember(changed, speakerList) { speakerList.associate { it.id to Recording.settings.speakerTuning(it.id) } },
@@ -217,6 +219,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             stopMicTest = { probe.stop() },
             chooseFolder = chooseFolder,
             openServer = { serverOpen = true },
+            locationPage = { back -> LocationSettingsPage(onBack = { location = Recording.settings.location; back() }) },
             addLanguage = { l -> added = (added + l).distinct(); io { Recording.settings.modelLanguages = added } },
             search = { query, language, kind, npuOnly ->
                 hub = HubSearch(query, language, kind, npuOnly, searching = true, results = hub.results)
