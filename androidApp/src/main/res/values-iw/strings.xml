@@ -917,4 +917,5 @@
     <string name="path_keeping_stop">לעצור</string>
     <string name="info_path_map">להציג במפה</string>
     <string name="info_path_map_note">מפה מ־OpenFreeMap ‏(OpenStreetMap). רק אזור המפה נטען מהרשת; המסלול נשאר בטלפון. נגיעה במסלול מנגנת משם.</string>
+    <string name="info_path_map_tap">נגיעה במפה פותחת אותה במסך מלא. המפה מגיעה מ־OpenFreeMap; המסלול נשאר בטלפון.</string>
 </resources>
