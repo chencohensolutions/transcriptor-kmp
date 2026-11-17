@@ -173,6 +173,8 @@ data class ModelsState(
     val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
     /** The microphones connected now besides the phone's own. */
     val micInputs: List<com.chencohensolution.transcriptor.recording.MicInput> = emptyList(),
+    /** What the phone says about its own microphones (positions, directionality), for the picker's drawing. */
+    val micDetails: List<com.chencohensolution.transcriptor.recording.MicDetail> = emptyList(),
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
     val busy: Boolean = false,
 ) {
@@ -1340,7 +1342,6 @@ private fun SpeakerTuning(value: Float, onChange: (Float) -> Unit) {
  * The one picked stays picked while it is away ("not connected"): the phone's own records until it is back.
  */
 @Composable
-/** The microphone row and its picker; on Settings › Recording format, since the microphone decides what is supported there. */
 internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val picked = state.micInput
@@ -1363,7 +1364,12 @@ internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
         onDismissRequest = { open = false },
         title = { Text(stringResource(R.string.settings_mic)) },
         text = {
-            Column(Modifier.selectableGroup()) {
+            Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+                // Where the phone's own microphones are, the picked one highlighted.
+                if (state.micInputs.any { it.kind == MicInput.Kind.BuiltIn }) PhoneMicMap(
+                    state.micInputs.filter { it.kind == MicInput.Kind.BuiltIn }.map { it.name }, state.micDetails,
+                    picked?.takeIf { it.kind == MicInput.Kind.BuiltIn }?.name,
+                )
                 choices.forEach { input ->
                     val selected = input?.key == picked?.key
                     Row(
@@ -1377,6 +1383,7 @@ internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
                                 when {
                                     input == null -> stringResource(R.string.settings_mic_phone_note)
                                     state.micInputs.none { it.key == input.key } -> stringResource(R.string.settings_mic_not_connected)
+                                    input.kind == MicInput.Kind.BuiltIn -> micPlaceNote(input.name, state.micDetails.firstOrNull { it.address == input.name })
                                     else -> stringResource(micKind(input.kind))
                                 },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

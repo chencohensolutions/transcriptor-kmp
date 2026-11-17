@@ -500,7 +500,7 @@
     <string name="settings_level_meter_spectrogram">ספקטרוגרמה של 8 השניות האחרונות</string>
     <string name="settings_mic">מיקרופון</string>
     <string name="settings_mic_phone">המיקרופונים של הטלפון</string>
-    <string name="settings_mic_phone_note">סטריאו, 48 kHz</string>
+    <string name="settings_mic_phone_note">סטריאו, 48 kHz: שניים מהם יחד, לשמאל ולימין. הכי טוב לרוב הדברים.</string>
     <string name="settings_mic_away">%1$s (לא מחובר: מקליט מהטלפון)</string>
     <string name="settings_mic_not_connected">לא מחובר עכשיו. כשהוא לא מחובר, הטלפון מקליט.</string>
     <string name="settings_mic_bluetooth">Bluetooth: מונו, באיכות של שיחת טלפון</string>
@@ -769,4 +769,15 @@
     <string name="settings_mic_back">המיקרופון האחורי (ליד המצלמה)</string>
     <string name="settings_mic_top">המיקרופון העליון</string>
     <string name="settings_mic_builtin_named">מיקרופון הטלפון: %1$s</string>
+    <string name="settings_mic_map_legend">● בקצה או בחזית   ○ בגב</string>
+    <string name="settings_mic_short_bottom">תחתון</string>
+    <string name="settings_mic_short_back">אחורי</string>
+    <string name="settings_mic_short_top">עליון</string>
+    <string name="settings_mic_note_bottom">בקצה התחתון, ליד שקע הטעינה: זה ששיחות משתמשות בו, הכי קרוב לפה. שומע את מי שהטלפון מכוון אליו.</string>
+    <string name="settings_mic_note_back">בגב, ליד המצלמות: פונה הרחק ממך, לכיוון מה שהמצלמה רואה. טוב לבמה שמולך.</string>
+    <string name="settings_mic_note_top">בקצה העליון: שומע את החדר מעל הטלפון; עם התחתון הוא זוג הסטריאו.</string>
+    <string name="settings_mic_omni">שומע לכל הכיוונים</string>
+    <string name="settings_mic_cardioid">שומע בעיקר מלפניו</string>
+    <string name="settings_mic_bidirectional">שומע מלפנים ומאחור</string>
+    <string name="settings_mic_max_spl">נחתך מעל %1$d dB</string>
 </resources>

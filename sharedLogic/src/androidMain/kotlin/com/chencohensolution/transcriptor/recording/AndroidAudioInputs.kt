@@ -51,6 +51,27 @@ class AndroidAudioInputs(context: Context) {
         return device?.encodings?.any { it in DEEP } == true
     }
 
+    /** What the phone says about its own microphones: where each is, how it hears ([MicDetail]); empty when it says nothing. */
+    fun builtInDetails(): List<MicDetail> = runCatching {
+        audio.microphones.filter { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }.map { m ->
+            val p = m.position.takeIf { it != android.media.MicrophoneInfo.POSITION_UNKNOWN }
+            MicDetail(
+                address = m.address.orEmpty(),
+                x = p?.x, y = p?.y, z = p?.z,
+                directionality = when (m.directionality) {
+                    android.media.MicrophoneInfo.DIRECTIONALITY_OMNI -> "omni"
+                    android.media.MicrophoneInfo.DIRECTIONALITY_BI_DIRECTIONAL -> "bidirectional"
+                    android.media.MicrophoneInfo.DIRECTIONALITY_CARDIOID -> "cardioid"
+                    android.media.MicrophoneInfo.DIRECTIONALITY_HYPER_CARDIOID -> "hypercardioid"
+                    android.media.MicrophoneInfo.DIRECTIONALITY_SUPER_CARDIOID -> "supercardioid"
+                    else -> null
+                },
+                sensitivityDb = m.sensitivity.takeIf { it != android.media.MicrophoneInfo.SENSITIVITY_UNKNOWN },
+                maxSplDb = m.maxSpl.takeIf { it != android.media.MicrophoneInfo.SPL_UNKNOWN },
+            )
+        }
+    }.getOrDefault(emptyList())
+
     /** The phone records [android.media.MediaRecorder.AudioSource.UNPROCESSED]: the microphone without voice processing. */
     val unprocessed: Boolean get() = audio.getProperty(AudioManager.PROPERTY_SUPPORT_AUDIO_SOURCE_UNPROCESSED) == "true"
 

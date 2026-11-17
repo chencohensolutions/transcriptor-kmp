@@ -494,7 +494,7 @@
     <string name="settings_level_meter_spectrogram">Spectrogram of the last 8 seconds</string>
     <string name="settings_mic">Microphone</string>
     <string name="settings_mic_phone">The phone\'s microphones</string>
-    <string name="settings_mic_phone_note">Stereo, 48 kHz</string>
+    <string name="settings_mic_phone_note">Stereo, 48 kHz: two of them together, for left and right. Best for most things.</string>
     <string name="settings_mic_away">%1$s (not connected: records from the phone)</string>
     <string name="settings_mic_not_connected">Not connected now. While it\'s away, the phone records.</string>
     <string name="settings_mic_bluetooth">Bluetooth: mono, phone-call quality</string>
@@ -758,4 +758,15 @@
     <string name="settings_mic_back">Back microphone (by the camera)</string>
     <string name="settings_mic_top">Top microphone</string>
     <string name="settings_mic_builtin_named">Phone microphone: %1$s</string>
+    <string name="settings_mic_map_legend">● on the edge or front   ○ on the back</string>
+    <string name="settings_mic_short_bottom">Bottom</string>
+    <string name="settings_mic_short_back">Back</string>
+    <string name="settings_mic_short_top">Top</string>
+    <string name="settings_mic_note_bottom">At the bottom edge, by the charging port: the one calls use, nearest your mouth. Hears the speaker you hold the phone toward.</string>
+    <string name="settings_mic_note_back">On the back, by the cameras: faces away from you, toward what the camera sees. Good for a stage in front of you.</string>
+    <string name="settings_mic_note_top">At the top edge: hears the room above the phone; with the bottom one it makes the stereo pair.</string>
+    <string name="settings_mic_omni">hears all around</string>
+    <string name="settings_mic_cardioid">hears mostly in front of it</string>
+    <string name="settings_mic_bidirectional">hears front and back</string>
+    <string name="settings_mic_max_spl">clips above %1$d dB</string>
 </resources>
