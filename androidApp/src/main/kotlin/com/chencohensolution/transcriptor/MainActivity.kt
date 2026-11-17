@@ -82,7 +82,9 @@ class MainActivity : ComponentActivity() {
     /** Lectures wait to be improved on their own until the phone charges with the app open (a foreground start). */
     private fun improvePendingIfCharging() {
         lifecycleScope.launch {
-            val waiting = withContext(Dispatchers.IO) { Recording.settings.improvePending.isNotEmpty() }
+            val waiting = withContext(Dispatchers.IO) {
+                Recording.settings.improvePending.isNotEmpty() || (Recording.backup.callMoments && Recording.backup.callsWaitingForText().isNotEmpty())
+            }
             val charging = getSystemService(android.os.BatteryManager::class.java).isCharging
             if (waiting && charging && !Recording.session.isRecording && Recording.refining.value == null) RecordingService.improvePending(this@MainActivity)
         }

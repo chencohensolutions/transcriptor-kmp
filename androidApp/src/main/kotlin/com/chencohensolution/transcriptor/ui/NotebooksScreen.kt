@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
@@ -681,14 +683,27 @@ private fun MomentRow(
         LabelPills(labels)
         // Marks: tucked away, its audio on the server only (opening brings it), and a call or voice message.
         val source = when (m.source?.lowercase()) {
-            "call" -> stringResource(R.string.notebooks_source_call)
+            "call" -> when (m.callDirection) {
+                com.chencohensolution.transcriptor.notebook.CALL_IN -> stringResource(R.string.notebooks_call_in)
+                com.chencohensolution.transcriptor.notebook.CALL_OUT -> stringResource(R.string.notebooks_call_out)
+                else -> stringResource(R.string.notebooks_source_call)
+            }
             "folder:whatsapp", "whatsapp" -> stringResource(R.string.notebooks_source_voice_message)
             else -> null
         }
         if (m.tucked || m.locked || m.notOnServer || source != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (m.tucked) MomentMark(Icons.Filled.VisibilityOff, stringResource(R.string.notebooks_tucked))
             if (m.locked) MomentMark(Icons.Filled.Lock, stringResource(R.string.notebooks_locked))
-            if (source != null) MomentMark(if (m.source.equals("call", true)) Icons.Filled.Call else Icons.Filled.Mic, source)
+            // A call: which way it went, when the call log told (an arrow in, or out).
+            if (source != null) MomentMark(
+                when {
+                    !m.source.equals("call", true) -> Icons.Filled.Mic
+                    m.callDirection == com.chencohensolution.transcriptor.notebook.CALL_IN -> Icons.AutoMirrored.Filled.CallReceived
+                    m.callDirection == com.chencohensolution.transcriptor.notebook.CALL_OUT -> Icons.AutoMirrored.Filled.CallMade
+                    else -> Icons.Filled.Call
+                },
+                source,
+            )
             // Only on the phone while a server is paired (not backed up yet); nothing for what the server holds.
             if (m.notOnServer) MomentMark(Icons.Filled.CloudOff, stringResource(R.string.notebooks_not_on_server))
         }

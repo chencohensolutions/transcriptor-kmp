@@ -558,6 +558,8 @@ object Recording {
 
     /** A recording's file, in the app's storage or in the lectures folder, opened for reading (with seeks). */
     fun openAudio(path: Path): ParcelFileDescriptor {
+        // A call of the phone's: read from the calls folder, as it is there.
+        if (PhoneCalls.isCall(path)) return (callsFolderFs ?: throw java.io.FileNotFoundException("$path: the calls folder can't be read")).openFd(PhoneCalls.toFolder(path))
         val library = store.library?.fileSystem as? SafFileSystem
         return if (library != null && path.toString().startsWith("$LIBRARY_ROOT/")) library.openFd(path)
         else ParcelFileDescriptor.open(path.toFile(), ParcelFileDescriptor.MODE_READ_ONLY)
@@ -722,6 +724,17 @@ object Recording {
                 }
                 runCatching { backup.backUpFinished(busy()) }.onFailure { android.util.Log.e("Recording", "backing up failed", it) }
                 if (backup.callsFolder != null) backUpCalls(context)
+                // The calls waiting for their transcript are transcribed now, then sent one by one (hen, Nov 17, 2026).
+                val toTranscribe = if (backup.callMoments && backup.state.value.transcribeCallsFirst) backup.callsWaitingForText().size else 0
+                if (toTranscribe > 0 && !session.isRecording) {
+                    callsNow = true
+                    backup.markTranscribingCalls(toTranscribe)
+                    runCatching { RecordingService.improvePending(context) }.onFailure {
+                        android.util.Log.e("Recording", "transcribing calls now failed", it)
+                        callsNow = false
+                        backup.markTranscribingCalls(0)
+                    }
+                }
                 if (backup.waiting() > 0) runCatching { backup.runUploads() }.onSuccess { android.util.Log.i("Recording", "upload now, new: $it") }
                     .onFailure { android.util.Log.e("Recording", "uploading failed", it) }
             } finally {
@@ -745,14 +758,80 @@ object Recording {
      * Hands shed the new calls in the calls folder and schedules their sending (files: not on the main thread). A pass
      * already running makes it return at once.
      */
-    suspend fun backUpCalls(context: android.content.Context) {
+    suspend fun backUpCalls(context: android.content.Context, force: Boolean = false) {
         if (!callsRunning.tryLock()) return
         try {
             if (backup.callsFolder != null) openCallsFolder()
-            runCatching { backup.backUpCalls(System.currentTimeMillis()) }.onFailure { android.util.Log.e("Recording", "backing up calls failed", it) }
+            // New calls become moments first, so one waiting for its transcript isn't sent before it has one.
+            runCatching { if (backup.importCalls(System.currentTimeMillis(), library.library.value.lastLanguage) > 0) library.reload() }
+                .onFailure { android.util.Log.e("Recording", "making calls moments failed", it) }
+            if (backup.callMoments && backup.callsWaitingForText().isNotEmpty()) CallsTranscribeJob.schedule(context)
+            runCatching { backup.backUpCalls(System.currentTimeMillis(), force) }.onFailure { android.util.Log.e("Recording", "backing up calls failed", it) }
             if (backup.waiting() > 0) scheduleUploads(context)
         } finally {
             callsRunning.unlock()
+        }
+    }
+
+    /**
+     * Upload now is transcribing the phone's calls before it sends them (Transcribe on the phone before uploading): the
+     * transcribe pass takes them whatever the charger says, and sends each once it is done.
+     */
+    @Volatile var callsNow = false
+        private set
+
+    /** Shows the phone's calls as moments, transcribed on the phone; off stops making new ones and hides them. */
+    fun setCallMoments(context: android.content.Context, on: Boolean) {
+        backup.setCallMoments(on)
+        library.reload()
+        if (on) syncScope.launch { backUpCalls(context) }
+    }
+
+    /** A call goes up only once transcribed, or as soon as it is found. */
+    fun setTranscribeCallsFirst(context: android.content.Context, on: Boolean) {
+        backup.setTranscribeCallsFirst(on)
+        if (!on) syncScope.launch { backUpCalls(context) }
+    }
+
+    /** A call was transcribed: handed over now, and with Upload now, sent here and now. */
+    fun callTranscribed(context: android.content.Context) {
+        syncScope.launch {
+            backUpCalls(context)
+            if (callsNow) {
+                backup.markTranscribingCalls(backup.callsWaitingForText().size.coerceAtLeast(1))
+                runCatching { backup.runUploads() }.onFailure { android.util.Log.e("Recording", "uploading a call failed", it) }
+            }
+        }
+    }
+
+    /** Upload now's calls are all transcribed (or none can be now): what is left is sent, and it ends. */
+    fun callsNowDone(context: android.content.Context) {
+        if (!callsNow) return
+        callsNow = false
+        syncScope.launch {
+            backUpCalls(context)
+            runCatching { backup.runUploads() }.onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+            backup.markTranscribingCalls(0)
+            if (backup.waiting() > 0) scheduleUploads(context)
+        }
+    }
+
+    /**
+     * Upload without transcription: every call waiting for its transcript goes up now as it is (its words follow in
+     * its note once it is transcribed), with the rest of what waits.
+     */
+    fun uploadWithoutTranscription(context: android.content.Context) {
+        if (backup.state.value.uploading) return
+        backup.markUploading(true)
+        syncScope.launch {
+            try {
+                backUpCalls(context, force = true)
+                runCatching { backup.backUpFinished(busy()) }
+                runCatching { backup.runUploads() }.onFailure { android.util.Log.e("Recording", "uploading failed", it) }
+            } finally {
+                backup.markUploading(false)
+            }
+            if (backup.waiting() > 0) scheduleUploads(context)
         }
     }
 
@@ -760,8 +839,15 @@ object Recording {
     private fun openCallsFolder() {
         val folder = backup.callsFolder?.let(Uri::parse)
         val allowed = folder != null && resolver.persistedUriPermissions.any { it.uri == folder && it.isReadPermission }
-        backup.useCallsFolder(if (allowed) SafFileSystem(resolver, folder!!) else null, LIBRARY_ROOT)
+        val fs = if (allowed) SafFileSystem(resolver, folder!!) else null
+        callsFolderFs = fs
+        // The calls' moments read their audio there (under PhoneCalls.CALLS_ROOT, apart from the lectures folder).
+        store.calls = fs?.let { Place(PhoneCalls.asCallsRoot(it), PhoneCalls.CALLS_ROOT) }
+        backup.useCallsFolder(fs, LIBRARY_ROOT)
     }
+
+    /** The calls folder as the app reads it now; null when it can't. */
+    @Volatile private var callsFolderFs: SafFileSystem? = null
 
     /** Backs up the calls in the folder the user picked ([tree], from the system's folder picker), reading it only. */
     fun chooseCallsFolder(context: android.content.Context, tree: Uri) {
@@ -907,6 +993,8 @@ object Recording {
         // The resolver first: the calls folder is read through it.
         resolver = app.contentResolver
         openCallsFolder()
+        backup.callDuration = { fs, path -> PhoneCalls.duration(fs, path) }
+        backup.callLog = { started, length -> PhoneCalls.logEntry(app, started, length) }
         CallsWorker.schedule(app)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
@@ -931,7 +1019,7 @@ object Recording {
             shown = {
                 val state = backup.state.value
                 val kinds = state.shown
-                com.chencohensolution.transcriptor.notebook.Shown(kinds?.calls ?: true, kinds?.voiceMessages ?: true, server = state.paired == null || state.showServer)
+                com.chencohensolution.transcriptor.notebook.Shown(kinds?.calls ?: true, kinds?.voiceMessages ?: true, server = state.paired == null || state.showServer, callsHere = state.callMoments)
             })
         // A backup done, or the pairing changed: the marks again.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { backup.state.collect { runCatching { library.locksChanged() } } }

@@ -19,6 +19,7 @@ import com.chencohensolution.transcriptor.notebook.Label
 import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.Place
+import com.chencohensolution.transcriptor.notebook.CALL_IN
 import kotlinx.coroutines.test.runTest
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
@@ -149,6 +150,62 @@ class ServerBackupTest {
         backup.chooseCallsFolder(null, null)
         assertEquals(0, backup.backUpCalls(later + 60 * 60_000))
         assertEquals(null, backup.state.value.callsFolder)
+    }
+
+    @Test
+    fun callsBecomeMomentsAndGoUpOnlyOnceTranscribed() = runTest {
+        val calls = "/sdcard/Recordings/Call".toPath()
+        fs.createDirectories(calls)
+        val dana = "שיחה ‏‪דנה‬‏_261117_172259.m4a"
+        fs.write(calls / dana) { writeUtf8("call one") }
+        fs.write(calls / "שיחה אבא_261116_090000.m4a") { writeUtf8("call two") }
+        val backup = backup(paired = true)
+        backup.useCallsFolder(fs, calls)
+        store.calls = Place(fs, calls)
+        backup.callDuration = { _, _ -> 90_000L }
+        backup.callLog = { started, _ -> if (started == startOfCall(dana)!! - 2 * 3_600_000L) CallLogEntry(CALL_IN, "0501234567") else null }
+        backup.chooseCallsFolder("content://tree/Call", "Call")
+        val later = fs.metadata(calls / dana).lastModifiedAtMillis!! + 10 * 60_000
+        assertEquals(0, backup.importCalls(later, "he"), "off until Show calls in the log")
+        backup.setCallMoments(true)
+        assertEquals(2, backup.importCalls(later, "he"))
+        assertEquals(0, backup.importCalls(later, "he"), "made once")
+
+        val id = callMomentId(dana)
+        val moment = store.load(id)!!
+        assertEquals("דנה", moment.title)
+        assertEquals("call", moment.source)
+        assertTrue(moment.pendingTranscript)
+        assertEquals(90_000L, moment.durationMillis)
+        assertEquals(CALL_IN, moment.callDirection)
+        assertEquals("0501234567", moment.callNumber)
+        // 2026-11-17 17:22:59 on a phone two hours ahead of UTC.
+        assertEquals(1_794_928_979_000L, moment.startedAtMillis)
+        assertTrue(store.hasAudio(moment), "its audio is the phone's file")
+        assertEquals("call one", fs.read(store.audioPath(moment)) { readUtf8() })
+        assertEquals(listOf(id, callMomentId("שיחה אבא_261116_090000.m4a")), backup.callsWaitingForText(), "newest first")
+        assertEquals(2, backup.state.value.callsToTranscribe)
+
+        // Waiting for their words: nothing goes up, not even as a recording.
+        assertEquals(0, backup.backUpCalls(later))
+        assertEquals(0, backup.backUpFinished(emptySet()))
+        // Transcribed: it goes up as the call it is, and its moment is backed up with it.
+        store.save(moment.copy(pendingTranscript = false, segments = listOf(Segment("s1", 0, 1_000, "שלום", "m"))))
+        assertEquals(1, backup.backUpCalls(later))
+        assertEquals(RunResult.Done(sent = 1, refused = 0), backup.runUploads())
+        assertEquals(MomentBackup.BackedUp, backup.stateOf(id))
+        assertEquals(listOf("call"), server.abouts.values.map { it.source })
+        // The other call goes up as it is when asked (Upload without transcription).
+        assertEquals(1, backup.backUpCalls(later, force = true))
+
+        // Free up space never takes the phone's own call recordings.
+        assertEquals(emptyList(), backup.freeUpPlan(FreeUpRule.Everything, later).ids)
+        store.deleteAudio(store.load(id)!!)
+        assertTrue(fs.exists(calls / dana), "the phone keeps its calls")
+        // A call deleted from the list isn't made again.
+        store.delete(id)
+        assertEquals(0, backup.importCalls(later, "he"))
+        assertTrue(fs.exists(calls / dana))
     }
 
     @Test
