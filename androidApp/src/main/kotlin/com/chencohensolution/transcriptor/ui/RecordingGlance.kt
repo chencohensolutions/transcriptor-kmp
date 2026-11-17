@@ -192,7 +192,7 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                 Text(stringResource(R.string.glance_mark), Modifier.padding(start = 10.dp), style = MaterialTheme.typography.titleLarge)
             }
             FilledIconButton(
-                onClick = stop.tap, enabled = !state.finishing, modifier = Modifier.size(64.dp),
+                onClick = stop.tap, enabled = !state.finishing, modifier = Modifier.sharedRecordButton().size(64.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = colors.recording, contentColor = Color.White),
             ) { Icon(if (stop.armed) Icons.Filled.Check else Icons.Filled.Stop, stringResource(if (stop.armed) R.string.lecture_stop_again else R.string.lecture_stop), Modifier.size(30.dp)) }
         }
