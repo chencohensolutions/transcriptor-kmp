@@ -904,4 +904,6 @@
     <string name="path_keeping">Saving the path</string>
     <string name="path_keeping_note">The recording stopped; its path goes on</string>
     <string name="path_keeping_stop">Stop</string>
+    <string name="info_path_map">Show on map</string>
+    <string name="info_path_map_note">Map from OpenFreeMap (OpenStreetMap). Only the map\'s area is fetched; the path stays on the phone. Tap the path to play from there.</string>
 </resources>
