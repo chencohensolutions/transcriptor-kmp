@@ -17,6 +17,12 @@ data class MicInput(val key: String, val name: String, val kind: Kind) {
         BluetoothLe,
         Wired,
         Usb,
+
+        /**
+         * One of the phone's own microphones on its own ([MicInput.key] "builtin:<where>": bottom, back…), as the phone
+         * lists them (owner's request, Nov 17, 2026); no [MicInput] is all of them, in stereo.
+         */
+        BuiltIn,
     }
 }
 

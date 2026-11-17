@@ -1349,8 +1349,8 @@ internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
         stringResource(R.string.settings_mic),
         when {
             picked == null -> stringResource(R.string.settings_mic_phone)
-            connected -> isolated(picked.name)
-            else -> stringResource(R.string.settings_mic_away, isolated(picked.name))
+            connected -> micName(picked.name, picked.kind)
+            else -> stringResource(R.string.settings_mic_away, micName(picked.name, picked.kind))
         },
     ) { open = true }
     if (!open) return
@@ -1372,7 +1372,7 @@ internal fun MicrophoneRow(state: ModelsState, set: (MicInput?) -> Unit) {
                     ) {
                         RadioButton(selected = selected, onClick = null)
                         Column(Modifier.padding(start = 16.dp)) {
-                            Text(if (input == null) stringResource(R.string.settings_mic_phone) else isolated(input.name), style = MaterialTheme.typography.bodyLarge)
+                            Text(if (input == null) stringResource(R.string.settings_mic_phone) else micName(input.name, input.kind), style = MaterialTheme.typography.bodyLarge)
                             Text(
                                 when {
                                     input == null -> stringResource(R.string.settings_mic_phone_note)
@@ -1400,4 +1400,20 @@ private fun micKind(kind: MicInput.Kind) = when (kind) {
     MicInput.Kind.BluetoothLe -> R.string.settings_mic_bluetooth_le
     MicInput.Kind.Wired -> R.string.settings_mic_wired
     MicInput.Kind.Usb -> R.string.settings_mic_usb
+    MicInput.Kind.BuiltIn -> R.string.settings_mic_builtin
+}
+
+/**
+ * A microphone's name as the screens show it: the phone's own by where they are ("bottom" is the bottom microphone),
+ * others as the phone names them. [kind] null: a name alone (a built-in one is known by its place).
+ */
+@Composable
+internal fun micName(name: String, kind: MicInput.Kind?): String {
+    if (kind != null && kind != MicInput.Kind.BuiltIn) return isolated(name)
+    return when (name) {
+        "bottom" -> stringResource(R.string.settings_mic_bottom)
+        "back" -> stringResource(R.string.settings_mic_back)
+        "top", "front" -> stringResource(R.string.settings_mic_top)
+        else -> if (kind == MicInput.Kind.BuiltIn) stringResource(R.string.settings_mic_builtin_named, isolated(name)) else isolated(name)
+    }
 }

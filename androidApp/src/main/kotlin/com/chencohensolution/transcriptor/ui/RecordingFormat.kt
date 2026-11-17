@@ -127,7 +127,7 @@ fun recordingFormatSummary(state: ModelsState): String {
     val choice = state.recordingChoice
     val presets = stringResource(R.string.rec_preset_summary, qualityName(choice.quality), powerName(choice.power))
         // The microphone moved here (it decides what is supported): its name when it isn't the phone's own.
-        .let { line -> state.micInput?.let { line + " · " + isolated(it.name) } ?: line }
+        .let { line -> state.micInput?.let { line + " · " + micName(it.name, it.kind) } ?: line }
     return presets + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
         AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)

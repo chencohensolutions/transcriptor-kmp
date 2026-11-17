@@ -753,4 +753,9 @@
     <string name="notebooks_power_normal">Now</string>
     <string name="notebooks_record_music">Music</string>
     <string name="notebooks_record_music_note">A concert: lossless FLAC, the mic without voice processing, no transcript.</string>
+    <string name="settings_mic_builtin">One of the phone\'s microphones on its own</string>
+    <string name="settings_mic_bottom">Bottom microphone</string>
+    <string name="settings_mic_back">Back microphone (by the camera)</string>
+    <string name="settings_mic_top">Top microphone</string>
+    <string name="settings_mic_builtin_named">Phone microphone: %1$s</string>
 </resources>

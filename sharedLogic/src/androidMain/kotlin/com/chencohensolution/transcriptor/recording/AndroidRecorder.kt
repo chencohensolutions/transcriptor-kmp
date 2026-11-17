@@ -24,6 +24,8 @@ class AndroidRecorder(
     private val routed = MutableStateFlow<InputInUse?>(null)
     override val inputInUse: StateFlow<InputInUse?> = routed
     private var communication = false
+    /** The input picked for this recording: a built-in microphone is named in [inputInUse] only when it was picked. */
+    private var picked: MicInput? = null
     private val routing = AudioRecord.OnRoutingChangedListener { r -> routed.value = r.routedDevice?.let(::inputOf) }
     private val position = MutableStateFlow(0L)
     private val analyzer = MeterAnalyzer(RATE)
@@ -74,6 +76,7 @@ class AndroidRecorder(
         // A picked input that is connected: a Bluetooth headset's microphone opens only as the communication device,
         // recorded as a call's voice (mono, the headset's own noise reduction); a wired or USB one is just preferred.
         // Asked for in 48 kHz stereo like the phone's own, the phone converts it, so the file is the same either way.
+        picked = input
         val device = input?.let { inputs?.find(it) }
         val bluetooth = device != null && AndroidAudioInputs.kindOf(device.type).let { it == MicInput.Kind.Bluetooth || it == MicInput.Kind.BluetoothLe }
         communication = bluetooth && inputs?.useForCommunication(device!!) == true
@@ -169,7 +172,8 @@ class AndroidRecorder(
 
     /** The routed device as the screen names it; null for the phone's own microphones. */
     private fun inputOf(device: android.media.AudioDeviceInfo): InputInUse? =
-        with(AndroidAudioInputs) { device.toInput() }?.let { InputInUse(it.name, it.kind) }
+        with(AndroidAudioInputs) { device.toInput() }?.takeIf { it.kind != MicInput.Kind.BuiltIn || picked?.kind == MicInput.Kind.BuiltIn }
+            ?.let { InputInUse(it.name, it.kind) }
 
     private companion object {
         const val RATE = WavWriter.SAMPLE_RATE

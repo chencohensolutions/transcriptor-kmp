@@ -118,8 +118,8 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
             // Which microphone, when it isn't the phone's own; the one picked in Settings when it isn't recording.
             val input = state.input
             val mic = when {
-                state.inputMissing != null -> stringResource(R.string.glance_mic_missing, isolated(state.inputMissing.orEmpty()))
-                input != null -> stringResource(R.string.glance_mic, isolated(input.name))
+                state.inputMissing != null -> stringResource(R.string.glance_mic_missing, micName(state.inputMissing.orEmpty(), null))
+                input != null -> stringResource(R.string.glance_mic, micName(input.name, input.kind))
                 else -> null
             }
             if (mic != null) Text(

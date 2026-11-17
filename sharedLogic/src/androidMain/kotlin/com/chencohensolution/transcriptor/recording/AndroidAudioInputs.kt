@@ -15,9 +15,10 @@ import android.os.Looper
 class AndroidAudioInputs(context: Context) {
     private val audio = context.getSystemService(AudioManager::class.java)
 
-    /** The inputs connected now, Bluetooth first. */
+    /** The inputs connected now: the phone's own microphones one by one first, then Bluetooth, wired, USB. */
     fun connected(): List<MicInput> =
-        audio.getDevices(AudioManager.GET_DEVICES_INPUTS).mapNotNull { it.toInput() }.distinctBy { it.key }.sortedBy { it.kind.ordinal }
+        audio.getDevices(AudioManager.GET_DEVICES_INPUTS).mapNotNull { it.toInput() }.distinctBy { it.key }
+            .sortedBy { if (it.kind == MicInput.Kind.BuiltIn) -1 else it.kind.ordinal }
 
     /** [input]'s device when it is connected now. */
     fun find(input: MicInput): AudioDeviceInfo? =
@@ -61,6 +62,11 @@ class AndroidAudioInputs(context: Context) {
         /** [AudioDeviceInfo] as an input the user may pick; null for the phone's own and for what isn't a microphone. */
         fun AudioDeviceInfo.toInput(): MicInput? {
             if (!isSource) return null
+            // The phone's own microphones by where they are ("bottom", "back"): the address the phone gives them.
+            if (type == AudioDeviceInfo.TYPE_BUILTIN_MIC) {
+                val where = address?.takeIf { it.isNotBlank() } ?: return null
+                return MicInput("builtin:$where", where, MicInput.Kind.BuiltIn)
+            }
             val kind = kindOf(type) ?: return null
             val name = productName?.toString()?.takeIf { it.isNotBlank() } ?: return null
             return MicInput("${kind.name.lowercase()}:$address:$name", name, kind)
