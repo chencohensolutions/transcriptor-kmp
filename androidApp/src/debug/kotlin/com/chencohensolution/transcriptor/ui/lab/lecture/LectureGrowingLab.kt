@@ -55,7 +55,9 @@ internal fun rememberGrowingLectureLab(): Pair<LiveLectureState, LiveLectureActi
             } else {
                 val from = (lecture.segments.lastOrNull()?.endMillis ?: 0) + 600
                 val id = if (round == 0) line.id else "${line.id}r$round"
-                lecture = lecture.copy(segments = lecture.segments + line.copy(id = id, startMillis = from, endMillis = elapsed))
+                // As the speaker labels do: a line comes without its speaker, which is found a line later.
+                val labelled = lecture.segments.map { seg -> seg.takeIf { it.speakerId != null } ?: seg.copy(speakerId = toSay.firstOrNull { t -> seg.id.startsWith(t.id) }?.speakerId) }
+                lecture = lecture.copy(segments = labelled + line.copy(id = id, startMillis = from, endMillis = elapsed, speakerId = null))
                 words = 0
                 saying = (saying + 1) % toSay.size
                 if (saying == 0) round++

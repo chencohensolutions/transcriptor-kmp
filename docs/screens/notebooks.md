@@ -116,3 +116,5 @@ permission the tap opens the app, whose Record asks for it. A long press opens t
   later (picked); a — notebooks with their moments, b — shelf, then the notebook, c — moments first.
 - [Round 2 (Nov 6, 2026)](../ux-history/notebooks/2026-11-06-delete.md): deleting a moment: b — hold to select, Undo (picked); a — a menu on each moment, c — swipe to delete.
 - [Round 3 (Nov 7, 2026)](../ux-history/notebooks/2026-11-07-labels.md): labels instead of notebooks: a — chips on top, labels on the Record bar (picked); b — labels after, one list; c — a side drawer.
+
+Record is red (Nov 17, 2026, hen's ask) and morphs into the recording screen's red Stop (`sharedRecordButton`, a shared element in MainActivity's `SharedTransitionLayout`/`AnimatedContent` screen switch, which also cross-fades the screens); going back, Stop morphs into the banner's red Back to the moment. While going to the recording screen the Record bar stays (no banner) so the button can morph.
