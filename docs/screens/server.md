@@ -36,7 +36,12 @@ without a server.
   it asks first, with how much would go;
   **Wi‑Fi only** (on by default); **Only while charging** (off by default; hen, Nov 17, 2026): the background
   sending waits for the charger and starts only once the battery is at 30% or more (`ENCODE_MIN_BATTERY`, the same rule
-  as compressing and transcribing on the charger); Upload now sends anyway; **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
+  as compressing and transcribing on the charger); Upload now sends anyway; **Wi‑Fi networks** (hen, Nov 17, 2026):
+  none means any network; **Add this network: <name>** adds the one the phone is on (asking for location first, since
+  Android hides the name without it), a chip per network removes it; with networks chosen the background work sends
+  only on them (`ShedUploads.schedule(wifiNetworks)`, checked when it starts, again every 15 minutes), and while
+  location isn't allowed "all the time" a red line says the work can't read the name with the app closed, with
+  **Allow location all the time**; Upload now sends anyway; **What Audio Logs shows from the server**: first **Recordings from the server** (on by default, a
   choice of this phone kept in `backup.json`; off, the moments list and search show only what was recorded in Audio
   Logs, nothing from the server or other phones, and backup goes on; Nov 16, 2026), then, while it is on, **Calls**
   and **Voice messages** switches, off by default, kept on the server for this app only, and that recordings marked
