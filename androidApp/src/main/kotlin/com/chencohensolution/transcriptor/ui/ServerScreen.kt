@@ -130,6 +130,8 @@ fun ServerScreen(
     state: ServerState, pairing: PairingUi, defaultDeviceName: String, actions: ServerActions, siblings: List<String> = emptyList(),
     locks: com.chencohensolution.transcriptor.notebook.Locks = com.chencohensolution.transcriptor.notebook.Locks(),
     wifi: WifiUi = WifiUi(),
+    /** The call being transcribed now, by whom it was with, and how far (0..1); null when none is. */
+    transcribingCall: Pair<String, Float>? = null,
 ) {
     Scaffold(
         topBar = {
@@ -144,7 +146,7 @@ fun ServerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val paired = state.paired
-            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions, locks, wifi)
+            if (paired == null) NotPaired(pairing, defaultDeviceName, siblings, actions) else Paired(state, actions, locks, wifi, transcribingCall)
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -188,7 +190,7 @@ private fun NotPaired(pairing: PairingUi, defaultDeviceName: String, siblings: L
 }
 
 @Composable
-private fun Paired(state: ServerState, actions: ServerActions, locks: com.chencohensolution.transcriptor.notebook.Locks, wifi: WifiUi = WifiUi()) {
+private fun Paired(state: ServerState, actions: ServerActions, locks: com.chencohensolution.transcriptor.notebook.Locks, wifi: WifiUi = WifiUi(), transcribingCall: Pair<String, Float>? = null) {
     val paired = state.paired ?: return
     var unpairing by rememberSaveable { mutableStateOf(false) }
     Text(
@@ -263,7 +265,7 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
         }
         Switch(checked = state.chargingOnly, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
-    CallsSection(state, actions)
+    CallsSection(state, actions, transcribingCall)
     HorizontalDivider()
     Text(stringResource(R.string.server_show), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
     // Off: the list shows only what Audio Logs recorded; backup goes on (owner's call, Nov 16, 2026).
@@ -312,7 +314,7 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
  * folder (tap to change it), and a way back in when the phone took the access away. Turning it off asks first.
  */
 @Composable
-private fun CallsSection(state: ServerState, actions: ServerActions) {
+private fun CallsSection(state: ServerState, actions: ServerActions, transcribingCall: Pair<String, Float>? = null) {
     var explaining by rememberSaveable { mutableStateOf(false) }
     var stopping by rememberSaveable { mutableStateOf(false) }
     val folder = state.callsFolder
@@ -345,8 +347,25 @@ private fun CallsSection(state: ServerState, actions: ServerActions) {
         ShowSwitch(R.string.calls_in_log, R.string.calls_in_log_note, state.callMoments, actions.setCallMoments)
         if (state.callMoments) {
             ShowSwitch(R.string.calls_transcribe_first, R.string.calls_transcribe_first_note, state.transcribeCallsFirst, actions.setTranscribeCallsFirst)
+            // How far the calls are (hen, Nov 17, 2026): transcribed of all, how many left, and the one going now.
             if (state.transcribingCalls > 0) {
-                Text(stringResource(R.string.calls_transcribing_now, state.transcribingCalls), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.calls_transcribing_before_upload), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+            if (state.callsTotal > 0) {
+                val done = state.callsTotal - state.callsToTranscribe
+                Text(
+                    stringResource(R.string.calls_progress, done, state.callsTotal, state.callsToTranscribe),
+                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp),
+                )
+                LinearProgressIndicator(progress = { done.toFloat() / state.callsTotal }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+            }
+            if (transcribingCall != null) {
+                val (who, p) = transcribingCall
+                Text(
+                    stringResource(R.string.calls_progress_now, isolated(who), (p * 100).toInt()),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                )
+                LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
             } else if (state.callsToTranscribe > 0) {
                 Text(
                     pluralStringResource(if (state.transcribeCallsFirst) R.plurals.calls_waiting_text else R.plurals.calls_not_transcribed, state.callsToTranscribe, state.callsToTranscribe),
