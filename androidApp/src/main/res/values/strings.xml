@@ -877,4 +877,16 @@
     <string name="place_stops_in">The recording stops in %1$d s</string>
     <string name="place_keep">Keep recording</string>
     <string name="place_stop_now">Stop now</string>
+    <string name="notebooks_place_stop">Stop by place</string>
+    <string name="notebooks_place_path">Path</string>
+    <string name="notebooks_summary_place_stop">It stops after leaving the place.</string>
+    <string name="notebooks_summary_place_path">The path is saved.</string>
+    <string name="place_status_finding">Finding the location…</string>
+    <string name="place_status_no_fix">No location yet</string>
+    <string name="place_status_leaving">Stops when leaving, %1$d m from here</string>
+    <string name="place_status_on">Stop by place is on</string>
+    <string name="place_status_path">Path</string>
+    <string name="place_here">Set the place again here</string>
+    <string name="place_cancel">Cancel for this recording</string>
+    <string name="place_close">Close</string>
 </resources>

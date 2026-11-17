@@ -140,6 +140,8 @@ class NotebooksActions(
     val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset, music: Boolean) -> Unit = { _, _ -> },
     /** Advanced mode's Record bar: "After" moments transcribed on the charger, or right after. */
     val setTranscribeSaving: (Boolean) -> Unit = {},
+    /** Advanced mode's Stop by place and Path rows: changes the shown profile's (Music's with [music]); null leaves one as it is. */
+    val setPlace: (stop: Boolean?, path: Boolean?, music: Boolean) -> Unit = { _, _, _ -> },
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -1101,6 +1103,12 @@ private fun RecordPresets(
             actions.setPower(if (on) com.chencohensolution.transcriptor.settings.PowerPreset.Low else com.chencohensolution.transcriptor.settings.PowerPreset.Normal, music)
         }
         if (mode == RecordMode.After) WhenRow(stringResource(R.string.notebooks_presets_transcribe), state.transcribeSaving, actions.setTranscribeSaving)
+        // Settings › Advanced › Location's rows, only when it is on: kept in the profile shown.
+        val location = state.location
+        val stopOn = location?.stopByPlace == true && settings?.stopByPlace == true
+        val pathOn = location?.savePath == true && settings?.savePath == true
+        if (location?.stopByPlace == true) PlaceRow(stringResource(R.string.notebooks_place_stop), stopOn) { actions.setPlace(it, null, music) }
+        if (location?.savePath == true) PlaceRow(stringResource(R.string.notebooks_place_path), pathOn) { actions.setPlace(null, it, music) }
         // All of it in one paragraph, right above Record.
         val compress = when {
             com.chencohensolution.transcriptor.settings.Codec.of(shown.audioFormat) == com.chencohensolution.transcriptor.settings.Codec.Wav -> stringResource(R.string.notebooks_summary_wav)
@@ -1118,11 +1126,26 @@ private fun RecordPresets(
                 R.string.notebooks_summary,
                 qualityLine(shown, settings).let { if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "\u2067$it\u2069" else "\u2066$it\u2069" },
                 compress, transcribe,
-            ),
+            ) + listOfNotNull(
+                stringResource(R.string.notebooks_summary_place_stop).takeIf { stopOn },
+                stringResource(R.string.notebooks_summary_place_path).takeIf { pathOn },
+            ).joinToString("") { " $it" },
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp),
         )
     }
+    }
+}
+
+/** Stop by place or Path on the Record bar: its name and a switch. */
+@Composable
+private fun PlaceRow(title: String, on: Boolean, set: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().toggleable(value = on, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = set).padding(start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+        androidx.compose.material3.Switch(checked = on, onCheckedChange = null, modifier = Modifier.padding(vertical = 2.dp))
     }
 }
 

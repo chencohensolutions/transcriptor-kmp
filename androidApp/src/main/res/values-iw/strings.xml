@@ -888,4 +888,16 @@
     <string name="place_stops_in">ההקלטה תיעצר בעוד %1$d שנ׳</string>
     <string name="place_keep">להמשיך להקליט</string>
     <string name="place_stop_now">לעצור עכשיו</string>
+    <string name="notebooks_place_stop">עצירה לפי מקום</string>
+    <string name="notebooks_place_path">מסלול</string>
+    <string name="notebooks_summary_place_stop">ההקלטה תיעצר ביציאה מהמקום.</string>
+    <string name="notebooks_summary_place_path">המסלול יישמר.</string>
+    <string name="place_status_finding">מאתר מיקום…</string>
+    <string name="place_status_no_fix">אין מיקום עדיין</string>
+    <string name="place_status_leaving">תיעצר ביציאה, %1$d מ׳ מכאן</string>
+    <string name="place_status_on">עצירה לפי מקום פועלת</string>
+    <string name="place_status_path">מסלול</string>
+    <string name="place_here">לקבוע את המקום מחדש כאן</string>
+    <string name="place_cancel">לבטל להקלטה הזאת</string>
+    <string name="place_close">לסגור</string>
 </resources>

@@ -39,6 +39,7 @@ import com.chencohensolution.transcriptor.review.ModelChoice
 import com.chencohensolution.transcriptor.review.ModelToGet
 import com.chencohensolution.transcriptor.review.PassState
 import com.chencohensolution.transcriptor.ui.LectureScreen
+import com.chencohensolution.transcriptor.ui.PlaceActions
 import com.chencohensolution.transcriptor.ui.LiveLectureActions
 import com.chencohensolution.transcriptor.ui.FolderNotice
 import com.chencohensolution.transcriptor.ui.NotebooksActions
@@ -209,6 +210,13 @@ class MainActivity : ComponentActivity() {
                                 renameSpeaker = Recording.session::renameSpeaker,
                                 editLine = Recording.session::editLine,
                             ),
+                            place = Recording.placeStatus.collectAsStateWithLifecycle().value,
+                            placeActions = PlaceActions(
+                                keepRecording = { RecordingService.keepRecording(this@MainActivity) },
+                                stopNow = { openAfterStop = true; RecordingService.stop(this@MainActivity) },
+                                cancel = { RecordingService.cancelPlaceStop(this@MainActivity) },
+                                here = { RecordingService.placeHere(this@MainActivity) },
+                            ),
                         )
                     }
                     shown == "review" && review != null -> {
@@ -339,10 +347,14 @@ class MainActivity : ComponentActivity() {
         var saving by remember { mutableStateOf(Recording.settings.powerSaving) }
         var musicSaving by remember { mutableStateOf(Recording.settings.savingFor(musicKey)) }
         var transcribeSaving by remember { mutableStateOf(Recording.settings.transcribeSaving) }
+        // Read again when the Record bar's Stop by place or Path row changes.
+        var placeTick by remember { mutableStateOf(0) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
             notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving,
-                activeSettings = choice?.let { Recording.settings.profile(active) }, musicSettings = musicChoice?.let { Recording.settings.profile(musicKey) }),
+                activeSettings = remember(placeTick, active, choice) { choice?.let { Recording.settings.profile(active) } },
+                musicSettings = remember(placeTick, musicChoice) { musicChoice?.let { Recording.settings.profile(musicKey) } },
+                location = remember(placeTick) { Recording.settings.location.takeIf { it.wantsLocation } }),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
@@ -352,6 +364,12 @@ class MainActivity : ComponentActivity() {
                     choice = Recording.settings.recordingChoice
                 },
                 setTranscribeSaving = { on -> Recording.settings.transcribeSaving = on; transcribeSaving = on },
+                setPlace = { stop, path, music ->
+                    val key = if (music) musicKey else active
+                    val p = Recording.settings.profile(key)
+                    Recording.settings.setProfile(key, p.copy(stopByPlace = stop ?: p.stopByPlace, savePath = path ?: p.savePath))
+                    placeTick++
+                },
                 setPower = { preset, music ->
                     val on = preset == com.chencohensolution.transcriptor.settings.PowerPreset.Low
                     // Music's own mode with Music picked, else the shared one.

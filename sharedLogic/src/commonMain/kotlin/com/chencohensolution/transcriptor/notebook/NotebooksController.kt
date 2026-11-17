@@ -90,6 +90,8 @@ data class NotebooksState(
     /** The active profile's and Music's settings in full (the other codecs' bitrates), for the summary above Record. */
     val activeSettings: com.chencohensolution.transcriptor.settings.ProfileSettings? = null,
     val musicSettings: com.chencohensolution.transcriptor.settings.ProfileSettings? = null,
+    /** Settings › Advanced › Location when stop by place or the path is on (the Record bar's rows then); null otherwise. */
+    val location: com.chencohensolution.transcriptor.location.LocationSettings? = null,
     /** The profile moments record with, for the same row. */
     val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** The list can read older recordings from the server as it nears its end ([Library.serverOlder]). */
