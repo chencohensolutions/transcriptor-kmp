@@ -4,6 +4,7 @@ import com.chencohensolution.transcriptor.location.DrivingSwitch
 import com.chencohensolution.transcriptor.location.Fix
 import com.chencohensolution.transcriptor.location.FixSource
 import com.chencohensolution.transcriptor.location.GeoPoint
+import com.chencohensolution.transcriptor.location.KeepUntil
 import com.chencohensolution.transcriptor.location.LocationSettings
 import com.chencohensolution.transcriptor.location.MomentLocation
 import com.chencohensolution.transcriptor.location.MomentPath
@@ -229,5 +230,36 @@ class StopByPlaceTest {
         assertEquals(MomentLocation.Request.EverySecond, driving.status.value.request)
         // Off for this moment's profile: nothing at all.
         assertFalse(MomentLocation(LocationSettings(stopByPlace = true, savePath = true), stopOn = false, pathOn = false) { it }.active)
+    }
+
+    @Test
+    fun thePathGoesOnAfterStopUntilASavedPlace() {
+        val homePlace = SavedPlace("h", "בית", north(5000.0))
+        val s = LocationSettings(savePath = true, keepAfterStop = true)
+        // Recording time = clock - 1,000,000 while recording.
+        val m = MomentLocation(s, stopOn = false, pathOn = true) { it - 1_000_000 }
+        m.fix(Fix(1_000_000, home, 5f))
+        m.fix(Fix(1_600_000, north(100.0), 5f))
+        assertTrue(m.keepGoing(1_600_000, audioEndMillis = 600_000, until = KeepUntil.SavedPlace, places = listOf(homePlace)))
+        assertEquals(MomentLocation.Request.Minute, m.status.value.request) // watching for home
+        m.fix(Fix(1_900_000, north(3000.0), 5f, speedMps = 20f))
+        assertFalse(m.keepingDone(1_900_000))
+        m.fix(Fix(2_200_000, north(5010.0), 5f))
+        m.fix(Fix(2_270_000, north(5005.0), 5f))
+        assertTrue(m.keepingDone(2_270_000))
+        val path = assertNotNull(m.keptPath())
+        assertEquals(600_000, path.audioEndMillis)
+        // After the audio: its end plus the clock since Stop.
+        assertEquals(listOf(0L, 600_000L, 900_000L, 1_200_000L, 1_270_000L), path.points.map { it.atMillis })
+        assertEquals(20f, path.topSpeedMps())
+    }
+
+    @Test
+    fun thePathAfterStopEndsOnTime() {
+        val m = MomentLocation(LocationSettings(savePath = true, keepAfterStop = true), stopOn = false, pathOn = true) { it }
+        m.keepGoing(0, 0, KeepUntil.Minutes30, emptyList())
+        assertFalse(m.keepingDone(29 * 60_000))
+        assertTrue(m.keepingDone(30 * 60_000))
+        assertFalse(MomentLocation(LocationSettings(), stopOn = false, pathOn = false) { it }.keepGoing(0, 0, KeepUntil.Hour1, emptyList()))
     }
 }

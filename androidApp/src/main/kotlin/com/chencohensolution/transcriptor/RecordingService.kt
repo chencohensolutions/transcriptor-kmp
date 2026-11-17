@@ -45,6 +45,13 @@ class RecordingService : Service() {
     /** The countdown's mark is on the moment. */
     private var countdownMarked = false
 
+    /** The moment whose path goes on after its audio stopped ("Keep saving the path after stopping"); null otherwise. */
+    private var keepingFor: String? = null
+
+    /** Media processing, and location while a path goes on after Stop (the service mustn't lose it meanwhile). */
+    private val processingType get() =
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING or (if (keepingFor != null) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0)
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -77,6 +84,8 @@ class RecordingService : Service() {
         val session = Recording.session
         when (intent?.action) {
             ACTION_START -> if (!session.isRecording) {
+                // A path still going on from the last moment ends here: this one has its own.
+                if (keepingFor != null) endKeeping()
                 quiet = Recording.settings.quietRecording
                 val mode = RecordMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: RecordMode.Live.name)
                 onlyRecord = mode == RecordMode.Only || mode == RecordMode.Music
@@ -102,7 +111,7 @@ class RecordingService : Service() {
                     startActivity(Intent(this, RecordFromTileActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     // Started as a foreground service: it must be one before stopping (media processing needs no "in use").
                     if (!compressing) {
-                        runCatching { startForeground(ID, progressNotification(R.string.recording_now, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING) }
+                        runCatching { startForeground(ID, progressNotification(R.string.recording_now, 0f), processingType) }
                         finish()
                     }
                     return START_NOT_STICKY
@@ -121,6 +130,7 @@ class RecordingService : Service() {
             }
             ACTION_PLACE_CANCEL -> place?.let { p -> Recording.placeStatus.value = p.cancel(System.currentTimeMillis()) }
             ACTION_PLACE_HERE -> place?.let { p -> Recording.placeStatus.value = p.reanchor(System.currentTimeMillis()) }
+            ACTION_PATH_STOP -> if (keepingFor != null) endKeeping()
             ACTION_PAUSE -> session.pauseOrResume()
             ACTION_MARK -> session.mark()
             ACTION_STOP -> scope.launch {
@@ -128,10 +138,14 @@ class RecordingService : Service() {
                 val skipped = session.state.value?.skippedForMemory != null
                 // Returns once live transcription has finished the last lines (and closed the live model).
                 val located = place
-                val path = located?.path(audioEndMillis = session.positionMillis)?.takeIf { !it.isEmpty }
-                val lecture = session.stop(located?.placeStop(), hasPath = path != null)?.also { Recording.lastLecture.value = it }
+                val settings = Recording.settings.location
+                // "Keep saving the path after stopping": the path goes on, saved with the moment when it ends.
+                val keep = located != null && settings.keepAfterStop &&
+                    located.keepGoing(System.currentTimeMillis(), session.positionMillis, settings.keep, settings.places)
+                val path = (if (keep) located?.keptPath() else located?.path(audioEndMillis = session.positionMillis))?.takeIf { !it.isEmpty }
+                val lecture = session.stop(located?.placeStop(), hasPath = path != null || keep)?.also { Recording.lastLecture.value = it }
                 if (lecture != null && path != null) runCatching { Recording.store.savePath(lecture, path) }
-                stopPlace()
+                if (keep && lecture != null) startKeeping(lecture.id) else stopPlace()
                 val model = lecture?.let { Recording.improveModelFor(it.language) }
                 // Only record: nothing runs on it but the encoding; "Transcribe now" on the moment when wanted.
                 if (onlyRecord && lecture != null && lecture.pendingTranscript) { if (!improveNextPending()) compressPending(); return@launch }
@@ -164,7 +178,7 @@ class RecordingService : Service() {
                 if (lecture != null && !session.isRecording && !compressing && Recording.refineModels(lecture.language).any { it.id == model }) {
                     if (speakersFirst) findSpeakers(lecture) { done -> refine(done, model) } else refine(lecture, model)
                 } else {
-                    startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                    startForeground(ID, progressNotification(R.string.refining, 0f), processingType)
                     finish()
                 }
             }
@@ -176,13 +190,13 @@ class RecordingService : Service() {
                     findSpeakers(lecture)
                 } else {
                     // Started as a foreground service: it must be one before stopping.
-                    startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                    startForeground(ID, progressNotification(R.string.finding_speakers, 0f), processingType)
                     finish()
                 }
             }
             ACTION_COMPRESS -> compressPending()
             ACTION_IMPROVE_PENDING -> {
-                startForeground(ID, progressNotification(R.string.refining, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+                startForeground(ID, progressNotification(R.string.refining, 0f), processingType)
                 if (!session.isRecording && !compressing && !improveNextPending()) finish()
             }
         }
@@ -195,7 +209,7 @@ class RecordingService : Service() {
      */
     private fun findSpeakers(lecture: Lecture, then: ((Lecture) -> Unit)? = null) {
         compressing = true
-        startForeground(ID, progressNotification(R.string.finding_speakers, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        startForeground(ID, progressNotification(R.string.finding_speakers, 0f), processingType)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             Recording.findingSpeakers.value = lecture.id to 0f
@@ -235,7 +249,7 @@ class RecordingService : Service() {
             return
         }
         compressing = true
-        startForeground(ID, progressNotification(title, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        startForeground(ID, progressNotification(title, 0f), processingType)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             var speakersNext: Lecture? = null
@@ -314,7 +328,7 @@ class RecordingService : Service() {
     private fun compressPending() {
         if (compressing) return
         compressing = true
-        startForeground(ID, progressNotification(R.string.compressing_flac, 0f), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+        startForeground(ID, progressNotification(R.string.compressing_flac, 0f), processingType)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             Recording.encodePending(this@RecordingService) { lecture, p ->
@@ -365,8 +379,50 @@ class RecordingService : Service() {
         }
     }
 
+    /** The audio of [lectureId] stopped; its path goes on, with a notification to stop it. */
+    private fun startKeeping(lectureId: String) {
+        keepingFor = lectureId
+        Recording.placeStatus.value = null
+        // The countdown's stop ended the ticker: the time limit still needs it.
+        val p = place
+        if (p != null && placeTicker?.isActive != true) placeTicker = scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000)
+                onPlace(p.tick(System.currentTimeMillis()))
+            }
+        }
+        getSystemService(NotificationManager::class.java).cancel(PLACE_ID)
+        getSystemService(NotificationManager::class.java).notify(PATH_ID, pathNotification())
+    }
+
+    /** The path after Stop ends: saved with its moment, and location is let go. */
+    private fun endKeeping() {
+        val id = keepingFor ?: return
+        val path = place?.keptPath()
+        keepingFor = null
+        if (path != null && !path.isEmpty) runCatching { Recording.store.load(id)?.let { Recording.store.savePath(it, path) } }
+        stopPlace()
+        getSystemService(NotificationManager::class.java).cancel(PATH_ID)
+        finish()
+    }
+
+    /** "Saving the path", with Stop. */
+    private fun pathNotification(): Notification = Notification.Builder(this, CHANNEL)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setContentTitle(getString(R.string.path_keeping))
+        .setContentText(getString(R.string.path_keeping_note))
+        .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+        .setOngoing(true)
+        .addAction(action(ACTION_PATH_STOP, R.string.path_keeping_stop))
+        .build()
+
     /** Acts on stop by place's state: the countdown's notification and mark, the stop when it runs out. */
     private fun onPlace(status: com.chencohensolution.transcriptor.location.MomentLocation.Status) {
+        if (keepingFor != null) {
+            feed?.request(status.request, false)
+            if (place?.keepingDone(System.currentTimeMillis()) == true) endKeeping()
+            return
+        }
         Recording.placeStatus.value = status
         feed?.request(status.request, place?.minutePrecise == true)
         when (val w = status.watch) {
@@ -422,11 +478,22 @@ class RecordingService : Service() {
 
     private fun finish() {
         if (Recording.session.isRecording || compressing) return
+        // The path goes on after Stop: the service stays, showing only that.
+        if (keepingFor != null) {
+            runCatching { startForeground(ID, pathNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION) }
+            getSystemService(NotificationManager::class.java).cancel(PATH_ID)
+            return
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onDestroy() {
+        if (keepingFor != null) {
+            val id = keepingFor!!
+            place?.keptPath()?.takeIf { !it.isEmpty }?.let { path -> runCatching { Recording.store.load(id)?.let { Recording.store.savePath(it, path) } } }
+            keepingFor = null
+        }
         stopPlace()
         scope.cancel()
         super.onDestroy()
@@ -493,6 +560,8 @@ class RecordingService : Service() {
         private const val ACTION_PLACE_HERE = "placeHere"
         private const val PLACE_CHANNEL = "place-stop"
         private const val PLACE_ID = 2
+        private const val PATH_ID = 3
+        private const val ACTION_PATH_STOP = "pathStop"
         private const val ACTION_COMPRESS = "compress"
         private const val ACTION_SPEAKERS = "speakers"
         private const val ACTION_REFINE = "refine"

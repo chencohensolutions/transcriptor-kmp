@@ -215,7 +215,7 @@ fun ReviewScreen(
         val info by androidx.compose.runtime.produceState<com.chencohensolution.transcriptor.review.MomentInfo?>(null) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { actions.info() }
         }
-        info?.let { MomentInfoSheet(it) { showingInfo = false } }
+        info?.let { MomentInfoSheet(it, seek = { at -> showingInfo = false; actions.seek(at) }) { showingInfo = false } }
     }
     var renaming by remember { mutableStateOf<Speaker?>(null) }
     var moving by remember { mutableStateOf<Segment?>(null) }

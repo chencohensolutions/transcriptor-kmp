@@ -81,7 +81,10 @@ class LocationFeed(
                 .setMinUpdateIntervalMillis(30_000).build()
         }
         runCatching {
-            manager.requestLocationUpdates(bestProvider(manager), built, executor, l)
+            // Every second straight from GPS (speed and bearing, and the same fixes the passive listener hears, so no
+            // second, smoothed track zigzags beside it); the minute's from the fused provider (Wi-Fi when it is enough).
+            val provider = if (request == MomentLocation.Request.EverySecond && manager.hasProvider(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER else bestProvider(manager)
+            manager.requestLocationUpdates(provider, built, executor, l)
             own = l
         }.onFailure { android.util.Log.w("LocationFeed", "location request refused", it) }
     }

@@ -889,4 +889,19 @@
     <string name="place_here">Set the place again here</string>
     <string name="place_cancel">Cancel for this recording</string>
     <string name="place_close">Close</string>
+    <string name="info_place_stop">Stopped by itself</string>
+    <string name="info_place_stop_left">Left the place</string>
+    <string name="info_place_stop_arrived">Arrived at %1$s</string>
+    <string name="info_place_stop_device">Connected to the car</string>
+    <string name="info_path">Path</string>
+    <string name="info_path_distance">Distance</string>
+    <string name="info_path_km">%1$.1f km</string>
+    <string name="info_path_top_speed">Top speed</string>
+    <string name="info_path_kmh">%1$.0f km/h</string>
+    <string name="info_path_points">Points</string>
+    <string name="info_path_after">The dashed part was saved after the audio stopped.</string>
+    <string name="info_path_speed">Driving speed (km/h). Tap to jump to that moment.</string>
+    <string name="path_keeping">Saving the path</string>
+    <string name="path_keeping_note">The recording stopped; its path goes on</string>
+    <string name="path_keeping_stop">Stop</string>
 </resources>

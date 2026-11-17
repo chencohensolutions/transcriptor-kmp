@@ -80,6 +80,7 @@ class LectureReview(
         return MomentInfo(
             lecture, runCatching { store.audioBytes(lecture) }.getOrNull(),
             runCatching { store.loadPower(lecture) }.getOrNull(), runCatching { store.loadEncodePower(lecture) }.getOrNull(),
+            if (lecture.hasPath) runCatching { store.loadPath(lecture) }.getOrNull() else null,
         )
     }
 

@@ -900,4 +900,19 @@
     <string name="place_here">לקבוע את המקום מחדש כאן</string>
     <string name="place_cancel">לבטל להקלטה הזאת</string>
     <string name="place_close">לסגור</string>
+    <string name="info_place_stop">נעצרה מעצמה</string>
+    <string name="info_place_stop_left">יציאה מהמקום</string>
+    <string name="info_place_stop_arrived">הגעה אל %1$s</string>
+    <string name="info_place_stop_device">חיבור לרכב</string>
+    <string name="info_path">מסלול</string>
+    <string name="info_path_distance">מרחק</string>
+    <string name="info_path_km">%1$.1f ק״מ</string>
+    <string name="info_path_top_speed">מהירות שיא</string>
+    <string name="info_path_kmh">%1$.0f קמ״ש</string>
+    <string name="info_path_points">נקודות</string>
+    <string name="info_path_after">החלק המקווקו נשמר אחרי שהקול נעצר.</string>
+    <string name="info_path_speed">מהירות נסיעה (קמ״ש). נגיעה קופצת לרגע הזה.</string>
+    <string name="path_keeping">שומר מסלול</string>
+    <string name="path_keeping_note">ההקלטה נעצרה, המסלול שלה ממשיך</string>
+    <string name="path_keeping_stop">לעצור</string>
 </resources>

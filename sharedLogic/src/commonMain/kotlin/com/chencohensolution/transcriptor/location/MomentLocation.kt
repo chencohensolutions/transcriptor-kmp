@@ -50,7 +50,14 @@ class MomentLocation(
 
     private val config = settings.watchConfig(stopOn)
     private val watch = PlaceWatch(config)
-    private val path = if (pathOn && settings.savePath) PathBuilder(toRecording) else null
+    private val path = if (pathOn && settings.savePath) PathBuilder { time(it) } else null
+
+    /** After Stop, while the path goes on: when the audio ended (recording ms and clock), until when, and the places that end it. */
+    private class Keeping(val audioEndMillis: Long, val stoppedAtClock: Long, val endsAtClock: Long, val arrival: PlaceWatch?)
+    private var keeping: Keeping? = null
+
+    /** A clock time in the recording's time: past the audio's end once it stopped. */
+    private fun time(clock: Long): Long = keeping?.let { it.audioEndMillis + (clock - it.stoppedAtClock) } ?: toRecording(clock)
     private val precision = settings.pathPrecision
     private val driving = DrivingSwitch()
     private var lastGood: Fix? = null
@@ -79,7 +86,8 @@ class MomentLocation(
         if (fix.accuracyM <= 50f) lastGood = fix
         path?.add(fix)
         if (precision == PathPrecision.WhileDriving) driving.update(fix)
-        watch.fix(fix)
+        val k = keeping
+        if (k != null) k.arrival?.fix(fix) else watch.fix(fix)
         return publish(fix.atMillis)
     }
 
@@ -90,7 +98,7 @@ class MomentLocation(
 
     /** Moves time on (every second while counting down). */
     fun tick(nowMillis: Long): Status {
-        watch.tick(nowMillis)
+        if (keeping == null) watch.tick(nowMillis)
         return publish(nowMillis)
     }
 
@@ -111,6 +119,33 @@ class MomentLocation(
         watch.reanchor(lastGood?.takeIf { nowMillis - it.atMillis < 120_000 })
         return publish(nowMillis)
     }
+
+    /**
+     * The audio stopped at [audioEndMillis] (now, [nowMillis] by the clock) and the path goes on ("Keep saving the path
+     * after stopping") until [until]: a time, or arriving at one of [places] (at most [KeepUntil.SavedPlace]'s time).
+     * Stop by place does nothing more. Returns false when there is no path to keep.
+     */
+    fun keepGoing(nowMillis: Long, audioEndMillis: Long, until: KeepUntil, places: List<SavedPlace>): Boolean {
+        if (path == null) return false
+        val arrival = if (until == KeepUntil.SavedPlace && places.isNotEmpty()) PlaceWatch(PlaceWatch.Config(arrive = places)) else null
+        // Seen where it stopped: a place it stopped in isn't arrived at again until it has left it.
+        lastGood?.let { arrival?.fix(it) }
+        keeping = Keeping(audioEndMillis, nowMillis, nowMillis + (until.millis ?: 0), arrival)
+        publish(nowMillis)
+        return true
+    }
+
+    /** The path goes on after the audio stopped ([keepGoing]). */
+    val isKeeping get() = keeping != null
+
+    /** The path after Stop is done: its time ran out, or it arrived at a saved place. */
+    fun keepingDone(nowMillis: Long): Boolean {
+        val k = keeping ?: return false
+        return nowMillis >= k.endsAtClock || k.arrival?.state is PlaceWatch.State.Counting || k.arrival?.state is PlaceWatch.State.Stop
+    }
+
+    /** The path with where the audio ended, for saving with the moment. */
+    fun keptPath(): MomentPath? = keeping?.let { path?.path(it.audioEndMillis) }
 
     /** Why the recording should be kept as stopped by itself, in recording time; null unless the countdown ran out. */
     fun placeStop(): PlaceStop? = (watch.state as? PlaceWatch.State.Stop)?.let { PlaceStop(it.reason.key, toRecording(it.firedAtMillis), it.place?.name) }
@@ -135,20 +170,26 @@ class MomentLocation(
     }
 
     private fun request(w: PlaceWatch.State, nowMillis: Long): Request {
-        val forPath = when {
-            path == null -> Request.None
-            precision == PathPrecision.Precise -> Request.EverySecond
-            precision == PathPrecision.WhileDriving && driving.on(nowMillis) -> Request.EverySecond
-            precision == PathPrecision.Economical -> Request.Minute
-            else -> Request.None
+        keeping?.let { k ->
+            val forArrival = if (k.arrival != null) Request.Minute else Request.None
+            return maxOf(forArrival, pathRequest(nowMillis))
         }
-        val forWatch = when {
-            !config.needsFixes || w is PlaceWatch.State.Off || w is PlaceWatch.State.Stop -> Request.None
-            // A first fix to anchor to, as soon as the phone can give one.
-            w is PlaceWatch.State.NoFix -> Request.EverySecond
-            else -> Request.Minute
-        }
-        return maxOf(forPath, forWatch)
+        return maxOf(pathRequest(nowMillis), watchRequest(w))
+    }
+
+    private fun pathRequest(nowMillis: Long): Request = when {
+        path == null -> Request.None
+        precision == PathPrecision.Precise -> Request.EverySecond
+        precision == PathPrecision.WhileDriving && driving.on(nowMillis) -> Request.EverySecond
+        precision == PathPrecision.Economical -> Request.Minute
+        else -> Request.None
+    }
+
+    private fun watchRequest(w: PlaceWatch.State): Request = when {
+        !config.needsFixes || w is PlaceWatch.State.Off || w is PlaceWatch.State.Stop -> Request.None
+        // A first fix to anchor to, as soon as the phone can give one.
+        w is PlaceWatch.State.NoFix -> Request.EverySecond
+        else -> Request.Minute
     }
 
     companion object {

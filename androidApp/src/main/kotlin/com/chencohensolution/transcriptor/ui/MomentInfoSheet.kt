@@ -37,7 +37,7 @@ import java.util.Locale
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MomentInfoSheet(info: MomentInfo, onDismiss: () -> Unit) {
+fun MomentInfoSheet(info: MomentInfo, seek: (Long) -> Unit = {}, onDismiss: () -> Unit) {
     val l = info.lecture
     val r = info.recording
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -80,6 +80,29 @@ fun MomentInfoSheet(info: MomentInfo, onDismiss: () -> Unit) {
                     "${formatClock(p.atMillis)} · " + if (resumed == null) stringResource(R.string.info_pause_open, clockTime(p.pausedAtMillis))
                         else stringResource(R.string.info_pause_row, clockTime(p.pausedAtMillis), clockTime(resumed), pauseLength(resumed - p.pausedAtMillis)),
                 )
+            }
+
+            // Stop by place and the path (Settings › Advanced › Location).
+            l.placeStop?.let { s ->
+                Item(
+                    stringResource(R.string.info_place_stop),
+                    when (s.reason) {
+                        "arrived" -> stringResource(R.string.info_place_stop_arrived, s.placeName ?: "")
+                        "device" -> stringResource(R.string.info_place_stop_device)
+                        else -> stringResource(R.string.info_place_stop_left)
+                    } + " · " + formatClock(s.atMillis),
+                )
+            }
+            info.path?.takeIf { !it.isEmpty }?.let { path ->
+                Section(stringResource(R.string.info_path))
+                Item(stringResource(R.string.info_path_distance), stringResource(R.string.info_path_km, path.distanceMeters() / 1000))
+                path.topSpeedMps()?.let { Item(stringResource(R.string.info_path_top_speed), stringResource(R.string.info_path_kmh, it * 3.6f)) }
+                Item(stringResource(R.string.info_path_points), path.points.size.toString())
+                path.audioEndMillis?.takeIf { end -> path.points.any { it.atMillis > end } }?.let {
+                    Note(stringResource(R.string.info_path_after))
+                }
+                PathDrawing(path, seek, Modifier.padding(vertical = 8.dp))
+                SpeedGraph(path, seek, stringResource(R.string.info_path_speed), Modifier.padding(vertical = 8.dp))
             }
 
             Section(stringResource(R.string.info_power_recording))
