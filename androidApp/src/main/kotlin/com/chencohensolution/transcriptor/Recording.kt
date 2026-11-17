@@ -129,13 +129,14 @@ object Recording {
 
     /** The power report of encoding [lecture]'s WAV ([samples] over [millis]): `power-encode.json` and a row in power-log.csv. */
     private fun logEncode(lecture: Lecture, toAac: Boolean, samples: List<com.chencohensolution.transcriptor.recording.PowerSample>, millis: Long) {
-        val aac = settings.aac
+        val profile = settings.profileFor(lecture.profile)
+        val aac = profile.aac
         val encoder = if (toAac) com.chencohensolution.transcriptor.recording.AacEncoders.lastUsed else "c2.android.flac.encoder"
         val audio = com.chencohensolution.transcriptor.recording.PowerAudio(
-            format = settings.audioFormat.name, codec = if (toAac) "aac" else "flac", encoder = encoder,
+            format = (if (toAac) "WavThenAac" else "WavThenFlac") + " · ${lecture.profile ?: "-"}", codec = if (toAac) "aac" else "flac", encoder = encoder,
             hardware = com.chencohensolution.transcriptor.recording.AacEncoders.all.any { it.name == encoder && it.hardware },
             details = (if (toAac) "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
-                else "level ${settings.flacLevel}") + " · ${lecture.durationMillis / 60_000} min of audio · ${settings.encodeAfter.name.lowercase()}",
+                else "level ${profile.flacLevel} · ${profile.flac.bitDepth} bit · ${profile.flac.sampleRate / 1000} kHz") + " · ${lecture.durationMillis / 60_000} min of audio · ${settings.encodeAfter.name.lowercase()}",
         )
         val report = com.chencohensolution.transcriptor.recording.PowerReport.of(samples, millis, emptyList(), audio, com.chencohensolution.transcriptor.recording.PowerReport.PHASE_ENCODE)
         val saved = store.load(lecture.id) ?: lecture
@@ -897,7 +898,10 @@ object Recording {
             speakerPassReady = { canFindSpeakers },
             power = PowerMeter(AndroidPowerProbe(app).also { powerProbe = it }),
         )
-        compression = AudioCompression(FileSystem.SYSTEM, store, androidFlacEncode, { settings.flacLevel }, androidAacEncode, { settings.aac }, { settings.flac })
+        compression = AudioCompression(
+            FileSystem.SYSTEM, store, androidFlacEncode, { settings.profileFor(it).flacLevel }, androidAacEncode,
+            { settings.profileFor(it).aac }, { settings.profileFor(it).flac },
+        )
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,
             speakerTuning = settings::speakerTuning, setSpeakerTuning = settings::setSpeakerTuning,

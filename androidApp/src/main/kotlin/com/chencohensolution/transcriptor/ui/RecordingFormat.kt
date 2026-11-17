@@ -56,7 +56,7 @@ import com.chencohensolution.transcriptor.settings.EncodeAfter
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import com.chencohensolution.transcriptor.settings.FlacFormat
 import com.chencohensolution.transcriptor.settings.PowerPreset
-import com.chencohensolution.transcriptor.settings.QualityPreset
+import com.chencohensolution.transcriptor.settings.QualityProfile
 import kotlin.math.roundToInt
 
 /** Settings' recording-format pages, opened from its Recording format row. */
@@ -109,11 +109,11 @@ private fun flacLine(flac: FlacFormat): String =
 private val ModelsState.recordedFlac get() = if (deepCapture) flac else flac.copy(bitDepth = 16)
 
 @Composable
-private fun qualityName(preset: QualityPreset) = stringResource(when (preset) {
-    QualityPreset.High -> R.string.rec_preset_high
-    QualityPreset.Normal -> R.string.rec_preset_normal
-    QualityPreset.Low -> R.string.rec_preset_low
-    QualityPreset.Custom -> R.string.rec_preset_custom
+internal fun profileName(profile: QualityProfile) = stringResource(when (profile) {
+    QualityProfile.High -> R.string.rec_preset_high
+    QualityProfile.Normal -> R.string.rec_preset_normal
+    QualityProfile.Low -> R.string.rec_preset_low
+    QualityProfile.Music -> R.string.notebooks_record_music
 })
 
 @Composable
@@ -123,14 +123,23 @@ private fun powerName(preset: PowerPreset) = stringResource(when (preset) {
     PowerPreset.Custom -> R.string.rec_preset_custom
 })
 
+/** The shown profile in one line: codec and its settings. */
+@Composable
+private fun profileLine(state: ModelsState): String = when (codecOf(state.audioFormat)) {
+    AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state)
+    AudioFormat.FlacLive -> stringResource(R.string.rec_format_codec_flac) + " · " + flacLine(state.recordedFlac)
+    else -> stringResource(R.string.rec_format_summary_wav)
+}
+
 /** The Recording format row's line in Settings: the presets, then the codec, its settings, and when it encodes. */
 @Composable
 fun recordingFormatSummary(state: ModelsState): String {
     val choice = state.recordingChoice
-    val presets = stringResource(R.string.rec_preset_summary, qualityName(choice.quality), powerName(choice.power))
-        // The microphone moved here (it decides what is supported): its name when it isn't the phone's own.
-        .let { line -> state.micInput?.let { line + " · " + micName(it.name, it.kind) } ?: line }
-    return presets + "\n" + when (codecOf(state.audioFormat)) {
+    val presets = stringResource(R.string.rec_preset_summary, profileName(state.activeProfile), powerName(choice.power))
+    // The settings line is the shown profile's: said only when it is the one moments record with.
+    if (state.profile != state.activeProfile) return presets
+    val withMic = state.micInput?.let { presets + " · " + micName(it.name, it.kind) } ?: presets
+    return withMic + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
         AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)
         else -> stringResource(R.string.rec_format_summary_wav)
@@ -175,14 +184,17 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
                 open(FormatPage.Flac)
             }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            EncodeLater(state, actions)
+            // Music always encodes as it records; WAV first is for the other profiles.
+            if (state.profile == QualityProfile.Music) FormatPageNote(stringResource(R.string.rec_profile_music_live))
+            else EncodeLater(state, actions)
         }
     }
 }
 
 /**
- * The quality presets (codec and its settings) and the battery presets (when encoding and "After" transcription run),
- * as segmented rows; Custom is shown, selected, only while the settings match no preset.
+ * The recording profiles (owner's request, Nov 17, 2026): High, Normal and Low (the one picked records moments) and
+ * Music (the Music mode's), each with its own settings, edited on this page while its tab is shown; Reset puts it
+ * back to its defaults. Then the battery presets (when encoding and "After" transcription run, for all).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,21 +202,20 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
     val choice = state.recordingChoice
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         FormatLabel(stringResource(R.string.rec_preset_quality))
-        val quality = listOf(QualityPreset.High, QualityPreset.Normal, QualityPreset.Low) + listOfNotNull(QualityPreset.Custom.takeIf { choice.quality == it })
+        val profiles = QualityProfile.entries
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            quality.forEachIndexed { i, p ->
+            profiles.forEachIndexed { i, p ->
                 SegmentedButton(
-                    selected = choice.quality == p, onClick = { if (p != QualityPreset.Custom) actions.setQuality(p) },
-                    shape = SegmentedButtonDefaults.itemShape(i, quality.size),
-                ) { Text(qualityName(p)) }
+                    selected = state.profile == p, onClick = { actions.showProfile(p) },
+                    shape = SegmentedButtonDefaults.itemShape(i, profiles.size),
+                ) { Text(profileName(p), maxLines = 1) }
             }
         }
-        FormatNote(stringResource(when (choice.quality) {
-            QualityPreset.High -> R.string.rec_preset_high_note
-            QualityPreset.Normal -> R.string.rec_preset_normal_note
-            QualityPreset.Low -> R.string.rec_preset_low_note
-            QualityPreset.Custom -> R.string.rec_preset_custom_note
-        }))
+        FormatNote(stringResource(if (state.profile == QualityProfile.Music) R.string.rec_profile_music_note else R.string.rec_profile_note))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(profileLine(state), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = actions.resetProfile) { Text(stringResource(R.string.rec_profile_reset)) }
+        }
         // How long a moment can be with the space left (while recording: the WAV, when it records as WAV first).
         val perHour = choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
         if (state.freeBytes > 0 && perHour > 0) {

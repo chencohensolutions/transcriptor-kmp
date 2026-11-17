@@ -44,7 +44,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val library by Recording.library.library.collectAsStateWithLifecycle()
     val folder by Recording.folder.collectAsStateWithLifecycle()
     var changed by remember { mutableStateOf(0) }
-    var format by remember { mutableStateOf(Recording.settings.audioFormat) }
+    // The recording profile shown on Recording settings (the active one at first), and the one moments record with.
+    val store = Recording.settings
+    var active by remember { mutableStateOf(store.activeProfile) }
+    var shown by remember { mutableStateOf(active) }
+    var format by remember { mutableStateOf(store.recordingChoice(shown).audioFormat) }
     var flacLevel by remember { mutableStateOf(Recording.settings.flacLevel) }
     var aac by remember { mutableStateOf(Recording.settings.aac) }
     var flac by remember { mutableStateOf(Recording.settings.flac) }
@@ -58,7 +62,19 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var meters by remember { mutableStateOf(Recording.settings.processorMeters) }
     var levelMeter by remember { mutableStateOf(Recording.settings.levelMeter) }
-    var micInput by remember { mutableStateOf(Recording.settings.micInput) }
+    var micInput by remember { mutableStateOf(store.profile(shown).micInput) }
+    /** Reads [shown]'s settings (and the timing) back after a change: the store is the truth. */
+    fun load() {
+        val p = store.profile(shown)
+        val choice = store.recordingChoice(shown)
+        format = choice.audioFormat; aac = p.aac; flac = p.flac; flacLevel = p.flacLevel; micInput = p.micInput
+        encodeAfter = choice.encodeAfter; transcribeWhen = choice.transcribeWhen; active = store.activeProfile
+    }
+    /** Changes [shown]'s settings and reads them back. */
+    fun edit(change: (com.chencohensolution.transcriptor.settings.ProfileSettings) -> com.chencohensolution.transcriptor.settings.ProfileSettings) {
+        store.setProfile(shown, change(store.profile(shown)))
+        load()
+    }
     var micInputs by remember { mutableStateOf(Recording.audioInputs.connected()) }
     // Settings › Microphone's test: listens only while that page is open, never while a moment records.
     val probe = remember { com.chencohensolution.transcriptor.recording.MicProbe(Recording.audioInputs) }
@@ -109,7 +125,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, encodeAfter = encodeAfter,
+        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, profile = shown, activeProfile = active, encodeAfter = encodeAfter,
         aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, deepCapture = remember(micInput, micInputs) { Recording.audioInputs.deepCapture(micInput) }, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs, micDetails = remember { Recording.audioInputs.builtInDetails() }, micMeter = micMeter, micTestOff = micTestOff, freeBytes = remember { runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(0L) },
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
@@ -146,24 +162,33 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setSpeakerTuning = { m, more -> io { Recording.settings.setSpeakerTuning(m.id, more) } },
             useSegmentation = { m -> io { Recording.settings.segmentationModel = m.id } },
             retryNpu = { m -> io { Recording.npuGuard.reenable(m.id) } },
-            setAudioFormat = { format = it; io { Recording.settings.audioFormat = it } },
-            setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
-            setAac = { aac = it.valid(); io { Recording.settings.aac = it } },
-            setFlac = { flac = it.valid(); io { Recording.settings.flac = it } },
+            // Every recording setting goes into the shown profile; WAV first and the timing are for all.
+            setAudioFormat = { f ->
+                edit { it.copy(codec = com.chencohensolution.transcriptor.settings.Codec.of(f)) }
+                if (f != com.chencohensolution.transcriptor.settings.AudioFormat.Wav && shown != com.chencohensolution.transcriptor.settings.QualityProfile.Music) {
+                    store.wavFirst = f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || f == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac
+                }
+                load()
+            },
+            setFlacLevel = { level -> edit { it.copy(flacLevel = level) } },
+            setAac = { a -> edit { it.copy(aac = a.valid()) } },
+            setFlac = { f -> edit { it.copy(flac = f.valid()) } },
             setSound = { rate, channels, bits ->
                 val next = state.recordingChoice.withSound(rate, channels, bits)
-                aac = next.aac; flac = next.flac
-                io { Recording.settings.recordingChoice = next }
+                edit { it.copy(aac = next.aac, flac = next.flac) }
             },
-            setQuality = { preset ->
-                val next = state.recordingChoice.with(preset)
-                format = next.audioFormat; aac = next.aac; flac = next.flac
-                io { Recording.settings.recordingChoice = next }
+            showProfile = { p ->
+                if (p != com.chencohensolution.transcriptor.settings.QualityProfile.Music) store.activeProfile = p
+                shown = p
+                load()
             },
+            resetProfile = { store.resetProfile(shown); load() },
             setPower = { preset ->
                 val next = state.recordingChoice.with(preset)
-                format = next.audioFormat; encodeAfter = next.encodeAfter; transcribeWhen = next.transcribeWhen
-                io { Recording.settings.recordingChoice = next }
+                val wavFirst = if (format == com.chencohensolution.transcriptor.settings.AudioFormat.Wav || shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music) store.wavFirst
+                    else next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac
+                store.setTiming(wavFirst, next.encodeAfter, next.transcribeWhen)
+                load()
             },
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },
             setTranscribeWhen = { transcribeWhen = it; io { Recording.settings.transcribeWhen = it } },
@@ -180,7 +205,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             },
             setProcessorMeters = { meters = it; io { Recording.settings.processorMeters = it } },
             setLevelMeter = { levelMeter = it; io { Recording.settings.levelMeter = it } },
-            setMicInput = { micInput = it; io { Recording.settings.micInput = it } },
+            setMicInput = { m -> edit { it.copy(micInput = m) } },
             startMicTest = { input ->
                 val allowed = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
                     android.content.pm.PackageManager.PERMISSION_GRANTED

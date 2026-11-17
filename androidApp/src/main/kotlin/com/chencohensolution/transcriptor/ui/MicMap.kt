@@ -165,7 +165,8 @@ internal fun MicrophonePage(state: ModelsState, actions: ModelsActions, back: ()
         topBar = {
             TopAppBar(
                 navigationIcon = { IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review_back)) } },
-                title = { Text(stringResource(R.string.settings_mic)) },
+                // The microphone is each profile's own: the page says whose.
+                title = { Text(stringResource(R.string.settings_mic) + " · " + profileName(state.profile)) },
             )
         },
     ) { padding ->

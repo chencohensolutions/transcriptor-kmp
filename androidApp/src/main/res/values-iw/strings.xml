@@ -735,10 +735,6 @@
     <string name="rec_preset_normal">רגילה</string>
     <string name="rec_preset_low">נמוכה</string>
     <string name="rec_preset_custom">מותאמת</string>
-    <string name="rec_preset_high_note">FLAC, ‏48 קילוהרץ סטריאו, 16 ביט: בלי אובדן, למוזיקה ולהופעות. כ־400 MB לשעה.</string>
-    <string name="rec_preset_normal_note">AAC, ‏48 קילוהרץ סטריאו, 256 קילוביט: נשמע כמו החדר. כ־115 MB לשעה.</string>
-    <string name="rec_preset_low_note">AAC, ‏24 קילוהרץ מונו, 48 קילוביט: דיבור ברור, הכי קטן. כ־22 MB לשעה.</string>
-    <string name="rec_preset_custom_note">ההגדרות שלך, למטה. בחירת הגדרה מוכנה מחליפה אותן.</string>
     <string name="rec_preset_power">סוללה</string>
     <string name="rec_preset_power_low">חיסכון בסוללה</string>
     <string name="rec_preset_power_normal">מיד</string>
@@ -793,4 +789,8 @@
     </plurals>
     <string name="rec_sound_note">ל־AAC, ל־FLAC ול־WAV כאחד.</string>
     <string name="rec_format_depth_fixed">המקסימום שהמיקרופון הזה נותן. מיקרופון USB שמקליט 24 ביט יציע כאן 24.</string>
+    <string name="rec_profile_note">רגעים מוקלטים בזו. שינויים למטה נשמרים בה.</string>
+    <string name="rec_profile_music_note">משמשת את ״מוזיקה״ בסרגל ההקלטה ובאריח. שינויים למטה נשמרים בה.</string>
+    <string name="rec_profile_reset">איפוס</string>
+    <string name="rec_profile_music_live">מוזיקה תמיד מקודדת בזמן ההקלטה.</string>
 </resources>

@@ -724,10 +724,6 @@
     <string name="rec_preset_normal">Normal</string>
     <string name="rec_preset_low">Low</string>
     <string name="rec_preset_custom">Custom</string>
-    <string name="rec_preset_high_note">FLAC, 48 kHz stereo, 16 bit: lossless, for music and concerts. About 400 MB an hour.</string>
-    <string name="rec_preset_normal_note">AAC, 48 kHz stereo, 256 kbps: sounds like the room. About 115 MB an hour.</string>
-    <string name="rec_preset_low_note">AAC, 24 kHz mono, 48 kbps: clear speech, the smallest. About 22 MB an hour.</string>
-    <string name="rec_preset_custom_note">Your own settings, below. Pick a preset to replace them.</string>
     <string name="rec_preset_power">Battery</string>
     <string name="rec_preset_power_low">Save battery</string>
     <string name="rec_preset_power_normal">Right away</string>
@@ -782,4 +778,8 @@
     </plurals>
     <string name="rec_sound_note">For AAC, FLAC and WAV alike.</string>
     <string name="rec_format_depth_fixed">The most this microphone gives. A USB microphone that records 24 bit offers 24 here.</string>
+    <string name="rec_profile_note">Moments record with this one. Changes below are kept in it.</string>
+    <string name="rec_profile_music_note">Used by Music on the Record bar and the tile. Changes below are kept in it.</string>
+    <string name="rec_profile_reset">Reset</string>
+    <string name="rec_profile_music_live">Music is always encoded as it records.</string>
 </resources>

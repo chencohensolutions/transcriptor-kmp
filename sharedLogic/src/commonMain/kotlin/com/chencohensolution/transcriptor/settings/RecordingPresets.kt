@@ -31,30 +31,81 @@ data class FlacFormat(
     }
 }
 
+/** The codec a profile ends up in (whether it records as WAV first is the battery's, [SettingsStore.wavFirst]). */
+@Serializable
+enum class Codec {
+    @kotlinx.serialization.SerialName("wav") Wav,
+    @kotlinx.serialization.SerialName("aac") Aac,
+    @kotlinx.serialization.SerialName("flac") Flac;
+
+    /** The [AudioFormat] this codec records as: as it records, or as WAV first then this. */
+    fun format(wavFirst: Boolean) = when (this) {
+        Wav -> AudioFormat.Wav
+        Aac -> if (wavFirst) AudioFormat.WavThenAac else AudioFormat.AacLive
+        Flac -> if (wavFirst) AudioFormat.WavThenFlac else AudioFormat.FlacLive
+    }
+
+    companion object {
+        fun of(format: AudioFormat) = when {
+            format.isAac -> Aac
+            format.isFlac -> Flac
+            else -> Wav
+        }
+    }
+}
+
 /**
- * Settings › Recording format's quality presets: each sets the codec and its settings; anything changed by hand reads
- * as [Custom]. Whether it records as WAV first is the power preset's ([PowerPreset]), and is kept.
+ * One recording profile's settings (owner's request, Nov 17, 2026: Low, Normal, High and Music each configurable,
+ * no "custom"): the [codec], AAC's and FLAC's settings (the sound, rate and channels, kept the same in both), FLAC's
+ * compression level, and the microphone (null: the phone's own).
  */
-enum class QualityPreset {
-    /**
-     * FLAC, 48 kHz stereo, 16 bit: lossless, for music (a concert). About 400 MB an hour. 16 bit because the owner's S25
-     * gives its built-in microphones to apps only as 16-bit PCM (its audio policy, Nov 17, 2026): 24 bit would only pad.
-     */
-    High,
+@Serializable
+data class ProfileSettings(
+    val codec: Codec,
+    val aac: AacSettings,
+    val flac: FlacFormat,
+    val flacLevel: Int = FLAC_DEFAULT_LEVEL,
+    val micInput: com.chencohensolution.transcriptor.recording.MicInput? = null,
+) {
+    fun valid() = copy(aac = aac.valid(), flac = flac.valid(), flacLevel = flacLevel.coerceIn(FLAC_LEVELS))
+}
+
+/**
+ * The recording profiles: [High], [Normal] or [Low] records moments (Live, After, No transcript), the one picked in
+ * Settings › Recording settings; [Music] records the Record bar's Music mode (a concert). Each starts from [defaults]
+ * and keeps what the user changes in it.
+ */
+enum class QualityProfile(val key: String) {
+    /** FLAC, 48 kHz stereo, 16 bit: lossless. 16 bit: the owner's S25 gives its own microphones as 16-bit PCM only. */
+    High("high"),
 
     /** AAC-LC, 48 kHz stereo, 256 kbps: about 115 MB an hour (the owner's settings, Nov 15, 2026). */
-    Normal,
+    Normal("normal"),
 
     /** AAC-LC, 24 kHz mono, 48 kbps: speech only, about 22 MB an hour. */
-    Low,
+    Low("low"),
 
-    /** Anything else (WAV included). */
-    Custom;
+    /** The Music mode: FLAC 48 kHz stereo, always encoded as it records; the microphone opened without voice processing. */
+    Music("music");
+
+    /** What this profile starts as, and goes back to on Reset. */
+    val defaults: ProfileSettings
+        get() = when (this) {
+            High, Music -> ProfileSettings(Codec.Flac, NORMAL_AAC, HIGH_FLAC)
+            Normal -> ProfileSettings(Codec.Aac, NORMAL_AAC, FlacFormat(48_000, 2, 16))
+            Low -> ProfileSettings(Codec.Aac, LOW_AAC, FlacFormat(24_000, 1, 16))
+        }
 
     companion object {
         val HIGH_FLAC = FlacFormat(48_000, 2, 16)
         val NORMAL_AAC = AacSettings(AacProfile.Lc, 48_000, 2, 256)
         val LOW_AAC = AacSettings(AacProfile.Lc, 24_000, 1, 48)
+
+        /** The profile kept as [key]; null for anything else. */
+        fun of(key: String?) = entries.firstOrNull { it.key == key }
+
+        /** The profiles moments record with (not Music). */
+        val forMoments = listOf(High, Normal, Low)
     }
 }
 
@@ -90,18 +141,6 @@ data class RecordingChoice(
     val encodeAfter: EncodeAfter,
     val transcribeWhen: EncodeAfter,
 ) {
-    val quality: QualityPreset
-        get() {
-            val a = aac.valid()
-            fun same(p: AacSettings) = a.profile == p.profile && a.sampleRate == p.sampleRate && a.channels == p.channels && a.bitrateKbps == p.bitrateKbps
-            return when {
-                audioFormat.isFlac && flac.valid() == QualityPreset.HIGH_FLAC -> QualityPreset.High
-                audioFormat.isAac && same(QualityPreset.NORMAL_AAC) -> QualityPreset.Normal
-                audioFormat.isAac && same(QualityPreset.LOW_AAC) -> QualityPreset.Low
-                else -> QualityPreset.Custom
-            }
-        }
-
     /**
      * About how many MB an hour takes on the phone while recording: the WAV when it records as WAV first (16 bit before
      * AAC, FLAC's depth before FLAC), else the codec's size. What limits how long a moment can be.
@@ -143,22 +182,6 @@ data class RecordingChoice(
             aac = aac.copy(profile = profile, sampleRate = rate, channels = channels).valid(),
             flac = flac.copy(sampleRate = rate, channels = channels, bitDepth = bits).valid(),
         )
-    }
-
-    /** These settings with [preset]'s codec and its settings; WAV first stays as it was, the AAC encoder too. */
-    fun with(preset: QualityPreset): RecordingChoice {
-        val first = audioFormat.wavFirst
-        fun aacOf(p: AacSettings) = p.copy(encoder = aac.encoder)
-        // The sound (rate, channels) is shared: the other codec follows the preset's.
-        return when (preset) {
-            QualityPreset.High -> copy(audioFormat = if (first) AudioFormat.WavThenFlac else AudioFormat.FlacLive, flac = QualityPreset.HIGH_FLAC)
-                .let { it.withSound(QualityPreset.HIGH_FLAC.sampleRate, QualityPreset.HIGH_FLAC.channels, QualityPreset.HIGH_FLAC.bitDepth) }
-            QualityPreset.Normal -> copy(audioFormat = if (first) AudioFormat.WavThenAac else AudioFormat.AacLive, aac = aacOf(QualityPreset.NORMAL_AAC))
-                .let { it.copy(flac = it.flac.copy(sampleRate = QualityPreset.NORMAL_AAC.sampleRate, channels = QualityPreset.NORMAL_AAC.channels)) }
-            QualityPreset.Low -> copy(audioFormat = if (first) AudioFormat.WavThenAac else AudioFormat.AacLive, aac = aacOf(QualityPreset.LOW_AAC))
-                .let { it.copy(flac = it.flac.copy(sampleRate = QualityPreset.LOW_AAC.sampleRate, channels = QualityPreset.LOW_AAC.channels)) }
-            QualityPreset.Custom -> this
-        }
     }
 
     /** These settings with [preset]'s timing: Low records as WAV first (the codec kept), Normal leaves that as it is. */

@@ -67,6 +67,12 @@ data class Lecture(
     val pendingFlac: Boolean = false,
     /** Recorded as WAV with "WAV, then AAC", and not encoded yet. */
     val pendingAac: Boolean = false,
+    /**
+     * The recording profile it was recorded with ([com.chencohensolution.transcriptor.settings.QualityProfile.key]): a
+     * WAV waiting to be encoded is encoded with this profile's settings, not whichever is picked by then. Null before
+     * profiles (Nov 17, 2026): the one picked now.
+     */
+    val profile: String? = null,
     /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
     val speakerPass: Boolean = false,
     /** The model the refine pass transcribed it with again; null before it. */

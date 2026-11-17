@@ -80,6 +80,8 @@ data class NotebooksState(
     val recordMode: RecordMode = RecordMode.After,
     /** The recording presets for the Record bar's extra row; null unless advanced mode is on. */
     val recordingChoice: com.chencohensolution.transcriptor.settings.RecordingChoice? = null,
+    /** The profile moments record with, for the same row. */
+    val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** The list can read older recordings from the server as it nears its end ([Library.serverOlder]). */
     val serverOlder: Boolean = false,
     /** The list can read newer recordings again as it nears its top ([Library.serverNewer]). */

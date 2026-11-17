@@ -134,7 +134,7 @@ class NotebooksActions(
     /** Keeps the Record bar's Live or After for next time. */
     val setRecordMode: (mode: RecordMode) -> Unit = {},
     /** Advanced mode's Record bar: applies a quality preset (Settings › Recording format). */
-    val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
+    val setQuality: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
     /** Advanced mode's Record bar: applies a battery preset. */
     val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
     val backToRecording: () -> Unit = {},
@@ -468,7 +468,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     )
                                 }
                             }
-                            state.recordingChoice?.let { choice -> RecordPresets(choice, actions) }
+                            state.recordingChoice?.let { choice -> RecordPresets(choice, state.activeProfile, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1059,18 +1059,17 @@ internal fun shortModelName(name: String): String {
 
 /**
  * Advanced mode's extra row on the Record bar: Quality (High, Normal, Low) and Battery (Save, Now), the presets of
- * Settings › Recording format. A setting that matches no preset leaves none of its chips selected; a tap applies one.
+ * Settings › Recording settings: a quality chip picks the profile moments record with; battery chips set the timing.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RecordPresets(choice: com.chencohensolution.transcriptor.settings.RecordingChoice, actions: NotebooksActions) {
-    val quality = choice.quality
+private fun RecordPresets(choice: com.chencohensolution.transcriptor.settings.RecordingChoice, quality: com.chencohensolution.transcriptor.settings.QualityProfile, actions: NotebooksActions) {
     val power = choice.power
     FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.Center) {
         listOf(
-            com.chencohensolution.transcriptor.settings.QualityPreset.High to R.string.notebooks_quality_high,
-            com.chencohensolution.transcriptor.settings.QualityPreset.Normal to R.string.notebooks_quality_normal,
-            com.chencohensolution.transcriptor.settings.QualityPreset.Low to R.string.notebooks_quality_low,
+            com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
+            com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
+            com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
         ).forEach { (p, label) ->
             FilterChip(selected = quality == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
         }

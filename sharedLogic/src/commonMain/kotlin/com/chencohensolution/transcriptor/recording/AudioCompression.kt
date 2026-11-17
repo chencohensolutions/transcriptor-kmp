@@ -37,13 +37,16 @@ class AudioCompression(
     private val fileSystem: FileSystem,
     private val store: LectureStore,
     private val encoder: FlacEncode,
-    /** The compression level, read when each lecture is compressed (the setting can change in between). */
-    private val level: () -> Int = { FLAC_DEFAULT_LEVEL },
+    /**
+     * The compression level, read when each lecture is compressed, for the profile it was recorded with
+     * ([Lecture.profile]; null: before profiles).
+     */
+    private val level: (profile: String?) -> Int = { FLAC_DEFAULT_LEVEL },
     private val aacEncoder: AacEncode? = null,
-    /** The AAC settings, read when each lecture is encoded. */
-    private val aac: () -> AacSettings = { AacSettings() },
-    /** FLAC's rate and channels, read when each lecture is encoded. */
-    private val flac: () -> FlacFormat = { FlacFormat() },
+    /** The AAC settings, read when each lecture is encoded, for its profile. */
+    private val aac: (profile: String?) -> AacSettings = { AacSettings() },
+    /** FLAC's rate and channels, read when each lecture is encoded, for its profile. */
+    private val flac: (profile: String?) -> FlacFormat = { FlacFormat() },
 ) {
     fun pending(): List<Lecture> = store.index().filter { it.pendingEncode }.mapNotNull { store.load(it.id) }
         .filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
@@ -57,8 +60,8 @@ class AudioCompression(
         fileSystem.delete(temp)
         WavWriter.repair(fileSystem, wav)
         val expected = WavWriter.read(fileSystem, wav).frames
-        val written = if (toAac) checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac().valid(), progress)
-        else encoder.encode(wav, temp, level(), flac().valid(), progress)
+        val written = if (toAac) checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac(lecture.profile).valid(), progress)
+        else encoder.encode(wav, temp, level(lecture.profile), flac(lecture.profile).valid(), progress)
         check(written == expected) { "${if (toAac) "AAC" else "FLAC"} took $written frames, the WAV has $expected" }
         fileSystem.atomicMove(temp, out)
         val done = lecture.copy(audioFile = name, pendingFlac = false, pendingAac = false)

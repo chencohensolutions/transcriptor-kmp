@@ -299,14 +299,24 @@ class MainActivity : ComponentActivity() {
         // Advanced mode: the Record bar also offers the quality and battery presets.
         val advanced = remember { Recording.settings.advancedMode }
         var choice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice else null) }
+        var active by remember { mutableStateOf(Recording.settings.activeProfile) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice),
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
-                setQuality = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
-                setPower = { preset -> choice?.with(preset)?.let { next -> choice = next; io { Recording.settings.recordingChoice = next } } },
+                setQuality = { profile ->
+                    Recording.settings.activeProfile = profile
+                    active = profile
+                    choice = Recording.settings.recordingChoice
+                },
+                setPower = { preset ->
+                    choice?.with(preset)?.let { next ->
+                        Recording.settings.setTiming(next.audioFormat.let { it == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || it == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac } || (next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.Wav && Recording.settings.wavFirst), next.encodeAfter, next.transcribeWhen)
+                        choice = Recording.settings.recordingChoice
+                    }
+                },
                 openLectureAt = { id, at -> openLecture(id, at) },
                 search = { query -> withContext(Dispatchers.IO) { Recording.migrateLibrary(); Recording.library.search(query) } },
                 record = { labels, language, mode ->

@@ -380,6 +380,8 @@ private data class LectureFileV1(
     val audio: String,
     val pendingFlac: Boolean = false,
     val pendingAac: Boolean = false,
+    /** The recording profile it was recorded with ([Lecture.profile]). */
+    val profile: String? = null,
     /** Recorded without live transcription, not transcribed yet. */
     val pendingTranscript: Boolean = false,
     val speakerPass: Boolean = false,
@@ -408,7 +410,7 @@ private data class LectureFileV1(
         segments = segments.map { Segment(it.id, it.startMs, it.endMs, it.text, it.model, it.edited, it.speaker, it.words.map { w -> Word(w.atMs, w.text) }) },
         notes = notes.map { Note(it.id, it.atMs, it.text) },
         speakers = speakers.map { Speaker(it.id, it.name) },
-        audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, speakerPass = speakerPass, refinedWith = refinedWith,
+        audioFile = audio, pendingFlac = pendingFlac, pendingAac = pendingAac, profile = profile, speakerPass = speakerPass, refinedWith = refinedWith,
         versions = versions.map { it.toInfo() }, pendingTranscript = pendingTranscript,
         pauses = pauses.map { Pause(it.atMs, it.pausedAt, it.resumedAt) },
         liveOff = liveOff.map { LiveOff(it.fromMs, it.toMs, it.offAt, it.onAt) },
@@ -421,7 +423,7 @@ private data class LectureFileV1(
             id = lecture.id, title = lecture.title, language = lecture.language,
             startedAt = Instant.fromEpochMilliseconds(lecture.startedAtMillis).toString(),
             durationMs = lecture.durationMillis, audio = lecture.audioFile, pendingFlac = lecture.pendingFlac, pendingAac = lecture.pendingAac,
-            pendingTranscript = lecture.pendingTranscript,
+            profile = lecture.profile, pendingTranscript = lecture.pendingTranscript,
             speakerPass = lecture.speakerPass, refinedWith = lecture.refinedWith,
             versions = lecture.versions.map { VersionInfoV1.of(it) },
             speakers = lecture.speakers.map { SpeakerV1(it.id, it.name) },

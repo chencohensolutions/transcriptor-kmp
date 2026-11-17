@@ -137,11 +137,15 @@ class RecordingTest {
     }
 
     @Test
-    fun musicRecordsFlacAtTheHighPresetWhateverTheFormat() = runTest {
+    fun musicRecordsWithTheMusicProfileWhateverTheActiveOne() = runTest {
         wav()
+        settings.setProfile(com.chencohensolution.transcriptor.settings.QualityProfile.Music,
+            com.chencohensolution.transcriptor.settings.QualityProfile.Music.defaults.copy(flacLevel = 4))
         val lecture = session().start(emptyList(), "", "he", "הופעה", transcribeLive = false, transcribeAfter = false, music = true)
         assertEquals(AudioFileFormat.Flac, recorder.format)
-        assertEquals(com.chencohensolution.transcriptor.settings.QualityPreset.HIGH_FLAC, recorder.flac)
+        assertEquals(com.chencohensolution.transcriptor.settings.QualityProfile.HIGH_FLAC, recorder.flac)
+        assertEquals(4, recorder.flacLevel)
+        assertEquals("music", store.load(lecture.id)?.profile)
         assertTrue(recorder.music)
         assertEquals(com.chencohensolution.transcriptor.notebook.AUDIO_FLAC, store.load(lecture.id)?.audioFile)
     }
@@ -342,7 +346,7 @@ class RecordingTest {
             fs.write(flac) { writeUtf8("fLaC") }
             progress(1f)
             96_000
-        }, settings::flacLevel)
+        }, { settings.flacLevel })
         assertEquals(listOf(stopped.id), compression.pending().map { it.id })
         val done = compression.compress(stopped)
         assertEquals(7, level)

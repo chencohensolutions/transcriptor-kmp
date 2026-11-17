@@ -7,7 +7,8 @@ import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.EncodeAfter
 import com.chencohensolution.transcriptor.settings.FlacFormat
 import com.chencohensolution.transcriptor.settings.PowerPreset
-import com.chencohensolution.transcriptor.settings.QualityPreset
+import com.chencohensolution.transcriptor.settings.QualityProfile
+import com.chencohensolution.transcriptor.settings.Codec
 import com.chencohensolution.transcriptor.settings.RecordingChoice
 import com.chencohensolution.transcriptor.settings.SettingsStore
 import okio.Path.Companion.toPath
@@ -17,30 +18,6 @@ import kotlin.test.assertEquals
 
 class RecordingPresetsTest {
     private val owner = RecordingChoice(AudioFormat.WavThenAac, AacSettings(), FlacFormat(), EncodeAfter.Stop, EncodeAfter.Charging)
-
-    @Test
-    fun theOwnersSettingsAreNormalQualityAndCustomPower() {
-        assertEquals(QualityPreset.Normal, owner.quality)
-        assertEquals(PowerPreset.Custom, owner.power)
-    }
-
-    @Test
-    fun highIsFlacStereoAndKeepsWavFirst() {
-        val high = owner.with(QualityPreset.High)
-        assertEquals(AudioFormat.WavThenFlac, high.audioFormat)
-        assertEquals(FlacFormat(48_000, 2, 16), high.flac)
-        assertEquals(QualityPreset.High, high.quality)
-        assertEquals(QualityPreset.Custom, high.copy(flac = high.flac.copy(channels = 1)).quality)
-    }
-
-    @Test
-    fun lowQualityIsMonoAacAndKeepsTheEncoder() {
-        val low = owner.copy(audioFormat = AudioFormat.FlacLive, aac = AacSettings(encoder = "x")).with(QualityPreset.Low)
-        assertEquals(AudioFormat.AacLive, low.audioFormat)
-        assertEquals(1, low.aac.channels)
-        assertEquals("x", low.aac.encoder)
-        assertEquals(QualityPreset.Low, low.quality)
-    }
 
     @Test
     fun powerPresetsSetTheTiming() {
@@ -53,19 +30,45 @@ class RecordingPresetsTest {
         assertEquals(EncodeAfter.Stop, normal.encodeAfter)
         assertEquals(EncodeAfter.Stop, normal.transcribeWhen)
         assertEquals(PowerPreset.Normal, normal.power)
-        // Quality and power are independent.
-        assertEquals(QualityPreset.Normal, normal.quality)
     }
 
     @Test
-    fun storeKeepsTheChoice() {
+    fun theOwnersSettingsBecomeTheNormalProfile() {
+        val fs = FakeFileSystem()
+        fs.createDirectories("/s".toPath())
+        // A settings file from before profiles: WAV then AAC, 256 kbps stereo, a picked microphone.
+        fs.write("/s/settings.json".toPath()) {
+            writeUtf8("""{"v":1,"audioFormat":"wav-then-aac","aac":{"profile":"lc","sampleRate":48000,"channels":2,"bitrateKbps":256},"micInput":{"key":"usb:1:Mic","name":"Mic","kind":"Usb"}}""")
+        }
+        val store = SettingsStore(fs, "/s".toPath())
+        assertEquals(QualityProfile.Normal, store.activeProfile)
+        assertEquals(AudioFormat.WavThenAac, store.audioFormat)
+        assertEquals(true, store.wavFirst)
+        assertEquals(256, store.profile(QualityProfile.Normal).aac.bitrateKbps)
+        // The others are their defaults, with the microphone picked before.
+        assertEquals(Codec.Flac, store.profile(QualityProfile.High).codec)
+        assertEquals("Mic", store.profile(QualityProfile.Low).micInput?.name)
+        assertEquals(1, store.profile(QualityProfile.Low).aac.channels)
+    }
+
+    @Test
+    fun changesGoIntoTheActiveProfileAndStayThere() {
         val fs = FakeFileSystem()
         val store = SettingsStore(fs, "/s".toPath())
-        store.recordingChoice = owner.with(QualityPreset.High).with(PowerPreset.Low)
-        val back = SettingsStore(fs, "/s".toPath()).recordingChoice
-        assertEquals(QualityPreset.High, back.quality)
-        assertEquals(PowerPreset.Low, back.power)
-        assertEquals(16, store.flac.bitDepth)
+        store.activeProfile = QualityProfile.High
+        store.flacLevel = 3
+        store.audioFormat = AudioFormat.AacLive
+        assertEquals(Codec.Aac, store.profile(QualityProfile.High).codec)
+        store.activeProfile = QualityProfile.Low
+        assertEquals(AudioFormat.AacLive, store.audioFormat)
+        assertEquals(1, store.aac.channels)
+        store.activeProfile = QualityProfile.High
+        assertEquals(3, SettingsStore(fs, "/s".toPath()).flacLevel)
+        // Music is edited but never the active one.
+        store.activeProfile = QualityProfile.Music
+        assertEquals(QualityProfile.High, store.activeProfile)
+        store.resetProfile(QualityProfile.High)
+        assertEquals(QualityProfile.High.defaults.flacLevel, store.profile(QualityProfile.High).flacLevel)
     }
 
     @Test
@@ -98,9 +101,6 @@ class RecordingPresetsTest {
         val he2 = owner.copy(aac = AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.HeV2, 48_000, 2, 32))
         assertEquals(com.chencohensolution.transcriptor.settings.AacProfile.He, he2.withSound(48_000, 1).aac.profile)
         assertEquals(com.chencohensolution.transcriptor.settings.AacProfile.Lc, he2.withSound(16_000, 1).aac.profile)
-        // A preset moves the other codec too.
-        assertEquals(1, owner.with(QualityPreset.Low).flac.channels)
-        assertEquals(2, owner.with(QualityPreset.Low).with(QualityPreset.High).aac.channels)
     }
 
     @Test
