@@ -92,6 +92,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -458,7 +459,9 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp),
                             )
-                            FlowRow(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            // Dense rows (owner's call, Nov 17, 2026): chips without the 48 dp touch margin around them.
+                            CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+                            FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(
                                     RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
                                     RecordMode.Only to R.string.notebooks_record_only, RecordMode.Music to R.string.notebooks_record_music,
@@ -469,6 +472,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                         leadingIcon = if (mode == RecordMode.Music) ({ Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) }) else null,
                                     )
                                 }
+                            }
                             }
                             state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode, actions) }
                             Button(
@@ -1078,11 +1082,12 @@ private fun RecordPresets(
     val saving = if (music) state.musicPowerSaving else state.powerSaving
     val shown = if (music) state.musicChoice ?: choice else choice
     val settings = if (music) state.musicSettings else state.activeSettings
-    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+    CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.notebooks_presets_quality), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
             if (music) {
-                Text(stringResource(R.string.notebooks_presets_music), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 10.dp))
+                Text(stringResource(R.string.notebooks_presets_music), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp))
             } else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
@@ -1116,8 +1121,9 @@ private fun RecordPresets(
                 compress, transcribe,
             ),
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp),
         )
+    }
     }
 }
 
@@ -1125,7 +1131,7 @@ private fun RecordPresets(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WhenRow(title: String, saving: Boolean, set: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(true to R.string.notebooks_power_low, false to R.string.notebooks_power_normal).forEach { (on, label) ->
