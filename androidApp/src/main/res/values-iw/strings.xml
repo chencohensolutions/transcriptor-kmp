@@ -815,4 +815,7 @@
     <string name="notebooks_presets_music">ההגדרות של מוזיקה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
     <string name="rec_preset_power_low_music">חוסך סוללה: מקליט WAV פשוט, שנדחס לקידוד שנבחר כשהטלפון בטעינה עם 30% ומעלה.</string>
     <string name="rec_preset_power_normal_music">דוחס בזמן ההקלטה. משתמש בסוללה אז.</string>
+    <string name="rec_format_codec">קידוד</string>
+    <string name="rec_format_wav_line">בלי דחיסה: הכי גדול, בלי שום קידוד.</string>
+    <string name="rec_format_flac_lossless">בלי אובדן: כל הצליל נשמר, בערך חצי מ־WAV.</string>
 </resources>
