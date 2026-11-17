@@ -143,16 +143,16 @@ class StopByPlaceTest {
     }
 
     @Test
-    fun pathIsThinned() {
+    fun everyFixIsKeptButTheSameOneTwice() {
         val b = PathBuilder { it - 1_000_000 }
         assertTrue(b.add(Fix(1_000_000, home, 5f)))
-        assertFalse(b.add(Fix(1_000_500, north(30.0), 5f))) // under a second
-        assertFalse(b.add(Fix(1_010_000, north(2.0), 5f))) // didn't move
+        assertFalse(b.add(Fix(1_000_100, home, 5f, source = FixSource.Gps))) // the same fix, heard by the other listener
+        assertTrue(b.add(Fix(1_001_000, north(0.3), 5f))) // standing still: kept anyway
         assertTrue(b.add(Fix(1_020_000, north(50.0), 5f, speedMps = 5f)))
-        assertTrue(b.add(Fix(1_080_000, north(51.0), 5f))) // still, but a minute on
+        assertFalse(b.add(Fix(1_010_000, north(10.0), 5f))) // an older one arriving late
         val path = b.path()
-        assertEquals(listOf(0L, 20_000L, 80_000L), path.points.map { it.atMillis })
-        assertTrue(abs(path.distanceMeters() - 51.0) < 1.0)
+        assertEquals(listOf(0L, 1_000L, 20_000L), path.points.map { it.atMillis })
+        assertTrue(abs(path.distanceMeters() - 50.0) < 1.0)
         assertEquals(5f, path.topSpeedMps())
     }
 
@@ -175,10 +175,7 @@ class StopByPlaceTest {
     @Test
     fun aSlowWalkKeepsEveryPoint() {
         val b = PathBuilder { it }
-        // 0.5 m/s: half a metre a second, under the 5 m a standing point needs.
         (0..10).forEach { s -> assertTrue(b.add(Fix(s * 1000L, north(s * 0.5), 4f, speedMps = 0.5f))) }
-        // Standing still with GPS noise: thinned.
-        assertFalse(b.add(Fix(12_000, north(5.2), 4f, speedMps = 0.05f)))
         assertEquals(11, b.size)
     }
 
