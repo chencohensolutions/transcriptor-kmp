@@ -196,7 +196,14 @@ class AacEncoder(
  */
 val androidAacEncode = AacEncode { wav, aac, settings, progress ->
     val info = WavWriter.read(okio.FileSystem.SYSTEM, wav)
-    val encoder = AacEncoder(aac.toFile(), settings, info.sampleRate, info.channels)
+    // The WAV's own sound (rate and channels), the profile's bitrate and AAC profile; one that can't take the sound gives way.
+    val sound = settings.copy(sampleRate = info.sampleRate, channels = info.channels).let { s ->
+        var p = s.profile
+        if (p == com.chencohensolution.transcriptor.settings.AacProfile.HeV2 && s.channels == 1) p = com.chencohensolution.transcriptor.settings.AacProfile.He
+        if (s.sampleRate !in com.chencohensolution.transcriptor.settings.AacSettings.rates(p)) p = com.chencohensolution.transcriptor.settings.AacProfile.Lc
+        s.copy(profile = p)
+    }
+    val encoder = AacEncoder(aac.toFile(), sound, info.sampleRate, info.channels)
     val bits = info.bitsPerSample
     val frame = info.blockAlign
     val narrow = if (bits == 24) ByteArray(64 * 1024) else null

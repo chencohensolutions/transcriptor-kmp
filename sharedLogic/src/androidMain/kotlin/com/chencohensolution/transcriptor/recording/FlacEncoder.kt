@@ -181,9 +181,8 @@ val androidFlacEncode = FlacEncode { wav, flac, level, format, progress ->
     val wavFile = wav.toFile()
     val info = WavWriter.read(okio.FileSystem.SYSTEM, wav)
     val bits = info.bitsPerSample
-    // The WAV's own rate and channels come in; FLAC can't be finer than the WAV (a 24 kHz WAV stays 24 kHz).
-    val out = format.copy(bitDepth = bits, sampleRate = minOf(format.sampleRate, info.sampleRate), channels = minOf(format.channels, info.channels))
-        .let { if (info.sampleRate % it.sampleRate == 0) it else it.copy(sampleRate = info.sampleRate) }
+    // The WAV was recorded at the sound it is to be kept at: FLAC takes its rate, channels and bit depth as they are.
+    val out = format.copy(bitDepth = bits, sampleRate = info.sampleRate, channels = info.channels)
     val encoder = FlacEncoder(flac.toFile(), level, out, info.sampleRate, info.channels)
     val frame = info.blockAlign
     RandomAccessFile(wavFile, "r").use { input ->

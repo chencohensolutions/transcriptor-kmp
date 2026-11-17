@@ -13,8 +13,8 @@ import okio.FileSystem
 import okio.Path
 
 /**
- * Encodes a WAV file to FLAC at [level] (0 the fastest, 8 the smallest) and [format]'s rate and channels (the bit depth
- * is the WAV's), reporting progress 0..1, and returns the number of the WAV's frames (samples per channel) it took in.
+ * Encodes a WAV file to FLAC at [level] (0 the fastest, 8 the smallest) at the WAV's own rate, channels and bit depth
+ * (owner's call, Nov 17, 2026: the WAV was recorded at the sound to keep), reporting progress 0..1, and returns the number of the WAV's frames (samples per channel) it took in.
  */
 fun interface FlacEncode {
     fun encode(wav: Path, flac: Path, level: Int, format: FlacFormat, progress: (Float) -> Unit): Long

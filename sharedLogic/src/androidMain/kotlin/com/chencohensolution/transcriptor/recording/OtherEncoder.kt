@@ -160,11 +160,8 @@ class OtherEncoder(
 /** [OtherEncode] with [OtherEncoder]: the WAV's PCM (a 24-bit one brought to 16) in 64 KB pieces; returns the WAV frames taken in. */
 val androidOtherEncode = OtherEncode { wav, out, spec, progress ->
     val info = WavWriter.read(okio.FileSystem.SYSTEM, wav)
-    val encoder = OtherEncoder(out.toFile(), spec.copy(
-        // Not finer than the WAV (its rate a whole multiple of the codec's, as recorded for it).
-        sampleRate = if (info.sampleRate % spec.sampleRate == 0) spec.sampleRate else info.sampleRate,
-        channels = minOf(spec.channels, info.channels),
-    ), info.sampleRate, info.channels)
+    // The WAV's own sound; the AMRs keep theirs (8 or 16 kHz mono: the WAV was recorded at it).
+    val encoder = OtherEncoder(out.toFile(), if (spec.codec.fixedRate != null) spec else spec.copy(sampleRate = info.sampleRate, channels = info.channels), info.sampleRate, info.channels)
     val frame = info.blockAlign
     val narrow = if (info.bitsPerSample == 24) ByteArray(64 * 1024) else null
     var frames = 0L

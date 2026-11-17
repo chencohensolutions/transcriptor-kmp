@@ -105,8 +105,8 @@ class FlacFormatRoundTripTest {
         val flac = File(dir, "test24-from-wav.flac")
         val frames = androidFlacEncode.encode(wav.toOkioPath(), flac.toOkioPath(), 8, FlacFormat(24_000, 1, 16)) {}
         assertEquals(seconds * 48_000L, frames)
-        // The WAV's bit depth wins over the setting's.
-        assertEquals(listOf(24_000L, 1L, 24L, seconds * 24_000L), streamInfo(flac))
+        // The WAV's sound wins over the setting's: 48 kHz stereo 24 bit, as it was recorded.
+        assertEquals(listOf(48_000L, 2L, 24L, seconds * 48_000L), streamInfo(flac))
         checkAudio(flac, "FLAC from 24-bit WAV")
 
         val aac = File(dir, "test24-from-wav.aac")
