@@ -22,7 +22,8 @@ without a server.
 - **Paired**: "Paired with … as … This phone is "…" there."; how the backup stands: "n moments on the phone · m uploaded" (the moments recorded in Audio Logs that are on
   the phone now, and how many of them went up; hen, Nov 17, 2026: the old "Every finished moment is on the server
   (917)" counted every moment ever handed over, deleted ones and server recordings opened here included), then
-  "Waiting to upload: 2 moments · 64 calls · 279 MB left" while something waits; what counts as uploaded is recorded in
+  "Waiting to upload: 2 moments · 64 calls · 279 MB left" while something waits; moments still WAV, waiting to be compressed on the charger, are said so ("3 moments wait to be compressed…"),
+  and Upload now compresses them first, on battery too ("Compressing 3 moments, then sending…"; hen, Nov 17, 2026); what counts as uploaded is recorded in
   `backup.json` when shed reports a file done, and only then does shed forget it (`recordUploads`, `Shed.acknowledge`;
   hen, Nov 17, 2026: shed keeps each upload until the app that asked has learned it ended, as shed will one day be one
   app serving several); what was handed over before that is asked of the server once (`confirmWithServer`), and handed

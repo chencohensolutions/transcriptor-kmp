@@ -785,4 +785,12 @@
     <string name="settings_mic_test_off">הבדיקה מקשיבה כשלא מוקלט כלום והאפליקציה רשאית להשתמש במיקרופון.</string>
     <string name="glance_clipping">חזק מדי: הצליל נחתך. כדאי להתרחק ממקור הקול, או לנסות את המיקרופון האחורי.</string>
     <string name="rec_preset_hours_left">בערך %1$d שעות הקלטה נכנסות בטלפון (%2$d GB פנויים).</string>
+    <plurals name="server_compressing">
+        <item quantity="one">דוחס רגע אחד, ואז שולח…</item>
+        <item quantity="other">דוחס %d רגעים, ואז שולח…</item>
+    </plurals>
+    <plurals name="server_awaiting_encode">
+        <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלח.</item>
+        <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלחו.</item>
+    </plurals>
 </resources>
