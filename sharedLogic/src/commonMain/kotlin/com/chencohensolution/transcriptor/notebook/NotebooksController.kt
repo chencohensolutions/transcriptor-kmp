@@ -80,6 +80,18 @@ data class NotebooksState(
     val recordMode: RecordMode = RecordMode.After,
     /** The recording presets for the Record bar's extra row; null unless advanced mode is on. */
     val recordingChoice: com.chencohensolution.transcriptor.settings.RecordingChoice? = null,
+    /** Music's settings, for the same rows when Music is picked (its encoder line and its own battery mode). */
+    val musicChoice: com.chencohensolution.transcriptor.settings.RecordingChoice? = null,
+    /** Save battery: the shared mode, and Music's own. */
+    val powerSaving: Boolean = false,
+    val musicPowerSaving: Boolean = false,
+    /** "After" moments are transcribed on the charger. */
+    val transcribeSaving: Boolean = false,
+    /** The active profile's and Music's settings in full (the other codecs' bitrates), for the summary above Record. */
+    val activeSettings: com.chencohensolution.transcriptor.settings.ProfileSettings? = null,
+    val musicSettings: com.chencohensolution.transcriptor.settings.ProfileSettings? = null,
+    /** The profile moments record with, for the same row. */
+    val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** The list can read older recordings from the server as it nears its end ([Library.serverOlder]). */
     val serverOlder: Boolean = false,
     /** The list can read newer recordings again as it nears its top ([Library.serverNewer]). */

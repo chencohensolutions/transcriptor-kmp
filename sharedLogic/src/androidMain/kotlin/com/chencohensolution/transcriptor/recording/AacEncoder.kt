@@ -72,9 +72,17 @@ object AacEncoders {
  * header, so the file plays and seeks without an index, and a recording cut off by a crash is good up to its last
  * whole frame. The PCM is brought to the settings' rate and channels first ([PcmReducer]).
  */
-class AacEncoder(file: File, settings: AacSettings) : PcmSink {
-    private val aac = settings.valid()
-    private val reducer = PcmReducer(aac.sampleRate, aac.channels)
+class AacEncoder(
+    file: File, settings: AacSettings,
+    /** The PCM's rate and channels as it comes in: the microphone's, or a WAV's already reduced. */
+    inRate: Int = WavWriter.SAMPLE_RATE, inChannels: Int = WavWriter.CHANNELS,
+) : PcmSink {
+    private val aac = settings.valid().let { a ->
+        // AAC can't be finer than its WAV: a 24 kHz mono WAV stays 24 kHz mono.
+        if (inRate % a.sampleRate == 0 && a.channels <= inChannels) a
+        else a.copy(sampleRate = if (inRate % a.sampleRate == 0) a.sampleRate else inRate, channels = minOf(a.channels, inChannels)).valid()
+    }
+    private val reducer = PcmReducer(aac.sampleRate, aac.channels, 16, inRate, inChannels)
     private val stream = FileOutputStream(file)
     // About a second of audio at 64 kbps: what a killed process can lose (FLAC loses less; it isn't buffered).
     private val out = BufferedOutputStream(stream, 8 * 1024)
@@ -187,9 +195,17 @@ class AacEncoder(file: File, settings: AacSettings) : PcmSink {
  * WAV frames taken in.
  */
 val androidAacEncode = AacEncode { wav, aac, settings, progress ->
-    val encoder = AacEncoder(aac.toFile(), settings)
-    val bits = WavWriter.read(okio.FileSystem.SYSTEM, wav).bitsPerSample
-    val frame = WavWriter.CHANNELS * bits / 8
+    val info = WavWriter.read(okio.FileSystem.SYSTEM, wav)
+    // The WAV's own sound (rate and channels), the profile's bitrate and AAC profile; one that can't take the sound gives way.
+    val sound = settings.copy(sampleRate = info.sampleRate, channels = info.channels).let { s ->
+        var p = s.profile
+        if (p == com.chencohensolution.transcriptor.settings.AacProfile.HeV2 && s.channels == 1) p = com.chencohensolution.transcriptor.settings.AacProfile.He
+        if (s.sampleRate !in com.chencohensolution.transcriptor.settings.AacSettings.rates(p)) p = com.chencohensolution.transcriptor.settings.AacProfile.Lc
+        s.copy(profile = p)
+    }
+    val encoder = AacEncoder(aac.toFile(), sound, info.sampleRate, info.channels)
+    val bits = info.bitsPerSample
+    val frame = info.blockAlign
     val narrow = if (bits == 24) ByteArray(64 * 1024) else null
     var frames = 0L
     java.io.RandomAccessFile(wav.toFile(), "r").use { input ->

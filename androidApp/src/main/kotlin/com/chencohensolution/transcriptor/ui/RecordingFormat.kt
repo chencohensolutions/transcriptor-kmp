@@ -50,22 +50,32 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.chencohensolution.transcriptor.R
 import com.chencohensolution.transcriptor.settings.AacProfile
+import com.chencohensolution.transcriptor.settings.AacSettings
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.EncodeAfter
 import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import com.chencohensolution.transcriptor.settings.FlacFormat
 import com.chencohensolution.transcriptor.settings.PowerPreset
-import com.chencohensolution.transcriptor.settings.QualityPreset
+import com.chencohensolution.transcriptor.settings.QualityProfile
+import com.chencohensolution.transcriptor.settings.Codec
+import com.chencohensolution.transcriptor.settings.wavFirst
 import kotlin.math.roundToInt
 
 /** Settings' recording-format pages, opened from its Recording format row. */
-enum class FormatPage { Format, Aac, Flac, Mic }
+enum class FormatPage { Format, Aac, Flac, Mic, Opus, Xhe, AmrWb, AmrNb }
 
-/** The codec a format records to in the end. */
-private fun codecOf(format: AudioFormat) = when (format) {
-    AudioFormat.Wav -> AudioFormat.Wav
-    AudioFormat.AacLive, AudioFormat.WavThenAac -> AudioFormat.AacLive
-    AudioFormat.FlacLive, AudioFormat.WavThenFlac -> AudioFormat.FlacLive
+/** The codec a format records to in the end, as it records (WAV first or not). */
+private fun codecOf(format: AudioFormat) = Codec.of(format).format(wavFirst = false)
+
+/** The page of one of the other codecs. */
+private fun pageOf(codec: Codec) = when (codec) {
+    Codec.Opus -> FormatPage.Opus
+    Codec.Xhe -> FormatPage.Xhe
+    Codec.AmrWb -> FormatPage.AmrWb
+    Codec.AmrNb -> FormatPage.AmrNb
+    Codec.Aac -> FormatPage.Aac
+    Codec.Flac -> FormatPage.Flac
+    Codec.Wav -> FormatPage.Format
 }
 
 /**
@@ -79,8 +89,9 @@ private fun codecOf(format: AudioFormat) = when (format) {
 fun RecordingFormatPages(page: FormatPage, state: ModelsState, actions: ModelsActions, open: (FormatPage) -> Unit, back: () -> Unit) {
     when (page) {
         FormatPage.Format -> FormatList(state, actions, open, back)
-        FormatPage.Aac, FormatPage.Flac -> CodecPage(state, actions, aac = page == FormatPage.Aac, back)
         FormatPage.Mic -> MicrophonePage(state, actions, back)
+        // The codecs' settings are on the one page now (owner's request, Nov 17, 2026).
+        else -> FormatList(state, actions, open, back)
     }
 }
 
@@ -94,8 +105,8 @@ private fun aacLine(state: ModelsState): String {
 }
 
 @Composable
-private fun encodeLine(state: ModelsState): String = when (state.audioFormat) {
-    AudioFormat.WavThenAac, AudioFormat.WavThenFlac ->
+private fun encodeLine(state: ModelsState): String = when {
+    state.audioFormat.wavFirst ->
         stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_stop_short else R.string.rec_format_later_charging_short)
     else -> stringResource(R.string.rec_format_while_recording_short)
 }
@@ -108,11 +119,11 @@ private fun flacLine(flac: FlacFormat): String =
 private val ModelsState.recordedFlac get() = if (deepCapture) flac else flac.copy(bitDepth = 16)
 
 @Composable
-private fun qualityName(preset: QualityPreset) = stringResource(when (preset) {
-    QualityPreset.High -> R.string.rec_preset_high
-    QualityPreset.Normal -> R.string.rec_preset_normal
-    QualityPreset.Low -> R.string.rec_preset_low
-    QualityPreset.Custom -> R.string.rec_preset_custom
+internal fun profileName(profile: QualityProfile) = stringResource(when (profile) {
+    QualityProfile.High -> R.string.rec_preset_high
+    QualityProfile.Normal -> R.string.rec_preset_normal
+    QualityProfile.Low -> R.string.rec_preset_low
+    QualityProfile.Music -> R.string.notebooks_record_music
 })
 
 @Composable
@@ -122,17 +133,47 @@ private fun powerName(preset: PowerPreset) = stringResource(when (preset) {
     PowerPreset.Custom -> R.string.rec_preset_custom
 })
 
+/** The shown profile in one line: codec and its settings. */
+@Composable
+private fun profileLine(state: ModelsState): String = when (codecOf(state.audioFormat)) {
+    AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state)
+    AudioFormat.FlacLive -> stringResource(R.string.rec_format_codec_flac) + " · " + flacLine(state.recordedFlac)
+    AudioFormat.Wav -> stringResource(R.string.rec_format_summary_wav)
+    else -> otherLine(state, Codec.of(state.audioFormat))
+}
+
+/** One of the other codecs in one line: its name, bitrate, channels and rate. */
+@Composable
+private fun otherLine(state: ModelsState, codec: Codec): String {
+    val o = state.profileSettings.other(codec) ?: return codecName(codec)
+    return codecName(codec) + " · " + stringResource(R.string.rec_format_kbps_decimal, kbps(o.bitrate)) + " · " +
+        stringResource(if (o.channels == 1) R.string.rec_format_mono else R.string.rec_format_stereo) + " · " + stringResource(R.string.rec_format_khz, o.sampleRate / 1000)
+}
+
+@Composable
+private fun codecName(codec: Codec) = stringResource(when (codec) {
+    Codec.Wav -> R.string.rec_format_codec_wav
+    Codec.Aac -> R.string.rec_format_codec_aac
+    Codec.Flac -> R.string.rec_format_codec_flac
+    Codec.Opus -> R.string.rec_format_codec_opus
+    Codec.Xhe -> R.string.rec_format_codec_xhe
+    Codec.AmrWb -> R.string.rec_format_codec_amrwb
+    Codec.AmrNb -> R.string.rec_format_codec_amrnb
+})
+
 /** The Recording format row's line in Settings: the presets, then the codec, its settings, and when it encodes. */
 @Composable
 fun recordingFormatSummary(state: ModelsState): String {
     val choice = state.recordingChoice
-    val presets = stringResource(R.string.rec_preset_summary, qualityName(choice.quality), powerName(choice.power))
-        // The microphone moved here (it decides what is supported): its name when it isn't the phone's own.
-        .let { line -> state.micInput?.let { line + " · " + micName(it.name, it.kind) } ?: line }
-    return presets + "\n" + when (codecOf(state.audioFormat)) {
+    val presets = stringResource(R.string.rec_preset_summary, profileName(state.activeProfile), powerName(choice.power))
+    // The settings line is the shown profile's: said only when it is the one moments record with.
+    if (state.profile != state.activeProfile) return presets
+    val withMic = state.micInput?.let { presets + " · " + micName(it.name, it.kind) } ?: presets
+    return withMic + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
         AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)
-        else -> stringResource(R.string.rec_format_summary_wav)
+        AudioFormat.Wav -> stringResource(R.string.rec_format_summary_wav)
+        else -> otherLine(state, Codec.of(state.audioFormat)) + " · " + encodeLine(state)
     }
 }
 
@@ -145,41 +186,55 @@ private fun FormatTopBar(title: String, back: () -> Unit) {
     )
 }
 
+/**
+ * Settings › Recording settings, one page from top to bottom, each part narrowing the next (owner's request, Nov 17,
+ * 2026): the microphone (what it gives), the profile (Low, Normal, High, Music), the codec, the sound the codec can
+ * take (rate, channels, bit depth: lossless only; the AMRs' fixed), that codec's own settings, then when to compress
+ * and transcribe. No page per codec.
+ */
 @Composable
 private fun FormatList(state: ModelsState, actions: ModelsActions, open: (FormatPage) -> Unit, back: () -> Unit) {
-    val codec = codecOf(state.audioFormat)
+    val codec = Codec.of(state.audioFormat)
     Scaffold(topBar = { FormatTopBar(stringResource(R.string.rec_format_format), back) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).selectableGroup()) {
-            // The microphone first: what it gives decides what is offered below (24 bit only from one that gives it).
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
             MicrophoneRow(state) { open(FormatPage.Mic) }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             Presets(state, actions)
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            FormatPageNote(stringResource(R.string.rec_format_format_note))
-            // WAV: chosen here. AAC and FLAC: chosen and their page opened (the previous way they recorded is kept).
-            CodecRow(codec == AudioFormat.Wav, stringResource(R.string.rec_format_codec_wav), stringResource(R.string.rec_format_wav_short), page = false) {
-                actions.setAudioFormat(AudioFormat.Wav)
-            }
-            CodecRow(codec == AudioFormat.AacLive, stringResource(R.string.rec_format_codec_aac),
-                if (codec == AudioFormat.AacLive) aacLine(state) + " · " + encodeLine(state) else stringResource(R.string.rec_format_aac_short), page = true) {
-                if (codec != AudioFormat.AacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenFlac) AudioFormat.WavThenAac else AudioFormat.AacLive)
-                open(FormatPage.Aac)
-            }
-            CodecRow(codec == AudioFormat.FlacLive, stringResource(R.string.rec_format_codec_flac),
-                if (codec == AudioFormat.FlacLive) flacLine(state.recordedFlac) + " · " + stringResource(R.string.rec_format_flac_line, state.flacLevel, FLAC_LEVELS.last) + " · " + encodeLine(state)
-                else stringResource(R.string.rec_format_flac_short), page = true) {
-                if (codec != AudioFormat.FlacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenAac) AudioFormat.WavThenFlac else AudioFormat.FlacLive)
-                open(FormatPage.Flac)
+            // 1. The codec: the phone's (only those it has), each with what it is for.
+            Column(Modifier.selectableGroup()) {
+                Text(stringResource(R.string.rec_format_codec), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
+                (listOf(Codec.Wav, Codec.Aac, Codec.Flac) + listOf(Codec.Opus, Codec.Xhe, Codec.AmrWb, Codec.AmrNb).filter { it in state.codecs }).forEach { c ->
+                    CodecRow(codec == c, codecName(c), stringResource(codecShort(c)), page = false) {
+                        if (codec != c) actions.setAudioFormat(c.format(state.audioFormat.wavFirst))
+                    }
+                }
             }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            EncodeLater(state, actions)
+            // 2. The sound this codec takes.
+            SoundPart(state, actions, codec)
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            // 3. This codec's own settings.
+            when (codec) {
+                Codec.Aac -> AacSettingsPart(state, actions)
+                Codec.Flac -> {
+                    FlacFormatPart(state.flac, state.deepCapture)
+                    FlacEffortPart(state.flacLevel, state.audioFormat, actions.setFlacLevel)
+                }
+                Codec.Wav -> FormatPageNote(stringResource(R.string.rec_format_wav_short, state.recordingChoice.copy(audioFormat = AudioFormat.Wav, flac = state.recordedFlac).megabytesPerHourWhileRecording))
+                else -> OtherCodecPart(state, actions, codec)
+            }
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+            // 4. When to compress and transcribe.
+            TimingPart(state, actions)
         }
     }
 }
 
 /**
- * The quality presets (codec and its settings) and the battery presets (when encoding and "After" transcription run),
- * as segmented rows; Custom is shown, selected, only while the settings match no preset.
+ * The recording profiles (owner's request, Nov 17, 2026): High, Normal and Low (the one picked records moments) and
+ * Music (the Music mode's), each with its own settings, edited on this page while its tab is shown; Reset puts it
+ * back to its defaults. Then the battery presets (when encoding and "After" transcription run, for all).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -187,63 +242,74 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
     val choice = state.recordingChoice
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         FormatLabel(stringResource(R.string.rec_preset_quality))
-        val quality = listOf(QualityPreset.High, QualityPreset.Normal, QualityPreset.Low) + listOfNotNull(QualityPreset.Custom.takeIf { choice.quality == it })
+        val profiles = QualityProfile.entries
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            quality.forEachIndexed { i, p ->
+            profiles.forEachIndexed { i, p ->
                 SegmentedButton(
-                    selected = choice.quality == p, onClick = { if (p != QualityPreset.Custom) actions.setQuality(p) },
-                    shape = SegmentedButtonDefaults.itemShape(i, quality.size),
-                ) { Text(qualityName(p)) }
+                    selected = state.profile == p, onClick = { actions.showProfile(p) },
+                    shape = SegmentedButtonDefaults.itemShape(i, profiles.size),
+                ) { Text(profileName(p), maxLines = 1) }
             }
         }
-        FormatNote(stringResource(when (choice.quality) {
-            QualityPreset.High -> R.string.rec_preset_high_note
-            QualityPreset.Normal -> R.string.rec_preset_normal_note
-            QualityPreset.Low -> R.string.rec_preset_low_note
-            QualityPreset.Custom -> R.string.rec_preset_custom_note
-        }))
+        FormatNote(stringResource(if (state.profile == QualityProfile.Music) R.string.rec_profile_music_note else R.string.rec_profile_note))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(profileLine(state), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = actions.resetProfile) { Text(stringResource(R.string.rec_profile_reset)) }
+        }
         // How long a moment can be with the space left (while recording: the WAV, when it records as WAV first).
-        val perHour = choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
+        // The other codecs as they record: their bitrate; WAV first: the WAV.
+        val other = state.profileSettings.other(Codec.of(state.audioFormat))?.takeIf { !state.audioFormat.wavFirst }
+        val perHour = other?.megabytesPerHour ?: choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
         if (state.freeBytes > 0 && perHour > 0) {
             val hours = (state.freeBytes / 1_000_000 / perHour).toInt()
             FormatNote(stringResource(R.string.rec_preset_hours_left, hours, state.freeBytes / 1_000_000_000))
         }
 
-        FormatLabel(stringResource(R.string.rec_preset_power))
-        val power = listOf(PowerPreset.Low, PowerPreset.Normal) + listOfNotNull(PowerPreset.Custom.takeIf { choice.power == it })
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            power.forEachIndexed { i, p ->
-                SegmentedButton(
-                    selected = choice.power == p, onClick = { if (p != PowerPreset.Custom) actions.setPower(p) },
-                    shape = SegmentedButtonDefaults.itemShape(i, power.size),
-                ) { Text(powerName(p)) }
-            }
-        }
-        FormatNote(stringResource(when (choice.power) {
-            PowerPreset.Low -> R.string.rec_preset_power_low_note
-            PowerPreset.Normal -> R.string.rec_preset_power_normal_note
-            PowerPreset.Custom -> R.string.rec_preset_power_custom_note
-        }))
-        // When moments recorded with After are transcribed: here, beside the battery (it was under Settings › After a
-        // moment); encoding's own timing is under "Record as WAV, encode afterwards" below.
-        Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
-        Column(Modifier.selectableGroup()) {
-            listOf(
-                EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
-                EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
-            ).forEach { (option, label) ->
-                Row(
-                    Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = state.transcribeWhen == option, onClick = null)
-                    Text(stringResource(label), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
         Spacer(Modifier.height(8.dp))
     }
+}
+
+/** When to compress and transcribe: on the charger (save battery) or right away; Music's own on its tab. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimingPart(state: ModelsState, actions: ModelsActions) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        // Compressing and transcribing, each on the charger or right away (owner's calls, Nov 17, 2026). Music has
+        // its own compressing and isn't transcribed.
+        val music = state.profile == QualityProfile.Music
+        TwoModes(
+            stringResource(R.string.rec_preset_power), state.powerSaving, actions.setPower,
+            stringResource(when {
+                music && state.powerSaving -> R.string.rec_preset_power_low_music
+                music -> R.string.rec_preset_power_normal_music
+                state.powerSaving -> R.string.rec_encode_low_note
+                else -> R.string.rec_encode_normal_note
+            }),
+        )
+        if (!music) TwoModes(
+            stringResource(R.string.rec_transcribe_title), state.transcribeSaving,
+            { p -> actions.setTranscribeWhen(if (p == PowerPreset.Low) EncodeAfter.Charging else EncodeAfter.Stop) },
+            stringResource(if (state.transcribeSaving) R.string.rec_transcribe_low_note else R.string.rec_transcribe_normal_note),
+        )
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** A when-choice: on the charger (saves battery) or right away, with what the choice does. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TwoModes(title: String, saving: Boolean, set: (PowerPreset) -> Unit, note: String) {
+    FormatLabel(title)
+    val modes = listOf(PowerPreset.Low, PowerPreset.Normal)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        modes.forEachIndexed { i, p ->
+            SegmentedButton(
+                selected = (p == PowerPreset.Low) == saving, onClick = { set(p) },
+                shape = SegmentedButtonDefaults.itemShape(i, modes.size),
+            ) { Text(powerName(p)) }
+        }
+    }
+    FormatNote(note)
 }
 
 @Composable
@@ -268,14 +334,11 @@ private fun CodecRow(selected: Boolean, title: String, note: String, page: Boole
 @Composable
 private fun EncodeLater(state: ModelsState, actions: ModelsActions) {
     val codec = codecOf(state.audioFormat)
-    val on = state.audioFormat == AudioFormat.WavThenAac || state.audioFormat == AudioFormat.WavThenFlac
+    val on = state.audioFormat.wavFirst
     val enabled = codec != AudioFormat.Wav
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, enabled = enabled, role = Role.Checkbox) { checked ->
-            actions.setAudioFormat(when (codec) {
-                AudioFormat.AacLive -> if (checked) AudioFormat.WavThenAac else AudioFormat.AacLive
-                else -> if (checked) AudioFormat.WavThenFlac else AudioFormat.FlacLive
-            })
+            actions.setAudioFormat(Codec.of(state.audioFormat).format(checked))
         }.padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -311,28 +374,52 @@ private fun EncodeLater(state: ModelsState, actions: ModelsActions) {
     }
 }
 
-/** AAC's or FLAC's page: the codec's settings (whether it encodes live or afterwards is on Recording format). */
+
+/** A bitrate in kbps as people write it: 32, 23.85, 12.2. */
+private fun kbps(bps: Int) = if (bps % 1000 == 0) "${bps / 1000}" else "%.2f".format(java.util.Locale.ROOT, bps / 1000.0).trimEnd('0')
+
+private fun codecShort(codec: Codec) = when (codec) {
+    Codec.Wav -> R.string.rec_format_wav_line
+    Codec.Aac -> R.string.rec_format_aac_short
+    Codec.Flac -> R.string.rec_format_flac_lossless
+    else -> otherShort(codec)
+}
+
+private fun otherShort(codec: Codec) = when (codec) {
+    Codec.Opus -> R.string.rec_format_opus_short
+    Codec.Xhe -> R.string.rec_format_xhe_short
+    Codec.AmrWb -> R.string.rec_format_amrwb_short
+    else -> R.string.rec_format_amrnb_short
+}
+
+/**
+ * Opus', xHE-AAC's, AMR-WB's or AMR-NB's page: the bitrate as chips with the size an hour, and what the codec is good
+ * for. The sound (rate, channels) is the profile's, on Recording settings; the AMRs have their own (16 or 8 kHz mono).
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun CodecPage(state: ModelsState, actions: ModelsActions, aac: Boolean, back: () -> Unit) {
-    val live = if (aac) AudioFormat.AacLive else AudioFormat.FlacLive
-    val later = if (aac) AudioFormat.WavThenAac else AudioFormat.WavThenFlac
-    val chosen = state.audioFormat == live || state.audioFormat == later
-    Scaffold(topBar = { FormatTopBar(stringResource(if (aac) R.string.rec_format_codec_aac else R.string.rec_format_codec_flac), back) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-            if (!chosen) {
-                // Opened while another codec records: the settings apply once this one is chosen.
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.rec_format_not_chosen), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { actions.setAudioFormat(live) }) { Text(stringResource(R.string.rec_format_use)) }
-                }
-            }
-            if (state.audioFormat == later) FormatPageNote(stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_here_stop else R.string.rec_format_later_here_charging))
-            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
-            if (aac) AacSettingsPart(state, actions) else {
-                FlacFormatPart(state.flac, state.deepCapture, actions.setFlac)
-                FlacEffortPart(state.flacLevel, if (state.audioFormat == AudioFormat.WavThenFlac) state.audioFormat else AudioFormat.FlacLive, actions.setFlacLevel)
+private fun OtherCodecPart(state: ModelsState, actions: ModelsActions, codec: Codec) {
+    val spec = state.profileSettings.other(codec)
+    FormatPageNote(stringResource(when (codec) {
+        Codec.Opus -> R.string.rec_format_opus_note
+        Codec.Xhe -> R.string.rec_format_xhe_note
+        Codec.AmrWb -> R.string.rec_format_amrwb_note
+        else -> R.string.rec_format_amrnb_note
+    }))
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.rec_format_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            if (spec != null) Text(stringResource(R.string.rec_format_size, spec.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            codec.bitrates.forEach { bps ->
+                FilterChip(
+                    selected = spec?.bitrate == bps, onClick = { actions.setBitrate(codec, bps) },
+                    label = { Text(stringResource(R.string.rec_format_kbps_decimal, kbps(bps))) },
+                )
             }
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -354,6 +441,8 @@ private fun AacSettingsPart(state: ModelsState, actions: ModelsActions) {
             profiles.forEachIndexed { i, (p, label) ->
                 SegmentedButton(
                     selected = aac.profile == p, onClick = { actions.setAac(aac.copy(profile = p).valid()) },
+                    // HE needs 24 or 48 kHz, HE v2 stereo: the sound is set on Recording settings.
+                    enabled = aac.sampleRate in AacSettings.rates(p) && (p != AacProfile.HeV2 || aac.channels == 2),
                     shape = SegmentedButtonDefaults.itemShape(i, profiles.size),
                 ) { Text(stringResource(label)) }
             }
@@ -364,29 +453,6 @@ private fun AacSettingsPart(state: ModelsState, actions: ModelsActions) {
             AacProfile.HeV2 -> R.string.rec_format_profile_he2_note
         }))
 
-        FormatLabel(stringResource(R.string.rec_format_rate))
-        val rates = aac.sampleRates
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            rates.forEachIndexed { i, r ->
-                SegmentedButton(
-                    selected = aac.sampleRate == r, onClick = { actions.setAac(aac.copy(sampleRate = r).valid()) },
-                    shape = SegmentedButtonDefaults.itemShape(i, rates.size),
-                ) { Text(stringResource(R.string.rec_format_khz, r / 1000)) }
-            }
-        }
-        FormatNote(stringResource(R.string.rec_format_rate_note))
-
-        FormatLabel(stringResource(R.string.rec_format_channels))
-        val channels = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo).filter { it.first in aac.channelCounts }
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            channels.forEachIndexed { i, (c, label) ->
-                SegmentedButton(
-                    selected = aac.channels == c, onClick = { actions.setAac(aac.copy(channels = c).valid()) },
-                    shape = SegmentedButtonDefaults.itemShape(i, channels.size),
-                ) { Text(stringResource(label)) }
-            }
-        }
-        FormatNote(stringResource(R.string.rec_format_channels_note))
 
         Row(Modifier.padding(top = 16.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.rec_format_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
@@ -464,22 +530,44 @@ private fun AacEncoderPicker(state: ModelsState, actions: ModelsActions) {
     if (state.aacEncoders.none { it.hardware }) FormatNote(stringResource(R.string.rec_format_encoder_none_hardware))
 }
 
-/** FLAC's sample rate, channels and bit depth, with the size an hour. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** FLAC's size an hour at the shared sound (sample rate, channels and bit depth are on Recording settings). */
 @Composable
-private fun FlacFormatPart(stored: FlacFormat, deep: Boolean, set: (FlacFormat) -> Unit) {
-    // 24 bit is offered only when the microphone gives it; otherwise what records is 16.
+private fun FlacFormatPart(stored: FlacFormat, deep: Boolean) {
     val flac = if (deep) stored else stored.copy(bitDepth = 16)
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.rec_format_rate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.rec_format_size, flac.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(flacLine(flac), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
+        FormatNote(stringResource(R.string.rec_format_size, flac.megabytesPerHour))
+        HorizontalDivider(Modifier.padding(top = 16.dp))
+    }
+}
+
+/**
+ * The sound both codecs record at, on Recording settings (owner's request, Nov 17, 2026): sample rate and channels for
+ * AAC and FLAC alike, and the bit depth for FLAC and WAV when the microphone gives more than 16 bits.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SoundPart(state: ModelsState, actions: ModelsActions, codec: Codec) {
+    val choice = state.recordingChoice
+    val rate = choice.sampleRate
+    val channels = choice.channels
+    val bits = state.recordedFlac.bitDepth
+    val fixed = codec.fixedRate
+    if (fixed != null) {
+        // The AMRs have one sound of their own: said, nothing to pick.
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            FormatLabel(stringResource(R.string.rec_format_rate))
+            FormatNote(stringResource(R.string.rec_format_amr_sound, fixed / 1000))
+            Spacer(Modifier.height(8.dp))
         }
-        Spacer(Modifier.height(6.dp))
+        return
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        FormatLabel(stringResource(R.string.rec_format_rate))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             FlacFormat.RATES.forEachIndexed { i, r ->
                 SegmentedButton(
-                    selected = flac.sampleRate == r, onClick = { set(flac.copy(sampleRate = r)) },
+                    selected = rate == r, onClick = { actions.setSound(r, channels, bits) },
                     shape = SegmentedButtonDefaults.itemShape(i, FlacFormat.RATES.size),
                 ) { Text(stringResource(R.string.rec_format_khz, r / 1000)) }
             }
@@ -487,30 +575,36 @@ private fun FlacFormatPart(stored: FlacFormat, deep: Boolean, set: (FlacFormat) 
         FormatNote(stringResource(R.string.rec_format_flac_rate_note))
 
         FormatLabel(stringResource(R.string.rec_format_channels))
-        val channels = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo)
+        val options = listOf(1 to R.string.rec_format_mono, 2 to R.string.rec_format_stereo)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            channels.forEachIndexed { i, (c, label) ->
+            options.forEachIndexed { i, (c, label) ->
                 SegmentedButton(
-                    selected = flac.channels == c, onClick = { set(flac.copy(channels = c)) },
-                    shape = SegmentedButtonDefaults.itemShape(i, channels.size),
+                    selected = channels == c, onClick = { actions.setSound(rate, c, bits) },
+                    shape = SegmentedButtonDefaults.itemShape(i, options.size),
                 ) { Text(stringResource(label)) }
             }
         }
         FormatNote(stringResource(R.string.rec_format_flac_channels_note))
 
-        if (deep) {
-        FormatLabel(stringResource(R.string.rec_format_depth))
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            FlacFormat.DEPTHS.forEachIndexed { i, bits ->
-                SegmentedButton(
-                    selected = flac.bitDepth == bits, onClick = { set(flac.copy(bitDepth = bits)) },
-                    shape = SegmentedButtonDefaults.itemShape(i, FlacFormat.DEPTHS.size),
-                ) { Text(stringResource(R.string.rec_format_bits, bits)) }
+        // Bit depth is the lossless codecs' (WAV, FLAC): a lossy one keeps none of its own.
+        if (codec == Codec.Wav || codec == Codec.Flac) if (state.deepCapture) {
+            FormatLabel(stringResource(R.string.rec_format_depth))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                FlacFormat.DEPTHS.forEachIndexed { i, b ->
+                    SegmentedButton(
+                        selected = bits == b, onClick = { actions.setSound(rate, channels, b) },
+                        shape = SegmentedButtonDefaults.itemShape(i, FlacFormat.DEPTHS.size),
+                    ) { Text(stringResource(R.string.rec_format_bits, b)) }
+                }
             }
+            FormatNote(stringResource(R.string.rec_format_depth_note))
+        } else {
+            // Not a choice with this microphone, but said: it records 16 bit.
+            FormatLabel(stringResource(R.string.rec_format_depth))
+            Text(stringResource(R.string.rec_format_bits, 16), style = MaterialTheme.typography.bodyMedium)
+            FormatNote(stringResource(R.string.rec_format_depth_fixed))
         }
-        FormatNote(stringResource(R.string.rec_format_depth_note))
-        }
-        HorizontalDivider(Modifier.padding(top = 16.dp))
+        Spacer(Modifier.height(8.dp))
     }
 }
 
