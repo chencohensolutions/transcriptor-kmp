@@ -1084,11 +1084,10 @@ private fun RecordPresets(
     val settings = if (music) state.musicSettings else state.activeSettings
     CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
     Column(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // With Music there is no quality to pick: the paragraph below says what it records (owner's call, Nov 17, 2026).
+        if (!music) Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.notebooks_presets_quality), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
-            if (music) {
-                Text(stringResource(R.string.notebooks_presets_music), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 6.dp))
-            } else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
                     com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
