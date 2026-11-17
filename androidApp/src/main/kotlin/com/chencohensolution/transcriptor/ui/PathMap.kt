@@ -48,90 +48,102 @@ import org.maplibre.geojson.Point
 private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
 
 /**
- * The moment's path on a map, full screen (Moment info › Path › Show on map): the part while recording in the app's
- * blue, the part after the audio stopped dashed in grey, the start a dot. Tapping near the path seeks the audio there
- * and closes the map. The map's tiles come from the internet only while this is open.
+ * The moment's path on a map: the part while recording in the app's blue, the part after the audio stopped dashed in
+ * grey, the start a dot (a single point is that dot alone). [interactive]: it pans and zooms, and tapping near the path
+ * calls [seek] with that time; otherwise it stays put and any tap calls [onTap]. The map's tiles come from the internet
+ * only while it shows; the path never leaves the phone.
  */
 @Composable
-fun PathMapDialog(path: MomentPath, seek: (Long) -> Unit, onDismiss: () -> Unit) {
-    val points = remember(path) { path.points.filter { it.accuracyM <= 100f } }
+fun PathMapView(path: MomentPath, interactive: Boolean, seek: (Long) -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
+    val points = remember(path) { path.points.filter { it.accuracyM <= 150f }.ifEmpty { path.points } }
     val audioEnd = path.audioEndMillis ?: Long.MAX_VALUE
     val split = points.indexOfFirst { it.atMillis > audioEnd }.let { if (it < 0) points.size else it }
     val during = points.take(split)
     val after = if (split < points.size) points.drop((split - 1).coerceAtLeast(0)) else emptyList()
     val blue = MaterialTheme.colorScheme.primary.let { Color.argb((it.alpha * 255).toInt(), (it.red * 255).toInt(), (it.green * 255).toInt(), (it.blue * 255).toInt()) }
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val map = remember {
+        MapLibre.getInstance(context)
+        MapView(context).apply { onCreate(null) }
+    }
+    DisposableEffect(lifecycle, map) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> map.onStart()
+                Lifecycle.Event.ON_RESUME -> map.onResume()
+                Lifecycle.Event.ON_PAUSE -> map.onPause()
+                Lifecycle.Event.ON_STOP -> map.onStop()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        map.onStart(); map.onResume()
+        onDispose {
+            lifecycle.removeObserver(observer)
+            map.onPause(); map.onStop(); map.onDestroy()
+        }
+    }
+    AndroidView(factory = {
+        map.getMapAsync { m ->
+            m.uiSettings.setAllGesturesEnabled(interactive)
+            m.uiSettings.isCompassEnabled = interactive
+            // Never closer than a street: two fixes a metre apart would otherwise fill the screen with one building.
+            m.setMaxZoomPreference(18.0)
+            m.setStyle(Style.Builder().fromUri(MAP_STYLE)) { style ->
+                fun line(list: List<com.chencohensolution.transcriptor.location.PathPoint>) =
+                    LineString.fromLngLats(list.map { Point.fromLngLat(it.point.lon, it.point.lat) })
+                if (during.size >= 2) {
+                    style.addSource(GeoJsonSource("during", line(during)))
+                    style.addLayer(LineLayer("during", "during").withProperties(
+                        PropertyFactory.lineColor(blue), PropertyFactory.lineWidth(5f),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND), PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                    ))
+                }
+                if (after.size >= 2) {
+                    style.addSource(GeoJsonSource("after", line(after)))
+                    style.addLayer(LineLayer("after", "after").withProperties(
+                        PropertyFactory.lineColor(Color.GRAY), PropertyFactory.lineWidth(4f), PropertyFactory.lineDasharray(arrayOf(2f, 1.5f)),
+                    ))
+                }
+                points.firstOrNull()?.let { s ->
+                    style.addSource(GeoJsonSource("start", Point.fromLngLat(s.point.lon, s.point.lat)))
+                    style.addLayer(CircleLayer("start", "start").withProperties(
+                        PropertyFactory.circleColor(blue), PropertyFactory.circleRadius(7f),
+                        PropertyFactory.circleStrokeColor(Color.WHITE), PropertyFactory.circleStrokeWidth(2f),
+                    ))
+                }
+            }
+            val spread = if (points.size >= 2) points.first().point.let { a -> points.maxOf { a.metersTo(it.point) } } else 0.0
+            if (spread >= 30) {
+                val bounds = LatLngBounds.Builder().includes(points.map { LatLng(it.point.lat, it.point.lon) }).build()
+                val pad = (40 * context.resources.displayMetrics.density).toInt()
+                m.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, pad))
+            } else points.firstOrNull()?.let { m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.point.lat, it.point.lon), 16.0)) }
+            m.addOnMapClickListener { tap ->
+                if (!interactive) { onTap(); return@addOnMapClickListener true }
+                // A tap near the path plays the audio from there.
+                val here = m.projection.toScreenLocation(tap)
+                fun d2(p: com.chencohensolution.transcriptor.location.PathPoint) =
+                    m.projection.toScreenLocation(LatLng(p.point.lat, p.point.lon)).let { (it.x - here.x) * (it.x - here.x) + (it.y - here.y) * (it.y - here.y) }
+                val nearest = points.minByOrNull(::d2)
+                val reach = 30f * context.resources.displayMetrics.density
+                if (nearest != null && d2(nearest) < reach * reach) { seek(nearest.atMillis.coerceAtMost(audioEnd)); true } else false
+            }
+        }
+        map
+    }, modifier = modifier)
+}
+
+/**
+ * The map full screen (tapping the one in Moment info): it pans and zooms, and tapping near the path plays the audio
+ * from there and closes it.
+ */
+@Composable
+fun PathMapDialog(path: MomentPath, seek: (Long) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            val context = LocalContext.current
-            val lifecycle = LocalLifecycleOwner.current.lifecycle
-            val map = remember {
-                MapLibre.getInstance(context)
-                MapView(context).apply { onCreate(null) }
-            }
-            DisposableEffect(lifecycle, map) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_START -> map.onStart()
-                        Lifecycle.Event.ON_RESUME -> map.onResume()
-                        Lifecycle.Event.ON_PAUSE -> map.onPause()
-                        Lifecycle.Event.ON_STOP -> map.onStop()
-                        else -> Unit
-                    }
-                }
-                lifecycle.addObserver(observer)
-                map.onStart(); map.onResume()
-                onDispose {
-                    lifecycle.removeObserver(observer)
-                    map.onPause(); map.onStop(); map.onDestroy()
-                }
-            }
-            AndroidView(factory = {
-                map.getMapAsync { m ->
-                    m.setStyle(Style.Builder().fromUri(MAP_STYLE)) { style ->
-                        fun line(list: List<com.chencohensolution.transcriptor.location.PathPoint>) =
-                            LineString.fromLngLats(list.map { Point.fromLngLat(it.point.lon, it.point.lat) })
-                        if (during.size >= 2) {
-                            style.addSource(GeoJsonSource("during", line(during)))
-                            style.addLayer(LineLayer("during", "during").withProperties(
-                                PropertyFactory.lineColor(blue), PropertyFactory.lineWidth(5f),
-                                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND), PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                            ))
-                        }
-                        if (after.size >= 2) {
-                            style.addSource(GeoJsonSource("after", line(after)))
-                            style.addLayer(LineLayer("after", "after").withProperties(
-                                PropertyFactory.lineColor(Color.GRAY), PropertyFactory.lineWidth(4f), PropertyFactory.lineDasharray(arrayOf(2f, 1.5f)),
-                            ))
-                        }
-                        points.firstOrNull()?.let { s ->
-                            style.addSource(GeoJsonSource("start", Point.fromLngLat(s.point.lon, s.point.lat)))
-                            style.addLayer(CircleLayer("start", "start").withProperties(
-                                PropertyFactory.circleColor(blue), PropertyFactory.circleRadius(7f),
-                                PropertyFactory.circleStrokeColor(Color.WHITE), PropertyFactory.circleStrokeWidth(2f),
-                            ))
-                        }
-                    }
-                    if (points.size >= 2) {
-                        val bounds = LatLngBounds.Builder().includes(points.map { LatLng(it.point.lat, it.point.lon) }).build()
-                        m.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 160))
-                    } else points.firstOrNull()?.let { m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.point.lat, it.point.lon), 16.0)) }
-                    // A tap near the path plays the audio from there.
-                    m.addOnMapClickListener { tap ->
-                        val here = m.projection.toScreenLocation(tap)
-                        val nearest = points.minByOrNull {
-                            val p = m.projection.toScreenLocation(LatLng(it.point.lat, it.point.lon))
-                            (p.x - here.x) * (p.x - here.x) + (p.y - here.y) * (p.y - here.y)
-                        }
-                        val p = nearest?.let { m.projection.toScreenLocation(LatLng(it.point.lat, it.point.lon)) }
-                        if (nearest != null && p != null && (p.x - here.x) * (p.x - here.x) + (p.y - here.y) * (p.y - here.y) < 60f * 60f * context.resources.displayMetrics.density) {
-                            seek(nearest.atMillis.coerceAtMost(audioEnd))
-                            onDismiss()
-                            true
-                        } else false
-                    }
-                }
-                map
-            }, modifier = Modifier.fillMaxSize())
+            PathMapView(path, interactive = true, seek = { seek(it); onDismiss() }, onTap = {}, modifier = Modifier.fillMaxSize())
             // The close button and the note at the top: MapLibre's credits (OpenStreetMap) stay visible at the bottom.
             androidx.compose.foundation.layout.Row(
                 Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)).statusBarsPadding().padding(8.dp),

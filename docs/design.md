@@ -389,8 +389,9 @@ moment, under the backup's settings.
   the service stays (location type, "Saving the path" with Stop) until the time or a saved place, then saves
   `path.json` with the moment.
 - **Moment info**: Stopped by itself (why, when), and Path: distance, top speed, points, a line drawing (the part
-  after the audio dashed) and a driving-speed graph; tapping either seeks the audio. **Show on map** (owner's request,
-  Nov 17, 2026) opens the path full screen on a MapLibre map (`ui/PathMap.kt`, `org.maplibre.gl:android-sdk`, about
+  after the audio dashed) and a driving-speed graph; tapping either seeks the audio. The map is shown right in Path (owner's request,
+  Nov 17, 2026: it wasn't found behind a button; a single point is a pin, never closer than street level); a tap
+  opens it full screen on a MapLibre map (`ui/PathMap.kt`, `org.maplibre.gl:android-sdk`, about
   2.5 MB) with OpenFreeMap's style (OpenStreetMap data, free, no key): only the map's tiles are fetched, only while it
   is open; the path itself never leaves the phone. Tapping near the path plays the audio from there.
 

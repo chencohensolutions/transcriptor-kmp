@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -103,9 +105,14 @@ fun MomentInfoSheet(info: MomentInfo, seek: (Long) -> Unit = {}, onDismiss: () -
                 path.audioEndMillis?.takeIf { end -> path.points.any { it.atMillis > end } }?.let {
                     Note(stringResource(R.string.info_path_after))
                 }
-                PathDrawing(path, seek, Modifier.padding(vertical = 8.dp))
+                // The map right here (fixed; a tap opens it full screen, where it pans, zooms and plays from the path).
                 var onMap by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-                androidx.compose.material3.OutlinedButton(onClick = { onMap = true }) { Text(stringResource(R.string.info_path_map)) }
+                PathMapView(
+                    path, interactive = false, seek = seek, onTap = { onMap = true },
+                    modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth().height(220.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                )
+                Note(stringResource(R.string.info_path_map_tap))
                 if (onMap) PathMapDialog(path, seek) { onMap = false }
                 SpeedGraph(path, seek, stringResource(R.string.info_path_speed), Modifier.padding(vertical = 8.dp))
             }
