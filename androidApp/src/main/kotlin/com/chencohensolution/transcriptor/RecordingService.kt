@@ -249,7 +249,12 @@ class RecordingService : Service() {
             return
         }
         compressing = true
-        startForeground(ID, progressNotification(title, 0f), processingType)
+        // A call of the phone's: which of how many, and whom it was with (hen, Nov 17, 2026).
+        val callLine = if (lecture.callFile != null && transcribing) Recording.backup.state.value.let { s ->
+            getString(R.string.calls_notification, s.callsTotal - s.callsToTranscribe + 1, s.callsTotal.coerceAtLeast(1), lecture.title)
+        } else null
+        fun note(p: Float) = if (callLine != null) progressNotification(callLine, p) else progressNotification(title, p)
+        startForeground(ID, note(0f), processingType)
         scope.launch(Dispatchers.IO) {
             var shown = -1
             var speakersNext: Lecture? = null
@@ -263,7 +268,7 @@ class RecordingService : Service() {
                     progress = { p ->
                         Recording.refining.value = lecture.id to p
                         val percent = (p * 100).toInt()
-                        if (percent != shown) { shown = percent; notify(progressNotification(title, p)) }
+                        if (percent != shown) { shown = percent; notify(note(p)) }
                     },
                     // A recording started: its live model needs the memory this model holds. Closed now, done after it stops.
                     stop = { Recording.session.isRecording },
@@ -565,9 +570,11 @@ class RecordingService : Service() {
         .setOngoing(true)
         .build()
 
-    private fun progressNotification(title: Int, progress: Float) = Notification.Builder(this, CHANNEL)
+    private fun progressNotification(title: Int, progress: Float) = progressNotification(getString(title), progress)
+
+    private fun progressNotification(title: String, progress: Float) = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(getString(title))
+        .setContentTitle(title)
         .setProgress(100, (progress * 100).toInt(), false)
         .setOngoing(true)
         .build()

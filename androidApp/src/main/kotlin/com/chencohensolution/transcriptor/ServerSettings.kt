@@ -29,6 +29,11 @@ fun ServerSettings(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by Recording.backup.state.collectAsStateWithLifecycle()
+    // The call being transcribed now, if the pass running is on one: whom it was with, and how far.
+    val refining by Recording.refining.collectAsStateWithLifecycle()
+    val callId = refining?.first
+    val callTitle = remember(callId) { callId?.let { id -> runCatching { Recording.store.index().firstOrNull { it.id == id && it.callHere }?.title }.getOrNull() } }
+    val transcribingCall = refining?.let { (_, p) -> callTitle?.let { it to p } }
     var pairing by remember { mutableStateOf<PairingUi>(PairingUi.Idle) }
     // Other apps on the phone built with shed (journal): one of them may already be paired.
     val siblings = remember { ShedSiblings.find(context) }
@@ -118,7 +123,8 @@ fun ServerSettings(onBack: () -> Unit) {
         wifi = wifi.copy(background = it)
     }
     ServerScreen(
-        state, pairing, Recording.shed.defaultDeviceName,
+        transcribingCall = transcribingCall,
+        state = state, pairing = pairing, defaultDeviceName = Recording.shed.defaultDeviceName, actions =
         ServerActions(
             back = onBack,
             check = { text ->
@@ -194,8 +200,8 @@ fun ServerSettings(onBack: () -> Unit) {
                 }
             },
         ),
-        siblings.map { it.label },
-        locks,
-        wifi,
+        siblings = siblings.map { it.label },
+        locks = locks,
+        wifi = wifi,
     )
 }

@@ -118,6 +118,8 @@ data class ServerState(
     val callsToTranscribe: Int = 0,
     /** Upload now is transcribing the calls first: this many left (0: not now). */
     val transcribingCalls: Int = 0,
+    /** The phone's calls that are moments here: of them, [callsToTranscribe] aren't transcribed yet. */
+    val callsTotal: Int = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
     val uploading: Boolean = false,
     /**
@@ -958,6 +960,7 @@ class ServerBackup(
             callMoments = kept.callMoments,
             transcribeCallsFirst = kept.transcribeCallsFirst,
             callsToTranscribe = callsToTranscribe(),
+            callsTotal = if (!kept.callMoments || callsAt == null) 0 else runCatching { store.index().count { it.callHere } }.getOrDefault(0),
             transcribingCalls = transcribingCalls,
         )
     }
