@@ -145,6 +145,11 @@ private data class SettingsFileV1(
      * most of them were in). Sets [wavFirst], [encodeAfter] and [transcribeWhen] together.
      */
     val powerSaving: Boolean? = null,
+    /**
+     * Transcribe "After" moments on the charger (owner's call, Nov 17, 2026: compressing and transcribing each their own
+     * choice); off: right after the moment. Null: from [transcribeWhen].
+     */
+    val transcribeSaving: Boolean? = null,
     /** When "WAV, then FLAC" and "WAV, then AAC" encode. */
     val encodeAfter: EncodeAfter = EncodeAfter.Stop,
     /** The live model chosen per language (BCP-47 tag to model id). */
@@ -216,8 +221,10 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     /** The settings with the profiles filled in: those from before profiles become the profile they match. */
     private fun profiled(f: SettingsFileV1): SettingsFileV1 {
-        if (f.profiles.isNotEmpty() && f.activeProfile != null && f.powerSaving != null) return f
-        if (f.profiles.isNotEmpty() && f.activeProfile != null) return f.copy(powerSaving = savingOf(f))
+        if (f.profiles.isNotEmpty() && f.activeProfile != null && f.powerSaving != null && f.transcribeSaving != null) return f
+        if (f.profiles.isNotEmpty() && f.activeProfile != null) {
+            return f.copy(powerSaving = f.powerSaving ?: savingOf(f), transcribeSaving = f.transcribeSaving ?: (f.transcribeWhen == EncodeAfter.Charging))
+        }
         val legacy = ProfileSettings(Codec.of(f.audioFormat), f.aac.valid(), f.flac.valid(), f.flacLevel.coerceIn(FLAC_LEVELS), f.micInput)
         fun same(a: AacSettings, b: AacSettings) = a.profile == b.profile && a.sampleRate == b.sampleRate && a.channels == b.channels && a.bitrateKbps == b.bitrateKbps
         val matched = when {
@@ -230,17 +237,22 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
             p.key to if (p == matched) legacy else p.defaults.copy(micInput = f.micInput)
         }
         return f.copy(profiles = profiles + f.profiles, activeProfile = f.activeProfile ?: matched.key, wavFirst = f.wavFirst ?: f.audioFormat.wavFirst)
-            .let { it.copy(powerSaving = it.powerSaving ?: savingOf(it)) }
+            .let { it.copy(powerSaving = it.powerSaving ?: savingOf(it), transcribeSaving = it.transcribeSaving ?: (it.transcribeWhen == EncodeAfter.Charging)) }
     }
 
     /** The mode most of the three timing settings from before were in: two or three of them waiting = save battery. */
     private fun savingOf(f: SettingsFileV1): Boolean =
         listOf(f.wavFirst ?: f.audioFormat.wavFirst, f.encodeAfter == EncodeAfter.Charging, f.transcribeWhen == EncodeAfter.Charging).count { it } >= 2
 
-    /** Save battery: WAV first, encoding and "After" transcription on the charger; off: right away. The one timing choice. */
+    /** Compressing saves battery: WAV first, compressed on the charger; off: compressed as it records. */
     var powerSaving: Boolean
         get() = profiled(read()).powerSaving == true
         set(value) = write(profiled(read()).copy(powerSaving = value))
+
+    /** "After" moments are transcribed on the charger; off: right after the moment. */
+    var transcribeSaving: Boolean
+        get() = profiled(read()).transcribeSaving == true
+        set(value) = write(profiled(read()).copy(transcribeSaving = value))
 
     /** [profile]'s settings. */
     fun profile(profile: QualityProfile): ProfileSettings =
@@ -319,13 +331,17 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
     /** Sets [profile]'s codec and sound from [value], and the timing ([wavFirst], encode and transcribe) for all. */
     fun setChoice(profile: QualityProfile, value: RecordingChoice) {
         setProfile(profile, profile(profile).copy(codec = Codec.of(value.audioFormat), aac = value.aac.valid(), flac = value.flac.valid()))
-        // The timing is one mode: saving when the choice waits for the charger.
-        write(profiled(read()).copy(powerSaving = value.transcribeWhen == EncodeAfter.Charging || value.encodeAfter == EncodeAfter.Charging))
+        // Compressing and transcribing, each its own mode.
+        write(profiled(read()).copy(
+            powerSaving = value.audioFormat.wavFirst || value.encodeAfter == EncodeAfter.Charging,
+            transcribeSaving = value.transcribeWhen == EncodeAfter.Charging,
+        ))
     }
 
     /** Sets the timing alone: WAV first, encode after, transcribe When (the battery). */
     fun setTiming(wavFirst: Boolean, encodeAfter: EncodeAfter, transcribeWhen: EncodeAfter) {
-        powerSaving = wavFirst || encodeAfter == EncodeAfter.Charging || transcribeWhen == EncodeAfter.Charging
+        powerSaving = wavFirst || encodeAfter == EncodeAfter.Charging
+        transcribeSaving = transcribeWhen == EncodeAfter.Charging
     }
 
     /** When a WAV waiting for FLAC or AAC is encoded: after Stop, or on the charger above [ENCODE_MIN_BATTERY]%. */
@@ -354,8 +370,8 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
      * [EncodeAfter.Charging] (the default) once the phone is on the charger with [ENCODE_MIN_BATTERY]% or more.
      */
     var transcribeWhen: EncodeAfter
-        get() = if (powerSaving) EncodeAfter.Charging else EncodeAfter.Stop
-        set(value) { powerSaving = value == EncodeAfter.Charging }
+        get() = if (transcribeSaving) EncodeAfter.Charging else EncodeAfter.Stop
+        set(value) { transcribeSaving = value == EncodeAfter.Charging }
 
     /**
      * The Record bar's Live or After: live transcription while a moment records, or (off, the default; owner's choice,

@@ -735,7 +735,7 @@
     <string name="rec_preset_normal">רגילה</string>
     <string name="rec_preset_low">נמוכה</string>
     <string name="rec_preset_custom">מותאמת</string>
-    <string name="rec_preset_power">מתי לקודד ולתמלל</string>
+    <string name="rec_preset_power">מתי לדחוס</string>
     <string name="rec_preset_power_low">בזמן טעינה</string>
     <string name="rec_preset_power_normal">מיד</string>
     <string name="rec_preset_power_low_note">חוסך סוללה: מקליט WAV פשוט (שום דבר לא דוחס בזמן ההקלטה), ואז דוחס לקידוד שנבחר ומתמלל רגעים שהוקלטו ב״אחר כך״ כשהטלפון בטעינה עם 30% ומעלה.</string>
@@ -808,9 +808,9 @@
     <string name="rec_format_amr_sound">תמיד %1$d קילוהרץ מונו, מה שלא תהיה הגדרת הצליל.</string>
     <string name="rec_format_other_sound">בצליל של הפרופיל: %1$s, ‏%2$d קילוהרץ (הגדרות הקלטה).</string>
     <string name="notebooks_presets_quality">איכות</string>
-    <string name="notebooks_presets_battery">עיבוד</string>
-    <string name="notebooks_power_low_note">דוחס את השמע ומתמלל כשהטלפון בטעינה: חוסך סוללה.</string>
-    <string name="notebooks_power_normal_note">דוחס את השמע ומתמלל מיד אחרי הרגע.</string>
+    <string name="notebooks_presets_battery">דחיסה</string>
+    <string name="notebooks_power_low_note">מקליט WAV, נדחס בזמן טעינה: חוסך סוללה.</string>
+    <string name="notebooks_power_normal_note">נדחס בזמן ההקלטה.</string>
     <string name="notebooks_power_custom_note">תזמון משלך (הגדרות › הגדרות הקלטה).</string>
     <string name="notebooks_presets_music">ההגדרות של מוזיקה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
     <string name="rec_preset_power_low_music">חוסך סוללה: מקליט WAV פשוט, שנדחס לקידוד שנבחר כשהטלפון בטעינה עם 30% ומעלה.</string>
@@ -818,4 +818,10 @@
     <string name="rec_format_codec">קידוד</string>
     <string name="rec_format_wav_line">בלי דחיסה: הכי גדול, בלי שום קידוד.</string>
     <string name="rec_format_flac_lossless">בלי אובדן: כל הצליל נשמר, בערך חצי מ־WAV.</string>
+    <string name="rec_encode_low_note">חוסך סוללה: מקליט WAV פשוט (שום דבר לא דוחס בזמן ההקלטה), שנדחס לקידוד שנבחר כשהטלפון בטעינה עם 30% ומעלה.</string>
+    <string name="rec_encode_normal_note">דוחס בזמן ההקלטה. משתמש בסוללה אז.</string>
+    <string name="rec_transcribe_title">מתי לתמלל רגעים שהוקלטו ב״אחר כך״</string>
+    <string name="rec_transcribe_low_note">חוסך סוללה: מתומלל כשהטלפון בטעינה עם 30% ומעלה.</string>
+    <string name="rec_transcribe_normal_note">מתומלל ברגע שהרגע נגמר. משתמש בסוללה אז.</string>
+    <string name="notebooks_presets_transcribe">תמלול</string>
 </resources>
