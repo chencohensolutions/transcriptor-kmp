@@ -115,6 +115,9 @@ object Recording {
     /** The last lecture stopped, for the start screen. */
     val lastLecture = MutableStateFlow<Lecture?>(null)
 
+    /** Stop by place and the path while a moment records (Settings › Advanced › Location); null when neither is on for it. */
+    val placeStatus = MutableStateFlow<com.chencohensolution.transcriptor.location.MomentLocation.Status?>(null)
+
     /** The refine pass: the lecture it runs on and 0..1; null when not running. */
     val refining = MutableStateFlow<Pair<String, Float>?>(null)
 

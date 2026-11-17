@@ -38,6 +38,13 @@ class RecordingService : Service() {
     /** Only record: the moment recording now isn't transcribed after it stops; it waits for "Transcribe now". */
     private var onlyRecord = false
 
+    /** Stop by place and the path for the moment recording now; null when neither is on for it. */
+    private var place: com.chencohensolution.transcriptor.location.MomentLocation? = null
+    private var feed: LocationFeed? = null
+    private var placeTicker: kotlinx.coroutines.Job? = null
+    /** The countdown's mark is on the moment. */
+    private var countdownMarked = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -46,6 +53,13 @@ class RecordingService : Service() {
             NotificationChannel(CHANNEL, getString(R.string.recording_channel), NotificationManager.IMPORTANCE_LOW),
         )
         // The quiet one (Settings › Recordings): the lowest importance, never on the lock screen, no badge.
+        // Stop by place's countdown: it must be seen and felt, even with the recording's notification quiet.
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(PLACE_CHANNEL, getString(R.string.place_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400)
+            },
+        )
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(QUIET_CHANNEL, getString(R.string.recording_quiet_channel), NotificationManager.IMPORTANCE_MIN).apply {
                 lockscreenVisibility = Notification.VISIBILITY_SECRET
@@ -66,8 +80,20 @@ class RecordingService : Service() {
                 quiet = Recording.settings.quietRecording
                 val mode = RecordMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: RecordMode.Live.name)
                 onlyRecord = mode == RecordMode.Only || mode == RecordMode.Music
+                val located = placeFor(mode)
                 try {
-                    startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                    try {
+                        startForeground(
+                            ID, recordingNotification(paused = false),
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or (if (located != null) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0),
+                        )
+                    } catch (e: SecurityException) {
+                        // Location wasn't allowed for this start (from the tile, say): the moment records without it.
+                        if (located == null) throw e
+                        android.util.Log.w("RecordingService", "location refused for this recording", e)
+                        startForeground(ID, recordingNotification(paused = false), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                        place = null
+                    }
                 } catch (e: RuntimeException) {
                     // From the tile, Android didn't count it as in use (SecurityException, or the start not allowed):
                     // started again from the foreground instead.
@@ -86,14 +112,26 @@ class RecordingService : Service() {
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
                     transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord, music = mode == RecordMode.Music,
                 )
+                if (place != null) startPlace()
             }
+            ACTION_KEEP -> place?.let { p ->
+                Recording.placeStatus.value = p.keepRecording(System.currentTimeMillis())
+                countdownMarked = false
+                getSystemService(NotificationManager::class.java).cancel(PLACE_ID)
+            }
+            ACTION_PLACE_CANCEL -> place?.let { p -> Recording.placeStatus.value = p.cancel(System.currentTimeMillis()) }
+            ACTION_PLACE_HERE -> place?.let { p -> Recording.placeStatus.value = p.reanchor(System.currentTimeMillis()) }
             ACTION_PAUSE -> session.pauseOrResume()
             ACTION_MARK -> session.mark()
             ACTION_STOP -> scope.launch {
                 // The live model chosen didn't fit in the free memory at the start: improved with it once this one is unloaded.
                 val skipped = session.state.value?.skippedForMemory != null
                 // Returns once live transcription has finished the last lines (and closed the live model).
-                val lecture = session.stop()?.also { Recording.lastLecture.value = it }
+                val located = place
+                val path = located?.path(audioEndMillis = session.positionMillis)?.takeIf { !it.isEmpty }
+                val lecture = session.stop(located?.placeStop(), hasPath = path != null)?.also { Recording.lastLecture.value = it }
+                if (lecture != null && path != null) runCatching { Recording.store.savePath(lecture, path) }
+                stopPlace()
                 val model = lecture?.let { Recording.improveModelFor(it.language) }
                 // Only record: nothing runs on it but the encoding; "Transcribe now" on the moment when wanted.
                 if (onlyRecord && lecture != null && lecture.pendingTranscript) { if (!improveNextPending()) compressPending(); return@launch }
@@ -288,6 +326,98 @@ class RecordingService : Service() {
         }
     }
 
+    /**
+     * Stop by place and the path for a moment starting in [mode]: on when Settings › Advanced › Location has them on,
+     * its profile does too, and the phone lets the app know its location. Sets [place]; null when neither is on.
+     */
+    private fun placeFor(mode: RecordMode): com.chencohensolution.transcriptor.location.MomentLocation? {
+        place = null
+        val settings = Recording.settings
+        val location = settings.location
+        if (!location.stopByPlace && !location.savePath) return null
+        val profile = settings.profile(if (mode == RecordMode.Music) com.chencohensolution.transcriptor.settings.QualityProfile.Music else settings.activeProfile)
+        val canLocate = locationAccess(this) != com.chencohensolution.transcriptor.ui.LocationAccess.None
+        val stopOn = location.stopByPlace && profile.stopByPlace
+        val m = com.chencohensolution.transcriptor.location.MomentLocation(
+            location.copy(stopWhenLeaving = location.stopWhenLeaving && canLocate, stopOnArrive = location.stopOnArrive && canLocate),
+            stopOn = stopOn, pathOn = profile.savePath && canLocate,
+        ) { clock -> (Recording.session.positionMillis - (System.currentTimeMillis() - clock)).coerceAtLeast(0) }
+        place = m.takeIf { it.active }
+        return place?.takeIf { it.needsFixes }
+    }
+
+    /** Listens for this moment's fixes and Bluetooth, and moves the countdown on every second. */
+    private fun startPlace() {
+        val p = place ?: return
+        countdownMarked = false
+        Recording.placeStatus.value = p.status.value
+        val f = LocationFeed(this, onFix = { fix -> onPlace(p.fix(fix)) }, onDevice = { onPlace(p.deviceConnected(System.currentTimeMillis())) })
+        feed = f
+        f.start(p.needsFixes, Recording.settings.location.device?.takeIf { Recording.settings.location.stopOnDevice })
+        f.request(p.status.value.request)
+        placeTicker = scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(1_000)
+                onPlace(p.tick(System.currentTimeMillis()))
+            }
+        }
+    }
+
+    /** Acts on stop by place's state: the countdown's notification and mark, the stop when it runs out. */
+    private fun onPlace(status: com.chencohensolution.transcriptor.location.MomentLocation.Status) {
+        Recording.placeStatus.value = status
+        feed?.request(status.request)
+        when (val w = status.watch) {
+            is com.chencohensolution.transcriptor.location.PlaceWatch.State.Counting -> {
+                if (!countdownMarked) {
+                    countdownMarked = true
+                    place?.firedAtRecording()?.let { Recording.session.markAt(it) }
+                }
+                getSystemService(NotificationManager::class.java).notify(PLACE_ID, countdownNotification(w))
+            }
+            is com.chencohensolution.transcriptor.location.PlaceWatch.State.Stop -> {
+                getSystemService(NotificationManager::class.java).cancel(PLACE_ID)
+                if (Recording.session.isRecording && Recording.session.state.value?.finishing != true) {
+                    placeTicker?.cancel()
+                    onStartCommand(Intent(this, RecordingService::class.java).setAction(ACTION_STOP), 0, 0)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    /** Stops listening for this moment's location. */
+    private fun stopPlace() {
+        placeTicker?.cancel()
+        placeTicker = null
+        feed?.stop()
+        feed = null
+        place = null
+        Recording.placeStatus.value = null
+        getSystemService(NotificationManager::class.java).cancel(PLACE_ID)
+    }
+
+    /** "Left the place. The recording stops in 45 s", with Keep recording and Stop now. */
+    private fun countdownNotification(w: com.chencohensolution.transcriptor.location.PlaceWatch.State.Counting): Notification {
+        val title = when (w.reason) {
+            com.chencohensolution.transcriptor.location.StopReason.Left -> getString(R.string.place_left)
+            com.chencohensolution.transcriptor.location.StopReason.Arrived -> getString(R.string.place_arrived, w.place?.name ?: "")
+            com.chencohensolution.transcriptor.location.StopReason.Device -> getString(R.string.place_device)
+        }
+        val seconds = ((w.endsAtMillis - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+        return Notification.Builder(this, PLACE_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(getString(R.string.place_stops_in, seconds))
+            .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .addAction(action(ACTION_KEEP, R.string.place_keep))
+            .addAction(action(ACTION_STOP, R.string.place_stop_now))
+            .build()
+    }
+
     private fun finish() {
         if (Recording.session.isRecording || compressing) return
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -295,6 +425,7 @@ class RecordingService : Service() {
     }
 
     override fun onDestroy() {
+        stopPlace()
         scope.cancel()
         super.onDestroy()
     }
@@ -355,6 +486,11 @@ class RecordingService : Service() {
         private const val ACTION_PAUSE = "pause"
         private const val ACTION_MARK = "mark"
         private const val ACTION_STOP = "stop"
+        private const val ACTION_KEEP = "placeKeep"
+        private const val ACTION_PLACE_CANCEL = "placeCancel"
+        private const val ACTION_PLACE_HERE = "placeHere"
+        private const val PLACE_CHANNEL = "place-stop"
+        private const val PLACE_ID = 2
         private const val ACTION_COMPRESS = "compress"
         private const val ACTION_SPEAKERS = "speakers"
         private const val ACTION_REFINE = "refine"
@@ -382,6 +518,18 @@ class RecordingService : Service() {
 
         fun stop(context: Context) =
             context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_STOP))
+
+        /** Stop by place's countdown: keep recording, and don't stop for that reason again in this moment. */
+        fun keepRecording(context: Context) =
+            context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_KEEP))
+
+        /** Stop by place does nothing more in this moment. */
+        fun cancelPlaceStop(context: Context) =
+            context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_PLACE_CANCEL))
+
+        /** Leaving is measured from here from now on. */
+        fun placeHere(context: Context) =
+            context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_PLACE_HERE))
 
         /** Improves [lecture] with [modelId], after the speaker pass when [speakersFirst]. */
         fun refine(context: Context, lecture: Lecture, modelId: String, speakersFirst: Boolean = false) = context.startForegroundService(

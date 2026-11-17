@@ -5,7 +5,9 @@ import com.chencohensolution.transcriptor.location.Fix
 import com.chencohensolution.transcriptor.location.FixSource
 import com.chencohensolution.transcriptor.location.GeoPoint
 import com.chencohensolution.transcriptor.location.LocationSettings
+import com.chencohensolution.transcriptor.location.MomentLocation
 import com.chencohensolution.transcriptor.location.MomentPath
+import com.chencohensolution.transcriptor.location.PathPrecision
 import com.chencohensolution.transcriptor.location.PathBuilder
 import com.chencohensolution.transcriptor.location.PathPoint
 import com.chencohensolution.transcriptor.location.PlaceWatch
@@ -184,5 +186,38 @@ class StopByPlaceTest {
         val old = assertNotNull(store.load("old"))
         assertNull(old.placeStop)
         assertNull(store.loadPath(old))
+    }
+
+    @Test
+    fun momentLocationAsksForGpsUntilAnchoredThenOnceAMinute() {
+        val s = LocationSettings(stopByPlace = true, stopMeters = 250)
+        val m = MomentLocation(s, stopOn = true, pathOn = true) { it - 1_000_000 }
+        assertEquals(MomentLocation.Request.EverySecond, m.status.value.request)
+        m.fix(Fix(1_000_000, home, 10f))
+        assertEquals(MomentLocation.Request.Minute, m.status.value.request)
+        assertNull(m.status.value.points) // path saving is off in the settings
+        m.fix(Fix(1_100_000, north(400.0), 10f))
+        m.fix(Fix(1_170_000, north(500.0), 10f))
+        assertTrue(m.status.value.stopping)
+        assertEquals(170_000, m.firedAtRecording())
+        m.tick(1_230_000)
+        assertEquals(com.chencohensolution.transcriptor.notebook.PlaceStop("left", 170_000), m.placeStop())
+        assertEquals(MomentLocation.Request.None, m.status.value.request)
+    }
+
+    @Test
+    fun passivePathAsksForNothingAndDrivingOnlyWhenFast() {
+        val passive = MomentLocation(LocationSettings(savePath = true), stopOn = false, pathOn = true) { it }
+        assertTrue(passive.active)
+        assertEquals(MomentLocation.Request.None, passive.status.value.request)
+        passive.fix(Fix(1_000, home, 5f))
+        assertEquals(1, passive.status.value.points)
+        val driving = MomentLocation(LocationSettings(savePath = true, precision = PathPrecision.WhileDriving.key), stopOn = false, pathOn = true) { it }
+        driving.fix(Fix(1_000, home, 5f, speedMps = 1f))
+        assertEquals(MomentLocation.Request.None, driving.status.value.request)
+        driving.fix(Fix(5_000, north(40.0), 5f, speedMps = 12f))
+        assertEquals(MomentLocation.Request.EverySecond, driving.status.value.request)
+        // Off for this moment's profile: nothing at all.
+        assertFalse(MomentLocation(LocationSettings(stopByPlace = true, savePath = true), stopOn = false, pathOn = false) { it }.active)
     }
 }

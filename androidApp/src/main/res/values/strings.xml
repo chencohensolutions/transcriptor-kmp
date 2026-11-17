@@ -870,4 +870,11 @@
     <string name="location_keep_2h">Two hours</string>
     <string name="location_sync">Sync location with the server</string>
     <string name="location_sync_note">Goes up with its moment, under the backup\'s settings. Never live.</string>
+    <string name="place_channel">Stop by place</string>
+    <string name="place_left">Left the place</string>
+    <string name="place_arrived">Arrived at %1$s</string>
+    <string name="place_device">Connected to the car</string>
+    <string name="place_stops_in">The recording stops in %1$d s</string>
+    <string name="place_keep">Keep recording</string>
+    <string name="place_stop_now">Stop now</string>
 </resources>

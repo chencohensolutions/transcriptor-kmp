@@ -881,4 +881,11 @@
     <string name="location_keep_2h">שעתיים</string>
     <string name="location_sync">לסנכרן מיקום עם השרת</string>
     <string name="location_sync_note">עולה יחד עם הרגע, לפי הגדרות הגיבוי. אף פעם לא בזמן אמת.</string>
+    <string name="place_channel">עצירה לפי מקום</string>
+    <string name="place_left">יצאת מהמקום</string>
+    <string name="place_arrived">הגעת אל %1$s</string>
+    <string name="place_device">הטלפון התחבר לרכב</string>
+    <string name="place_stops_in">ההקלטה תיעצר בעוד %1$d שנ׳</string>
+    <string name="place_keep">להמשיך להקליט</string>
+    <string name="place_stop_now">לעצור עכשיו</string>
 </resources>
