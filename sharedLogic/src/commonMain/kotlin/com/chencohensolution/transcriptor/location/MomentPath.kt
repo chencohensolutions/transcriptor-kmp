@@ -29,26 +29,19 @@ data class MomentPath(val points: List<PathPoint>, val audioEndMillis: Long? = n
 }
 
 /**
- * Builds a moment's path from fixes as they come: at most one point a second, and a point that didn't move (within its
- * accuracy, at least 5 m) less than a minute after the last one is left out. Fixes are by the clock; [toRecording] turns
- * a clock time into the recording's (pauses taken out by the caller).
+ * Builds a moment's path from fixes as they come: every fix is kept (owner's call, Nov 17, 2026: once the phone has a
+ * fix, keeping it costs next to nothing, so nothing is thinned), only the same fix heard twice (the passive listener and
+ * the app's own request, under half a second apart) or an older one arriving late is left out. Fixes are by the clock;
+ * [toRecording] turns a clock time into the recording's (pauses taken out by the caller).
  */
 class PathBuilder(private val toRecording: (Long) -> Long) {
     private val kept = mutableListOf<PathPoint>()
     private var lastClock: Long? = null
 
-    /** Adds [fix] unless it is thinned out; true when kept. */
+    /** Adds [fix] unless it is one already kept; true when kept. */
     fun add(fix: Fix): Boolean {
-        val last = kept.lastOrNull()
         val lastAt = lastClock
-        if (last != null && lastAt != null) {
-            val dt = fix.atMillis - lastAt
-            if (dt < 1_000) return false
-            // Moving, even at a slow walk (GPS's own speed, good to a fraction of a m/s): every point counts.
-            val moving = (fix.speedMps ?: 0f) >= SLOW_WALK_MPS && fix.accuracyM <= 30f
-            val still = !moving && last.point.metersTo(fix.point) < maxOf(5f, fix.accuracyM, last.accuracyM)
-            if (still && dt < 60_000) return false
-        }
+        if (lastAt != null && fix.atMillis - lastAt < SAME_FIX_MILLIS) return false
         kept += PathPoint(toRecording(fix.atMillis), fix.point, fix.accuracyM, fix.speedMps, fix.bearingDeg, fix.source)
         lastClock = fix.atMillis
         return true
@@ -59,8 +52,8 @@ class PathBuilder(private val toRecording: (Long) -> Long) {
     fun path(audioEndMillis: Long? = null) = MomentPath(kept.toList(), audioEndMillis)
 
     companion object {
-        /** About 1 km/h: slower than this, a point has to move to be kept. */
-        const val SLOW_WALK_MPS = 0.3f
+        /** Two fixes closer than this are the same one, heard by two listeners. */
+        const val SAME_FIX_MILLIS = 500L
     }
 }
 
