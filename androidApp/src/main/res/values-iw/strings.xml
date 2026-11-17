@@ -162,7 +162,7 @@
     <string name="models_multilingual">שפות רבות</string>
     <string name="models_multilingual_note">ל%1$s אין כאן מודלים משלה: הרב־לשוניים מתמללים אותה. אפשר למצוא עוד ב־Hugging Face.</string>
     <string name="models_no_npu">אין NPU שהאפליקציה יכולה להשתמש בו</string>
-    <string name="models_none">אין כאן מודל שהאפליקציה יכולה להריץ. %1$d מאגרים נמצאו בפורמטים אחרים (PyTorch, safetensors).</string>
+    <string name="models_none">אין כאן מודל שהאפליקציה יכולה להריץ. %1$d מאגרים נמצאו בסוגי קבצים אחרים (PyTorch, safetensors).</string>
     <string name="models_not_this_phone">לא בשביל הטלפון הזה</string>
     <string name="models_not_yet">עוד לא באפליקציה</string>
     <string name="models_not_yet_note">האפליקציה עוד לא מריצה מודלי %1$s: מנוע הדיבור שלה קורא את הקבצים, אבל האפליקציה עוד לא משתמשת בו בשבילם.</string>
@@ -188,7 +188,7 @@
     <string name="models_sizes">%1$d גדלים, מ־%2$s</string>
     <string name="models_speakers">דוברים</string>
     <string name="models_title">מודלים</string>
-    <string name="models_unusable">עוד %1$d מאגרים נמצאו, בפורמטים שהאפליקציה לא מריצה.</string>
+    <string name="models_unusable">עוד %1$d מאגרים נמצאו, בסוגי קבצים שהאפליקציה לא מריצה.</string>
     <!-- Settings: the languages and their models, the switches after a lecture. -->
     <string name="settings_languages">שפות</string>
     <string name="settings_live_is">בזמן אמת: %1$s</string>
@@ -336,7 +336,7 @@
     <string name="rec_format_encoder_software">רץ על %1$s, בתוכנה על המעבד</string>
     <string name="rec_format_flac_short">בלי אובדן: כל הצליל נשמר, בערך \u2066350–450 MB\u2069 לשעה.</string>
     <string name="rec_format_flac_line">מאמץ %1$d מתוך %2$d</string>
-    <string name="rec_format_format">פורמט ההקלטה</string>
+    <string name="rec_format_format">הגדרות הקלטה</string>
     <string name="rec_format_format_note">איך הרגעים נשמרים. ל־AAC ול־FLAC יש עמוד משלהם.</string>
     <string name="rec_format_kbps">\u2066%1$d kbps\u2069</string>
     <string name="rec_format_khz">\u2066%1$d kHz\u2069</string>
@@ -344,8 +344,8 @@
     <string name="rec_format_later_charging">בזמן טעינה, עם 30% סוללה ומעלה</string>
     <string name="rec_format_later_charging_note">מחכה למטען, גם כשהאפליקציה סגורה; הרגע נשאר WAV עד אז</string>
     <string name="rec_format_later_charging_short">קודם WAV, מקודד בזמן טעינה</string>
-    <string name="rec_format_later_here_charging">מוקלט כ־WAV ומקודד לזה בזמן טעינה מעל 30% (פורמט ההקלטה).</string>
-    <string name="rec_format_later_here_stop">מוקלט כ־WAV ומקודד לזה אחרי הרגע (פורמט ההקלטה).</string>
+    <string name="rec_format_later_here_charging">מוקלט כ־WAV ומקודד לזה בזמן טעינה מעל 30% (הגדרות הקלטה).</string>
+    <string name="rec_format_later_here_stop">מוקלט כ־WAV ומקודד לזה אחרי הרגע (הגדרות הקלטה).</string>
     <string name="rec_format_later_note">שום דבר לא מקודד בזמן ההקלטה; ה־WAV (בערך \u2066690 MB\u2069 לשעה) הופך ל־AAC או FLAC מאוחר יותר ואז נמחק.</string>
     <string name="rec_format_later_stop">כשהרגע נגמר</string>
     <string name="rec_format_later_stop_note">מיד אחרי עצירה והמעברים שלה</string>
