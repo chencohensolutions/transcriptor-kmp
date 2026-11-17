@@ -396,7 +396,19 @@ private fun SpeechRow(
             .clickable(enabled = !editing, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
-        if (speaker != null) SpeakerChip(speaker, Modifier.padding(start = 44.dp, bottom = 4.dp)) { onSpeaker(speaker) }
+        // A speaker found for lines already shown (speaker labels often come a few lines late, several at once) opens
+        // its place between the lines and fades in, instead of the lines jumping; a speaker that changes cross-fades.
+        var lastSpeaker by remember { mutableStateOf(speaker) }
+        if (speaker != null) lastSpeaker = speaker
+        androidx.compose.animation.AnimatedVisibility(
+            visible = speaker != null,
+            enter = androidx.compose.animation.expandVertically(tween(320)) + androidx.compose.animation.fadeIn(tween(260, delayMillis = 120)),
+            exit = androidx.compose.animation.shrinkVertically(tween(280)) + androidx.compose.animation.fadeOut(tween(160)),
+        ) {
+            androidx.compose.animation.Crossfade(lastSpeaker, animationSpec = tween(250), label = "speaker") { shown ->
+                if (shown != null) SpeakerChip(shown, Modifier.padding(start = 44.dp, bottom = 4.dp)) { onSpeaker(shown) }
+            }
+        }
         Row {
             Column(Modifier.width(44.dp).padding(top = 3.dp)) {
                 Text(formatClock(entry.segment.startMillis), style = MaterialTheme.typography.labelSmall, color = colors.time)

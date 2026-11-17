@@ -473,7 +473,9 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                             state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                // Red, like the recording screen's Stop it turns into.
+                                colors = ButtonDefaults.buttonColors(containerColor = LocalTranscriptorColors.current.recording, contentColor = Color.White),
+                                modifier = Modifier.sharedRecordButton().fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
                                 Text(stringResource(R.string.notebooks_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
@@ -959,7 +961,8 @@ private fun RecordingBanner(recording: RecordingNow, labels: List<Label>, onBack
                     style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White)) { Text(stringResource(R.string.notebooks_back_to_lecture)) }
+            // The recording screen's Stop morphs into this button on the way back, and out of it going there.
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = red, contentColor = Color.White), modifier = Modifier.sharedRecordButton()) { Text(stringResource(R.string.notebooks_back_to_lecture)) }
         }
     }
 }

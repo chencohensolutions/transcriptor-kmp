@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.compose.animation.togetherWith
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -154,9 +155,37 @@ class MainActivity : ComponentActivity() {
                 ReviewPasses()
                 val state = live
                 val review = opened
+                // The screens change with a short cross-fade; Record on the first screen morphs into the recording
+                // screen's Stop (shared bounds, LocalSharedScopes), and back.
+                val screen = when {
+                    firstRun == true && state == null -> "first"
+                    state != null && showLive -> "live"
+                    review != null -> "review"
+                    settings -> "settings"
+                    else -> "notebooks"
+                }
+                androidx.compose.animation.SharedTransitionLayout {
+                androidx.compose.animation.AnimatedContent(
+                    screen, label = "screen",
+                    // Eased cross-fade, no spring anywhere (the default size change springs: a bounce).
+                    transitionSpec = {
+                        // Only the first screen and the recording screen fade into each other (Record becomes Stop);
+                        // every other change is immediate, as before.
+                        val recording = setOf(initialState, targetState) == setOf("notebooks", "live")
+                        if (!recording) return@AnimatedContent androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                        val ease = androidx.compose.animation.core.FastOutSlowInEasing
+                        val millis = com.chencohensolution.transcriptor.ui.MORPH_MILLIS
+                        // The screen going away stays whole underneath while the new one fades in over it: no moment
+                        // where both are half see-through (the window showing between them: a blink).
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(millis, easing = ease)) togetherWith
+                            androidx.compose.animation.ExitTransition.KeepUntilTransitionsFinished)
+                            .using(androidx.compose.animation.SizeTransform(clip = false) { _, _ -> androidx.compose.animation.core.tween(millis, easing = ease) })
+                    },
+                ) { shown ->
+                androidx.compose.runtime.CompositionLocalProvider(com.chencohensolution.transcriptor.ui.LocalSharedScopes provides com.chencohensolution.transcriptor.ui.SharedScopes(this@SharedTransitionLayout, this@AnimatedContent)) {
                 when {
-                    firstRun == true && state == null -> FirstRun(onDone = { firstRun = false })
-                    state != null && showLive -> {
+                    shown == "first" -> FirstRun(onDone = { firstRun = false })
+                    shown == "live" && state != null -> {
                         BackHandler { showLive = false }
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
                         val meterStyle = remember { Recording.settings.processorMeters }
@@ -173,7 +202,7 @@ class MainActivity : ComponentActivity() {
                             LiveLectureActions(
                                 back = { showLive = false },
                                 pauseOrResume = Recording.session::pauseOrResume,
-                                stop = { openAfterStop = true; RecordingService.stop(this) },
+                                stop = { openAfterStop = true; RecordingService.stop(this@MainActivity) },
                                 addNote = Recording.session::addNote,
                                 mark = Recording.session::mark,
                                 setTranscribing = { on -> lifecycleScope.launch(Dispatchers.Default) { Recording.session.setTranscribing(on) } },
@@ -182,7 +211,7 @@ class MainActivity : ComponentActivity() {
                             ),
                         )
                     }
-                    review != null -> {
+                    shown == "review" && review != null -> {
                         BackHandler { Recording.review.close() }
                         val r = Recording.review
                         val library by Recording.library.library.collectAsStateWithLifecycle()
@@ -223,9 +252,9 @@ class MainActivity : ComponentActivity() {
                                     setLabels(review.lecture.labels - id)
                                     lifecycleScope.launch(Dispatchers.IO) { Recording.deleteLabel(id) }
                                 },
-                                findSpeakers = { RecordingService.findSpeakers(this, review.lecture) },
+                                findSpeakers = { RecordingService.findSpeakers(this@MainActivity, review.lecture) },
                                 tuneSpeakers = r::tuneSpeakers, applySpeakerTuning = r::applySpeakerTuning,
-                                improve = { model, speakersFirst -> RecordingService.refine(this, review.lecture, model, speakersFirst) },
+                                improve = { model, speakersFirst -> RecordingService.refine(this@MainActivity, review.lecture, model, speakersFirst) },
                                 getModel = { id ->
                                     lifecycleScope.launch(Dispatchers.IO) { Recording.modelLibrary.all.firstOrNull { it.id == id }?.let { Recording.models.download(it) } }
                                 },
@@ -247,12 +276,14 @@ class MainActivity : ComponentActivity() {
                             ),
                         )
                     }
-                    settings -> {
+                    shown == "settings" -> {
                         BackHandler { settings = false }
                         Settings(onBack = { settings = false }, chooseFolder = chooseFolder)
                     }
-                    else -> Notebooks(
-                        recordingNow = state?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
+                    shown == "notebooks" -> Notebooks(
+                        // On the way to the recording screen the Record bar stays (its button morphs into Stop); the
+                        // banner back to the moment shows only while the recording screen is closed.
+                        recordingNow = state?.takeIf { !showLive }?.let { RecordingNow(it.lecture.labels, it.lecture.title, it.elapsedMillis, it.lecture.id) },
                         working = working,
                         onRecord = { labels, language, mode -> startLecture(labels, language, mode); showLive = true },
                         onBackToRecording = { showLive = true },
@@ -260,6 +291,9 @@ class MainActivity : ComponentActivity() {
                         chooseFolder = chooseFolder,
                         place = notebooksPlace,
                     )
+                }
+                }
+                }
                 }
               }
             }
