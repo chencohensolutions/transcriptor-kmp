@@ -167,9 +167,13 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.animation.SharedTransitionLayout {
                 androidx.compose.animation.AnimatedContent(
                     screen, label = "screen",
+                    // Eased cross-fade, no spring anywhere (the default size change springs: a bounce).
                     transitionSpec = {
-                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(320, delayMillis = 60)) togetherWith
-                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220))
+                        val ease = androidx.compose.animation.core.FastOutSlowInEasing
+                        val millis = com.chencohensolution.transcriptor.ui.MORPH_MILLIS
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(millis, easing = ease)) togetherWith
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(millis, easing = ease)))
+                            .using(androidx.compose.animation.SizeTransform(clip = false) { _, _ -> androidx.compose.animation.core.tween(millis, easing = ease) })
                     },
                 ) { shown ->
                 androidx.compose.runtime.CompositionLocalProvider(com.chencohensolution.transcriptor.ui.LocalSharedScopes provides com.chencohensolution.transcriptor.ui.SharedScopes(this@SharedTransitionLayout, this@AnimatedContent)) {
