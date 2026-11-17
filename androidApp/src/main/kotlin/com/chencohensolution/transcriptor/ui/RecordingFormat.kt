@@ -202,6 +202,12 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
             QualityPreset.Low -> R.string.rec_preset_low_note
             QualityPreset.Custom -> R.string.rec_preset_custom_note
         }))
+        // How long a moment can be with the space left (while recording: the WAV, when it records as WAV first).
+        val perHour = choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
+        if (state.freeBytes > 0 && perHour > 0) {
+            val hours = (state.freeBytes / 1_000_000 / perHour).toInt()
+            FormatNote(stringResource(R.string.rec_preset_hours_left, hours, state.freeBytes / 1_000_000_000))
+        }
 
         FormatLabel(stringResource(R.string.rec_preset_power))
         val power = listOf(PowerPreset.Low, PowerPreset.Normal) + listOfNotNull(PowerPreset.Custom.takeIf { choice.power == it })
@@ -218,6 +224,24 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
             PowerPreset.Normal -> R.string.rec_preset_power_normal_note
             PowerPreset.Custom -> R.string.rec_preset_power_custom_note
         }))
+        // When moments recorded with After are transcribed: here, beside the battery (it was under Settings › After a
+        // moment); encoding's own timing is under "Record as WAV, encode afterwards" below.
+        Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
+        Column(Modifier.selectableGroup()) {
+            listOf(
+                EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
+                EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
+            ).forEach { (option, label) ->
+                Row(
+                    Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = state.transcribeWhen == option, onClick = null)
+                    Text(stringResource(label), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
     }
 }

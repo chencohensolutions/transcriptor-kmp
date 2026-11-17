@@ -102,6 +102,20 @@ data class RecordingChoice(
             }
         }
 
+    /**
+     * About how many MB an hour takes on the phone while recording: the WAV when it records as WAV first (16 bit before
+     * AAC, FLAC's depth before FLAC), else the codec's size. What limits how long a moment can be.
+     */
+    val megabytesPerHourWhileRecording: Int
+        get() {
+            val wavBits = if (audioFormat == AudioFormat.WavThenAac) 16 else flac.valid().bitDepth
+            return when {
+                audioFormat == AudioFormat.Wav || audioFormat.wavFirst -> (48_000L * 2 * wavBits / 8 * 3600 / 1_000_000).toInt()
+                audioFormat.isAac -> aac.valid().megabytesPerHour
+                else -> flac.valid().megabytesPerHour
+            }
+        }
+
     val power: PowerPreset
         get() = when {
             encodeAfter == EncodeAfter.Charging && transcribeWhen == EncodeAfter.Charging && (audioFormat.wavFirst || audioFormat == AudioFormat.Wav) -> PowerPreset.Low

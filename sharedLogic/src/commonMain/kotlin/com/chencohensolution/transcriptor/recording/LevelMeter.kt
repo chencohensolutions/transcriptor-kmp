@@ -34,9 +34,11 @@ data class StereoMeterState(
     val bands: List<Float> = emptyList(),
     val bandHistory: List<List<Float>> = emptyList(),
     val stereo: Boolean = false,
+    /** A sample hit full scale in the last few seconds: too loud, the recording is clipping. */
+    val clipping: Boolean = false,
 ) {
     /** Paused: nothing is heard, the strips stay as they were. */
-    fun silenced() = copy(now = StereoLevel.Silent, bands = bands.map { 0f })
+    fun silenced() = copy(now = StereoLevel.Silent, bands = bands.map { 0f }, clipping = false)
 }
 
 /** How many bands the frequency styles split [BAND_LOW_HZ] .. [BAND_HIGH_HZ] into, evenly on a log scale. */
@@ -66,10 +68,22 @@ class MeterAnalyzer(private val sampleRate: Int = WavWriter.SAMPLE_RATE) {
     private var leftPeak = 0f
     private var rightPeak = 0f
     private var stereo = false
+    /** Readings left that still say "clipping" after the last full-scale sample. */
+    private var clipHold = 0
+    /** [feed] saw a full-scale sample since the last reading. */
+    @kotlin.concurrent.Volatile private var sawClip = false
     var state = StereoMeterState()
         private set
 
     fun feed(pcm: ByteArray, size: Int) {
+        // Every buffer is checked for a clip (the reading looks at one in five).
+        if (!sawClip) {
+            var j = 0
+            while (j + 1 < size) {
+                if (kotlin.math.abs(sample(pcm, j)) >= CLIP_LEVEL) { sawClip = true; break }
+                j += 2
+            }
+        }
         if (!wantBands) {
             filled = 0
             return
@@ -86,15 +100,20 @@ class MeterAnalyzer(private val sampleRate: Int = WavWriter.SAMPLE_RATE) {
     fun read(pcm: ByteArray, size: Int): StereoMeterState {
         var left = 0.0
         var right = 0.0
+        var loudest = 0f
         var i = 0
         while (i + 3 < size) {
             val l = sample(pcm, i)
             val r = sample(pcm, i + 2)
+            loudest = max(loudest, max(kotlin.math.abs(l), kotlin.math.abs(r)).toFloat())
             if (l != r) stereo = true
             left += l.toDouble() * l
             right += r.toDouble() * r
             i += 4
         }
+        // Within half a percent of full scale counts as a clip; it is said for about three seconds after.
+        clipHold = if (loudest >= CLIP_LEVEL || sawClip) CLIP_HOLD_READS else (clipHold - 1).coerceAtLeast(0)
+        sawClip = false
         val frames = (size / 4).coerceAtLeast(1)
         val l = scale(sqrt(left / frames) / Short.MAX_VALUE)
         val r = scale(sqrt(right / frames) / Short.MAX_VALUE)
@@ -108,6 +127,7 @@ class MeterAnalyzer(private val sampleRate: Int = WavWriter.SAMPLE_RATE) {
             bands = bands,
             bandHistory = if (bands.isEmpty()) state.bandHistory else (state.bandHistory + listOf(bands)).takeLast(METER_HISTORY),
             stereo = stereo,
+            clipping = clipHold > 0,
         )
         return state
     }
@@ -117,6 +137,8 @@ class MeterAnalyzer(private val sampleRate: Int = WavWriter.SAMPLE_RATE) {
         leftPeak = 0f
         rightPeak = 0f
         stereo = false
+        clipHold = 0
+        sawClip = false
         filled = 0
         state = StereoMeterState()
     }
@@ -152,6 +174,8 @@ class MeterAnalyzer(private val sampleRate: Int = WavWriter.SAMPLE_RATE) {
     private companion object {
         const val FFT_SIZE = 2048
         const val PEAK_FALL = 0.025f
+        const val CLIP_LEVEL = 32_600f
+        const val CLIP_HOLD_READS = 30
         val window = FloatArray(FFT_SIZE) { (0.5 - 0.5 * cos(2 * PI * it / (FFT_SIZE - 1))).toFloat() }
 
         fun sample(pcm: ByteArray, i: Int) = (pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)

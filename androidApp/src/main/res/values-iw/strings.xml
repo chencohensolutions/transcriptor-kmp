@@ -746,7 +746,7 @@
     <string name="rec_preset_power_normal">מיד</string>
     <string name="rec_preset_power_low_note">מקליט WAV בלי מקודד פועל; מקודד ומתמלל רגעים שהוקלטו ב״אחרי״ כשהטלפון בטעינה עם 30% ומעלה.</string>
     <string name="rec_preset_power_normal_note">מקודד בזמן ההקלטה או מיד אחרי עצירה, ומתמלל רגעים שהוקלטו ב״אחרי״ ברגע שהם נגמרים.</string>
-    <string name="rec_preset_power_custom_note">תזמון משלך: הקידוד למטה, התמלול בהגדרות › אחרי רגע.</string>
+    <string name="rec_preset_power_custom_note">תזמון משלך: התמלול למטה, הקידוד תחת ״להקליט כ־WAV״.</string>
     <string name="rec_preset_summary">איכות %1$s · %2$s</string>
     <string name="rec_format_depth">עומק סיביות</string>
     <string name="rec_format_bits">%1$d ביט</string>
@@ -783,4 +783,6 @@
     <string name="settings_mic_test">בדיקה</string>
     <string name="settings_mic_test_note">גרדו או הקישו בעדינות ליד מיקרופון: הפסים מראים מה שומע המיקרופון שנבחר, שמאל וימין.</string>
     <string name="settings_mic_test_off">הבדיקה מקשיבה כשלא מוקלט כלום והאפליקציה רשאית להשתמש במיקרופון.</string>
+    <string name="glance_clipping">חזק מדי: הצליל נחתך. כדאי להתרחק ממקור הקול, או לנסות את המיקרופון האחורי.</string>
+    <string name="rec_preset_hours_left">בערך %1$d שעות הקלטה נכנסות בטלפון (%2$d GB פנויים).</string>
 </resources>

@@ -177,6 +177,8 @@ data class ModelsState(
     val micDetails: List<com.chencohensolution.transcriptor.recording.MicDetail> = emptyList(),
     /** Settings › Microphone's test: the picked microphone's levels while its page is open. */
     val micMeter: com.chencohensolution.transcriptor.recording.StereoMeterState = com.chencohensolution.transcriptor.recording.StereoMeterState(),
+    /** Free space where moments record (the app's storage), for "about N hours fit". */
+    val freeBytes: Long = 0,
     /** The test can't listen: a moment is recording, or the microphone permission isn't given. */
     val micTestOff: Boolean = false,
     /** Recording or improving: models are in use, none is removed or deleted until it is done. */
@@ -422,23 +424,6 @@ private fun SettingsPage(state: ModelsState, actions: ModelsActions, openLanguag
             }
             HorizontalDivider(Modifier.padding(top = 8.dp))
             SectionTitle(stringResource(R.string.settings_after))
-            Column(Modifier.selectableGroup()) {
-                Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp))
-                PageNote(stringResource(R.string.settings_transcribe_when_note))
-                listOf(
-                    EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
-                    EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
-                ).forEach { (option, label) ->
-                    Row(
-                        Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = state.transcribeWhen == option, onClick = null)
-                        Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
             SwitchRow(
                 stringResource(R.string.settings_auto_improve),
                 stringResource(if (state.autoImprove) R.string.settings_auto_improve_on else R.string.settings_auto_improve_off),

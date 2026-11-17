@@ -93,8 +93,7 @@ stops.
   shown selected only while the settings match none; picking a preset keeps "WAV first" and the AAC encoder. Then
   **Battery**: Save battery (WAV first; encoding and After transcription on the charger at 30% or more) or Right away
   (encoding and After transcription right after Stop), Custom likewise (`QualityPreset`, `PowerPreset`,
-  `RecordingChoice`, `SettingsStore.recordingChoice`; the battery preset also sets Settings › After a moment's
-  `transcribeWhen`). Then **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
+  `RecordingChoice`, `SettingsStore.recordingChoice`). Under Quality, about how many hours fit in the free space (`megabytesPerHourWhileRecording`: the WAV when it records as WAV first). Under Battery, **Transcribe moments recorded with After**: right after or when charging (`transcribeWhen`; moved here from Settings › After a moment, Nov 17, 2026). Then **WAV**, **AAC** and **FLAC** as radio rows (AAC and FLAC with a › that opens their page; choosing one opens it), and
   under them **Record as WAV, encode afterwards** (greyed out for WAV) with **When the moment ends** or **When charging,
   with 30% battery or more** (`SettingsStore.audioFormat`: `wav`, `aac-live`, `wav-then-aac`, `flac-live`,
   `wav-then-flac`; `SettingsStore.encodeAfter`). The **AAC** page: AAC profile (LC, HE, HE v2), sample rate (16, 24,

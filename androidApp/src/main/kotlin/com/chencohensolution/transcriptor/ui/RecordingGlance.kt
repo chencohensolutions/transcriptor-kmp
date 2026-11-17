@@ -126,6 +126,11 @@ internal fun RecordingGlance(state: LiveLectureState, actions: LiveLectureAction
                 mic, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp),
                 color = if (state.inputMissing != null) MaterialTheme.colorScheme.error else colors.time,
             )
+            // Too loud: a sample hit full scale in the last seconds (a concert up close).
+            if (state.stereoMeter.clipping) Text(
+                stringResource(R.string.glance_clipping), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp),
+            )
             // A problem is said; while things work, the models aren't.
             val problem = when {
                 state.liveError != null -> stringResource(R.string.glance_live_stopped)

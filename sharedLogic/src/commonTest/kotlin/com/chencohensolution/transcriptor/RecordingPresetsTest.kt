@@ -79,6 +79,13 @@ class RecordingPresetsTest {
     }
 
     @Test
+    fun sizeWhileRecordingIsTheWavWhenItComesFirst() {
+        assertEquals(691, owner.megabytesPerHourWhileRecording)
+        assertEquals(115, owner.copy(audioFormat = AudioFormat.AacLive).megabytesPerHourWhileRecording)
+        assertEquals(1036, owner.copy(audioFormat = AudioFormat.WavThenFlac, flac = FlacFormat(bitDepth = 24)).megabytesPerHourWhileRecording)
+    }
+
+    @Test
     fun pcm24RoundTrips() {
         val floats = floatArrayOf(0f, 0.5f, -0.5f, 1f, -1f, 0.25f)
         val wide = ByteArray(18)

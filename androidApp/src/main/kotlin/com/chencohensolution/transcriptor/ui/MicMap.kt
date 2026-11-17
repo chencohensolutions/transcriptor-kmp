@@ -180,6 +180,7 @@ internal fun MicrophonePage(state: ModelsState, actions: ModelsActions, back: ()
                     Text(stringResource(R.string.settings_mic_test_off), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     LevelMeter(state.micMeter.copy(stereo = true), LevelMeterStyle.Lines, Modifier.padding(vertical = 8.dp))
+                    if (state.micMeter.clipping) Text(stringResource(R.string.glance_clipping), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     Text(stringResource(R.string.settings_mic_test_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

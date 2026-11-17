@@ -735,7 +735,7 @@
     <string name="rec_preset_power_normal">Right away</string>
     <string name="rec_preset_power_low_note">Records as WAV with no encoder running; encodes and transcribes moments recorded with After once the phone charges with 30% or more.</string>
     <string name="rec_preset_power_normal_note">Encodes while recording or right after Stop, and transcribes moments recorded with After as soon as they end.</string>
-    <string name="rec_preset_power_custom_note">Your own timing: encoding below, transcribing in Settings › After a moment.</string>
+    <string name="rec_preset_power_custom_note">Your own timing: transcribing below, encoding under Record as WAV.</string>
     <string name="rec_preset_summary">%1$s quality · %2$s</string>
     <string name="rec_format_depth">Bit depth</string>
     <string name="rec_format_bits">%1$d bit</string>
@@ -772,4 +772,6 @@
     <string name="settings_mic_test">Test</string>
     <string name="settings_mic_test_note">Scratch or tap gently near a microphone: the bars show what the picked one hears, left and right.</string>
     <string name="settings_mic_test_off">The test listens when nothing is recording and the app may use the microphone.</string>
+    <string name="glance_clipping">Too loud: the sound is clipping. Move away from the source, or try the back microphone.</string>
+    <string name="rec_preset_hours_left">About %1$d hours of recording fit on the phone (%2$d GB free).</string>
 </resources>
