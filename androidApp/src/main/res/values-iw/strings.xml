@@ -952,4 +952,6 @@
     <string name="calls_progress_now">עכשיו: %1$s · %2$d%%</string>
     <string name="calls_transcribing_before_upload">מתמלל שיחות לפני ההעלאה</string>
     <string name="calls_notification">מתמלל שיחה %1$d מתוך %2$d · %3$s</string>
+    <string name="notebooks_panel_fold">קיפול אפשרויות ההקלטה</string>
+    <string name="notebooks_panel_open">פתיחת אפשרויות ההקלטה</string>
 </resources>
