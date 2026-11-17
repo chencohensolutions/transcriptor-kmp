@@ -150,6 +150,11 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             setFlacLevel = { flacLevel = it; io { Recording.settings.flacLevel = it } },
             setAac = { aac = it.valid(); io { Recording.settings.aac = it } },
             setFlac = { flac = it.valid(); io { Recording.settings.flac = it } },
+            setSound = { rate, channels, bits ->
+                val next = state.recordingChoice.withSound(rate, channels, bits)
+                aac = next.aac; flac = next.flac
+                io { Recording.settings.recordingChoice = next }
+            },
             setQuality = { preset ->
                 val next = state.recordingChoice.with(preset)
                 format = next.audioFormat; aac = next.aac; flac = next.flac

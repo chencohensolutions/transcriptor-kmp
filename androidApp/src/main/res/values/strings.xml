@@ -322,7 +322,6 @@
     <string name="rec_format_bitrate">Bitrate</string>
     <string name="rec_format_bitrate_he_high">HE gains nothing over LC above about 64 kbps: at this bitrate LC sounds as good and costs less to encode.</string>
     <string name="rec_format_channels">Channels</string>
-    <string name="rec_format_channels_note">Mono is half the encoding for the same bitrate; transcription hears mono either way.</string>
     <string name="rec_format_codec_aac">AAC</string>
     <string name="rec_format_codec_flac">FLAC</string>
     <string name="rec_format_codec_wav">WAV</string>
@@ -361,7 +360,6 @@
     <string name="rec_format_profile_lc">LC</string>
     <string name="rec_format_profile_lc_note">The plainest: cheapest to encode and to play back, and the best sound at 64 kbps and up.</string>
     <string name="rec_format_rate">Sample rate</string>
-    <string name="rec_format_rate_note">Speech models listen at 16 kHz. Higher keeps more of the room for listening back. HE needs 24 or 48.</string>
     <string name="rec_format_size">About %1$d MB an hour</string>
     <string name="rec_format_stereo">Stereo</string>
     <string name="rec_format_summary_aac">%1$s · %2$d kbps · %3$s · %4$d kHz · %5$s</string>
@@ -782,4 +780,5 @@
         <item quantity="one">1 moment waits to be compressed (when charging, or Upload now), then it is sent.</item>
         <item quantity="other">%d moments wait to be compressed (when charging, or Upload now), then they are sent.</item>
     </plurals>
+    <string name="rec_sound_note">For AAC and FLAC alike. WAV is always 48 kHz stereo.</string>
 </resources>

@@ -86,6 +86,22 @@ class RecordingPresetsTest {
     }
 
     @Test
+    fun soundIsSharedByBothCodecs() {
+        val mono = owner.withSound(24_000, 1)
+        assertEquals(24_000, mono.aac.sampleRate)
+        assertEquals(24_000, mono.flac.sampleRate)
+        assertEquals(1, mono.flac.channels)
+        assertEquals(1, mono.channels)
+        // HE v2 is stereo only: mono makes it HE; HE can't do 16 kHz: LC.
+        val he2 = owner.copy(aac = AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.HeV2, 48_000, 2, 32))
+        assertEquals(com.chencohensolution.transcriptor.settings.AacProfile.He, he2.withSound(48_000, 1).aac.profile)
+        assertEquals(com.chencohensolution.transcriptor.settings.AacProfile.Lc, he2.withSound(16_000, 1).aac.profile)
+        // A preset moves the other codec too.
+        assertEquals(1, owner.with(QualityPreset.Low).flac.channels)
+        assertEquals(2, owner.with(QualityPreset.Low).with(QualityPreset.High).aac.channels)
+    }
+
+    @Test
     fun pcm24RoundTrips() {
         val floats = floatArrayOf(0f, 0.5f, -0.5f, 1f, -1f, 0.25f)
         val wide = ByteArray(18)

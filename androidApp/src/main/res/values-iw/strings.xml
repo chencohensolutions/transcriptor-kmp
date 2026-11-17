@@ -322,7 +322,6 @@
     <string name="rec_format_bitrate">קצב סיביות</string>
     <string name="rec_format_bitrate_he_high">מעל בערך \u206664 kbps\u2069 ל־HE אין יתרון על LC: בקצב הזה LC נשמע טוב באותה מידה וזול יותר לקידוד.</string>
     <string name="rec_format_channels">ערוצים</string>
-    <string name="rec_format_channels_note">במונו יש חצי קידוד באותו קצב; התמלול שומע מונו בכל מקרה.</string>
     <string name="rec_format_codec_aac">AAC</string>
     <string name="rec_format_codec_flac">FLAC</string>
     <string name="rec_format_codec_wav">WAV</string>
@@ -361,7 +360,6 @@
     <string name="rec_format_profile_lc">LC</string>
     <string name="rec_format_profile_lc_note">הפשוט ביותר: הכי זול לקידוד ולהשמעה, והצליל הטוב ביותר מ־64 kbps ומעלה.</string>
     <string name="rec_format_rate">קצב דגימה</string>
-    <string name="rec_format_rate_note">מודלי הדיבור מאזינים ב־16 kHz. גבוה יותר שומר יותר מהחדר להאזנה חוזרת. HE צריך 24 או 48.</string>
     <string name="rec_format_size">בערך \u2066%1$d MB\u2069 לשעה</string>
     <string name="rec_format_stereo">סטריאו</string>
     <string name="rec_format_summary_aac">%1$s · \u2066%2$d kbps\u2069 · %3$s · \u2066%4$d kHz\u2069 · %5$s</string>
@@ -793,4 +791,5 @@
         <item quantity="one">רגע אחד ממתין לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלח.</item>
         <item quantity="other">%d רגעים ממתינים לדחיסה (בזמן טעינה, או ״להעלות עכשיו״), ואז יישלחו.</item>
     </plurals>
+    <string name="rec_sound_note">ל־AAC ול־FLAC כאחד. WAV תמיד 48 קילוהרץ סטריאו.</string>
 </resources>

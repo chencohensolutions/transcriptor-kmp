@@ -123,14 +123,39 @@ data class RecordingChoice(
             else -> PowerPreset.Custom
         }
 
+    /**
+     * The sample rate and channels both codecs record at (owner's request, Nov 17, 2026: one setting, not one per
+     * codec): the codec in use's, AAC's when it's AAC, else FLAC's.
+     */
+    val sampleRate get() = if (audioFormat.isAac) aac.valid().sampleRate else flac.valid().sampleRate
+    val channels get() = if (audioFormat.isAac) aac.valid().channels else flac.valid().channels
+
+    /**
+     * These settings at [rate] and [channels] for AAC and FLAC alike, and FLAC (and the WAV before it) at [bits]. An
+     * AAC profile that can't take them gives way: HE v2 to HE for mono, HE to LC at 16 kHz.
+     */
+    fun withSound(rate: Int, channels: Int, bits: Int = flac.bitDepth): RecordingChoice {
+        var profile = aac.profile
+        if (profile == AacProfile.HeV2 && channels == 1) profile = AacProfile.He
+        if (rate !in AacSettings.rates(profile)) profile = AacProfile.Lc
+        return copy(
+            aac = aac.copy(profile = profile, sampleRate = rate, channels = channels).valid(),
+            flac = flac.copy(sampleRate = rate, channels = channels, bitDepth = bits).valid(),
+        )
+    }
+
     /** These settings with [preset]'s codec and its settings; WAV first stays as it was, the AAC encoder too. */
     fun with(preset: QualityPreset): RecordingChoice {
         val first = audioFormat.wavFirst
         fun aacOf(p: AacSettings) = p.copy(encoder = aac.encoder)
+        // The sound (rate, channels) is shared: the other codec follows the preset's.
         return when (preset) {
             QualityPreset.High -> copy(audioFormat = if (first) AudioFormat.WavThenFlac else AudioFormat.FlacLive, flac = QualityPreset.HIGH_FLAC)
+                .let { it.withSound(QualityPreset.HIGH_FLAC.sampleRate, QualityPreset.HIGH_FLAC.channels, QualityPreset.HIGH_FLAC.bitDepth) }
             QualityPreset.Normal -> copy(audioFormat = if (first) AudioFormat.WavThenAac else AudioFormat.AacLive, aac = aacOf(QualityPreset.NORMAL_AAC))
+                .let { it.copy(flac = it.flac.copy(sampleRate = QualityPreset.NORMAL_AAC.sampleRate, channels = QualityPreset.NORMAL_AAC.channels)) }
             QualityPreset.Low -> copy(audioFormat = if (first) AudioFormat.WavThenAac else AudioFormat.AacLive, aac = aacOf(QualityPreset.LOW_AAC))
+                .let { it.copy(flac = it.flac.copy(sampleRate = QualityPreset.LOW_AAC.sampleRate, channels = QualityPreset.LOW_AAC.channels)) }
             QualityPreset.Custom -> this
         }
     }

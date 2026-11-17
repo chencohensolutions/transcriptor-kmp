@@ -261,6 +261,8 @@ class ModelsActions(
     val setFlacLevel: (Int) -> Unit = {},
     val setAac: (AacSettings) -> Unit = {},
     val setFlac: (com.chencohensolution.transcriptor.settings.FlacFormat) -> Unit = {},
+    /** The shared sound: sample rate and channels for AAC and FLAC, bit depth for FLAC and WAV. */
+    val setSound: (rate: Int, channels: Int, bits: Int) -> Unit = { _, _, _ -> },
     /** Applies a quality preset (codec and its settings). */
     val setQuality: (com.chencohensolution.transcriptor.settings.QualityPreset) -> Unit = {},
     /** Applies a power preset (when encoding and "After" transcription run). */
