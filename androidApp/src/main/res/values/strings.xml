@@ -919,4 +919,22 @@
     <string name="info_path_map">Show on map</string>
     <string name="info_path_map_note">Map from OpenFreeMap (OpenStreetMap). Only the map\'s area is fetched; the path stays on the phone. Tap the path to play from there.</string>
     <string name="info_path_map_tap">Tap the map to open it full screen. The map comes from OpenFreeMap; the path stays on the phone.</string>
+
+    <!-- The phone's calls in the log (Nov 17, 2026). -->
+    <string name="calls_in_log">Show calls in the log</string>
+    <string name="calls_in_log_note">Each recorded call becomes a moment, transcribed on the phone. The recording stays in the calls folder and isn\'t copied.</string>
+    <string name="calls_transcribe_first">Transcribe on the phone before uploading</string>
+    <string name="calls_transcribe_first_note">A call goes up to the server only once it\'s transcribed. Transcribing runs on the charger, from 30% battery.</string>
+    <string name="calls_transcribing_now">Transcribing calls before uploading · %d left</string>
+    <string name="calls_upload_without_text">Upload without transcription</string>
+    <string name="notebooks_call_in">Incoming call</string>
+    <string name="notebooks_call_out">Outgoing call</string>
+    <plurals name="calls_waiting_text">
+        <item quantity="one">One call waiting to be transcribed before uploading</item>
+        <item quantity="other">%d calls waiting to be transcribed before uploading</item>
+    </plurals>
+    <plurals name="calls_not_transcribed">
+        <item quantity="one">One call not transcribed yet</item>
+        <item quantity="other">%d calls not transcribed yet</item>
+    </plurals>
 </resources>

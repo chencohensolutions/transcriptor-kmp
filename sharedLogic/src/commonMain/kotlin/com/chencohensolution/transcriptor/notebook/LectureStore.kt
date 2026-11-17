@@ -12,6 +12,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import okio.FileSystem
 import okio.Path
+import okio.Path.Companion.toPath
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -109,10 +110,29 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 
     fun folder(lectureId: String): Path = placeOf(lectureId).folder(lectureId)
 
-    fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path = folder(lecture.id) / file
+    /**
+     * The moment's audio file (or another file of its folder, [file]). A call from the phone's call recordings
+     * ([Lecture.callFile]) has its audio in the calls folder ([calls]), read through [audioFileSystem].
+     */
+    fun audioPath(lecture: Lecture, file: String = lecture.audioFile): Path {
+        val call = lecture.callFile
+        if (call != null && file == lecture.audioFile) return (calls?.root ?: CALLS_NOWHERE) / call
+        return folder(lecture.id) / file
+    }
 
     /** The file system the lecture's folder is on: the app's own, or the library's. */
     fun fileSystemOf(lectureId: String): FileSystem = placeOf(lectureId).fileSystem
+
+    /** The file system [audioPath] is on: the calls folder's for a call of the phone's, else the moment folder's. */
+    fun audioFileSystem(lecture: Lecture): FileSystem =
+        if (lecture.callFile != null) calls?.fileSystem ?: local.fileSystem else fileSystemOf(lecture.id)
+
+    /**
+     * The phone's call recordings folder, read only, as the app can read it now: the audio of call moments
+     * ([Lecture.callFile]). Null when it can't (no folder picked, or the access was taken back): their audio is missing.
+     */
+    @kotlin.concurrent.Volatile
+    var calls: Place? = null
 
     /** The lecture is in the app's own storage, not (yet) in the library. */
     fun isLocal(lecture: Lecture) = placeOf(lecture.id) == local
@@ -145,7 +165,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      */
     fun serverNote(lecture: Lecture, path: com.chencohensolution.transcriptor.location.MomentPath? = null): String =
         json.encodeToString(
-            LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) }, serverSha256 = null))
+            LectureFileV1.of(lecture.copy(segments = lecture.segments.map { it.copy(words = emptyList()) }, serverSha256 = null, callFile = null))
                 .copy(pathNote = path?.takeIf { !it.isEmpty }?.let { com.chencohensolution.transcriptor.location.PathNoteV1.of(it) }),
         )
 
@@ -157,10 +177,16 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
         runCatching { json.decodeFromString<LectureFileV1>(text).pathNote?.toPath() }.getOrNull()
 
     /** Whether the moment's audio is on the phone (here or in the library), not only on the server. */
-    fun hasAudio(lecture: Lecture): Boolean = runCatching { fileSystemOf(lecture.id).exists(audioPath(lecture)) }.getOrDefault(false)
+    fun hasAudio(lecture: Lecture): Boolean = runCatching {
+        if (lecture.callFile != null && calls == null) false else audioFileSystem(lecture).exists(audioPath(lecture))
+    }.getOrDefault(false)
 
-    /** Deletes the moment's audio from the phone, keeping the rest (Free up space, once the server holds it). */
+    /**
+     * Deletes the moment's audio from the phone, keeping the rest (Free up space, once the server holds it). Never a
+     * call's: that file is the phone's own.
+     */
     fun deleteAudio(lecture: Lecture) {
+        if (lecture.callFile != null) return
         fileSystemOf(lecture.id).delete(audioPath(lecture), mustExist = false)
         indexNow(lecture.id, load(lecture.id))
     }
@@ -227,7 +253,7 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
      * lecture is being recorded. Only here: a lecture reaches the library finished.
      */
     fun repairAudio(lecture: Lecture) {
-        if (!isLocal(lecture)) return
+        if (!isLocal(lecture) || lecture.callFile != null) return
         val audio = audioPath(lecture)
         if (lecture.audioFile == AUDIO_WAV && local.fileSystem.exists(audio)) WavWriter.repair(local.fileSystem, audio)
     }
@@ -394,6 +420,9 @@ class LectureStore(fileSystem: FileSystem, root: Path, private val utcOffset: (L
 /** The index of the moments ([IndexedMoment]), in the app's own storage. */
 const val INDEX_FILE = "moments-index.json"
 
+/** Where a call's audio is said to be while the calls folder can't be read ([LectureStore.calls] null): nothing there. */
+private val CALLS_NOWHERE = "/calls-folder-not-readable".toPath()
+
 /** The readable transcript beside the audio. */
 const val TRANSCRIPT = "transcript.md"
 
@@ -442,6 +471,10 @@ private data class LectureFileV1(
     val placeStop: PlaceStopV1? = null,
     /** [Lecture.hasPath]. */
     val path: Boolean = false,
+    /** [Lecture.callFile], [Lecture.callDirection], [Lecture.callNumber]. */
+    val callFile: String? = null,
+    val callDirection: String? = null,
+    val callNumber: String? = null,
     /** Only in the server's note, with Sync location on: the path itself ([com.chencohensolution.transcriptor.location.PathNoteV1]). */
     val pathNote: com.chencohensolution.transcriptor.location.PathNoteV1? = null,
 ) {
@@ -458,6 +491,7 @@ private data class LectureFileV1(
         liveOff = liveOff.map { LiveOff(it.fromMs, it.toMs, it.offAt, it.onAt) },
         tucked = tucked, serverSha256 = server, source = source,
         placeStop = placeStop?.let { PlaceStop(it.reason, it.atMs, it.place) }, hasPath = path,
+        callFile = callFile, callDirection = callDirection, callNumber = callNumber,
     )
 
     companion object {
@@ -479,6 +513,7 @@ private data class LectureFileV1(
             liveOff = lecture.liveOff.map { LiveOffV1(it.fromMillis, it.toMillis, it.offAtMillis, it.onAtMillis) },
             tucked = lecture.tucked, server = lecture.serverSha256, source = lecture.source,
             placeStop = lecture.placeStop?.let { PlaceStopV1(it.reason, it.atMillis, it.placeName) }, path = lecture.hasPath,
+            callFile = lecture.callFile, callDirection = lecture.callDirection, callNumber = lecture.callNumber,
         )
     }
 }

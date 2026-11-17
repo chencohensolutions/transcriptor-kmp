@@ -111,6 +111,12 @@ class ServerActions(
     val chooseCallsFolder: () -> Unit = {},
     /** Stops backing up calls (what was sent stays on the server). */
     val stopCalls: () -> Unit = {},
+    /** Shows the phone's calls as moments, transcribed on the phone (asks for the call log first). */
+    val setCallMoments: (Boolean) -> Unit = {},
+    /** A call goes up only once transcribed. */
+    val setTranscribeCallsFirst: (Boolean) -> Unit = {},
+    /** Sends the calls waiting for their transcript now, as they are. */
+    val uploadWithoutTranscription: () -> Unit = {},
 )
 
 /**
@@ -227,7 +233,7 @@ private fun Paired(state: ServerState, actions: ServerActions, locks: com.chenco
     state.refused.forEach { (moment, reason) ->
         Text(stringResource(R.string.server_refused, isolated(moment), reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
-    BackUpNowButton(state, actions, if (state.waiting + calls + state.awaitingEncode > 0) R.string.server_upload_now else R.string.server_back_up_now)
+    BackUpNowButton(state, actions, if (state.waiting + calls + state.awaitingEncode + state.callsToTranscribe > 0) R.string.server_upload_now else R.string.server_back_up_now)
     Row(
         Modifier.fillMaxWidth().toggleable(value = state.wifiOnly, role = Role.Switch, onValueChange = actions.setWifiOnly).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -334,6 +340,24 @@ private fun CallsSection(state: ServerState, actions: ServerActions) {
         Text(stringResource(R.string.server_calls_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton(onClick = actions.chooseCallsFolder) {
             Text(stringResource(if (state.callsReadable) R.string.server_calls_change else R.string.server_calls_allow))
+        }
+        // The phone's calls in the log, transcribed on the phone before they go up (hen, Nov 17, 2026).
+        ShowSwitch(R.string.calls_in_log, R.string.calls_in_log_note, state.callMoments, actions.setCallMoments)
+        if (state.callMoments) {
+            ShowSwitch(R.string.calls_transcribe_first, R.string.calls_transcribe_first_note, state.transcribeCallsFirst, actions.setTranscribeCallsFirst)
+            if (state.transcribingCalls > 0) {
+                Text(stringResource(R.string.calls_transcribing_now, state.transcribingCalls), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            } else if (state.callsToTranscribe > 0) {
+                Text(
+                    pluralStringResource(if (state.transcribeCallsFirst) R.plurals.calls_waiting_text else R.plurals.calls_not_transcribed, state.callsToTranscribe, state.callsToTranscribe),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.transcribeCallsFirst && state.callsToTranscribe > 0) {
+                OutlinedButton(onClick = actions.uploadWithoutTranscription, enabled = !state.uploading) {
+                    Text(stringResource(R.string.calls_upload_without_text))
+                }
+            }
         }
     }
     if (explaining) AlertDialog(

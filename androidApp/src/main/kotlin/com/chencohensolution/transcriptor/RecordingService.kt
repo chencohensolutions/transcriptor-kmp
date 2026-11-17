@@ -272,9 +272,15 @@ class RecordingService : Service() {
                 if (Recording.lastLecture.value?.id == done.id) Recording.lastLecture.value = done
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
                 if (transcribing && done.segments.isNotEmpty() && Recording.canFindSpeakers) speakersNext = done
+                // A call of the phone's, transcribed: it may go up now (it waited for its words).
+                if (done.callFile != null && !done.pendingTranscript) Recording.callTranscribed(this@RecordingService)
             }.onFailure {
                 if (it is RefinePass.Stopped) { Recording.modelReleased(); Recording.improveAfterRecording += lecture.id to modelId }
-                else android.util.Log.e("RecordingService", "refine pass failed", it)
+                else {
+                    android.util.Log.e("RecordingService", "refine pass failed", it)
+                    // Not taken again in this run: the next call is.
+                    if (lecture.callFile != null) callsFailed += lecture.id
+                }
             }
             Recording.settings.removeImprovePending(lecture.id)
             Recording.refining.value = null
@@ -286,6 +292,9 @@ class RecordingService : Service() {
             }
         }
     }
+
+    /** Calls whose transcribe pass failed while this service runs: left for the next time. */
+    private val callsFailed = mutableSetOf<String>()
 
     /** The phone is on the charger. */
     private fun charging() = getSystemService(android.os.BatteryManager::class.java).isCharging
@@ -320,6 +329,22 @@ class RecordingService : Service() {
             if (if (transcribing) !transcribeAllowed() else !charging) continue
             refine(lecture, model.id)
             return true
+        }
+        // The phone's calls (Show calls in the log), newest first: on the charger with enough battery, or now for
+        // Upload now. One with no model for its language is left waiting.
+        if (Recording.backup.callMoments) {
+            val (percent, plugged) = Recording.battery(this)
+            if (Recording.callsNow || (plugged && percent >= com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY)) {
+                for (id in Recording.backup.callsWaitingForText()) {
+                    if (id in callsFailed) continue
+                    val lecture = Recording.store.load(id) ?: continue
+                    if (!Recording.store.hasAudio(lecture)) continue
+                    val model = Recording.improveModelFor(lecture.language) ?: continue
+                    refine(lecture, model.id)
+                    return true
+                }
+            }
+            Recording.callsNowDone(this)
         }
         return false
     }

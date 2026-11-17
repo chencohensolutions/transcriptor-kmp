@@ -21,6 +21,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- EncodeJob is kept across a restart (encode when charging). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Which way each of the phone's recorded calls went, and the number (asked when calls are shown in the log). -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
 
     <application
         android:name=".TranscriptorApp"
@@ -76,6 +78,10 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <service
             android:name=".EncodeJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name=".CallsTranscribeJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
         <!-- Qualcomm's FastRPC, for the NPU models: a vendor library apps see only when they ask for it. Not on other

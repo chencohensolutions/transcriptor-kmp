@@ -930,4 +930,22 @@
     <string name="info_path_map">להציג במפה</string>
     <string name="info_path_map_note">מפה מ־OpenFreeMap ‏(OpenStreetMap). רק אזור המפה נטען מהרשת; המסלול נשאר בטלפון. נגיעה במסלול מנגנת משם.</string>
     <string name="info_path_map_tap">נגיעה במפה פותחת אותה במסך מלא. המפה מגיעה מ־OpenFreeMap; המסלול נשאר בטלפון.</string>
+
+    <!-- The phone's calls in the log (Nov 17, 2026). -->
+    <string name="calls_in_log">הצגת שיחות ביומן</string>
+    <string name="calls_in_log_note">כל שיחה מוקלטת נכנסת ליומן כרגע ומתומללת בטלפון. ההקלטה נשארת בתיקיית השיחות ולא מועתקת.</string>
+    <string name="calls_transcribe_first">תמלול בטלפון לפני ההעלאה</string>
+    <string name="calls_transcribe_first_note">שיחה עולה לשרת רק אחרי שתומללה. התמלול רץ בזמן טעינה, מ־30% סוללה.</string>
+    <string name="calls_transcribing_now">מתמלל שיחות לפני ההעלאה · נשארו %d</string>
+    <string name="calls_upload_without_text">העלאה בלי תמלול</string>
+    <string name="notebooks_call_in">שיחה נכנסת</string>
+    <string name="notebooks_call_out">שיחה יוצאת</string>
+    <plurals name="calls_waiting_text">
+        <item quantity="one">שיחה אחת ממתינה לתמלול לפני ההעלאה</item>
+        <item quantity="other">%d שיחות ממתינות לתמלול לפני ההעלאה</item>
+    </plurals>
+    <plurals name="calls_not_transcribed">
+        <item quantity="one">שיחה אחת עוד לא תומללה</item>
+        <item quantity="other">%d שיחות עוד לא תומללו</item>
+    </plurals>
 </resources>

@@ -19,6 +19,9 @@ import com.chencohensolution.transcriptor.notebook.Lecture
 import com.chencohensolution.transcriptor.notebook.LectureStore
 import com.chencohensolution.transcriptor.notebook.pendingEncode
 import com.chencohensolution.transcriptor.notebook.summary
+import com.chencohensolution.transcriptor.notebook.isCall
+import com.chencohensolution.transcriptor.notebook.CALL_IN
+import com.chencohensolution.transcriptor.notebook.CALL_OUT
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
@@ -107,6 +110,14 @@ data class ServerState(
     val compressing: Int = 0,
     /** Bytes of the waiting calls not sent yet. */
     val callsBytesLeft: Long = 0,
+    /** The phone's calls are moments in the list (Show calls in the log), transcribed on the phone. */
+    val callMoments: Boolean = false,
+    /** A call goes up only once it is transcribed (Transcribe on the phone before uploading). */
+    val transcribeCallsFirst: Boolean = true,
+    /** Calls of the phone not transcribed yet: with [transcribeCallsFirst], they wait for that before they go up. */
+    val callsToTranscribe: Int = 0,
+    /** Upload now is transcribing the calls first: this many left (0: not now). */
+    val transcribingCalls: Int = 0,
     /** A send of the queue is running in the app now ([runUploads]: Back up now), not only in the background work. */
     val uploading: Boolean = false,
     /**
@@ -170,6 +181,15 @@ private data class BackupFileV1(
     val calls: Map<String, HandedCall> = emptyMap(),
     /** The moments list shows the server's recordings (Settings › Server backup); off: only what Audio Logs recorded here. */
     val showServer: Boolean = true,
+    /** The phone's calls become moments here, transcribed on the phone (hen, Nov 17, 2026). */
+    val callMoments: Boolean = false,
+    /** With [callMoments]: a call is handed over only once it is transcribed (Upload without transcription skips it). */
+    val transcribeCallsFirst: Boolean = true,
+    /**
+     * The calls made moments, by their path in the calls folder, to the moment's id: each is made once, so a call
+     * deleted from the list isn't made again.
+     */
+    val callMomentIds: Map<String, String> = emptyMap(),
 )
 
 /** A call recording handed to shed ([ServerBackup.backUpCalls]): its size and time then, and its sha256. */
@@ -188,7 +208,12 @@ private data class HandedOver(
     val note: String? = null,
     /** shed said it is on the server (or the server said so when asked): recorded here, then shed forgets it. */
     val uploaded: Boolean = false,
+    /** shed's ref when it isn't the moment's id: a call of the phone's, handed over as the call it is ([CALL_REF]). */
+    val ref: String? = null,
 )
+
+/** What the phone's call log says of a call ([ServerBackup.callLog]): [direction] ([CALL_IN], [CALL_OUT]) and the number. */
+data class CallLogEntry(val direction: String?, val number: String?)
 
 /** What Free up space removes: the audio of moments the server holds ([ServerBackup.freeUpPlan]). */
 sealed interface FreeUpRule {
@@ -240,7 +265,7 @@ class ServerBackup(
             return@FileLocator Located(fs, folder / id.removePrefix(CALL_REF))
         }
         val lecture = store.load(id) ?: return@FileLocator null
-        Located(store.fileSystemOf(id), store.audioPath(lecture))
+        Located(store.audioFileSystem(lecture), store.audioPath(lecture))
     }
 
     private val pageFile = root / "server-page.json"
@@ -344,10 +369,13 @@ class ServerBackup(
         // By the index first: only the moments that may need handing over are read.
         for (entry in store.index()) {
             if (entry.id in busy || entry.pendingEncode || !entry.hasAudio) continue
+            // The phone's calls go up as the calls they are ([backUpCalls]), not as recordings.
+            if (entry.callHere || isCall(entry.source)) continue
             if (kept.moments[entry.id]?.audioFile == entry.audioFile) continue
             val lecture = store.load(entry.id) ?: continue
             if (lecture.pendingEncode) continue
             if (kept.moments[lecture.id]?.audioFile == lecture.audioFile) continue
+            if (lecture.callFile != null) continue
             val fs = store.fileSystemOf(lecture.id)
             val audio = store.audioPath(lecture)
             if (!fs.exists(audio)) continue
@@ -373,7 +401,7 @@ class ServerBackup(
         return try {
             var sha = kept.moments[lectureId]?.takeIf { it.audioFile == lecture.audioFile }?.sha256
             if (sha == null) {
-                val fs = store.fileSystemOf(lectureId)
+                val fs = store.audioFileSystem(lecture)
                 sha = shed.put(store.audioPath(lecture), aboutOf(lecture), ref = lectureId, from = fs)
                 mutex.withLock { save(kept.copy(moments = kept.moments + (lectureId to HandedOver(sha, lecture.audioFile)))) }
             }
@@ -676,7 +704,7 @@ class ServerBackup(
      */
     suspend fun bringAudio(lectureId: String, progress: (got: Long, of: Long) -> Unit = { _, _ -> }): Boolean {
         val lecture = store.load(lectureId) ?: return false
-        if (store.hasAudio(lecture)) return true
+        if (store.hasAudio(lecture) || lecture.callFile != null) return store.hasAudio(lecture)
         val sha = lecture.serverSha256 ?: kept.moments[lectureId]?.sha256 ?: return false
         val fetched = shed.fetch(sha, progress)
         val fs = store.fileSystemOf(lectureId)
@@ -695,7 +723,8 @@ class ServerBackup(
      * notes and labels stay. Files: not on the main thread.
      */
     fun freeUpPlan(rule: FreeUpRule, now: Long, busy: Set<String> = emptySet()): FreeUpPlan {
-        val withAudio = store.all().filter { store.hasAudio(it) }.sortedBy { it.startedAtMillis }
+        // Never a call of the phone's: that file is the phone's own, not Audio Logs' to remove.
+        val withAudio = store.all().filter { it.callFile == null && store.hasAudio(it) }.sortedBy { it.startedAtMillis }
         val sizes = withAudio.associate { it.id to (store.audioBytes(it) ?: 0L) }
         val candidates = withAudio.filter { lecture ->
             val handed = kept.moments[lecture.id]
@@ -732,7 +761,7 @@ class ServerBackup(
             progress(i, ids.size)
             val lecture = store.load(id) ?: continue
             val handed = kept.moments[id] ?: continue
-            if (id in busy || lecture.pendingEncode || handed.audioFile != lecture.audioFile || !store.hasAudio(lecture)) continue
+            if (id in busy || lecture.callFile != null || lecture.pendingEncode || handed.audioFile != lecture.audioFile || !store.hasAudio(lecture)) continue
             val fs = store.fileSystemOf(id)
             val audio = store.audioPath(lecture)
             val hash = HashingSink.sha256(blackholeSink()).also { sink -> fs.source(audio).buffer().use { it.readAll(sink) } }.hash.hex()
@@ -857,7 +886,7 @@ class ServerBackup(
     /** A moment handed over: recorded as uploaded, else as shed lists it. */
     private fun momentState(id: String, handed: HandedOver): MomentBackup =
         if (handed.uploaded) MomentBackup.BackedUp
-        else momentState(shed.uploads.value.firstOrNull { it.ref == id && it.sha256 == handed.sha256 })
+        else momentState(shed.uploads.value.firstOrNull { it.ref == (handed.ref ?: id) && it.sha256 == handed.sha256 })
 
     private fun momentState(status: UploadStatus?): MomentBackup = when (status?.state) {
         // Not listed and not recorded as uploaded: handed over before uploads were recorded (confirmWithServer).
@@ -926,7 +955,20 @@ class ServerBackup(
             uploading = uploading,
             compressing = compressing,
             showServer = kept.showServer,
+            callMoments = kept.callMoments,
+            transcribeCallsFirst = kept.transcribeCallsFirst,
+            callsToTranscribe = callsToTranscribe(),
+            transcribingCalls = transcribingCalls,
         )
+    }
+
+    /** Upload now is transcribing the calls first: [left] of them (0: done). Set by the app. */
+    @kotlin.concurrent.Volatile
+    private var transcribingCalls = 0
+
+    fun markTranscribingCalls(left: Int) {
+        transcribingCalls = left
+        refresh()
     }
 
     // Calls
@@ -960,9 +1002,10 @@ class ServerBackup(
      * changed or deleted. A file changed in the last 2 minutes is left for a later pass: a call still going on.
      * Returns how many were handed over.
      */
-    suspend fun backUpCalls(now: Long): Int {
+    suspend fun backUpCalls(now: Long, force: Boolean = false): Int {
         if (journal.state.value !is JournalState.Paired || kept.callsFolder == null) return 0
         val (fs, root) = callsAt ?: return 0
+        val held = heldCalls(force)
         val name = kept.callsFolderName ?: "Call"
         val found = mutableMapOf<String, HandedCall>()
         var handed = 0
@@ -982,6 +1025,8 @@ class ServerBackup(
                 found[relative] = before
                 continue
             }
+            // Its moment waits for its transcript first (Transcribe on the phone before uploading).
+            if (relative in held) continue
             val sha = runCatching { shed.put(path, aboutOfCall(path.name, modified, name), ref = CALL_REF + relative, from = fs) }.getOrNull() ?: continue
             found[relative] = HandedCall(size, modified, sha)
             handed++
@@ -989,8 +1034,144 @@ class ServerBackup(
             if (handed % 25 == 0) mutex.withLock { save(kept.copy(calls = kept.calls + found)) }
         }
         mutex.withLock { if (kept.callsFolder != null) save(kept.copy(calls = found)) }
+        linkCallMoments()
         refresh()
         return handed
+    }
+
+    // The phone's calls as moments (hen, Nov 17, 2026)
+
+    /**
+     * How long the call recording at a path of a file system lasts, in milliseconds (the platform reads it); null when
+     * it can't tell. Set by the app.
+     */
+    var callDuration: (FileSystem, Path) -> Long? = { _, _ -> null }
+
+    /**
+     * The phone's call log's entry for the call that started near this time and lasted about this long; null when the
+     * app may not read the call log, or none fits. Set by the app.
+     */
+    var callLog: (startedAtMillis: Long, durationMillis: Long) -> CallLogEntry? = { _, _ -> null }
+
+    /** Shows the phone's calls as moments here (and transcribes them), or stops making new ones. */
+    fun setCallMoments(on: Boolean) {
+        save(kept.copy(callMoments = on))
+        refresh()
+    }
+
+    /** A call goes up only once transcribed, or as soon as it is found (the transcript follows in its note). */
+    fun setTranscribeCallsFirst(on: Boolean) {
+        save(kept.copy(transcribeCallsFirst = on))
+        refresh()
+    }
+
+    val callMoments: Boolean get() = kept.callMoments
+
+    /** The calls' moments not transcribed yet, newest first: what the transcribe pass takes next. */
+    fun callsWaitingForText(): List<String> = runCatching {
+        store.index().filter { it.callHere && it.pendingTranscript }.sortedByDescending { it.startedAtMillis }.map { it.id }
+    }.getOrDefault(emptyList())
+
+    private fun callsToTranscribe(): Int = if (!kept.callMoments || callsAt == null) 0 else callsWaitingForText().size
+
+    /** The calls (by their path in the folder) whose moments wait for their transcript before they go up. */
+    private fun heldCalls(force: Boolean): Set<String> {
+        if (force || !kept.callMoments || !kept.transcribeCallsFirst) return emptySet()
+        val waiting = callsWaitingForText().toSet()
+        return kept.callMomentIds.filterValues { it in waiting }.keys
+    }
+
+    /**
+     * Makes each call in the calls folder not made one yet a moment here, not transcribed yet (files: not on the main
+     * thread): whom it was with and when from its file name, how long from the file, which way and the number from
+     * the call log. Its audio stays the phone's file ([Lecture.callFile]); nothing in the folder changes. A call the
+     * server's list already made a moment here becomes that moment's, with its words. A file changed in the last 2
+     * minutes is left for later (a call still going on). Works without a server. Returns how many it made.
+     */
+    suspend fun importCalls(now: Long, language: String): Int {
+        if (!kept.callMoments || kept.callsFolder == null) return 0
+        val (fs, root) = callsAt ?: return 0
+        val files = runCatching { fs.listRecursively(root).toList() }.getOrElse { return 0 }
+        val made = mutableMapOf<String, String>()
+        for (path in files) {
+            if (path.name.startsWith(".") || path.name.substringAfterLast('.', "").lowercase() !in CALL_EXTENSIONS) continue
+            val relative = path.relativeTo(root).toString()
+            if (relative in kept.callMomentIds) continue
+            val meta = runCatching { fs.metadataOrNull(path) }.getOrNull() ?: continue
+            if (!meta.isRegularFile || (meta.size ?: 0L) == 0L) continue
+            val modified = meta.lastModifiedAtMillis ?: 0L
+            if (now - modified < SETTLED_MILLIS) continue
+            val extension = path.name.substringAfterLast('.').lowercase()
+            // The server's recording of this call, made a moment here before: it becomes this call's.
+            val sha = kept.calls[relative]?.sha256
+            val before = sha?.let { store.idOfServerSha(it) }?.let(store::load)
+            if (before != null) {
+                if (before.callFile == null) store.save(before.copy(callFile = relative, source = "call"))
+                made[relative] = before.id
+                continue
+            }
+            val duration = runCatching { callDuration(fs, path) }.getOrNull() ?: 0L
+            val started = startOfCall(path.name)?.let { local -> local - utcOffset(local - utcOffset(local)) }
+                ?: (modified - duration).coerceAtLeast(0)
+            val log = runCatching { callLog(started, duration) }.getOrNull()
+            val lecture = Lecture(
+                id = callMomentId(relative),
+                title = titleOf(path.name),
+                language = language,
+                startedAtMillis = started,
+                durationMillis = duration,
+                segments = emptyList(),
+                notes = emptyList(),
+                audioFile = "audio.$extension",
+                pendingTranscript = true,
+                source = "call",
+                callFile = relative,
+                callDirection = log?.direction,
+                callNumber = log?.number,
+            )
+            if (store.load(lecture.id) == null) store.save(lecture)
+            made[relative] = lecture.id
+            // Kept as it goes: a pass cut short doesn't make these again.
+            if (made.size % 25 == 0) mutex.withLock { save(kept.copy(callMomentIds = kept.callMomentIds + made)) }
+        }
+        if (made.isNotEmpty()) mutex.withLock { save(kept.copy(callMomentIds = kept.callMomentIds + made)) }
+        fillCallDirections()
+        linkCallMoments()
+        refresh()
+        return made.size
+    }
+
+    /** Calls made moments before the call log could be read: their direction and number, once it can. */
+    private fun fillCallDirections() {
+        val byId = store.index().associateBy { it.id }
+        for ((_, id) in kept.callMomentIds) {
+            val entry = byId[id] ?: continue
+            if (!entry.callHere || entry.callDirection != null) continue
+            val log = runCatching { callLog(entry.startedAtMillis, entry.durationMillis) }.getOrNull() ?: continue
+            val lecture = store.load(id) ?: continue
+            store.save(lecture.copy(callDirection = log.direction, callNumber = log.number))
+        }
+    }
+
+    /**
+     * Each call handed over whose moment is here is that moment's backup too: its state is the call's, its words go to
+     * the server as the call's note ([syncNotes]), and the server's copy leaves the list (it is this moment).
+     */
+    private suspend fun linkCallMoments() = mutex.withLock {
+        var moments = kept.moments
+        val byId = store.index().associateBy { it.id }
+        for ((relative, id) in kept.callMomentIds) {
+            val call = kept.calls[relative] ?: continue
+            val before = moments[id]
+            val same = before != null && before.sha256 == call.sha256
+            if (same && before!!.ref == CALL_REF + relative && (before.uploaded || !call.uploaded)) continue
+            val audioFile = byId[id]?.audioFile ?: continue
+            moments = moments + (id to HandedOver(
+                sha256 = call.sha256, audioFile = audioFile, note = before?.takeIf { same }?.note,
+                uploaded = call.uploaded || (same && before!!.uploaded), ref = CALL_REF + relative,
+            ))
+        }
+        if (moments != kept.moments) save(kept.copy(moments = moments))
     }
 
     /** What the server is told about a call recording; [modified] stands in for when it was until the server reads its name. */
@@ -1099,6 +1280,30 @@ private const val TAIL = 256L * 1024
 
 /** The name of the labels in Audio Logs' own data on the server. */
 private const val LABELS = "labels"
+
+/** The moment id of the call at [relative] in the calls folder: the same each time it is found. */
+internal fun callMomentId(relative: String): String = "call-" + relative.encodeUtf8().sha256().hex().take(16)
+
+// Samsung's "…_261117_172259": the call's start, by the phone's clock.
+private val CALL_STARTED = Regex("""_(\d{2})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$""")
+
+/** When the call started by the phone's clock (milliseconds as if that clock were UTC), from Samsung's file name; null for another name. */
+internal fun startOfCall(fileName: String): Long? {
+    val m = CALL_STARTED.find(callBase(fileName)) ?: return null
+    val (yy, mo, dd, hh, mi, ss) = m.destructured
+    val year = 2000 + yy.toInt()
+    val month = mo.toInt()
+    val day = dd.toInt()
+    if (month !in 1..12 || day !in 1..31) return null
+    // Days since 1970-01-01 of a civil date (Howard Hinnant's algorithm).
+    val y = if (month <= 2) year - 1 else year
+    val era = y.floorDiv(400)
+    val yoe = y - era * 400
+    val doy = (153 * (if (month > 2) month - 3 else month + 9) + 2) / 5 + day - 1
+    val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    val days = era * 146_097L + doe - 719_468
+    return ((days * 24 + hh.toInt()) * 60 + mi.toInt()) * 60_000L + ss.toInt() * 1000L
+}
 
 /** shed's ref for a call recording: this, then its path in the calls folder ([ServerBackup.locator]). */
 internal const val CALL_REF = "call:"

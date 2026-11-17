@@ -66,6 +66,18 @@ without a server.
   size and time in `backup.json`), with source `call` and the folder's name; shed finds them by the ref
   `call:<path>` when it sends. The server reads who and when from each name. Calls the server already has (from the
   journal app, which backed them up before) are answered "exists" and not sent again.
+- Calls in the log (hen, Nov 17, 2026): under Back up calls, **Show calls in the log** (asks for the call log once,
+  for which way each call went and its number) makes each call in the folder a moment (`ServerBackup.importCalls`,
+  id `call-<hash of its path>`, made once: one deleted from the list isn't made again): whom it was with and when
+  from Samsung's file name, its length from the file, an arrow in or out in the list from the call log. Its audio is
+  the phone's file (`Lecture.callFile`, read through the documents provider under `/calls`), never copied, moved,
+  freed or deleted. **Transcribe on the phone before uploading** (on by default): a call waits for its transcript
+  before it is handed to shed (`heldCalls`); the transcribe pass takes calls newest first on the charger from 30%
+  (`CallsTranscribeJob`, or the app opened on the charger), then hands each over as the call it is, and its moment's
+  words go as that call's note. "12 calls waiting to be transcribed before uploading"; **Upload now** transcribes them
+  first whatever the charger says ("Transcribing calls before uploading · 5 left"), sending each as it is done;
+  **Upload without transcription** sends them now as they are (the words follow in the note). A call handed over
+  before is linked to its moment, so the server's copy leaves the list.
 
 - Nothing is handed over or sent until the user pairs. Pairing makes a key in the Android Keystore (StrongBox when
   there is one) and enrolls Audio Logs as a device of its own with the app name `audio-logs`, so the server shows it

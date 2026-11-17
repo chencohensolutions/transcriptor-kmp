@@ -45,6 +45,10 @@ data class LectureSummary(
     val textModel: String? = null,
     /** How many earlier transcripts it keeps ([Lecture.versions]). */
     val versions: Int = 0,
+    /** A call of the phone's own call recordings ([Lecture.callFile]): its audio is the phone's file, read only. */
+    val callHere: Boolean = false,
+    /** [Lecture.callDirection]. */
+    val callDirection: String? = null,
 )
 
 /**
@@ -110,7 +114,22 @@ data class Lecture(
     val placeStop: PlaceStop? = null,
     /** It has a path (`path.json`, [com.chencohensolution.transcriptor.location.MomentPath]). */
     val hasPath: Boolean = false,
+    /**
+     * A call from the phone's own call recordings (hen, Nov 17, 2026): its audio is that file, at this path in the calls
+     * folder, read only and never copied, moved or deleted ([LectureStore.audioPath]). Null for any other moment.
+     */
+    val callFile: String? = null,
+    /** Whether the call came in or went out ([CALL_IN], [CALL_OUT]), from the phone's call log; null when unknown. */
+    val callDirection: String? = null,
+    /** The other side's number, from the phone's call log; null when unknown. */
+    val callNumber: String? = null,
 )
+
+/** [Lecture.callDirection]: a call that came in. */
+const val CALL_IN = "in"
+
+/** [Lecture.callDirection]: a call that went out. */
+const val CALL_OUT = "out"
 
 /**
  * A recording stopped by stop by place: [reason] ([com.chencohensolution.transcriptor.location.StopReason.key]) at

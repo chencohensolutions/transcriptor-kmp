@@ -32,13 +32,16 @@ data class IndexedMoment(
     val hasAudio: Boolean = false,
     val textModel: String? = null,
     val versions: Int = 0,
+    /** [LectureSummary.callHere]. */
+    val callHere: Boolean = false,
+    val callDirection: String? = null,
 ) {
     val pendingEncode: Boolean get() = pendingFlac || pendingAac || pendingCodec != null
 
     fun summary() = LectureSummary(
         id, title, startedAtMillis, durationMillis, noteCount, refined, language, labels, pendingTranscript,
         people = people, unnamedPeople = unnamedPeople, preview = preview, tucked = tucked, source = source,
-        textModel = textModel, versions = versions,
+        textModel = textModel, versions = versions, callHere = callHere, callDirection = callDirection,
     )
 }
 
@@ -47,7 +50,7 @@ fun Lecture.indexed(hasAudio: Boolean): IndexedMoment = summary().let { s ->
     IndexedMoment(
         id, title, language, startedAtMillis, durationMillis, s.noteCount, s.refined, labels, pendingTranscript, s.people,
         s.unnamedPeople, s.preview, tucked, source, serverSha256, audioFile, pendingFlac, pendingAac, pendingCodec, hasAudio,
-        textModel = s.textModel, versions = s.versions,
+        textModel = s.textModel, versions = s.versions, callHere = callFile != null, callDirection = callDirection,
     )
 }
 

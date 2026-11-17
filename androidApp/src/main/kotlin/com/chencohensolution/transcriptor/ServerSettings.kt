@@ -110,6 +110,10 @@ fun ServerSettings(onBack: () -> Unit) {
         if (name != null) setNetworks(Recording.backup.wifiNetworks + name)
     }
     // Android 11 and later: opens the app's location page, where "Allow all the time" is.
+    // Calls in the log: on whatever the answer (without the call log, calls show without which way they went).
+    val askCallLog = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        scope.launch(Dispatchers.IO) { Recording.setCallMoments(context, true) }
+    }
     val askBackground = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         wifi = wifi.copy(background = it)
     }
@@ -159,6 +163,13 @@ fun ServerSettings(onBack: () -> Unit) {
             removeNetwork = { name -> setNetworks(Recording.backup.wifiNetworks - name) },
             allowBackgroundLocation = { askBackground.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
             backUpNow = { Recording.uploadNow(context) },
+            setCallMoments = { on ->
+                // Which way each call went needs the call log: asked once, as calls are turned on (hen, Nov 17, 2026).
+                if (on && !PhoneCalls.canReadLog(context)) askCallLog.launch(android.Manifest.permission.READ_CALL_LOG)
+                else scope.launch(Dispatchers.IO) { Recording.setCallMoments(context, on) }
+            },
+            setTranscribeCallsFirst = { on -> scope.launch(Dispatchers.IO) { Recording.setTranscribeCallsFirst(context, on) } },
+            uploadWithoutTranscription = { Recording.uploadWithoutTranscription(context) },
             onMeteredNetwork = { Recording.onMeteredNetwork(context) },
             setShowServer = { on -> scope.launch(Dispatchers.IO) { Recording.backup.setShowServer(on) } },
             setShown = { shown ->
