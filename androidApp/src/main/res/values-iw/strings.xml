@@ -754,10 +754,10 @@
     <string name="notebooks_quality_high">גבוהה</string>
     <string name="notebooks_quality_normal">רגילה</string>
     <string name="notebooks_quality_low">נמוכה</string>
-    <string name="notebooks_power_low">חיסכון</string>
+    <string name="notebooks_power_low">חיסכון בסוללה</string>
     <string name="notebooks_power_normal">מיד</string>
     <string name="notebooks_record_music">מוזיקה</string>
-    <string name="notebooks_record_music_note">הופעה: FLAC בלי אובדן, המיקרופון בלי עיבוד קול, בלי תמלול.</string>
+    <string name="notebooks_record_music_note">הופעה: הגדרות המוזיקה, המיקרופון בלי עיבוד קול, בלי תמלול.</string>
     <string name="settings_mic_builtin">אחד המיקרופונים של הטלפון לבדו</string>
     <string name="settings_mic_bottom">המיקרופון התחתון</string>
     <string name="settings_mic_back">המיקרופון האחורי (ליד המצלמה)</string>
@@ -807,4 +807,10 @@
     <string name="rec_format_amrnb_note">AMR-NB: קידוד השיחות הישן, במקודד החומרה של הטלפון. תמיד 8 קילוהרץ מונו: עמום, אבל הקבצים הכי קטנים.</string>
     <string name="rec_format_amr_sound">תמיד %1$d קילוהרץ מונו, מה שלא תהיה הגדרת הצליל.</string>
     <string name="rec_format_other_sound">בצליל של הפרופיל: %1$s, ‏%2$d קילוהרץ (הגדרות הקלטה).</string>
+    <string name="notebooks_presets_quality">איכות</string>
+    <string name="notebooks_presets_battery">סוללה</string>
+    <string name="notebooks_power_low_note">מקליט WAV; מקודד ומתמלל בזמן טעינה.</string>
+    <string name="notebooks_power_normal_note">מקודד ומתמלל מיד אחרי הרגע.</string>
+    <string name="notebooks_power_custom_note">תזמון משלך (הגדרות › הגדרות הקלטה).</string>
+    <string name="notebooks_presets_music">מוזיקה מוקלטת בהגדרות ובתזמון משלה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
 </resources>

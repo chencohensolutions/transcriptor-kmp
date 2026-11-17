@@ -743,10 +743,10 @@
     <string name="notebooks_quality_high">High</string>
     <string name="notebooks_quality_normal">Normal</string>
     <string name="notebooks_quality_low">Low</string>
-    <string name="notebooks_power_low">Save</string>
-    <string name="notebooks_power_normal">Now</string>
+    <string name="notebooks_power_low">Save battery</string>
+    <string name="notebooks_power_normal">Right away</string>
     <string name="notebooks_record_music">Music</string>
-    <string name="notebooks_record_music_note">A concert: lossless FLAC, the mic without voice processing, no transcript.</string>
+    <string name="notebooks_record_music_note">A concert: the Music settings, the mic without voice processing, no transcript.</string>
     <string name="settings_mic_builtin">One of the phone\'s microphones on its own</string>
     <string name="settings_mic_bottom">Bottom microphone</string>
     <string name="settings_mic_back">Back microphone (by the camera)</string>
@@ -796,4 +796,10 @@
     <string name="rec_format_amrnb_note">AMR-NB: the old phone-call codec, on the phone\'s hardware encoder. Always 8 kHz mono: muffled, but the smallest files.</string>
     <string name="rec_format_amr_sound">Always %1$d kHz mono, whatever the sound setting.</string>
     <string name="rec_format_other_sound">At the profile\'s sound: %1$s, %2$d kHz (Recording settings).</string>
+    <string name="notebooks_presets_quality">Quality</string>
+    <string name="notebooks_presets_battery">Battery</string>
+    <string name="notebooks_power_low_note">Records WAV; encodes and transcribes on the charger.</string>
+    <string name="notebooks_power_normal_note">Encodes and transcribes right after the moment.</string>
+    <string name="notebooks_power_custom_note">Your own timing (Settings › Recording settings).</string>
+    <string name="notebooks_presets_music">Music records with its own settings and timing: Settings › Recording settings › Music.</string>
 </resources>
