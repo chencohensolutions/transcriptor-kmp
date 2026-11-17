@@ -479,7 +479,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 // Red, like the recording screen's Stop it turns into.
                                 colors = ButtonDefaults.buttonColors(containerColor = LocalTranscriptorColors.current.recording, contentColor = Color.White),
-                                modifier = Modifier.sharedRecordButton().fillMaxWidth().height(56.dp),
+                                // Room above it, apart from the rows of choices (owner's ask, Nov 17, 2026).
+                                modifier = Modifier.padding(top = 12.dp).sharedRecordButton().fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
                                 Text(stringResource(R.string.notebooks_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
