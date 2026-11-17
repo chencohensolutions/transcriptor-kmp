@@ -12,6 +12,9 @@ import androidx.compose.ui.Modifier
 /** The app's screen switch, for elements shared between screens (MainActivity's AnimatedContent). */
 class SharedScopes(val shared: SharedTransitionScope, val animated: AnimatedVisibilityScope)
 
+/** How long Record takes to become Stop, and the screens to cross-fade. */
+const val MORPH_MILLIS = 700
+
 /** Set by MainActivity around each screen; null in previews and the UI lab (no morph there). */
 val LocalSharedScopes = compositionLocalOf<SharedScopes?> { null }
 
@@ -26,7 +29,10 @@ fun Modifier.sharedRecordButton(): Modifier {
     return with(scopes.shared) {
         this@sharedRecordButton.sharedBounds(
             rememberSharedContentState("record-button"), scopes.animated,
-            boundsTransform = { _, _ -> tween(420, easing = FastOutSlowInEasing) },
+            // Eased, no spring (no bounce), slow enough to follow (owner's call, Nov 17, 2026).
+            boundsTransform = { _, _ -> tween(MORPH_MILLIS, easing = FastOutSlowInEasing) },
+            enter = androidx.compose.animation.fadeIn(tween(MORPH_MILLIS, easing = FastOutSlowInEasing)),
+            exit = androidx.compose.animation.fadeOut(tween(MORPH_MILLIS, easing = FastOutSlowInEasing)),
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
         )
     }
