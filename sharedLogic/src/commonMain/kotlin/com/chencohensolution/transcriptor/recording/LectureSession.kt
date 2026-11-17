@@ -11,6 +11,7 @@ import com.chencohensolution.transcriptor.notebook.Pause
 import com.chencohensolution.transcriptor.settings.AudioFormat
 import com.chencohensolution.transcriptor.settings.QualityProfile
 import com.chencohensolution.transcriptor.settings.SettingsStore
+import com.chencohensolution.transcriptor.settings.wavFirst
 import com.chencohensolution.transcriptor.speech.LiveOutput
 import com.chencohensolution.transcriptor.speech.LiveSpeakers
 import com.chencohensolution.transcriptor.speech.liveLines
@@ -247,11 +248,8 @@ class LectureSession(
             id = "lecture-$startedAt", title = title, language = language, labels = labels,
             startedAtMillis = startedAt, durationMillis = 0, segments = emptyList(), notes = emptyList(),
             profile = profileKey.key,
-            audioFile = when (format) {
-                AudioFormat.FlacLive -> AUDIO_FLAC
-                AudioFormat.AacLive -> AUDIO_AAC
-                else -> AUDIO_WAV
-            },
+            // As it records: the codec's file; WAV first (or WAV): the WAV.
+            audioFile = if (format.wavFirst) AUDIO_WAV else profile.codec.file,
         )
         names = emptyMap()
         edits = emptyMap()
@@ -268,17 +266,26 @@ class LectureSession(
         power?.start(scope)
         recorder.start(
             store.audioPath(lecture),
-            when (format) {
-                AudioFormat.FlacLive -> AudioFileFormat.Flac
-                AudioFormat.AacLive -> AudioFileFormat.Aac
-                else -> AudioFileFormat.Wav
+            when {
+                format.wavFirst || profile.codec == com.chencohensolution.transcriptor.settings.Codec.Wav -> AudioFileFormat.Wav
+                profile.codec == com.chencohensolution.transcriptor.settings.Codec.Flac -> AudioFileFormat.Flac
+                profile.codec == com.chencohensolution.transcriptor.settings.Codec.Aac -> AudioFileFormat.Aac
+                else -> AudioFileFormat.Other
             },
             profile.flacLevel,
             profile.aac,
             profile.micInput,
             // The WAV kept before AAC is 16 bit: AAC keeps no more.
-            profile.flac.let { if (format == AudioFormat.WavThenAac) it.copy(bitDepth = 16, sampleRate = profile.aac.sampleRate, channels = profile.aac.channels) else it },
+            profile.flac.let {
+                when {
+                    format == AudioFormat.WavThenAac -> it.copy(bitDepth = 16, sampleRate = profile.aac.sampleRate, channels = profile.aac.channels)
+                    // The WAV before another codec is at that codec's sound (an AMR's 8 or 16 kHz mono), 16 bit.
+                    format.wavFirst && profile.codec.other -> profile.other()!!.let { o -> it.copy(bitDepth = 16, sampleRate = o.sampleRate, channels = o.channels) }
+                    else -> it
+                }
+            },
             music,
+            profile.other(),
         )
         wantedInput = profile.micInput
         recording.value = Recording(labelNames, lecture, paused = false, transcribeAfter = transcribeAfter, transcribing = liveModel != null, canTranscribe = liveModel != null || liveAvailable(language))
@@ -346,13 +353,13 @@ class LectureSession(
         val profile = settings.profile(startProfile)
         val codec = file.substringAfterLast('.')
         val aac = profile.aac
-        val details = when (codec) {
+        val details = profile.other()?.takeIf { file == it.codec.file }?.let { o -> "${o.bitrate / 1000.0} kbps · ${if (o.channels == 1) "mono" else "stereo"} · ${o.sampleRate / 1000} kHz" } ?: when (codec) {
             "aac" -> "${aac.profile.name} · ${aac.bitrateKbps} kbps · ${if (aac.channels == 1) "mono" else "stereo"} · ${aac.sampleRate / 1000} kHz"
             "flac" -> "level ${profile.flacLevel} · ${flacDetails()}" + if (musicNow) " · music, ${recorder.sourceName ?: "mic"} source" else ""
             else -> when (format) {
                 AudioFormat.WavThenAac -> "then AAC ${aac.profile.name} · ${aac.bitrateKbps} kbps, ${settings.encodeAfter.name.lowercase()}"
                 AudioFormat.WavThenFlac -> "then FLAC level ${profile.flacLevel} · ${flacDetails()}, ${settings.encodeAfter.name.lowercase()}"
-                else -> ""
+                else -> profile.other(com.chencohensolution.transcriptor.settings.Codec.of(format))?.let { o -> "then ${o.codec.key} ${o.bitrate / 1000.0} kbps, ${settings.encodeAfter.name.lowercase()}" } ?: ""
             }
         }
         return PowerAudio(
@@ -488,6 +495,7 @@ class LectureSession(
             durationMillis = duration,
             pendingFlac = r.lecture.audioFile == AUDIO_WAV && startFormat == AudioFormat.WavThenFlac,
             pendingAac = r.lecture.audioFile == AUDIO_WAV && startFormat == AudioFormat.WavThenAac,
+            pendingCodec = com.chencohensolution.transcriptor.settings.Codec.of(startFormat).takeIf { r.lecture.audioFile == AUDIO_WAV && startFormat.wavFirst && it.other }?.key,
         )
         save(lecture)
         recording.value = null

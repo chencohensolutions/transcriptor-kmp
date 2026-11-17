@@ -313,7 +313,7 @@ class MainActivity : ComponentActivity() {
                 },
                 setPower = { preset ->
                     choice?.with(preset)?.let { next ->
-                        Recording.settings.setTiming(next.audioFormat.let { it == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenAac || it == com.chencohensolution.transcriptor.settings.AudioFormat.WavThenFlac } || (next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.Wav && Recording.settings.wavFirst), next.encodeAfter, next.transcribeWhen)
+                        Recording.settings.setTiming(next.audioFormat.name.startsWith("WavThen") || (next.audioFormat == com.chencohensolution.transcriptor.settings.AudioFormat.Wav && Recording.settings.wavFirst), next.encodeAfter, next.transcribeWhen)
                         choice = Recording.settings.recordingChoice
                     }
                 },

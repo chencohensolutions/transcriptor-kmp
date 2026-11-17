@@ -73,6 +73,8 @@ data class Lecture(
      * profiles (Nov 17, 2026): the one picked now.
      */
     val profile: String? = null,
+    /** Recorded as WAV first for Opus, xHE-AAC, AMR-WB or AMR-NB ([com.chencohensolution.transcriptor.settings.Codec.key]), not encoded yet. */
+    val pendingCodec: String? = null,
     /** The speaker pass ran after the lecture: its lines follow the speakers' turns. */
     val speakerPass: Boolean = false,
     /** The model the refine pass transcribed it with again; null before it. */
@@ -155,7 +157,7 @@ fun Lecture.asVersion(now: Long) = Version(
 )
 
 /** Its WAV waits to be encoded (to FLAC or AAC) by [com.chencohensolution.transcriptor.recording.AudioCompression]. */
-val Lecture.pendingEncode get() = pendingFlac || pendingAac
+val Lecture.pendingEncode get() = pendingFlac || pendingAac || pendingCodec != null
 
 const val AUDIO_WAV = "audio.wav"
 const val AUDIO_FLAC = "audio.flac"

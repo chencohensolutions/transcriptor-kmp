@@ -45,11 +45,13 @@ class FakeRecorder(private val fileSystem: FileSystem) : AudioRecorder {
     var aac: com.chencohensolution.transcriptor.settings.AacSettings? = null
     var flac: com.chencohensolution.transcriptor.settings.FlacFormat? = null
     var music = false
+    var other: com.chencohensolution.transcriptor.settings.OtherCodec? = null
     var paused = false
     var checkpoints = 0
     private var wav: WavWriter? = null
 
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?, flac: com.chencohensolution.transcriptor.settings.FlacFormat, music: Boolean) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: com.chencohensolution.transcriptor.settings.AacSettings, input: com.chencohensolution.transcriptor.recording.MicInput?, flac: com.chencohensolution.transcriptor.settings.FlacFormat, music: Boolean, other: com.chencohensolution.transcriptor.settings.OtherCodec?) {
+        this.other = other
         this.music = music
         this.input = input
         this.flac = flac
@@ -353,6 +355,33 @@ class RecordingTest {
         assertEquals(AUDIO_FLAC, done.audioFile)
         assertEquals(AUDIO_FLAC, store.load(stopped.id)?.audioFile)
         assertFalse(fs.exists(store.audioPath(stopped, AUDIO_WAV)))
+        assertTrue(compression.pending().isEmpty())
+    }
+
+    @Test
+    fun wavThenOpusIsEncodedWithTheProfileItRecordedWith() = runTest {
+        settings.audioFormat = AudioFormat.WavThenOpus
+        settings.setProfile(settings.activeProfile, settings.profile(settings.activeProfile).copy(bitrates = mapOf("opus" to 24_000)))
+        val recordedWith = settings.activeProfile
+        val session = session()
+        session.start(emptyList(), "", "he", "t")
+        assertEquals(AudioFileFormat.Wav, recorder.format)
+        recorder.advance(2_000)
+        val stopped = assertNotNull(session.stop())
+        assertEquals("opus", stopped.pendingCodec)
+        // Another profile picked meanwhile: the moment still encodes with its own.
+        settings.activeProfile = com.chencohensolution.transcriptor.settings.QualityProfile.High
+        var bitrate: Int? = null
+        val compression = AudioCompression(fs, store, { _, _, _, _, _ -> error("not FLAC") }, otherEncoder = { _, out, spec, _ ->
+            bitrate = spec.bitrate
+            fs.write(out) { writeUtf8("opus") }
+            96_000
+        }, other = { key, codec -> settings.profileFor(key).other(codec) })
+        assertEquals(listOf(stopped.id), compression.pending().map { it.id })
+        val done = compression.compress(stopped)
+        assertEquals(24_000, bitrate)
+        assertEquals("audio.opus", done.audioFile)
+        assertEquals(recordedWith.key, done.profile)
         assertTrue(compression.pending().isEmpty())
     }
 

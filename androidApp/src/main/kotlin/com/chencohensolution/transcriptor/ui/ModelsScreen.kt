@@ -155,6 +155,10 @@ data class ModelsState(
     val deepCapture: Boolean = false,
     /** The recording profile shown on Recording settings (its settings are [audioFormat], [aac], [flac], [flacLevel], [micInput]). */
     val profile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
+    /** The shown profile's settings in full (the other codecs' bitrates). */
+    val profileSettings: com.chencohensolution.transcriptor.settings.ProfileSettings = com.chencohensolution.transcriptor.settings.QualityProfile.Normal.defaults,
+    /** The other codecs this phone encodes (Opus, xHE-AAC, AMR-WB, AMR-NB). */
+    val codecs: Set<com.chencohensolution.transcriptor.settings.Codec> = emptySet(),
     /** The profile moments record with (High, Normal or Low). */
     val activeProfile: com.chencohensolution.transcriptor.settings.QualityProfile = com.chencohensolution.transcriptor.settings.QualityProfile.Normal,
     /** Advanced mode: the main screen's Record bar also shows Quality and Battery. */
@@ -269,6 +273,8 @@ class ModelsActions(
     val setSound: (rate: Int, channels: Int, bits: Int) -> Unit = { _, _, _ -> },
     /** Shows a recording profile to edit; High, Normal or Low also becomes the one moments record with. */
     val showProfile: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
+    /** Sets one of the other codecs' bitrate (bits a second) in the shown profile. */
+    val setBitrate: (com.chencohensolution.transcriptor.settings.Codec, Int) -> Unit = { _, _ -> },
     /** Puts the shown profile back to its defaults. */
     val resetProfile: () -> Unit = {},
     /** Applies a power preset (when encoding and "After" transcription run). */

@@ -57,16 +57,25 @@ import com.chencohensolution.transcriptor.settings.FLAC_LEVELS
 import com.chencohensolution.transcriptor.settings.FlacFormat
 import com.chencohensolution.transcriptor.settings.PowerPreset
 import com.chencohensolution.transcriptor.settings.QualityProfile
+import com.chencohensolution.transcriptor.settings.Codec
+import com.chencohensolution.transcriptor.settings.wavFirst
 import kotlin.math.roundToInt
 
 /** Settings' recording-format pages, opened from its Recording format row. */
-enum class FormatPage { Format, Aac, Flac, Mic }
+enum class FormatPage { Format, Aac, Flac, Mic, Opus, Xhe, AmrWb, AmrNb }
 
-/** The codec a format records to in the end. */
-private fun codecOf(format: AudioFormat) = when (format) {
-    AudioFormat.Wav -> AudioFormat.Wav
-    AudioFormat.AacLive, AudioFormat.WavThenAac -> AudioFormat.AacLive
-    AudioFormat.FlacLive, AudioFormat.WavThenFlac -> AudioFormat.FlacLive
+/** The codec a format records to in the end, as it records (WAV first or not). */
+private fun codecOf(format: AudioFormat) = Codec.of(format).format(wavFirst = false)
+
+/** The page of one of the other codecs. */
+private fun pageOf(codec: Codec) = when (codec) {
+    Codec.Opus -> FormatPage.Opus
+    Codec.Xhe -> FormatPage.Xhe
+    Codec.AmrWb -> FormatPage.AmrWb
+    Codec.AmrNb -> FormatPage.AmrNb
+    Codec.Aac -> FormatPage.Aac
+    Codec.Flac -> FormatPage.Flac
+    Codec.Wav -> FormatPage.Format
 }
 
 /**
@@ -82,6 +91,10 @@ fun RecordingFormatPages(page: FormatPage, state: ModelsState, actions: ModelsAc
         FormatPage.Format -> FormatList(state, actions, open, back)
         FormatPage.Aac, FormatPage.Flac -> CodecPage(state, actions, aac = page == FormatPage.Aac, back)
         FormatPage.Mic -> MicrophonePage(state, actions, back)
+        FormatPage.Opus -> OtherCodecPage(state, actions, Codec.Opus, back)
+        FormatPage.Xhe -> OtherCodecPage(state, actions, Codec.Xhe, back)
+        FormatPage.AmrWb -> OtherCodecPage(state, actions, Codec.AmrWb, back)
+        FormatPage.AmrNb -> OtherCodecPage(state, actions, Codec.AmrNb, back)
     }
 }
 
@@ -95,8 +108,8 @@ private fun aacLine(state: ModelsState): String {
 }
 
 @Composable
-private fun encodeLine(state: ModelsState): String = when (state.audioFormat) {
-    AudioFormat.WavThenAac, AudioFormat.WavThenFlac ->
+private fun encodeLine(state: ModelsState): String = when {
+    state.audioFormat.wavFirst ->
         stringResource(if (state.encodeAfter == EncodeAfter.Stop) R.string.rec_format_later_stop_short else R.string.rec_format_later_charging_short)
     else -> stringResource(R.string.rec_format_while_recording_short)
 }
@@ -128,8 +141,28 @@ private fun powerName(preset: PowerPreset) = stringResource(when (preset) {
 private fun profileLine(state: ModelsState): String = when (codecOf(state.audioFormat)) {
     AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state)
     AudioFormat.FlacLive -> stringResource(R.string.rec_format_codec_flac) + " · " + flacLine(state.recordedFlac)
-    else -> stringResource(R.string.rec_format_summary_wav)
+    AudioFormat.Wav -> stringResource(R.string.rec_format_summary_wav)
+    else -> otherLine(state, Codec.of(state.audioFormat))
 }
+
+/** One of the other codecs in one line: its name, bitrate, channels and rate. */
+@Composable
+private fun otherLine(state: ModelsState, codec: Codec): String {
+    val o = state.profileSettings.other(codec) ?: return codecName(codec)
+    return codecName(codec) + " · " + stringResource(R.string.rec_format_kbps_decimal, kbps(o.bitrate)) + " · " +
+        stringResource(if (o.channels == 1) R.string.rec_format_mono else R.string.rec_format_stereo) + " · " + stringResource(R.string.rec_format_khz, o.sampleRate / 1000)
+}
+
+@Composable
+private fun codecName(codec: Codec) = stringResource(when (codec) {
+    Codec.Wav -> R.string.rec_format_codec_wav
+    Codec.Aac -> R.string.rec_format_codec_aac
+    Codec.Flac -> R.string.rec_format_codec_flac
+    Codec.Opus -> R.string.rec_format_codec_opus
+    Codec.Xhe -> R.string.rec_format_codec_xhe
+    Codec.AmrWb -> R.string.rec_format_codec_amrwb
+    Codec.AmrNb -> R.string.rec_format_codec_amrnb
+})
 
 /** The Recording format row's line in Settings: the presets, then the codec, its settings, and when it encodes. */
 @Composable
@@ -142,7 +175,8 @@ fun recordingFormatSummary(state: ModelsState): String {
     return withMic + "\n" + when (codecOf(state.audioFormat)) {
         AudioFormat.AacLive -> stringResource(R.string.rec_format_codec_aac) + " · " + aacLine(state) + " · " + encodeLine(state)
         AudioFormat.FlacLive -> stringResource(R.string.rec_format_summary_flac, state.flacLevel, FLAC_LEVELS.last) + " · " + flacLine(state.recordedFlac) + " · " + encodeLine(state)
-        else -> stringResource(R.string.rec_format_summary_wav)
+        AudioFormat.Wav -> stringResource(R.string.rec_format_summary_wav)
+        else -> otherLine(state, Codec.of(state.audioFormat)) + " · " + encodeLine(state)
     }
 }
 
@@ -183,6 +217,14 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
                 if (codec != AudioFormat.FlacLive) actions.setAudioFormat(if (state.audioFormat == AudioFormat.WavThenAac) AudioFormat.WavThenFlac else AudioFormat.FlacLive)
                 open(FormatPage.Flac)
             }
+            // The phone's other encoders, those it has (owner's request, Nov 17, 2026: all the supported codecs).
+            listOf(Codec.Opus, Codec.Xhe, Codec.AmrWb, Codec.AmrNb).filter { it in state.codecs }.forEach { c ->
+                val chosen = Codec.of(state.audioFormat) == c
+                CodecRow(chosen, codecName(c), if (chosen) otherLine(state, c) + " · " + encodeLine(state) else stringResource(otherShort(c)), page = true) {
+                    if (!chosen) actions.setAudioFormat(c.format(state.audioFormat.wavFirst))
+                    open(pageOf(c))
+                }
+            }
             HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             // WAV first: Music's own, the shared one for the others.
             EncodeLater(state, actions)
@@ -216,7 +258,9 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
             TextButton(onClick = actions.resetProfile) { Text(stringResource(R.string.rec_profile_reset)) }
         }
         // How long a moment can be with the space left (while recording: the WAV, when it records as WAV first).
-        val perHour = choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
+        // The other codecs as they record: their bitrate; WAV first: the WAV.
+        val other = state.profileSettings.other(Codec.of(state.audioFormat))?.takeIf { !state.audioFormat.wavFirst }
+        val perHour = other?.megabytesPerHour ?: choice.copy(flac = state.recordedFlac).megabytesPerHourWhileRecording
         if (state.freeBytes > 0 && perHour > 0) {
             val hours = (state.freeBytes / 1_000_000 / perHour).toInt()
             FormatNote(stringResource(R.string.rec_preset_hours_left, hours, state.freeBytes / 1_000_000_000))
@@ -281,14 +325,11 @@ private fun CodecRow(selected: Boolean, title: String, note: String, page: Boole
 @Composable
 private fun EncodeLater(state: ModelsState, actions: ModelsActions) {
     val codec = codecOf(state.audioFormat)
-    val on = state.audioFormat == AudioFormat.WavThenAac || state.audioFormat == AudioFormat.WavThenFlac
+    val on = state.audioFormat.wavFirst
     val enabled = codec != AudioFormat.Wav
     Row(
         Modifier.fillMaxWidth().toggleable(value = on, enabled = enabled, role = Role.Checkbox) { checked ->
-            actions.setAudioFormat(when (codec) {
-                AudioFormat.AacLive -> if (checked) AudioFormat.WavThenAac else AudioFormat.AacLive
-                else -> if (checked) AudioFormat.WavThenFlac else AudioFormat.FlacLive
-            })
+            actions.setAudioFormat(Codec.of(state.audioFormat).format(checked))
         }.padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -344,6 +385,63 @@ private fun CodecPage(state: ModelsState, actions: ModelsActions, aac: Boolean, 
             if (aac) AacSettingsPart(state, actions) else {
                 FlacFormatPart(state.flac, state.deepCapture)
                 FlacEffortPart(state.flacLevel, if (state.audioFormat == AudioFormat.WavThenFlac) state.audioFormat else AudioFormat.FlacLive, actions.setFlacLevel)
+            }
+        }
+    }
+}
+
+/** A bitrate in kbps as people write it: 32, 23.85, 12.2. */
+private fun kbps(bps: Int) = if (bps % 1000 == 0) "${bps / 1000}" else "%.2f".format(java.util.Locale.ROOT, bps / 1000.0).trimEnd('0')
+
+private fun otherShort(codec: Codec) = when (codec) {
+    Codec.Opus -> R.string.rec_format_opus_short
+    Codec.Xhe -> R.string.rec_format_xhe_short
+    Codec.AmrWb -> R.string.rec_format_amrwb_short
+    else -> R.string.rec_format_amrnb_short
+}
+
+/**
+ * Opus', xHE-AAC's, AMR-WB's or AMR-NB's page: the bitrate as chips with the size an hour, and what the codec is good
+ * for. The sound (rate, channels) is the profile's, on Recording settings; the AMRs have their own (16 or 8 kHz mono).
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun OtherCodecPage(state: ModelsState, actions: ModelsActions, codec: Codec, back: () -> Unit) {
+    val chosen = Codec.of(state.audioFormat) == codec
+    val spec = state.profileSettings.other(codec)
+    Scaffold(topBar = { FormatTopBar(codecName(codec), back) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            if (!chosen) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.rec_format_not_chosen), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { actions.setAudioFormat(codec.format(state.audioFormat.wavFirst)) }) { Text(stringResource(R.string.rec_format_use)) }
+                }
+            }
+            FormatPageNote(stringResource(when (codec) {
+                Codec.Opus -> R.string.rec_format_opus_note
+                Codec.Xhe -> R.string.rec_format_xhe_note
+                Codec.AmrWb -> R.string.rec_format_amrwb_note
+                else -> R.string.rec_format_amrnb_note
+            }))
+            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.rec_format_bitrate), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    if (spec != null) Text(stringResource(R.string.rec_format_size, spec.megabytesPerHour), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    codec.bitrates.forEach { bps ->
+                        FilterChip(
+                            selected = spec?.bitrate == bps, onClick = { actions.setBitrate(codec, bps) },
+                            label = { Text(stringResource(R.string.rec_format_kbps_decimal, kbps(bps))) },
+                        )
+                    }
+                }
+                if (spec != null) FormatNote(
+                    if (codec.fixedRate != null) stringResource(R.string.rec_format_amr_sound, spec.sampleRate / 1000)
+                    else stringResource(R.string.rec_format_other_sound, stringResource(if (spec.channels == 1) R.string.rec_format_mono else R.string.rec_format_stereo), spec.sampleRate / 1000),
+                )
+                Spacer(Modifier.height(24.dp))
             }
         }
     }

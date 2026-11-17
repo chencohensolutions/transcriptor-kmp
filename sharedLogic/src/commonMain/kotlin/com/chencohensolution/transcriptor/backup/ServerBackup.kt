@@ -586,7 +586,7 @@ class ServerBackup(
             ?.let { (it["audioLogs"] as? JsonObject ?: it).toString() }
             ?.let(store::fromServerNote)
         if (restored != null) {
-            return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, source = restored.source ?: sourceOf(file))
+            return restored.copy(serverSha256 = file.sha256, audioFile = "audio.$extension", pendingFlac = false, pendingAac = false, pendingCodec = null, source = restored.source ?: sourceOf(file))
         }
         val started = listOfNotNull(file.about.takenAt, file.storedAt).firstNotNullOfOrNull {
             runCatching { kotlin.time.Instant.parse(it).toEpochMilliseconds() }.getOrNull()
@@ -980,6 +980,10 @@ class ServerBackup(
         val mime = when (lecture.audioFile) {
             AUDIO_FLAC -> "audio/flac"
             AUDIO_AAC -> "audio/aac"
+            "audio.opus" -> "audio/ogg"
+            "audio.m4a" -> "audio/mp4"
+            "audio.awb" -> "audio/amr-wb"
+            "audio.amr" -> "audio/amr"
             else -> "audio/wav"
         }
         val name = lecture.title.ifBlank { lecture.id }.replace(Regex("""[\\/:*?"<>|\[\]]"""), "-").take(80)

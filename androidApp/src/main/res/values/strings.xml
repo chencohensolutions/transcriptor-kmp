@@ -345,11 +345,11 @@
     <string name="rec_format_later_charging_short">WAV first, encoded on the charger</string>
     <string name="rec_format_later_here_charging">Recorded as WAV, encoded to this on the charger above 30% (Recording format).</string>
     <string name="rec_format_later_here_stop">Recorded as WAV, encoded to this after the moment (Recording format).</string>
-    <string name="rec_format_later_note">Nothing is encoded while recording; the WAV (about 690 MB an hour) becomes AAC or FLAC later and is then deleted.</string>
+    <string name="rec_format_later_note">Nothing is encoded while recording; the WAV (at the profile\'s sound) becomes the chosen codec later and is then deleted.</string>
     <string name="rec_format_later_stop">When the moment ends</string>
     <string name="rec_format_later_stop_note">Right after Stop and its passes</string>
     <string name="rec_format_later_stop_short">WAV first, encoded after the moment</string>
-    <string name="rec_format_later_wav">For AAC and FLAC: WAV keeps the WAV.</string>
+    <string name="rec_format_later_wav">For every codec but WAV: WAV keeps the WAV.</string>
     <string name="rec_format_mono">Mono</string>
     <string name="rec_format_not_chosen">Moments are recorded another way now.</string>
     <string name="rec_format_profile">AAC profile</string>
@@ -781,4 +781,19 @@
     <string name="rec_profile_note">Moments record with this one. Changes below are kept in it.</string>
     <string name="rec_profile_music_note">Used by Music on the Record bar and the tile. Changes below are kept in it.</string>
     <string name="rec_profile_reset">Reset</string>
+    <string name="rec_format_codec_opus">Opus</string>
+    <string name="rec_format_codec_xhe">xHE-AAC</string>
+    <string name="rec_format_codec_amrwb">AMR-WB</string>
+    <string name="rec_format_codec_amrnb">AMR-NB</string>
+    <string name="rec_format_kbps_decimal">%1$s kbps</string>
+    <string name="rec_format_opus_short">The most sound for its size: clear speech at 24 kbps mono, music at about 128.</string>
+    <string name="rec_format_xhe_short">Very good at low bitrates; the file is whole only once the moment stops.</string>
+    <string name="rec_format_amrwb_short">Phone-call quality (HD voice), 16 kHz mono, on the phone\'s hardware.</string>
+    <string name="rec_format_amrnb_short">Old phone-call quality, 8 kHz mono: the smallest of all.</string>
+    <string name="rec_format_opus_note">Opus (in an Ogg file): the most efficient codec. Speech sounds clear from 16–24 kbps mono; music near the original from about 128 kbps stereo. Encoded on the CPU (it is light).</string>
+    <string name="rec_format_xhe_note">xHE-AAC (in an M4A file): very good at low bitrates. The file is only complete after Stop, so a recording cut off by a crash can be lost: Record as WAV first is safer.</string>
+    <string name="rec_format_amrwb_note">AMR-WB: the codec of HD voice calls, on the phone\'s hardware encoder. Always 16 kHz mono; fine for speech, not for music.</string>
+    <string name="rec_format_amrnb_note">AMR-NB: the old phone-call codec, on the phone\'s hardware encoder. Always 8 kHz mono: muffled, but the smallest files.</string>
+    <string name="rec_format_amr_sound">Always %1$d kHz mono, whatever the sound setting.</string>
+    <string name="rec_format_other_sound">At the profile\'s sound: %1$s, %2$d kHz (Recording settings).</string>
 </resources>

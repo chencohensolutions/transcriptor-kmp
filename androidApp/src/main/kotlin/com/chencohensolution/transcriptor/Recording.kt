@@ -901,6 +901,7 @@ object Recording {
         compression = AudioCompression(
             FileSystem.SYSTEM, store, androidFlacEncode, { settings.profileFor(it).flacLevel }, androidAacEncode,
             { settings.profileFor(it).aac }, { settings.profileFor(it).flac },
+            com.chencohensolution.transcriptor.recording.androidOtherEncode, { key, codec -> settings.profileFor(key).other(codec) },
         )
         review = LectureReview(
             store, voices, AndroidAudioPlayer(::openAudio), CoroutineScope(SupervisorJob() + Dispatchers.Main), ::printOf,

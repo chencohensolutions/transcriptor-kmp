@@ -345,11 +345,11 @@
     <string name="rec_format_later_charging_short">קודם WAV, מקודד בזמן טעינה</string>
     <string name="rec_format_later_here_charging">מוקלט כ־WAV ומקודד לזה בזמן טעינה מעל 30% (הגדרות הקלטה).</string>
     <string name="rec_format_later_here_stop">מוקלט כ־WAV ומקודד לזה אחרי הרגע (הגדרות הקלטה).</string>
-    <string name="rec_format_later_note">שום דבר לא מקודד בזמן ההקלטה; ה־WAV (בערך \u2066690 MB\u2069 לשעה) הופך ל־AAC או FLAC מאוחר יותר ואז נמחק.</string>
+    <string name="rec_format_later_note">שום דבר לא מקודד בזמן ההקלטה; ה־WAV (בצליל של הפרופיל) מקודד לקידוד שנבחר מאוחר יותר ואז נמחק.</string>
     <string name="rec_format_later_stop">כשהרגע נגמר</string>
     <string name="rec_format_later_stop_note">מיד אחרי עצירה והמעברים שלה</string>
     <string name="rec_format_later_stop_short">קודם WAV, מקודד אחרי הרגע</string>
-    <string name="rec_format_later_wav">ל־AAC ול־FLAC: עם WAV נשאר WAV.</string>
+    <string name="rec_format_later_wav">לכל קידוד חוץ מ־WAV: עם WAV נשאר WAV.</string>
     <string name="rec_format_mono">מונו</string>
     <string name="rec_format_not_chosen">הרגעים מוקלטים עכשיו בדרך אחרת.</string>
     <string name="rec_format_profile">פרופיל AAC</string>
@@ -792,4 +792,19 @@
     <string name="rec_profile_note">רגעים מוקלטים בזו. שינויים למטה נשמרים בה.</string>
     <string name="rec_profile_music_note">משמשת את ״מוזיקה״ בסרגל ההקלטה ובאריח. שינויים למטה נשמרים בה.</string>
     <string name="rec_profile_reset">איפוס</string>
+    <string name="rec_format_codec_opus">Opus</string>
+    <string name="rec_format_codec_xhe">xHE-AAC</string>
+    <string name="rec_format_codec_amrwb">AMR-WB</string>
+    <string name="rec_format_codec_amrnb">AMR-NB</string>
+    <string name="rec_format_kbps_decimal">%1$s kbps</string>
+    <string name="rec_format_opus_short">הכי הרבה צליל לגודל: דיבור ברור ב־24 קילוביט מונו, מוזיקה בערך ב־128.</string>
+    <string name="rec_format_xhe_short">טוב מאוד בקצב נמוך; הקובץ שלם רק כשהרגע נעצר.</string>
+    <string name="rec_format_amrwb_short">איכות שיחה (HD), ‏16 קילוהרץ מונו, בחומרה של הטלפון.</string>
+    <string name="rec_format_amrnb_short">איכות שיחה ישנה, 8 קילוהרץ מונו: הכי קטן.</string>
+    <string name="rec_format_opus_note">Opus (בקובץ Ogg): הקידוד היעיל ביותר. דיבור ברור מ־16–24 קילוביט מונו; מוזיקה קרובה למקור מבערך 128 קילוביט סטריאו. מקודד במעבד (קל).</string>
+    <string name="rec_format_xhe_note">xHE-AAC (בקובץ M4A): טוב מאוד בקצב נמוך. הקובץ שלם רק אחרי עצירה, כך שהקלטה שנקטעה בקריסה עלולה ללכת לאיבוד: הקלטה כ־WAV קודם בטוחה יותר.</string>
+    <string name="rec_format_amrwb_note">AMR-WB: הקידוד של שיחות HD, במקודד החומרה של הטלפון. תמיד 16 קילוהרץ מונו; טוב לדיבור, לא למוזיקה.</string>
+    <string name="rec_format_amrnb_note">AMR-NB: קידוד השיחות הישן, במקודד החומרה של הטלפון. תמיד 8 קילוהרץ מונו: עמום, אבל הקבצים הכי קטנים.</string>
+    <string name="rec_format_amr_sound">תמיד %1$d קילוהרץ מונו, מה שלא תהיה הגדרת הצליל.</string>
+    <string name="rec_format_other_sound">בצליל של הפרופיל: %1$s, ‏%2$d קילוהרץ (הגדרות הקלטה).</string>
 </resources>

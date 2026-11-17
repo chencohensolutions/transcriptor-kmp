@@ -55,11 +55,11 @@ class AndroidRecorder(
         private set
 
     @SuppressLint("MissingPermission")
-    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings, input: MicInput?, flac: FlacFormat, music: Boolean) {
+    override fun start(file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings, input: MicInput?, flac: FlacFormat, music: Boolean, other: com.chencohensolution.transcriptor.settings.OtherCodec?) {
         check(record == null) { "Already recording" }
         // 24 bit only from a microphone that gives it (the phone's own give 16): else 16, the same sound in a smaller file.
         val lossless = flac.valid().let { if (it.bitDepth == 24 && inputs?.deepCapture(input) != true) it.copy(bitDepth = 16) else it }
-        bits = if (format == AudioFileFormat.Aac) 16 else lossless.bitDepth
+        bits = if (format == AudioFileFormat.Aac || format == AudioFileFormat.Other) 16 else lossless.bitDepth
         sink = when (format) {
             // A WAV at the shared sound: 48 kHz stereo, or brought down as FLAC and AAC are.
             AudioFileFormat.Wav -> ReducingSink(
@@ -68,13 +68,15 @@ class AndroidRecorder(
             )
             AudioFileFormat.Flac -> FlacEncoder(file.toFile(), flacLevel, lossless)
             AudioFileFormat.Aac -> AacEncoder(file.toFile(), aac)
+            AudioFileFormat.Other -> OtherEncoder(file.toFile(), checkNotNull(other) { "No settings for the codec" })
         }
         encoderName = when (val s = sink) {
             is FlacEncoder -> s.encoderName
             is AacEncoder -> s.encoderName
+            is OtherEncoder -> s.encoderName
             else -> null
         }
-        encoderHardware = AacEncoders.all.any { it.name == encoderName && it.hardware }
+        encoderHardware = AacEncoders.all.any { it.name == encoderName && it.hardware } || (sink is OtherEncoder && OtherEncoders.hardware(encoderName))
         val encoding = if (bits == 24) AudioFormat.ENCODING_PCM_FLOAT else AudioFormat.ENCODING_PCM_16BIT
         val minimum = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_STEREO, encoding)
         // A picked input that is connected: a Bluetooth headset's microphone opens only as the communication device,

@@ -33,25 +33,56 @@ data class FlacFormat(
 
 /** The codec a profile ends up in (whether it records as WAV first is the battery's, [SettingsStore.wavFirst]). */
 @Serializable
-enum class Codec {
-    @kotlinx.serialization.SerialName("wav") Wav,
-    @kotlinx.serialization.SerialName("aac") Aac,
-    @kotlinx.serialization.SerialName("flac") Flac;
+enum class Codec(val key: String, val file: String, val mime: String) {
+    @kotlinx.serialization.SerialName("wav") Wav("wav", "audio.wav", "audio/wav"),
+    @kotlinx.serialization.SerialName("aac") Aac("aac", "audio.aac", "audio/mp4a-latm"),
+    @kotlinx.serialization.SerialName("flac") Flac("flac", "audio.flac", "audio/flac"),
+    /** Opus in Ogg: the most sound for its size, speech clear at 24 kbps mono. Software (CPU). */
+    @kotlinx.serialization.SerialName("opus") Opus("opus", "audio.opus", "audio/opus"),
+    /** xHE-AAC (USAC) in MP4: very good at low bitrates. Software. Its file is whole only once the moment stops. */
+    @kotlinx.serialization.SerialName("xhe") Xhe("xhe", "audio.m4a", "audio/mp4a-latm"),
+    /** AMR-WB: 16 kHz mono, 6.6–23.85 kbps, call quality ("HD voice"); the phone's hardware encoder. */
+    @kotlinx.serialization.SerialName("amrwb") AmrWb("amrwb", "audio.awb", "audio/amr-wb"),
+    /** AMR-NB: 8 kHz mono, 4.75–12.2 kbps, old phone-call quality, the smallest; the phone's hardware encoder. */
+    @kotlinx.serialization.SerialName("amrnb") AmrNb("amrnb", "audio.amr", "audio/3gpp");
 
     /** The [AudioFormat] this codec records as: as it records, or as WAV first then this. */
     fun format(wavFirst: Boolean) = when (this) {
         Wav -> AudioFormat.Wav
         Aac -> if (wavFirst) AudioFormat.WavThenAac else AudioFormat.AacLive
         Flac -> if (wavFirst) AudioFormat.WavThenFlac else AudioFormat.FlacLive
+        Opus -> if (wavFirst) AudioFormat.WavThenOpus else AudioFormat.OpusLive
+        Xhe -> if (wavFirst) AudioFormat.WavThenXhe else AudioFormat.XheLive
+        AmrWb -> if (wavFirst) AudioFormat.WavThenAmrWb else AudioFormat.AmrWbLive
+        AmrNb -> if (wavFirst) AudioFormat.WavThenAmrNb else AudioFormat.AmrNbLive
     }
 
-    companion object {
-        fun of(format: AudioFormat) = when {
-            format.isAac -> Aac
-            format.isFlac -> Flac
-            else -> Wav
+    /** Opus, xHE-AAC and the AMRs: encoded by [OtherCodec] (AAC and FLAC have their own encoders). */
+    val other get() = this == Opus || this == Xhe || this == AmrWb || this == AmrNb
+
+    /** The bitrates offered (bits a second); empty for WAV, AAC (its own) and FLAC. */
+    val bitrates: List<Int>
+        get() = when (this) {
+            Opus -> listOf(12, 16, 24, 32, 48, 64, 96, 128, 160, 192, 256).map { it * 1000 }
+            Xhe -> listOf(12, 16, 24, 32, 48, 64, 96, 128).map { it * 1000 }
+            AmrWb -> listOf(6600, 8850, 12650, 14250, 15850, 18250, 19850, 23050, 23850)
+            AmrNb -> listOf(4750, 5150, 5900, 6700, 7400, 7950, 10200, 12200)
+            else -> emptyList()
         }
+
+    /** A fixed sound for the AMRs (their only rate, mono); null: the profile's. */
+    val fixedRate: Int? get() = when (this) { AmrWb -> 16_000; AmrNb -> 8_000; else -> null }
+
+    companion object {
+        fun of(format: AudioFormat) = entries.first { it.format(true) == format || it.format(false) == format }
+        fun of(key: String?) = entries.firstOrNull { it.key == key }
     }
+}
+
+/** How one of the other codecs ([Codec.other]) records: its rate, channels and bitrate (bits a second). */
+data class OtherCodec(val codec: Codec, val sampleRate: Int, val channels: Int, val bitrate: Int) {
+    /** About how many MB an hour. */
+    val megabytesPerHour get() = (bitrate.toLong() * 3600 / 8 / 1_000_000).toInt().coerceAtLeast(1)
 }
 
 /**
@@ -71,8 +102,27 @@ data class ProfileSettings(
      * default); the other profiles share [SettingsStore.wavFirst].
      */
     val wavFirst: Boolean = false,
+    /** The other codecs' bitrates (bits a second), by [Codec.key]; a codec without one: its default. */
+    val bitrates: Map<String, Int> = emptyMap(),
 ) {
     fun valid() = copy(aac = aac.valid(), flac = flac.valid(), flacLevel = flacLevel.coerceIn(FLAC_LEVELS))
+
+    /** [codec]'s bitrate here: the one picked, moved to the nearest offered, else its default. */
+    fun bitrate(codec: Codec): Int {
+        val offered = codec.bitrates
+        if (offered.isEmpty()) return 0
+        val picked = bitrates[codec.key] ?: DEFAULT_BITRATES[codec] ?: offered.first()
+        return offered.minBy { kotlin.math.abs(it - picked) }
+    }
+
+    /** How [codec] (one of [Codec.other]) records in this profile: the AMRs at their own rate in mono, the rest at the profile's sound. */
+    fun other(codec: Codec = this.codec): OtherCodec? = codec.takeIf { it.other }?.let { c ->
+        OtherCodec(c, c.fixedRate ?: flac.valid().sampleRate, if (c.fixedRate != null) 1 else flac.valid().channels, bitrate(c))
+    }
+
+    companion object {
+        val DEFAULT_BITRATES = mapOf(Codec.Opus to 32_000, Codec.Xhe to 32_000, Codec.AmrWb to 23_850, Codec.AmrNb to 12_200)
+    }
 }
 
 /**
@@ -130,7 +180,7 @@ enum class PowerPreset {
 }
 
 /** True when [format] records as WAV and encodes afterwards. */
-val AudioFormat.wavFirst get() = this == AudioFormat.WavThenAac || this == AudioFormat.WavThenFlac
+val AudioFormat.wavFirst get() = name.startsWith("WavThen")
 
 /** True when [format] ends up as FLAC. */
 val AudioFormat.isFlac get() = this == AudioFormat.FlacLive || this == AudioFormat.WavThenFlac
@@ -192,11 +242,7 @@ data class RecordingChoice(
     /** These settings with [preset]'s timing: Low records as WAV first (the codec kept), Normal leaves that as it is. */
     fun with(preset: PowerPreset): RecordingChoice = when (preset) {
         PowerPreset.Low -> copy(
-            audioFormat = when (audioFormat) {
-                AudioFormat.AacLive -> AudioFormat.WavThenAac
-                AudioFormat.FlacLive -> AudioFormat.WavThenFlac
-                else -> audioFormat
-            },
+            audioFormat = Codec.of(audioFormat).format(wavFirst = true),
             encodeAfter = EncodeAfter.Charging, transcribeWhen = EncodeAfter.Charging,
         )
         PowerPreset.Normal -> copy(encodeAfter = EncodeAfter.Stop, transcribeWhen = EncodeAfter.Stop)

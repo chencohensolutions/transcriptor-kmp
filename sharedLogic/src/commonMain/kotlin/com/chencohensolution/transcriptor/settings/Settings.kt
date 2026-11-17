@@ -25,6 +25,17 @@ enum class AudioFormat {
 
     /** WAV while recording, encoded to AAC ([AacSettings]) after the moment, as [EncodeAfter] says; then the WAV is deleted. */
     @SerialName("wav-then-aac") WavThenAac,
+
+    // The phone's other encoders (owner's request, Nov 17, 2026: "add all the supported codecs"), each as it records or
+    // WAV first: Opus (Ogg), xHE-AAC (MP4), AMR-WB and AMR-NB (their own files, the phone's hardware encoders).
+    @SerialName("opus-live") OpusLive,
+    @SerialName("wav-then-opus") WavThenOpus,
+    @SerialName("xhe-live") XheLive,
+    @SerialName("wav-then-xhe") WavThenXhe,
+    @SerialName("amrwb-live") AmrWbLive,
+    @SerialName("wav-then-amrwb") WavThenAmrWb,
+    @SerialName("amrnb-live") AmrNbLive,
+    @SerialName("wav-then-amrnb") WavThenAmrNb,
 }
 
 /** When a WAV recorded for "WAV, then FLAC" or "WAV, then AAC" is encoded. */

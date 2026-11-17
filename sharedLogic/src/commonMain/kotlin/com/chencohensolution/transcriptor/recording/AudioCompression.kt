@@ -21,6 +21,14 @@ fun interface FlacEncode {
 }
 
 /**
+ * Encodes a WAV file to one of the other codecs ([OtherCodec]: Opus, xHE-AAC, AMR-WB, AMR-NB), reporting progress 0..1,
+ * and returns the number of the WAV's frames it took in.
+ */
+fun interface OtherEncode {
+    fun encode(wav: Path, out: Path, spec: com.chencohensolution.transcriptor.settings.OtherCodec, progress: (Float) -> Unit): Long
+}
+
+/**
  * Encodes a WAV file to AAC (ADTS) as [settings] say, reporting progress 0..1, and returns the number of the WAV's frames
  * (samples per channel, at 48 kHz) it took in.
  */
@@ -47,24 +55,32 @@ class AudioCompression(
     private val aac: (profile: String?) -> AacSettings = { AacSettings() },
     /** FLAC's rate and channels, read when each lecture is encoded, for its profile. */
     private val flac: (profile: String?) -> FlacFormat = { FlacFormat() },
+    private val otherEncoder: OtherEncode? = null,
+    /** How [Lecture.pendingCodec] encodes for the lecture's profile. */
+    private val other: (profile: String?, codec: com.chencohensolution.transcriptor.settings.Codec) -> com.chencohensolution.transcriptor.settings.OtherCodec? = { _, _ -> null },
 ) {
     fun pending(): List<Lecture> = store.index().filter { it.pendingEncode }.mapNotNull { store.load(it.id) }
-        .filter { it.pendingEncode && (it.pendingFlac || aacEncoder != null) }
+        .filter { it.pendingEncode && (it.pendingFlac || (it.pendingAac && aacEncoder != null) || (it.pendingCodec != null && otherEncoder != null)) }
 
     fun compress(lecture: Lecture, progress: (Float) -> Unit = {}): Lecture {
+        val otherCodec = com.chencohensolution.transcriptor.settings.Codec.of(lecture.pendingCodec)?.takeIf { !lecture.pendingFlac && !lecture.pendingAac }
         val toAac = lecture.pendingAac && !lecture.pendingFlac
-        val name = if (toAac) AUDIO_AAC else AUDIO_FLAC
+        val name = otherCodec?.file ?: if (toAac) AUDIO_AAC else AUDIO_FLAC
         val wav = store.audioPath(lecture, AUDIO_WAV)
         val out = store.audioPath(lecture, name)
         val temp = store.audioPath(lecture, "$name.tmp")
         fileSystem.delete(temp)
         WavWriter.repair(fileSystem, wav)
         val expected = WavWriter.read(fileSystem, wav).frames
-        val written = if (toAac) checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac(lecture.profile).valid(), progress)
-        else encoder.encode(wav, temp, level(lecture.profile), flac(lecture.profile).valid(), progress)
-        check(written == expected) { "${if (toAac) "AAC" else "FLAC"} took $written frames, the WAV has $expected" }
+        val written = when {
+            otherCodec != null -> checkNotNull(otherEncoder) { "No encoder for ${otherCodec.key}" }
+                .encode(wav, temp, checkNotNull(other(lecture.profile, otherCodec)) { "No settings for ${otherCodec.key}" }, progress)
+            toAac -> checkNotNull(aacEncoder) { "No AAC encoder" }.encode(wav, temp, aac(lecture.profile).valid(), progress)
+            else -> encoder.encode(wav, temp, level(lecture.profile), flac(lecture.profile).valid(), progress)
+        }
+        check(written == expected) { "${otherCodec?.key ?: if (toAac) "AAC" else "FLAC"} took $written frames, the WAV has $expected" }
         fileSystem.atomicMove(temp, out)
-        val done = lecture.copy(audioFile = name, pendingFlac = false, pendingAac = false)
+        val done = lecture.copy(audioFile = name, pendingFlac = false, pendingAac = false, pendingCodec = null)
         store.save(done)
         fileSystem.delete(wav)
         return done

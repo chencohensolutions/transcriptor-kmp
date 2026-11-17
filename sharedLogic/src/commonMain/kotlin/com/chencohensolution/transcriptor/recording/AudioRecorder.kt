@@ -6,7 +6,9 @@ import com.chencohensolution.transcriptor.settings.FlacFormat
 import okio.Path
 
 /** How the recorder writes the audio while recording. */
-enum class AudioFileFormat { Wav, Flac, Aac }
+enum class AudioFileFormat { Wav, Flac, Aac,
+    /** One of [com.chencohensolution.transcriptor.settings.Codec.other], as [AudioRecorder.start]'s `other` says. */
+    Other }
 
 /**
  * The microphone, written to a file as it records: 48 kHz, stereo, 16 bit. One per platform (Android's in
@@ -34,6 +36,7 @@ interface AudioRecorder {
     fun start(
         file: Path, format: AudioFileFormat, flacLevel: Int, aac: AacSettings = AacSettings(), input: MicInput? = null,
         flac: FlacFormat = FlacFormat(), music: Boolean = false,
+        other: com.chencohensolution.transcriptor.settings.OtherCodec? = null,
     )
     fun pause()
     fun resume()
