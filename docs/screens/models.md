@@ -106,7 +106,7 @@ stops.
   **Stop by place**: stop when leaving the place (100, 250 or 500 m), stop when arriving at a saved place, **Saved
   places** (Add the current place takes one fix and a name; no map), stop when the phone connects to the car (picks
   a paired Bluetooth device; asks for Bluetooth only then). **Save the recording's path**: precision (Only when GPS is
-  already on, the default; Economical; Precise while driving; Precise), keep saving after stopping (until a saved
+  already on, the default; Economical; Precise while moving, a slow walk too; Precise), keep saving after stopping (until a saved
   place, 30 minutes, an hour or two hours), and, when paired, sync location with the server. With approximate location
   only, stopping is at 500 m and the precise levels are disabled. Processor meters while recording, one of Off (the default),
   Three bars under the top bar, A small chip, tap for details, or The last minute as graphs

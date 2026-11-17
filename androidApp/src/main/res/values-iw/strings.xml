@@ -868,8 +868,8 @@
     <string name="location_precision_passive_note">משתמש במיקומים שאפליקציות אחרות מבקשות, כמו ניווט. בלי סוללה נוספת.</string>
     <string name="location_precision_economical">חסכוני</string>
     <string name="location_precision_economical_note">מוסיף נקודה בערך פעם בדקה</string>
-    <string name="location_precision_driving">מדויק בנסיעה</string>
-    <string name="location_precision_driving_note">GPS כל שנייה במהירות מעל 15 קמ״ש</string>
+    <string name="location_precision_driving">מדויק בתנועה</string>
+    <string name="location_precision_driving_note">GPS כל שנייה כשהטלפון זז, גם בהליכה איטית. חיישן התנועה מעיר אותו, כך שעמידה במקום לא צורכת סוללה.</string>
     <string name="location_precision_precise">מדויק</string>
     <string name="location_precision_precise_note">GPS כל שנייה, תמיד. צורך הכי הרבה סוללה.</string>
     <string name="location_keep">להמשיך לשמור מסלול אחרי העצירה</string>

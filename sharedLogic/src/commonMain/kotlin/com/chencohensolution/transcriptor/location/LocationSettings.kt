@@ -10,8 +10,8 @@ enum class PathPrecision(val key: String) {
     /** Plus a low-power fix about once a minute. */
     Economical("economical"),
 
-    /** Plus GPS every second while moving faster than about 15 km/h ([DrivingSwitch]). */
-    WhileDriving("driving"),
+    /** Plus GPS every second while moving, a slow walk too ([MovingSwitch]); the key from when it was "while driving". */
+    WhileMoving("driving"),
 
     /** GPS every second, always. */
     Precise("precise");

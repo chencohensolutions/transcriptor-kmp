@@ -44,7 +44,9 @@ class PathBuilder(private val toRecording: (Long) -> Long) {
         if (last != null && lastAt != null) {
             val dt = fix.atMillis - lastAt
             if (dt < 1_000) return false
-            val still = last.point.metersTo(fix.point) < maxOf(5f, fix.accuracyM, last.accuracyM)
+            // Moving, even at a slow walk (GPS's own speed, good to a fraction of a m/s): every point counts.
+            val moving = (fix.speedMps ?: 0f) >= SLOW_WALK_MPS && fix.accuracyM <= 30f
+            val still = !moving && last.point.metersTo(fix.point) < maxOf(5f, fix.accuracyM, last.accuracyM)
             if (still && dt < 60_000) return false
         }
         kept += PathPoint(toRecording(fix.atMillis), fix.point, fix.accuracyM, fix.speedMps, fix.bearingDeg, fix.source)
@@ -55,23 +57,43 @@ class PathBuilder(private val toRecording: (Long) -> Long) {
     val size get() = kept.size
 
     fun path(audioEndMillis: Long? = null) = MomentPath(kept.toList(), audioEndMillis)
+
+    companion object {
+        /** About 1 km/h: slower than this, a point has to move to be kept. */
+        const val SLOW_WALK_MPS = 0.3f
+    }
 }
 
 /**
- * "Precise while driving": GPS every second once a fix says faster than [onAboveMps] (about 15 km/h), off again
- * [offAfterMillis] after the last fix that fast.
+ * "Precise while moving" (owner's request, Nov 17, 2026: precise at a slow walk too, not only driving): GPS every
+ * second from the moment the phone moves, off again [offAfterMillis] after it last did. Moving is a fix whose measured
+ * speed is at least [onAboveMps] (about 1.4 km/h, a slow walk), a good fix [moveMeters] or more from where it stood, or
+ * the phone's motion sensor ([motion]: it wakes on the first steps, costing nothing while standing).
  */
-class DrivingSwitch(private val onAboveMps: Float = 15f / 3.6f, private val offAfterMillis: Long = 120_000) {
-    private var fastAt: Long? = null
+class MovingSwitch(
+    private val onAboveMps: Float = 0.4f,
+    private val offAfterMillis: Long = 120_000,
+    private val moveMeters: Double = 15.0,
+) {
+    private var movedAt: Long? = null
+    private var stoodAt: GeoPoint? = null
 
     /** Feeds [fix]; returns whether GPS should run every second now. */
     fun update(fix: Fix): Boolean {
         val speed = fix.speedMps
-        if (speed != null && speed >= onAboveMps) fastAt = fix.atMillis
+        if (speed != null && speed >= onAboveMps && fix.accuracyM <= 30f) movedAt = fix.atMillis
+        if (fix.accuracyM <= 50f) {
+            val stood = stoodAt
+            if (stood == null) stoodAt = fix.point
+            else if (stood.metersTo(fix.point) >= maxOf(moveMeters, fix.accuracyM * 2.0)) { movedAt = fix.atMillis; stoodAt = fix.point }
+        }
         return on(fix.atMillis)
     }
 
-    fun on(nowMillis: Long): Boolean = fastAt?.let { nowMillis - it < offAfterMillis } ?: false
+    /** The phone's motion sensor felt it start moving at [nowMillis]. */
+    fun motion(nowMillis: Long) { movedAt = nowMillis }
+
+    fun on(nowMillis: Long): Boolean = movedAt?.let { nowMillis - it < offAfterMillis } ?: false
 }
 
 /** `path.json`, version 1: the points as columns (compact: an hour a second is about 3,600 rows). */

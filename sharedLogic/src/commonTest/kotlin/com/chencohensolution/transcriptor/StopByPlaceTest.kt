@@ -1,6 +1,6 @@
 package com.chencohensolution.transcriptor
 
-import com.chencohensolution.transcriptor.location.DrivingSwitch
+import com.chencohensolution.transcriptor.location.MovingSwitch
 import com.chencohensolution.transcriptor.location.Fix
 import com.chencohensolution.transcriptor.location.FixSource
 import com.chencohensolution.transcriptor.location.GeoPoint
@@ -157,12 +157,29 @@ class StopByPlaceTest {
     }
 
     @Test
-    fun drivingSwitchTurnsOnWhenFastAndOffTwoMinutesLater() {
-        val d = DrivingSwitch()
-        assertFalse(d.update(fix(0, 0.0, speed = 2f)))
-        assertTrue(d.update(fix(10, 0.0, speed = 10f)))
-        assertTrue(d.update(fix(100, 0.0, speed = 1f)))
-        assertFalse(d.update(fix(131, 0.0, speed = 1f)))
+    fun movingSwitchTurnsOnAtASlowWalkAndOffTwoMinutesLater() {
+        val d = MovingSwitch()
+        assertFalse(d.update(fix(0, 0.0, speed = 0.1f))) // standing, GPS noise
+        assertFalse(d.update(fix(5, 4.0, speed = 0.1f))) // drift of a few metres isn't moving
+        assertTrue(d.update(fix(10, 4.0, speed = 0.5f))) // a slow walk, about 1.8 km/h
+        assertTrue(d.update(fix(100, 4.0, speed = 0.1f)))
+        assertFalse(d.update(fix(131, 4.0, speed = 0.1f)))
+        // Without speed (network fixes): moving 15 m or more counts.
+        assertTrue(d.update(Fix(140_000, north(25.0), 8f)))
+        // The motion sensor counts on its own.
+        val s = MovingSwitch()
+        s.motion(1_000)
+        assertTrue(s.on(60_000))
+    }
+
+    @Test
+    fun aSlowWalkKeepsEveryPoint() {
+        val b = PathBuilder { it }
+        // 0.5 m/s: half a metre a second, under the 5 m a standing point needs.
+        (0..10).forEach { s -> assertTrue(b.add(Fix(s * 1000L, north(s * 0.5), 4f, speedMps = 0.5f))) }
+        // Standing still with GPS noise: thinned.
+        assertFalse(b.add(Fix(12_000, north(5.2), 4f, speedMps = 0.05f)))
+        assertEquals(11, b.size)
     }
 
     @Test
@@ -224,11 +241,13 @@ class StopByPlaceTest {
         assertEquals(MomentLocation.Request.None, passive.status.value.request)
         passive.fix(Fix(1_000, home, 5f))
         assertEquals(1, passive.status.value.points)
-        val driving = MomentLocation(LocationSettings(savePath = true, precision = PathPrecision.WhileDriving.key), stopOn = false, pathOn = true) { it }
-        driving.fix(Fix(1_000, home, 5f, speedMps = 1f))
-        assertEquals(MomentLocation.Request.None, driving.status.value.request)
-        driving.fix(Fix(5_000, north(40.0), 5f, speedMps = 12f))
-        assertEquals(MomentLocation.Request.EverySecond, driving.status.value.request)
+        val moving = MomentLocation(LocationSettings(savePath = true, precision = PathPrecision.WhileMoving.key), stopOn = false, pathOn = true, motionSensor = true) { it }
+        moving.fix(Fix(1_000, home, 5f, speedMps = 0.1f))
+        assertEquals(MomentLocation.Request.None, moving.status.value.request) // standing; the sensor will wake it
+        moving.motion(2_000)
+        assertEquals(MomentLocation.Request.EverySecond, moving.status.value.request)
+        // No motion sensor: a fix a minute notices the walk.
+        assertEquals(MomentLocation.Request.Minute, MomentLocation(LocationSettings(savePath = true, precision = PathPrecision.WhileMoving.key), stopOn = false, pathOn = true) { it }.status.value.request)
         // Off for this moment's profile: nothing at all.
         assertFalse(MomentLocation(LocationSettings(stopByPlace = true, savePath = true), stopOn = false, pathOn = false) { it }.active)
     }
