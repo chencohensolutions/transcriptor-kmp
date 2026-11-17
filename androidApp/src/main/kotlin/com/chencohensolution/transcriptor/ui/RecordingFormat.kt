@@ -225,9 +225,7 @@ private fun FormatList(state: ModelsState, actions: ModelsActions, open: (Format
                     open(pageOf(c))
                 }
             }
-            HorizontalDivider(Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            // WAV first: Music's own, the shared one for the others.
-            EncodeLater(state, actions)
+            // Recording as WAV first is part of the mode above (save battery), not a setting of its own.
         }
     }
 }
@@ -266,39 +264,26 @@ private fun Presets(state: ModelsState, actions: ModelsActions) {
             FormatNote(stringResource(R.string.rec_preset_hours_left, hours, state.freeBytes / 1_000_000_000))
         }
 
+        // When to compress and transcribe: two modes, no mix (owner's call, Nov 17, 2026). Music has its own (it isn't
+        // transcribed: only when it is compressed).
         FormatLabel(stringResource(R.string.rec_preset_power))
-        val power = listOf(PowerPreset.Low, PowerPreset.Normal) + listOfNotNull(PowerPreset.Custom.takeIf { choice.power == it })
+        val music = state.profile == QualityProfile.Music
+        val power = listOf(PowerPreset.Low, PowerPreset.Normal)
+        val picked = if (state.powerSaving) PowerPreset.Low else PowerPreset.Normal
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             power.forEachIndexed { i, p ->
                 SegmentedButton(
-                    selected = choice.power == p, onClick = { if (p != PowerPreset.Custom) actions.setPower(p) },
+                    selected = picked == p, onClick = { actions.setPower(p) },
                     shape = SegmentedButtonDefaults.itemShape(i, power.size),
                 ) { Text(powerName(p)) }
             }
         }
-        FormatNote(stringResource(when (choice.power) {
-            PowerPreset.Low -> R.string.rec_preset_power_low_note
-            PowerPreset.Normal -> R.string.rec_preset_power_normal_note
-            PowerPreset.Custom -> R.string.rec_preset_power_custom_note
+        FormatNote(stringResource(when {
+            music && state.powerSaving -> R.string.rec_preset_power_low_music
+            music -> R.string.rec_preset_power_normal_music
+            state.powerSaving -> R.string.rec_preset_power_low_note
+            else -> R.string.rec_preset_power_normal_note
         }))
-        // When moments recorded with After are transcribed: here, beside the battery (it was under Settings › After a
-        // moment); encoding's own timing is under "Record as WAV, encode afterwards" below.
-        Text(stringResource(R.string.settings_transcribe_when), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp))
-        Column(Modifier.selectableGroup()) {
-            listOf(
-                EncodeAfter.Stop to R.string.settings_transcribe_when_stop,
-                EncodeAfter.Charging to R.string.settings_transcribe_when_charging,
-            ).forEach { (option, label) ->
-                Row(
-                    Modifier.fillMaxWidth().selectable(selected = state.transcribeWhen == option, role = Role.RadioButton) { actions.setTranscribeWhen(option) }
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = state.transcribeWhen == option, onClick = null)
-                    Text(stringResource(label), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
         Spacer(Modifier.height(8.dp))
     }
 }

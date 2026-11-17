@@ -126,7 +126,7 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
         languages = languages, chip = chip, models = models, statuses = statuses,
         live = languages.mapNotNull { l -> Recording.settings.liveModel(l)?.let { l to it } }.toMap(),
         refine = languages.mapNotNull { l -> Recording.settings.refineModel(l)?.let { l to it } }.toMap(),
-        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, profile = shown, activeProfile = active, profileSettings = profileSettings, codecs = remember { com.chencohensolution.transcriptor.recording.OtherEncoders.available }, encodeAfter = encodeAfter,
+        npu = npu, audioFormat = format, flacLevel = flacLevel, aac = aac, flac = flac, profile = shown, activeProfile = active, powerSaving = remember(format, shown) { store.savingFor(shown) }, profileSettings = profileSettings, codecs = remember { com.chencohensolution.transcriptor.recording.OtherEncoders.available }, encodeAfter = encodeAfter,
         aacEncoders = AacEncoders.all, autoAacEncoder = remember(aac) { AacEncoders.candidates(aac.copy(encoder = null)).first() }, findSpeakersOnStop = speakers, autoImprove = auto, transcribeWhen = transcribeWhen, quietRecording = quiet, stopTwice = stopTwice, advancedMode = advancedMode, deepCapture = remember(micInput, micInputs) { Recording.audioInputs.deepCapture(micInput) }, folder = folder, processorMeters = meters, levelMeter = levelMeter, micInput = micInput, micInputs = micInputs, micDetails = remember { Recording.audioInputs.builtInDetails() }, micMeter = micMeter, micTestOff = micTestOff, freeBytes = remember { runCatching { android.os.StatFs(context.filesDir.path).availableBytes }.getOrDefault(0L) },
         voiceModel = remember(statuses, changed) { Recording.voiceModel?.id },
         segmentationModel = remember(statuses, changed) { Recording.segmentationModel?.id },
@@ -187,14 +187,10 @@ fun Settings(onBack: () -> Unit, chooseFolder: () -> Unit) {
             resetProfile = { store.resetProfile(shown); load() },
             setBitrate = { codec, bps -> edit { it.copy(bitrates = it.bitrates + (codec.key to bps)) } },
             setPower = { preset ->
-                val next = state.recordingChoice.with(preset)
-                val wavFirst = if (format == com.chencohensolution.transcriptor.settings.AudioFormat.Wav || shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music) store.wavFirst
-                    else next.audioFormat.name.startsWith("WavThen")
-                store.setTiming(wavFirst, next.encodeAfter, next.transcribeWhen)
-                // Shown on Music, the battery's WAV first is Music's own.
-                if (shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music && format != com.chencohensolution.transcriptor.settings.AudioFormat.Wav) {
-                    edit { it.copy(wavFirst = next.audioFormat.name.startsWith("WavThen")) }
-                }
+                val saving = preset == com.chencohensolution.transcriptor.settings.PowerPreset.Low
+                // Music's own mode (WAV, compressed on the charger), else the shared one.
+                if (shown == com.chencohensolution.transcriptor.settings.QualityProfile.Music) edit { it.copy(wavFirst = saving) }
+                else store.powerSaving = saving
                 load()
             },
             setEncodeAfter = { encodeAfter = it; io { Recording.settings.encodeAfter = it } },

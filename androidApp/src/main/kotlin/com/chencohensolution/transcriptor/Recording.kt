@@ -157,10 +157,13 @@ object Recording {
      * setting and the charger (Upload now, which the user tapped).
      */
     fun encodePending(context: android.content.Context, now: Boolean = false, progress: (Lecture, Float) -> Unit = { _, _ -> }): Boolean {
-        val pending = compression.pending()
-        if (pending.isEmpty()) return false
+        val waiting = compression.pending()
+        if (waiting.isEmpty()) return false
         val (percent, charging) = battery(context)
-        if (!now && !settings.encodeAfter.allows(charging, percent)) { EncodeJob.schedule(context); return false }
+        // Each moment by its profile's mode: one saving battery waits for the charger (Music has its own mode).
+        val pending = if (now) waiting else waiting.filter { settings.encodeAllowed(it, charging, percent) }
+        if (pending.size < waiting.size) EncodeJob.schedule(context)
+        if (pending.isEmpty()) return false
         if (!encoding.compareAndSet(false, true)) return false
         try {
             for (lecture in pending) {

@@ -94,7 +94,9 @@ class RecordingTest {
         // A new install records as the owner does (Nov 16, 2026): WAV, then AAC LC 48 kHz stereo 256 kbps right after
         // the moment, FLAC effort 8, a quiet notification.
         assertEquals(AudioFormat.WavThenAac, settings.audioFormat)
-        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
+        // Save battery (Nov 17, 2026: one timing mode; the old defaults were mostly waiting for the charger).
+        assertTrue(settings.powerSaving)
+        assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Charging, settings.encodeAfter)
         assertTrue(settings.quietRecording)
         assertEquals(com.chencohensolution.transcriptor.settings.AacSettings(com.chencohensolution.transcriptor.settings.AacProfile.Lc, 48_000, 2, 256, null), settings.aac)
         assertEquals(8, settings.flacLevel)
@@ -413,6 +415,7 @@ class RecordingTest {
 
     @Test
     fun encodingWaitsForTheChargerAndThirtyPercentWhenAsked() {
+        settings.powerSaving = false
         assertEquals(com.chencohensolution.transcriptor.settings.EncodeAfter.Stop, settings.encodeAfter)
         settings.encodeAfter = com.chencohensolution.transcriptor.settings.EncodeAfter.Charging
         val after = SettingsStore(fs, root).encodeAfter

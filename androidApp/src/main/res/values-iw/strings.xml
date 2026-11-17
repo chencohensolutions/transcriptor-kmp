@@ -812,5 +812,7 @@
     <string name="notebooks_power_low_note">דוחס את השמע ומתמלל כשהטלפון בטעינה: חוסך סוללה.</string>
     <string name="notebooks_power_normal_note">דוחס את השמע ומתמלל מיד אחרי הרגע.</string>
     <string name="notebooks_power_custom_note">תזמון משלך (הגדרות › הגדרות הקלטה).</string>
-    <string name="notebooks_presets_music">מוזיקה מוקלטת בהגדרות ובתזמון משלה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
+    <string name="notebooks_presets_music">ההגדרות של מוזיקה: הגדרות › הגדרות הקלטה › מוזיקה.</string>
+    <string name="rec_preset_power_low_music">חוסך סוללה: מקליט WAV פשוט, שנדחס לקידוד שנבחר כשהטלפון בטעינה עם 30% ומעלה.</string>
+    <string name="rec_preset_power_normal_music">דוחס בזמן ההקלטה. משתמש בסוללה אז.</string>
 </resources>

@@ -136,7 +136,7 @@ class NotebooksActions(
     /** Advanced mode's Record bar: applies a quality preset (Settings › Recording format). */
     val setQuality: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
     /** Advanced mode's Record bar: applies a battery preset. */
-    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset) -> Unit = {},
+    val setPower: (com.chencohensolution.transcriptor.settings.PowerPreset, music: Boolean) -> Unit = { _, _ -> },
     val backToRecording: () -> Unit = {},
     /** Makes a label; returns its id. */
     val newLabel: (name: String) -> String = { "" },
@@ -468,7 +468,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     )
                                 }
                             }
-                            state.recordingChoice?.let { choice -> RecordPresets(choice, state.activeProfile, recordMode == RecordMode.Music, actions) }
+                            state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode == RecordMode.Music, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1058,40 +1058,43 @@ internal fun shortModelName(name: String): String {
 }
 
 /**
- * Advanced mode's rows on the Record bar, each with its name and what the choice does (owner's request, Nov 17,
- * 2026): **Quality** (Low, Normal, High: the profile moments record with, and its settings in a line) and **Battery**
- * (Save battery, Right away). Music records with its own profile and timing, so with Music picked the rows give way to
- * one line saying so: no quality to pick that wouldn't apply.
+ * Advanced mode's rows on the Record bar, each with its name and what the choice does (owner's requests, Nov 17,
+ * 2026): **Quality** (Low, Normal, High: the profile moments record with, its encoder in a line) and **Processing**
+ * (save battery or right away). With Music picked, Quality shows Music's own encoder line instead of the chips, and
+ * Processing sets Music's own mode.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RecordPresets(
-    choice: com.chencohensolution.transcriptor.settings.RecordingChoice, quality: com.chencohensolution.transcriptor.settings.QualityProfile,
+    choice: com.chencohensolution.transcriptor.settings.RecordingChoice, state: NotebooksState,
     music: Boolean, actions: NotebooksActions,
 ) {
     val note = MaterialTheme.colorScheme.onSurfaceVariant
-    if (music) {
-        Text(
-            stringResource(R.string.notebooks_presets_music), style = MaterialTheme.typography.bodySmall, color = note,
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-        )
-        return
-    }
-    val power = choice.power
+    val saving = if (music) state.musicPowerSaving else state.powerSaving
+    val power = if (saving) com.chencohensolution.transcriptor.settings.PowerPreset.Low else com.chencohensolution.transcriptor.settings.PowerPreset.Normal
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.notebooks_presets_quality), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (music) {
+                // Music records with its own profile: its encoder in a line, set in Settings › Recording settings › Music.
+                Text(
+                    state.musicChoice?.let { qualityLine(it) }.orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 10.dp),
+                )
+            } else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Low to R.string.notebooks_quality_low,
                     com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
                     com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
                 ).forEach { (p, label) ->
-                    FilterChip(selected = quality == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
+                    FilterChip(selected = state.activeProfile == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) })
                 }
             }
         }
-        Text(qualityLine(choice), style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp))
+        Text(
+            if (music) stringResource(R.string.notebooks_presets_music) else qualityLine(choice),
+            style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
+        )
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
             Text(stringResource(R.string.notebooks_presets_battery), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1100,17 +1103,18 @@ private fun RecordPresets(
                     com.chencohensolution.transcriptor.settings.PowerPreset.Normal to R.string.notebooks_power_normal,
                 ).forEach { (p, label) ->
                     FilterChip(
-                        selected = power == p, onClick = { actions.setPower(p) }, label = { Text(stringResource(label)) },
+                        selected = power == p, onClick = { actions.setPower(p, music) }, label = { Text(stringResource(label)) },
                         leadingIcon = if (p == com.chencohensolution.transcriptor.settings.PowerPreset.Low) ({ Icon(Icons.Filled.BatterySaver, null, Modifier.size(16.dp)) }) else null,
                     )
                 }
             }
         }
         Text(
-            stringResource(when (power) {
-                com.chencohensolution.transcriptor.settings.PowerPreset.Low -> R.string.notebooks_power_low_note
-                com.chencohensolution.transcriptor.settings.PowerPreset.Normal -> R.string.notebooks_power_normal_note
-                com.chencohensolution.transcriptor.settings.PowerPreset.Custom -> R.string.notebooks_power_custom_note
+            stringResource(when {
+                music && saving -> R.string.rec_preset_power_low_music
+                music -> R.string.rec_preset_power_normal_music
+                saving -> R.string.notebooks_power_low_note
+                else -> R.string.notebooks_power_normal_note
             }),
             style = MaterialTheme.typography.bodySmall, color = note, modifier = Modifier.padding(start = 76.dp),
         )
