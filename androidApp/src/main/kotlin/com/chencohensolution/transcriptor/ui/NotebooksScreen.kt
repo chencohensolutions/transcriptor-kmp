@@ -404,7 +404,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
         },
         bottomBar = {
             Surface(tonalElevation = 3.dp, shadowElevation = 6.dp) {
-                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+                // Less room on top while the Record panel shows: its handle sits there (hen, Nov 17, 2026).
+                Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = if (state.recording == null) 4.dp else 16.dp)) {
                     val r = state.recording
                     if (r != null) {
                         RecordingBanner(r, r.labels.mapNotNull { labelsById[it] }, actions.backToRecording)
@@ -416,7 +417,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                         fun openPanel(open: Boolean) { panelOpen = open; prefs.edit().putBoolean("open", open).apply() }
                         Column(Modifier.animateContentSize()) {
                             Box(
-                                Modifier.fillMaxWidth().offset(y = (-12).dp).height(28.dp)
+                                Modifier.fillMaxWidth().height(28.dp)
                                     .clickable(onClickLabel = stringResource(if (panelOpen) R.string.notebooks_panel_fold else R.string.notebooks_panel_open)) { openPanel(!panelOpen) }
                                     .draggable(
                                         rememberDraggableState { },
@@ -511,7 +512,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                 // Red, like the recording screen's Stop it turns into.
                                 colors = ButtonDefaults.buttonColors(containerColor = LocalTranscriptorColors.current.recording, contentColor = Color.White),
                                 // Room above it, apart from the rows of choices (owner's ask, Nov 17, 2026).
-                                modifier = Modifier.padding(top = if (panelOpen) 12.dp else 8.dp).sharedRecordButton().fillMaxWidth().height(56.dp),
+                                modifier = Modifier.padding(top = 16.dp).sharedRecordButton().fillMaxWidth().height(56.dp),
                             ) {
                                 Icon(Icons.Filled.Mic, null)
                                 Text(stringResource(R.string.notebooks_record), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
