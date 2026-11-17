@@ -239,7 +239,38 @@ object Recording {
 
     /** [make]s a streaming engine, inside [npuGuard] when [model] runs on the NPU. */
     fun <T> npuEngine(model: SpeechModel, make: () -> T): T =
-        if (model.kind.onNpu) npuGuard.load(model, make) else make()
+        if (model.kind.onNpu) loadOnNpu(model, make) else make()
+
+    /** [make] loads [model] on the NPU through [npuGuard], once the app has freed what it can ([waitForMemory]). */
+    fun <T> loadOnNpu(model: SpeechModel, make: () -> T): T {
+        if (!npuGuard.fitsNow(model)) waitForMemory(model)
+        return npuGuard.load(model, make)
+    }
+
+    /**
+     * Frees what the app can before [model]'s NPU load (owner's request, Nov 17, 2026: a recording frees as much memory
+     * as it can for its live model): the Java heap is collected, and while an improve pass is letting go of its model
+     * (it stops when a recording starts) this waits for it, up to [MEMORY_WAIT_MILLIS]. Not on the main thread.
+     */
+    private fun waitForMemory(model: SpeechModel) {
+        val until = System.currentTimeMillis() + MEMORY_WAIT_MILLIS
+        Runtime.getRuntime().gc()
+        while (!npuGuard.fitsNow(model) && System.currentTimeMillis() < until && (refining.value != null || freeing())) {
+            Thread.sleep(250)
+            Runtime.getRuntime().gc()
+        }
+        android.util.Log.i("NpuLoadGuard", "${model.id}: ${if (npuGuard.fitsNow(model)) "fits" else "still doesn't fit"} after freeing memory")
+    }
+
+    /** Memory was just let go of (an improve pass closed its model for a recording): it takes a moment to come back. */
+    private var freedAt = 0L
+    private fun freeing() = System.currentTimeMillis() - freedAt < 3_000
+
+    /** An improve pass closed its model because a recording started: its memory is on its way back. */
+    fun modelReleased() { freedAt = System.currentTimeMillis() }
+
+    /** How long a recording's live model waits for memory the app is freeing before it falls back. */
+    const val MEMORY_WAIT_MILLIS = 15_000L
 
     /** whisper.cpp with [model]'s `model.bin`; for [ModelKind.WhisperNpuEncoder], its encoder on the NPU (`encoder.bin`). */
     fun whisperEngine(model: SpeechModel): WhisperEngine {
@@ -938,7 +969,14 @@ fun liveModelPick(language: String) = Recording.npuGuard.pick(liveModelFor(langu
  * downloaded, starting from the voices the app [known]; null when no live model is downloaded.
  */
 private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice>): LiveModel? {
-    val pick = liveModelPick(language)
+    // As much memory as the app can free goes to the live model: an improve pass running now lets go of its model as
+    // the recording starts, so the model picked waits for that memory ([Recording.npuEngine]) rather than falling back.
+    Runtime.getRuntime().gc()
+    val pick = liveModelPick(language).let { p ->
+        val skipped = p.skipped
+        if (skipped != null && Recording.refining.value != null) com.chencohensolution.transcriptor.models.NpuLoadGuard.Pick(skipped)
+        else p
+    }
     val model = pick.model ?: return null
     val prints = Recording.voiceModel
     // With segmentation (live turns) the prints are of short pieces: their own, lower threshold.
@@ -989,7 +1027,7 @@ private fun liveModel(language: String, scope: CoroutineScope, known: List<Voice
         ModelKind.WhisperNpu -> {
             val dir = Recording.models.dir(model)
             UtteranceTranscriber(language, model.id, scope, worker, labeler, limits) {
-                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).also { e -> Recording.npuGuard.load(model) { e.load(language) } }
+                SherpaNpuWhisperEngine(dir, Recording.nativeLibDir).also { e -> Recording.loadOnNpu(model) { e.load(language) } }
             }
         }
         ModelKind.StreamingTransducer, ModelKind.StreamingTransducerNpu -> {

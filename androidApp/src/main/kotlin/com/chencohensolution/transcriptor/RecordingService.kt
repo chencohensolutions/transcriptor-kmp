@@ -273,7 +273,7 @@ class RecordingService : Service() {
                 launch(Dispatchers.Main) { if (Recording.review.lecture?.id == done.id) Recording.review.reload() }
                 if (transcribing && done.segments.isNotEmpty() && Recording.canFindSpeakers) speakersNext = done
             }.onFailure {
-                if (it is RefinePass.Stopped) Recording.improveAfterRecording += lecture.id to modelId
+                if (it is RefinePass.Stopped) { Recording.modelReleased(); Recording.improveAfterRecording += lecture.id to modelId }
                 else android.util.Log.e("RecordingService", "refine pass failed", it)
             }
             Recording.settings.removeImprovePending(lecture.id)
