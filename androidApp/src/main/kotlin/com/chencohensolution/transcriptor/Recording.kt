@@ -869,13 +869,15 @@ object Recording {
         CallsWorker.schedule(app)
         settings = SettingsStore(FileSystem.SYSTEM, root)
         installedModels = InstalledModels(FileSystem.SYSTEM, root)
-        npuGuard = NpuLoadGuard(installedModels, log = { android.util.Log.i("NpuLoadGuard", it) }) {
+        npuGuard = NpuLoadGuard(installedModels, log = { android.util.Log.i("NpuLoadGuard", it) }, clock = System::currentTimeMillis) {
             val info = android.app.ActivityManager.MemoryInfo()
             app.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(info)
             info.availMem
         }
         // An NPU model whose load got the app killed last time: disabled for this phone, the pick falls back.
-        npuGuard.recover()?.let { android.util.Log.w("Transcriptor", "NPU model $it disabled: the app was killed loading it") }
+        // Not when the app was installed again since that load began: the install closed it, not the model.
+        val updatedAt = runCatching { app.packageManager.getPackageInfo(app.packageName, 0).lastUpdateTime }.getOrNull()
+        npuGuard.recover(updatedAt)?.let { android.util.Log.w("Transcriptor", "NPU model $it disabled: the app was killed loading it") }
         modelLibrary = ModelLibrary(installedModels)
         labels = LabelStore { store.library ?: store.local }
         resolver = app.contentResolver
