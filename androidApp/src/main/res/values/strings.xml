@@ -906,4 +906,5 @@
     <string name="path_keeping_stop">Stop</string>
     <string name="info_path_map">Show on map</string>
     <string name="info_path_map_note">Map from OpenFreeMap (OpenStreetMap). Only the map\'s area is fetched; the path stays on the phone. Tap the path to play from there.</string>
+    <string name="info_path_map_tap">Tap the map to open it full screen. The map comes from OpenFreeMap; the path stays on the phone.</string>
 </resources>
