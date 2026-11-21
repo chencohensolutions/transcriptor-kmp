@@ -770,7 +770,6 @@
     <string name="notebooks_power_low">בטעינה</string>
     <string name="notebooks_power_normal">מיד</string>
     <string name="notebooks_record_music">מוזיקה</string>
-    <string name="notebooks_record_music_note">הופעה: הגדרות המוזיקה, המיקרופון בלי עיבוד קול, בלי תמלול.</string>
     <string name="settings_mic_builtin">אחד המיקרופונים של הטלפון לבדו</string>
     <string name="settings_mic_bottom">המיקרופון התחתון</string>
     <string name="settings_mic_back">המיקרופון האחורי (ליד המצלמה)</string>

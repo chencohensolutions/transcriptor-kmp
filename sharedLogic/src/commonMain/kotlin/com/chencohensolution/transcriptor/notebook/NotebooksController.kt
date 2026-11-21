@@ -82,6 +82,8 @@ data class NotebooksState(
     val working: Map<String, Float> = emptyMap(),
     /** The Record bar's Live, After or Only record, as the settings keep it ([com.chencohensolution.transcriptor.settings.SettingsStore.recordMode]). */
     val recordMode: RecordMode = RecordMode.After,
+    /** Music is the quality picked ([com.chencohensolution.transcriptor.settings.SettingsStore.recordMusic]). */
+    val recordMusic: Boolean = false,
     /** The recording presets for the Record bar's extra row; null unless advanced mode is on. */
     val recordingChoice: com.chencohensolution.transcriptor.settings.RecordingChoice? = null,
     /** Music's settings, for the same rows when Music is picked (its encoder line and its own battery mode). */

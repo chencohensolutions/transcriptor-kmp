@@ -300,3 +300,7 @@ anything left to decide. Remove an entry once it is built.
   `ReviewScreen.kt` (`FoldHandle`, `Overview(single)`). Strings `review_fold_speakers`, `review_open_speakers`,
   `review_everyone`, `glance_stop_leaving`, `glance_stop_back`, `glance_path`, `place_returned`, `place_status_back`.
 - List rows: no + label button (holding selects for the labels sheet).
+
+## Music as a quality (Nov 21, 2026)
+
+- `RecordMode.Music` is gone: `SettingsStore.recordMusic` and `NotebooksState.recordMusic`; the Record bar shows Music in the Quality row (Advanced) or as its own chip. Music moments are transcribed by the mode.

@@ -88,8 +88,10 @@ class RecordingService : Service() {
                 if (keepingFor != null) endKeeping()
                 quiet = Recording.settings.quietRecording
                 val mode = RecordMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: RecordMode.Live.name)
-                onlyRecord = mode == RecordMode.Only || mode == RecordMode.Music
-                val located = placeFor(mode)
+                // Music is a quality now, transcribed by the mode like the others.
+                val music = Recording.settings.recordMusic
+                onlyRecord = mode == RecordMode.Only
+                val located = placeFor(music)
                 try {
                     try {
                         startForeground(
@@ -119,7 +121,7 @@ class RecordingService : Service() {
                 session.start(
                     intent.getStringArrayExtra(EXTRA_LABELS)?.toList().orEmpty(), intent.getStringExtra(EXTRA_LABEL_NAMES).orEmpty(),
                     intent.getStringExtra(EXTRA_LANGUAGE)!!, intent.getStringExtra(EXTRA_TITLE)!!,
-                    transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord, music = mode == RecordMode.Music,
+                    transcribeLive = mode == RecordMode.Live, transcribeAfter = !onlyRecord, music = music,
                 )
                 if (place != null) startPlace()
             }
@@ -372,15 +374,15 @@ class RecordingService : Service() {
     }
 
     /**
-     * Stop by place and the path for a moment starting in [mode]: on when Settings › Advanced › Location has them on,
+     * Stop by place and the path for a moment starting with Music or not ([music]): on when Settings › Advanced › Location has them on,
      * its profile does too, and the phone lets the app know its location. Sets [place]; null when neither is on.
      */
-    private fun placeFor(mode: RecordMode): com.chencohensolution.transcriptor.location.MomentLocation? {
+    private fun placeFor(music: Boolean): com.chencohensolution.transcriptor.location.MomentLocation? {
         place = null
         val settings = Recording.settings
         val location = settings.location
         if (!location.stopByPlace && !location.savePath) return null
-        val profile = settings.profile(if (mode == RecordMode.Music) com.chencohensolution.transcriptor.settings.QualityProfile.Music else settings.activeProfile)
+        val profile = settings.profile(if (music) com.chencohensolution.transcriptor.settings.QualityProfile.Music else settings.activeProfile)
         val canLocate = locationAccess(this) != com.chencohensolution.transcriptor.ui.LocationAccess.None
         val stopOn = location.stopByPlace && profile.stopByPlace
         val m = momentLocation(

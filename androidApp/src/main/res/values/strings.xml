@@ -759,7 +759,6 @@
     <string name="notebooks_power_low">On charger</string>
     <string name="notebooks_power_normal">Right away</string>
     <string name="notebooks_record_music">Music</string>
-    <string name="notebooks_record_music_note">A concert: the Music settings, the mic without voice processing, no transcript.</string>
     <string name="settings_mic_builtin">One of the phone\'s microphones on its own</string>
     <string name="settings_mic_bottom">Bottom microphone</string>
     <string name="settings_mic_back">Back microphone (by the camera)</string>

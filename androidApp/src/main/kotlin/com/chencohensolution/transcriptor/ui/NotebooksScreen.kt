@@ -143,6 +143,8 @@ class NotebooksActions(
     val record: (labels: List<String>, language: String, mode: RecordMode) -> Unit = { _, _, _ -> },
     /** Keeps the Record bar's Live or After for next time. */
     val setRecordMode: (mode: RecordMode) -> Unit = {},
+    /** Music as the quality, or not (the Record bar's Music chip). */
+    val setRecordMusic: (Boolean) -> Unit = {},
     /** Advanced mode's Record bar: applies a quality preset (Settings › Recording format). */
     val setQuality: (com.chencohensolution.transcriptor.settings.QualityProfile) -> Unit = {},
     /** Advanced mode's Record bar: applies a battery preset. */
@@ -270,6 +272,8 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
     var choosingLabels by remember { mutableStateOf(false) }
     var choosingLanguage by remember { mutableStateOf(false) }
     var recordMode by rememberSaveable { mutableStateOf(state.recordMode) }
+    var recordMusic by rememberSaveable { mutableStateOf(state.recordMusic) }
+    val setMusic = { on: Boolean -> recordMusic = on; actions.setRecordMusic(on) }
     // Search: the query while the search bar is open (null: closed), and what it found (null: still looking).
     var query by rememberSaveable { mutableStateOf<String?>(null) }
     var hits by remember { mutableStateOf<List<SearchHit>?>(emptyList()) }
@@ -476,6 +480,7 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                     AssistChip(
                                         onClick = { modeMenu = true },
                                         label = { Text(stringResource(modeLabel(recordMode)), maxLines = 1) },
+                                        leadingIcon = if (recordMusic) ({ Icon(Icons.Filled.MusicNote, stringResource(R.string.notebooks_record_music), Modifier.size(16.dp)) }) else null,
                                         trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) },
                                         modifier = Modifier.padding(start = 8.dp),
                                     )
@@ -505,7 +510,6 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                                         RecordMode.Live -> R.string.notebooks_record_live_note
                                         RecordMode.After -> R.string.notebooks_record_after_note
                                         RecordMode.Only -> R.string.notebooks_record_only_note
-                                        RecordMode.Music -> R.string.notebooks_record_music_note
                                     },
                                 ),
                                 style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -517,17 +521,24 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                             if (panelOpen) FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 listOf(
                                     RecordMode.Live to R.string.notebooks_record_live, RecordMode.After to R.string.notebooks_record_after,
-                                    RecordMode.Only to R.string.notebooks_record_only, RecordMode.Music to R.string.notebooks_record_music,
+                                    RecordMode.Only to R.string.notebooks_record_only,
                                 ).forEach { (mode, label) ->
                                     FilterChip(
                                         selected = recordMode == mode, onClick = { recordMode = mode; actions.setRecordMode(mode) },
                                         label = { Text(stringResource(label)) }, colors = recordChipColors(),
-                                        leadingIcon = if (mode == RecordMode.Music) ({ Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) }) else null,
                                     )
                                 }
+                                // Without Advanced mode there is no quality row: Music is a chip of its own here,
+                                // on or off beside the mode.
+                                if (state.recordingChoice == null) FilterChip(
+                                    selected = recordMusic, onClick = { setMusic(!recordMusic) },
+                                    label = { Text(stringResource(R.string.notebooks_record_music)) }, colors = recordChipColors(),
+                                    leadingIcon = { Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) },
+                                    modifier = Modifier.padding(start = 6.dp),
+                                )
                             }
                             }
-                            if (panelOpen) state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode, actions) }
+                            if (panelOpen) state.recordingChoice?.let { choice -> RecordPresets(choice, state, recordMode, recordMusic, setMusic, actions) }
                             Button(
                                 onClick = { actions.record(nextLabels, language, recordMode); chosen = null }, shape = RoundedCornerShape(16.dp),
                                 // Red, like the recording screen's Stop it turns into.
@@ -1135,16 +1146,15 @@ internal fun shortModelName(name: String): String {
 @Composable
 private fun RecordPresets(
     choice: com.chencohensolution.transcriptor.settings.RecordingChoice, state: NotebooksState,
-    mode: RecordMode, actions: NotebooksActions,
+    mode: RecordMode, music: Boolean, setMusic: (Boolean) -> Unit, actions: NotebooksActions,
 ) {
-    val music = mode == RecordMode.Music
     val saving = if (music) state.musicPowerSaving else state.powerSaving
     val shown = if (music) state.musicChoice ?: choice else choice
     val settings = if (music) state.musicSettings else state.activeSettings
     CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
     Column(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // With Music there is no quality to pick: the paragraph below says what it records (owner's call, Nov 17, 2026).
-        if (!music) Row(verticalAlignment = Alignment.CenterVertically) {
+        // Music is one of the qualities (owner's call, Nov 21, 2026): its own profile, transcribed by the mode above.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.notebooks_presets_quality), style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp).padding(start = 4.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
@@ -1152,8 +1162,12 @@ private fun RecordPresets(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
                     com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
                 ).forEach { (p, label) ->
-                    FilterChip(selected = state.activeProfile == p, onClick = { actions.setQuality(p) }, label = { Text(stringResource(label)) }, colors = recordChipColors())
+                    FilterChip(selected = !music && state.activeProfile == p, onClick = { setMusic(false); actions.setQuality(p) }, label = { Text(stringResource(label)) }, colors = recordChipColors())
                 }
+                FilterChip(
+                    selected = music, onClick = { setMusic(true) }, label = { Text(stringResource(R.string.notebooks_record_music)) }, colors = recordChipColors(),
+                    leadingIcon = { Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) },
+                )
             }
         }
         WhenRow(stringResource(R.string.notebooks_presets_battery), saving) { on ->
@@ -1265,5 +1279,4 @@ private fun modeLabel(mode: RecordMode) = when (mode) {
     RecordMode.Live -> R.string.notebooks_record_live
     RecordMode.After -> R.string.notebooks_record_after
     RecordMode.Only -> R.string.notebooks_record_only
-    RecordMode.Music -> R.string.notebooks_record_music
 }
