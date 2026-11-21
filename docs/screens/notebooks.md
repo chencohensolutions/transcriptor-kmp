@@ -62,7 +62,7 @@ The code still calls it `NotebooksScreen`.
 - **Music** (owner's request, Nov 17, 2026; `SettingsStore.recordMusic`): a concert. FLAC as it records at the High
   preset (48 kHz stereo 16 bit) whatever Recording format says, the microphone opened as `UNPROCESSED` where the phone
   supports it (else `CAMCORDER`). Since Nov 21, 2026 (hen's ask) it is a **quality**, not a mode: the last chip of the
-  Quality row (Low, Normal, High, Music), and it is transcribed by the mode like the others (Live, After or No
+  Quality row (Low, Normal, High, and Music as its note icon so the row fits one line), and it is transcribed by the mode like the others (Live, After or No
   transcript), so a lossless recording gets a transcript too. Without Advanced mode, where there is no Quality row, it
   is a chip of its own after the modes, on or off; folded, the mode chip shows a note icon while it is on. The Quick
   Settings tile follows both. The source used is in the moment's power details.

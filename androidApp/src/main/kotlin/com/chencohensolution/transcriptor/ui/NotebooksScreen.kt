@@ -1162,11 +1162,12 @@ private fun RecordPresets(
                     com.chencohensolution.transcriptor.settings.QualityProfile.Normal to R.string.notebooks_quality_normal,
                     com.chencohensolution.transcriptor.settings.QualityProfile.High to R.string.notebooks_quality_high,
                 ).forEach { (p, label) ->
-                    FilterChip(selected = !music && state.activeProfile == p, onClick = { setMusic(false); actions.setQuality(p) }, label = { Text(stringResource(label)) }, colors = recordChipColors())
+                    FilterChip(selected = !music && state.activeProfile == p, onClick = { if (music) setMusic(false); actions.setQuality(p) }, label = { Text(stringResource(label)) }, colors = recordChipColors())
                 }
+                // Music as its note alone, so the four fit one line (hen, Nov 21, 2026); the paragraph below names it.
                 FilterChip(
-                    selected = music, onClick = { setMusic(true) }, label = { Text(stringResource(R.string.notebooks_record_music)) }, colors = recordChipColors(),
-                    leadingIcon = { Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp)) },
+                    selected = music, onClick = { if (!music) setMusic(true) }, colors = recordChipColors(),
+                    label = { Icon(Icons.Filled.MusicNote, stringResource(R.string.notebooks_record_music), Modifier.size(18.dp)) },
                 )
             }
         }
@@ -1195,7 +1196,7 @@ private fun RecordPresets(
             // The codec's line kept in the chrome's direction as a whole, so the sentence's period lands after it.
             stringResource(
                 R.string.notebooks_summary,
-                qualityLine(shown, settings).let { if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "\u2067$it\u2069" else "\u2066$it\u2069" },
+                qualityLine(shown, settings).let { if (music) stringResource(R.string.notebooks_record_music) + " · " + it else it }.let { if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "\u2067$it\u2069" else "\u2066$it\u2069" },
                 compress, transcribe,
             ) + listOfNotNull(
                 stringResource(R.string.notebooks_summary_place_stop).takeIf { stopOn },
