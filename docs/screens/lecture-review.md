@@ -48,6 +48,13 @@ was unnamed, which the owner turned off (Nov 16, 2026).
 - **One person's turns**: with two or more speakers, a chip per person above the player. Tapping one plays only their
   turns, skipping the others' and pausing after their last (`LectureReview.playOnly`, `Lecture.onlyOf`,
   `ReviewState.onlySpeaker`); the others' turns and lanes fade. Tapping it again plays everyone.
+- **The player panel folds and scrolls** (hen's ask, Nov 21, 2026): many speakers made the overview's lanes (one per
+  speaker) push the text off the screen. A handle on top of the panel folds it to one strip: every line on one lane in
+  its speaker's color, the notes and the playhead, with play, the time, speed and note as before; the person whose
+  turns play shows as a chip beside the time (tap to hear everyone). Open, the people row stays on top and the lanes
+  show five at a time, scrolling under it, following who talks now (a fade says more are below). It starts folded with
+  six or more speakers, and folds by itself while editing or typing. Dragging on the lanes scrubs. Lab: `review
+  current-crowd` (twelve speakers).
 - **Share** opens a menu: **Share as text** (the moment as "Name: what they said", notes in brackets;
   `transcriptText`, `LectureReview.text`) or **Share as Word**. Holding it still saves the Word file.
 

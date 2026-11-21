@@ -44,7 +44,12 @@ class PlaceActions(
     val cancel: () -> Unit = {},
     /** "Set the place again here". */
     val here: () -> Unit = {},
+    /** The recording screen's switches: Stop when leaving, Stop when back here, Path. */
+    val set: (PlaceSwitch, on: Boolean) -> Unit = { _, _ -> },
 )
+
+/** The recording screen's location switches (owner's request, Nov 21, 2026). */
+enum class PlaceSwitch { Leave, Back, Path }
 
 /**
  * Stop by place and the path while recording, under the top bar (only when one of them is on for this moment): a
@@ -65,6 +70,7 @@ fun PlaceStatusBar(status: MomentLocation.Status, elapsedMillis: Long, actions: 
                         StopReason.Left -> stringResource(R.string.place_left)
                         StopReason.Arrived -> stringResource(R.string.place_arrived, w.place?.name ?: "")
                         StopReason.Device -> stringResource(R.string.place_device)
+                        StopReason.Returned -> stringResource(R.string.place_returned)
                     },
                     style = MaterialTheme.typography.titleSmall,
                 )
@@ -81,11 +87,13 @@ fun PlaceStatusBar(status: MomentLocation.Status, elapsedMillis: Long, actions: 
     val stop = when {
         w is PlaceWatch.State.NoFix && status.lastFixAt == null && elapsedMillis > 120_000 -> stringResource(R.string.place_status_no_fix)
         w is PlaceWatch.State.NoFix -> stringResource(R.string.place_status_finding)
-        w is PlaceWatch.State.Watching && leave != null -> stringResource(R.string.place_status_leaving, leave)
-        w is PlaceWatch.State.Watching -> stringResource(R.string.place_status_on)
+        w is PlaceWatch.State.Watching -> listOfNotNull(
+            leave?.let { stringResource(R.string.place_status_leaving, it) },
+            stringResource(R.string.place_status_back).takeIf { status.returning },
+        ).joinToString(" · ").ifEmpty { stringResource(R.string.place_status_on) }
         else -> null
     }
-    val path = status.points?.let { stringResource(R.string.place_status_path) }
+    val path = stringResource(R.string.place_status_path).takeIf { status.pathOn }
     val line = listOfNotNull(stop, path).joinToString(" · ").ifEmpty { return }
     var asking by remember { mutableStateOf(false) }
     Row(

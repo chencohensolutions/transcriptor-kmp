@@ -19,7 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.WhereToVote
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Flag
@@ -122,6 +127,9 @@ internal fun RecordingGlance(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            // Location while it records (owner's request, Nov 21, 2026): stop when leaving here, stop when back here,
+            // and the path, each on or off at any time, with or without Settings › Advanced › Location.
+            if (!state.finishing) PlaceSwitches(place, placeActions.set)
             LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))
             // Which microphone, when it isn't the phone's own; the one picked in Settings when it isn't recording.
             val input = state.input
@@ -233,5 +241,30 @@ private fun RunningWords(state: LiveLectureState, partialColor: Color) {
             text, style = style, color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.fillMaxWidth().verticalScroll(scroll, enabled = false),
         )
+    }
+}
+
+/** Stop when I leave, Stop when back here and Path: three switches as chips, under the live transcript's. */
+@Composable
+private fun PlaceSwitches(place: com.chencohensolution.transcriptor.location.MomentLocation.Status?, set: (PlaceSwitch, Boolean) -> Unit) {
+    val leaving = place?.leaving == true
+    val back = place?.returning == true
+    val path = place?.pathOn == true
+    // One row (the glance has little height to spare), short names: the status line above says the rest once one is on.
+    Row(
+        Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+    ) {
+        listOf(
+            Triple(PlaceSwitch.Leave, leaving, R.string.glance_stop_leaving) to Icons.AutoMirrored.Filled.DirectionsWalk,
+            Triple(PlaceSwitch.Back, back, R.string.glance_stop_back) to Icons.Filled.WhereToVote,
+            Triple(PlaceSwitch.Path, path, R.string.glance_path) to Icons.Filled.Route,
+        ).forEach { (sw, icon) ->
+            val (which, on, label) = sw
+            androidx.compose.material3.FilterChip(
+                selected = on, onClick = { set(which, !on) },
+                label = { Text(stringResource(label), maxLines = 1) },
+                leadingIcon = { Icon(icon, null, Modifier.size(18.dp)) },
+            )
+        }
     }
 }

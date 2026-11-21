@@ -901,6 +901,13 @@
     <string name="place_status_path">Path</string>
     <string name="place_here">Set the place again here</string>
     <string name="place_cancel">Cancel for this recording</string>
+    <string name="place_returned">Back at the spot</string>
+    <string name="info_place_stop_returned">Came back to the spot</string>
+    <string name="place_status_back">Stops when back here</string>
+    <string name="glance_stop_leaving">Stop on leaving</string>
+    <string name="glance_stop_back">Stop back here</string>
+    <string name="glance_path">Path</string>
+    <string name="glance_location_denied">Location isn’t allowed: the switches need it</string>
     <string name="place_close">Close</string>
     <string name="info_place_stop">Stopped by itself</string>
     <string name="info_place_stop_left">Left the place</string>

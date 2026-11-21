@@ -93,6 +93,7 @@ fun MomentInfoSheet(info: MomentInfo, seek: (Long) -> Unit = {}, onDismiss: () -
                     when (s.reason) {
                         "arrived" -> stringResource(R.string.info_place_stop_arrived, s.placeName ?: "")
                         "device" -> stringResource(R.string.info_place_stop_device)
+                        "returned" -> stringResource(R.string.info_place_stop_returned)
                         else -> stringResource(R.string.info_place_stop_left)
                     } + " · " + formatClock(s.atMillis),
                 )

@@ -290,3 +290,13 @@ anything left to decide. Remove an entry once it is built.
   precision maps to significant-change or `kCLLocationAccuracyReduced`, the precise levels to `kCLLocationAccuracyBest`
   at 1 Hz; the device trigger to the car's Bluetooth (CarPlay or audio route change).
 
+
+## Location switches while recording, folding player panel (Nov 21, 2026)
+
+- Glance: Stop on leaving, Stop back here and Path chips: `MomentLocation.setLeaving` / `setReturning` / `setPath`,
+  `Status.leaving` / `returning` / `pathOn`, `StopReason.Returned`; ask for location on the first one. Mirror
+  `RecordingGlance.kt` (`PlaceSwitches`) and `RecordingService.setPlace`.
+- Review: the player panel's handle folds it to one strip; lanes capped at five and scrolling. Mirror
+  `ReviewScreen.kt` (`FoldHandle`, `Overview(single)`). Strings `review_fold_speakers`, `review_open_speakers`,
+  `review_everyone`, `glance_stop_leaving`, `glance_stop_back`, `glance_path`, `place_returned`, `place_status_back`.
+- List rows: no + label button (holding selects for the labels sheet).

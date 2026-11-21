@@ -190,6 +190,20 @@ class MainActivity : ComponentActivity() {
                     shown == "first" -> FirstRun(onDone = { firstRun = false })
                     shown == "live" && state != null -> {
                         BackHandler { showLive = false }
+                        // A location switch turned on without the permission: asked for, then turned on when granted.
+                        var askedFor by remember { mutableStateOf<com.chencohensolution.transcriptor.ui.PlaceSwitch?>(null) }
+                        val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) {
+                            val which = askedFor
+                            askedFor = null
+                            if (which != null && locationAccess(this@MainActivity) != com.chencohensolution.transcriptor.ui.LocationAccess.None) placeSwitchNow(which, true)
+                            else android.widget.Toast.makeText(this@MainActivity, R.string.glance_location_denied, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                        val placeSwitch = { which: com.chencohensolution.transcriptor.ui.PlaceSwitch, on: Boolean ->
+                            if (on && locationAccess(this@MainActivity) == com.chencohensolution.transcriptor.ui.LocationAccess.None) {
+                                askedFor = which
+                                askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                            } else placeSwitchNow(which, on)
+                        }
                         // Settings › Advanced; read when the screen opens (Settings is another screen).
                         val meterStyle = remember { Recording.settings.processorMeters }
                         val stopTwice = remember { Recording.settings.stopTwice }
@@ -218,6 +232,7 @@ class MainActivity : ComponentActivity() {
                                 stopNow = { openAfterStop = true; RecordingService.stop(this@MainActivity) },
                                 cancel = { RecordingService.cancelPlaceStop(this@MainActivity) },
                                 here = { RecordingService.placeHere(this@MainActivity) },
+                                set = { which, on -> placeSwitch(which, on) },
                             ),
                         )
                     }
@@ -497,6 +512,16 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Opens on the moment recording now, if one is (else on the moments). */
         const val EXTRA_SHOW_RECORDING = "showRecording"
+    }
+    /** A location switch of the recording screen, to the recording. */
+    private fun placeSwitchNow(which: com.chencohensolution.transcriptor.ui.PlaceSwitch, on: Boolean) {
+        RecordingService.setPlace(
+            this, when (which) {
+                com.chencohensolution.transcriptor.ui.PlaceSwitch.Leave -> RecordingService.PLACE_LEAVE
+                com.chencohensolution.transcriptor.ui.PlaceSwitch.Back -> RecordingService.PLACE_BACK
+                com.chencohensolution.transcriptor.ui.PlaceSwitch.Path -> RecordingService.PLACE_PATH
+            }, on,
+        )
     }
 }
 
