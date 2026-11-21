@@ -341,14 +341,15 @@ class RecordingService : Service() {
         if (Recording.backup.callMoments) {
             val (percent, plugged) = Recording.battery(this)
             if (Recording.callsNow || (plugged && percent >= com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY)) {
-                for (id in Recording.backup.callsWaitingForText()) {
-                    if (id in callsFailed) continue
-                    val lecture = Recording.store.load(id) ?: continue
-                    if (!Recording.store.hasAudio(lecture)) continue
-                    val model = Recording.improveModelFor(lecture.language) ?: continue
-                    refine(lecture, model.id)
+                val next = Recording.nextCallToTranscribe(callsFailed)
+                if (next != null) {
+                    refine(next.first, next.second.id)
                     return true
                 }
+            } else if (Recording.backup.callsWaitingForText().isNotEmpty()) {
+                // Not on the charger now: the job takes them on the next charge (it ran once already and is done).
+                android.util.Log.i("RecordingService", "calls wait for the charger: charging=$plugged battery=$percent%")
+                runCatching { CallsTranscribeJob.schedule(this) }
             }
             Recording.callsNowDone(this)
         }

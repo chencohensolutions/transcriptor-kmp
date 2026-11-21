@@ -73,7 +73,9 @@ without a server.
   the phone's file (`Lecture.callFile`, read through the documents provider under `/calls`), never copied, moved,
   freed or deleted. **Transcribe on the phone before uploading** (on by default): a call waits for its transcript
   before it is handed to shed (`heldCalls`); the transcribe pass takes calls newest first on the charger from 30%
-  (`CallsTranscribeJob`, or the app opened on the charger), then hands each over as the call it is, and its moment's
+  (`CallsTranscribeJob`, or the app opened on the charger; when Android won't let the job start the transcribe service
+  from the background, the app not being Battery › Unrestricted, the job transcribes the calls itself until unplugged and
+  runs again on the next charge; `Recording.nextCallToTranscribe` logs why waiting calls can't be taken), then hands each over as the call it is, and its moment's
   words go as that call's note. "12 calls waiting to be transcribed before uploading"; **Upload now** transcribes them
   first whatever the charger says ("Transcribing calls before uploading · 5 left"), sending each as it is done;
   **Upload without transcription** sends them now as they are (the words follow in the note). A call handed over
