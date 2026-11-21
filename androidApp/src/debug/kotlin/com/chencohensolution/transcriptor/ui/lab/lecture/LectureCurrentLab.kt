@@ -28,9 +28,17 @@ internal val lectureCurrentGlance = LabOption("current-glance", "The app's, at a
     )
     LectureScreen(
         state, actions, place = place,
-        placeActions = PlaceActions(set = { which, on ->
-            when (which) { PlaceSwitch.Leave -> leave = on; PlaceSwitch.Back -> back = on; PlaceSwitch.Path -> path = on }
-        }),
+        placeActions = PlaceActions(
+            set = { which, on ->
+                when (which) {
+                    PlaceSwitch.Leave -> { leave = on; if (on) back = false }
+                    PlaceSwitch.Back -> { back = on; if (on) leave = false }
+                    PlaceSwitch.Path -> path = on
+                }
+            },
+            backHere = { back = true; leave = false },
+            stops = true,
+        ),
     )
 }
 

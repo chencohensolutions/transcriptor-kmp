@@ -919,6 +919,7 @@
     <string name="glance_stop_back">עצירה בחזרה</string>
     <string name="glance_path">מסלול</string>
     <string name="glance_location_denied">אין הרשאת מיקום, והמתגים צריכים אותה</string>
+    <string name="glance_back_set">הנקודה נקבעה כאן</string>
     <string name="place_close">לסגור</string>
     <string name="info_place_stop">נעצרה מעצמה</string>
     <string name="info_place_stop_left">יציאה מהמקום</string>

@@ -190,6 +190,7 @@ class MainActivity : ComponentActivity() {
                     shown == "first" -> FirstRun(onDone = { firstRun = false })
                     shown == "live" && state != null -> {
                         BackHandler { showLive = false }
+                        val advancedMode = remember { Recording.settings.advancedMode }
                         // A location switch turned on without the permission: asked for, then turned on when granted.
                         var askedFor by remember { mutableStateOf<com.chencohensolution.transcriptor.ui.PlaceSwitch?>(null) }
                         val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) {
@@ -233,6 +234,11 @@ class MainActivity : ComponentActivity() {
                                 cancel = { RecordingService.cancelPlaceStop(this@MainActivity) },
                                 here = { RecordingService.placeHere(this@MainActivity) },
                                 set = { which, on -> placeSwitch(which, on) },
+                                backHere = {
+                                    placeSwitch(com.chencohensolution.transcriptor.ui.PlaceSwitch.Back, true)
+                                    android.widget.Toast.makeText(this@MainActivity, R.string.glance_back_set, android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                stops = advancedMode,
                             ),
                         )
                     }

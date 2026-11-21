@@ -46,6 +46,10 @@ class PlaceActions(
     val here: () -> Unit = {},
     /** The recording screen's switches: Stop when leaving, Stop when back here, Path. */
     val set: (PlaceSwitch, on: Boolean) -> Unit = { _, _ -> },
+    /** Holding Stop back here: its spot is here again (and it is on). */
+    val backHere: () -> Unit = {},
+    /** The two stop switches show (Advanced mode); Path shows always. */
+    val stops: Boolean = false,
 )
 
 /** The recording screen's location switches (owner's request, Nov 21, 2026). */

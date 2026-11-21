@@ -380,6 +380,10 @@ class StopByPlaceTest {
         assertEquals(LocationSettings.DEFAULT_STOP_METERS, s.leaveMeters)
         s = m.setReturning(true, 12_000)
         assertTrue(s.returning)
+        assertFalse(s.leaving) // one stop at a time
+        s = m.setLeaving(true, 12_500)
+        assertTrue(s.leaving)
+        assertFalse(s.returning)
         s = m.setPath(false, 13_000)
         assertFalse(s.pathOn)
         m.fix(fix(20, 8.0))

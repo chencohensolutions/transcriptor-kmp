@@ -908,6 +908,7 @@
     <string name="glance_stop_back">Stop back here</string>
     <string name="glance_path">Path</string>
     <string name="glance_location_denied">Location isn’t allowed: the switches need it</string>
+    <string name="glance_back_set">The spot is set here</string>
     <string name="place_close">Close</string>
     <string name="info_place_stop">Stopped by itself</string>
     <string name="info_place_stop_left">Left the place</string>

@@ -111,8 +111,10 @@ starts afresh. Amber from 70%, red from 90%.
 
 ## Behavior
 
-- **Location switches** (hen's ask, Nov 21, 2026): a row of three chips under the live chip on the glance, with or
-  without Settings › Advanced › Location: **Stop on leaving** (leaving is measured from where the phone is now, at the
+- **Location switches** (hen's ask, Nov 21, 2026): a row of chips under the live chip on the glance, with or
+  without Settings › Advanced › Location. **Path** shows always; the two stops show in Advanced mode only
+  (`SettingsStore.advancedMode`), and only one of them is on at a time (turning one on turns the other off; both can
+  be off). Holding **Stop back here** sets its spot where the phone is now, and turns it on. **Stop on leaving** (leaving is measured from where the phone is now, at the
   Advanced page's distance, 250 m by default), **Stop back here** (where the phone is now is the spot; once the phone
   has been 150 m away, coming back within 50 m starts the usual countdown; `PlaceWatch.setReturning`,
   `StopReason.Returned`) and **Path** (saves the path from now, or pauses it; without the Advanced page's path, GPS

@@ -140,14 +140,22 @@ class MomentLocation(
         return publish(nowMillis)
     }
 
-    /** The recording screen's "Stop when leaving": leaving is measured from here (the last good fix, else the next). */
+    /**
+     * The recording screen's "Stop when leaving": leaving is measured from here (the last good fix, else the next).
+     * One of it and back here is on at a time (owner's call, Nov 21, 2026): on turns back here off.
+     */
     fun setLeaving(on: Boolean, nowMillis: Long): Status {
+        if (on && watch.returning) watch.setReturning(false, null)
         watch.setLeaving(on, settings.leaveMeters, lastGood?.takeIf { nowMillis - it.atMillis < 120_000 })
         return publish(nowMillis)
     }
 
-    /** The recording screen's "Stop when back here": here is the spot (the last good fix, else the next). */
+    /**
+     * The recording screen's "Stop when back here": here is the spot (the last good fix, else the next); on again sets
+     * the spot here again (its long-press). On turns leaving off.
+     */
     fun setReturning(on: Boolean, nowMillis: Long): Status {
+        if (on && watch.leaving) watch.setLeaving(false, settings.leaveMeters, null)
         watch.setReturning(on, lastGood?.takeIf { nowMillis - it.atMillis < 120_000 })
         return publish(nowMillis)
     }
