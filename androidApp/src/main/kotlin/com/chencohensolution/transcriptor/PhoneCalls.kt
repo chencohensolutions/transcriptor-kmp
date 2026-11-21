@@ -14,12 +14,15 @@ import com.chencohensolution.transcriptor.backup.CallLogEntry
 import com.chencohensolution.transcriptor.notebook.CALL_IN
 import com.chencohensolution.transcriptor.notebook.CALL_OUT
 import com.chencohensolution.transcriptor.settings.ENCODE_MIN_BATTERY
+import com.chencohensolution.transcriptor.speech.RefinePass
 import com.chencohensolution.transcriptor.storage.LIBRARY_ROOT
 import com.chencohensolution.transcriptor.storage.SafFileSystem
 import okio.FileSystem
 import okio.ForwardingFileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
@@ -92,26 +95,88 @@ object PhoneCalls {
 /**
  * Transcribing the phone's calls on the charger with [ENCODE_MIN_BATTERY]% battery: the system starts this job once the
  * phone charges (the app needn't be open), and it starts the transcribe pass ([RecordingService.improvePending]). When
- * Android doesn't let the app start it from the background, the calls wait for the app to be opened on the charger.
+ * Android doesn't let the app start that from the background (the app isn't Battery › Unrestricted), the job
+ * transcribes the calls itself, one after another, until the phone is unplugged, the system stops the job, or none is
+ * left; then it asks to run again on the next charge.
  */
 class CallsTranscribeJob : JobService() {
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    /** The system stopped the job (or the phone was unplugged): the call being transcribed stops at its next line. */
+    @Volatile private var stopped = false
+
     override fun onStartJob(params: JobParameters): Boolean {
         val (percent, charging) = Recording.battery(this)
         val waiting = runCatching { Recording.backup.callMoments && Recording.backup.callsWaitingForText().isNotEmpty() }.getOrDefault(false)
         if (!waiting) return false
         if (!charging || percent < ENCODE_MIN_BATTERY || Recording.session.isRecording || Recording.refining.value != null) {
+            android.util.Log.i(TAG, "calls wait: charging=$charging battery=$percent% recording=${Recording.session.isRecording} busy=${Recording.refining.value != null}")
             jobFinished(params, true)
             return true
         }
-        runCatching { RecordingService.improvePending(this) }
-            .onFailure { android.util.Log.w("CallsTranscribeJob", "not allowed to start transcribing from the background", it) }
-        return false
+        val started = runCatching { RecordingService.improvePending(this) }
+            .onFailure { android.util.Log.w(TAG, "not allowed to start transcribing from the background: transcribing here", it) }
+            .isSuccess
+        if (started) return false
+        stopped = false
+        scope.launch {
+            val more = runCatching { transcribeCalls() }.onFailure { android.util.Log.e(TAG, "transcribing calls failed", it) }.getOrDefault(true)
+            // Calls left (unplugged, stopped, or one failed): again on the next charge.
+            jobFinished(params, more)
+        }
+        return true
     }
 
-    override fun onStopJob(params: JobParameters) = true
+    override fun onStopJob(params: JobParameters): Boolean {
+        stopped = true
+        return true
+    }
+
+    /** Transcribes the waiting calls newest first; true when some are left for later. */
+    private suspend fun transcribeCalls(): Boolean {
+        val failed = mutableSetOf<String>()
+        while (true) {
+            val (percent, charging) = Recording.battery(this)
+            if (stopped || !charging || percent < ENCODE_MIN_BATTERY || Recording.session.isRecording || Recording.refining.value != null) return true
+            val next = Recording.nextCallToTranscribe(failed) ?: return Recording.backup.callsWaitingForText().any { it !in failed }.also {
+                if (it) android.util.Log.i(TAG, "calls left that can't be transcribed now")
+            }
+            val (lecture, model) = next
+            if (!Recording.npuGuard.fitsNow(model)) {
+                android.util.Log.i(TAG, "not enough free memory for ${model.name} now: calls wait")
+                return true
+            }
+            Recording.refining.value = lecture.id to 0f
+            try {
+                Recording.audioHere(lecture)
+                val done = Recording.refine(
+                    lecture, model.id,
+                    progress = { p -> Recording.refining.value = lecture.id to p },
+                    stop = { stopped || Recording.session.isRecording || !Recording.battery(this).second },
+                )
+                android.util.Log.i(TAG, "call ${lecture.id} transcribed: ${done.segments.size} lines")
+                if (done.callFile != null && !done.pendingTranscript) Recording.callTranscribed(this)
+            } catch (e: RefinePass.Stopped) {
+                Recording.modelReleased()
+                return true
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "transcribing call ${lecture.id} failed", e)
+                failed += lecture.id
+            } finally {
+                Recording.refining.value = null
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        stopped = true
+        scope.cancel()
+        super.onDestroy()
+    }
 
     companion object {
         private const val ID = 4402
+        private const val TAG = "CallsTranscribeJob"
 
         /** Asks the system to run the job on the charger (once; again on boot), unless it is already scheduled. */
         fun schedule(context: Context) {

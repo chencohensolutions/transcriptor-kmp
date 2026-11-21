@@ -223,6 +223,33 @@ object Recording {
     /** The model that improves [language]: the one chosen in Settings if it is downloaded, else the first that is. */
     fun improveModelFor(language: String): SpeechModel? = ModelChoices.running(refineModels(language), settings.refineModel(language), models::isReady)
 
+    /**
+     * The newest call waiting for its transcript that can be transcribed now, with its model; null when none can. Each
+     * one skipped is logged with why (its moment gone, its audio not readable, no model for its language), since
+     * nothing else shows why calls stay untranscribed.
+     */
+    fun nextCallToTranscribe(skip: Set<String> = emptySet()): Pair<Lecture, SpeechModel>? {
+        val waiting = backup.callsWaitingForText()
+        var noAudio = 0
+        val noModel = mutableMapOf<String, Int>()
+        var gone = 0
+        for (id in waiting) {
+            if (id in skip) continue
+            val lecture = store.load(id)
+            if (lecture == null) { gone++; continue }
+            if (!store.hasAudio(lecture)) { noAudio++; continue }
+            val model = improveModelFor(lecture.language)
+            if (model == null) { noModel[lecture.language] = (noModel[lecture.language] ?: 0) + 1; continue }
+            return lecture to model
+        }
+        if (waiting.isNotEmpty()) android.util.Log.w(
+            "Recording",
+            "${waiting.size} calls wait, none can be transcribed now: failed=${waiting.count { it in skip }} gone=$gone " +
+                "noAudio=$noAudio (calls folder readable: ${store.calls != null}) noModel=$noModel",
+        )
+        return null
+    }
+
     /** With nothing downloaded to improve [language] with: the model to get. */
     fun improveSuggestion(language: String): SpeechModel? =
         ModelChoices.improveSuggestion(modelLibrary.forLanguage(language, SherpaNpuWhisperEngine.chip), models::isReady)
