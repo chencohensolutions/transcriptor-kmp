@@ -382,7 +382,8 @@ class MainActivity : ComponentActivity() {
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
-                setRecordMusic = { on -> io { Recording.settings.recordMusic = on } },
+                // On this thread, as the quality is: the two are set together when a quality chip is tapped.
+                setRecordMusic = { on -> Recording.settings.recordMusic = on },
                 setQuality = { profile ->
                     Recording.settings.activeProfile = profile
                     active = profile

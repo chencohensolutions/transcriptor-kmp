@@ -165,4 +165,17 @@ class RecordingPresetsTest {
         // Past the filter's start, the average (0.375) at full 24-bit resolution.
         assertEquals((0.375 * 8_388_607).toInt().toDouble(), PcmConvert.read24(out.pcm, 100).toDouble(), 2.0)
     }
+
+    @Test
+    fun aFileWithATailLeftByTwoWritesIsReadAndWrittenBackClean() {
+        val fs = FakeFileSystem()
+        val store = SettingsStore(fs, "/s".toPath())
+        store.recordMusic = true
+        val whole = fs.read("/s/settings.json".toPath()) { readUtf8() }
+        // What two writes at once left on the phone: the file, then the end of a longer one.
+        fs.write("/s/settings.json".toPath()) { writeUtf8(whole + "    \"sampleRate\": 48000,\n  }\n}") }
+        val again = SettingsStore(fs, "/s".toPath())
+        assertTrue(again.recordMusic)
+        assertEquals(whole.length, fs.read("/s/settings.json".toPath()) { readUtf8() }.length)
+    }
 }

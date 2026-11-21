@@ -1,5 +1,7 @@
 package com.chencohensolution.transcriptor.settings
 
+import kotlinx.atomicfu.locks.synchronized
+
 import com.chencohensolution.transcriptor.models.DefaultModels
 import com.chencohensolution.transcriptor.models.ModelChoices
 import kotlinx.serialization.SerialName
@@ -551,15 +553,53 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
         get() = read().modelLanguages
         set(value) = write(read().copy(modelLanguages = value.distinct()))
 
-    private fun read(): SettingsFileV1 =
-        if (fileSystem.exists(file)) json.decodeFromString(fileSystem.read(file) { readUtf8() }) else SettingsFileV1()
+    private fun read(): SettingsFileV1 = synchronized(FILE_LOCK) {
+        if (!fileSystem.exists(file)) return@synchronized SettingsFileV1()
+        val text = fileSystem.read(file) { readUtf8() }
+        try {
+            json.decodeFromString(text)
+        } catch (e: kotlinx.serialization.SerializationException) {
+            // Two writes at once (before FILE_LOCK) could leave a whole file followed by the tail of a longer one: the
+            // first object is kept, and written back clean. Anything else wrong is still an error.
+            val end = firstObjectEnd(text) ?: throw e
+            json.decodeFromString<SettingsFileV1>(text.substring(0, end)).also { write(it) }
+        }
+    }
 
-    private fun write(settings: SettingsFileV1) {
+    /**
+     * One write at a time, from any thread and any store on the same file: two at once wrote the same temp file and
+     * the second move found it gone (the crash on tapping a quality, Nov 21, 2026).
+     */
+    private fun write(settings: SettingsFileV1) = synchronized(FILE_LOCK) {
         fileSystem.createDirectories(root)
         val temp = root / "settings.json.tmp"
         fileSystem.write(temp) { writeUtf8(json.encodeToString(settings)) }
         fileSystem.atomicMove(temp, file)
     }
+
+    private companion object {
+        val FILE_LOCK = kotlinx.atomicfu.locks.SynchronizedObject()
+    }
+}
+
+/** Where the first top-level JSON object in [text] ends (one past its closing brace), strings skipped; null if none closes. */
+internal fun firstObjectEnd(text: String): Int? {
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for ((i, c) in text.withIndex()) {
+        when {
+            inString -> when {
+                escaped -> escaped = false
+                c == '\\' -> escaped = true
+                c == '"' -> inString = false
+            }
+            c == '"' -> inString = true
+            c == '{' -> depth++
+            c == '}' -> { depth--; if (depth == 0) return i + 1 }
+        }
+    }
+    return null
 }
 
 /** How a moment records: transcribed as it records, after it stops, or not at all until the user asks. */
