@@ -111,6 +111,16 @@ starts afresh. Amber from 70%, red from 90%.
 
 ## Behavior
 
+- **Location switches** (hen's ask, Nov 21, 2026): a row of chips under the live chip on the glance, with or
+  without Settings › Advanced › Location. **Path** shows always; the two stops show in Advanced mode only
+  (`SettingsStore.advancedMode`), and only one of them is on at a time (turning one on turns the other off; both can
+  be off). Holding **Stop back here** sets its spot where the phone is now, and turns it on. **Stop on leaving** (leaving is measured from where the phone is now, at the
+  Advanced page's distance, 250 m by default), **Stop back here** (where the phone is now is the spot; once the phone
+  has been 150 m away, coming back within 50 m starts the usual countdown; `PlaceWatch.setReturning`,
+  `StopReason.Returned`) and **Path** (saves the path from now, or pauses it; without the Advanced page's path, GPS
+  while moving). The first one on asks for location when the app doesn't have it, and makes the recording a location
+  one (`RecordingService.setPlace`, `MomentLocation.setLeaving` / `setReturning` / `setPath`). The status line above
+  says what is on. Lab: `lecture current-glance` (switches in memory).
 - **Live transcription off and on** (hen's ask, Nov 16, 2026): a chip under the glance's status, "Transcribing live" /
   "Live transcript off", when a live model is on the phone for the language (`LiveLectureState.canTranscribe`,
   `LectureSession.setTranscribing`). Off ends the line being said and stops feeding the model (it stays loaded, so on is

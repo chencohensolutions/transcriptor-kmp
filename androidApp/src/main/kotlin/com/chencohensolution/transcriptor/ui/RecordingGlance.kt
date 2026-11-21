@@ -1,6 +1,10 @@
 package com.chencohensolution.transcriptor.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +23,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.WhereToVote
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Flag
@@ -122,6 +131,9 @@ internal fun RecordingGlance(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            // Location while it records (owner's request, Nov 21, 2026): stop when leaving here, stop when back here,
+            // and the path, each on or off at any time, with or without Settings › Advanced › Location.
+            if (!state.finishing) PlaceSwitches(place, placeActions.stops, placeActions.set, placeActions.backHere)
             LevelMeter(state.stereoMeter, state.levelMeter, Modifier.padding(top = 14.dp))
             // Which microphone, when it isn't the phone's own; the one picked in Settings when it isn't recording.
             val input = state.input
@@ -233,5 +245,48 @@ private fun RunningWords(state: LiveLectureState, partialColor: Color) {
             text, style = style, color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.fillMaxWidth().verticalScroll(scroll, enabled = false),
         )
+    }
+}
+
+/**
+ * Stop on leaving, Stop back here and Path: switches as chips under the live transcript's. The two stops show in
+ * Advanced mode only, and one of them is on at a time; holding Stop back here sets its spot here again. Path shows
+ * always (owner's calls, Nov 21, 2026).
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun PlaceSwitches(place: com.chencohensolution.transcriptor.location.MomentLocation.Status?, stops: Boolean, set: (PlaceSwitch, Boolean) -> Unit, backHere: () -> Unit) {
+    val leaving = place?.leaving == true
+    val back = place?.returning == true
+    val path = place?.pathOn == true
+    // One row (the glance has little height to spare), short names: the status line above says the rest once one is on.
+    Row(
+        Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+    ) {
+        if (stops) {
+            SwitchChip(leaving, stringResource(R.string.glance_stop_leaving), Icons.AutoMirrored.Filled.DirectionsWalk, onClick = { set(PlaceSwitch.Leave, !leaving) })
+            SwitchChip(back, stringResource(R.string.glance_stop_back), Icons.Filled.WhereToVote, onClick = { set(PlaceSwitch.Back, !back) }, onLongClick = backHere)
+        }
+        SwitchChip(path, stringResource(R.string.glance_path), Icons.Filled.Route, onClick = { set(PlaceSwitch.Path, !path) })
+    }
+}
+
+/** A filter chip's look with a long-press too (Material's FilterChip has none). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SwitchChip(on: Boolean, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
+    val shape = RoundedCornerShape(8.dp)
+    androidx.compose.material3.Surface(
+        shape = shape,
+        color = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        contentColor = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        border = if (on) null else androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.height(32.dp).clip(shape).semantics { selected = on; role = androidx.compose.ui.semantics.Role.Switch }
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+    ) {
+        Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(label, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        }
     }
 }

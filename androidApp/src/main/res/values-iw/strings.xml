@@ -251,7 +251,6 @@
     <string name="models_npu_retry">לנסות שוב</string>
     <string name="models_others">נמצאו גם, לא שמישים כאן (%1$d)</string>
     <string name="notebooks_labels">תוויות</string>
-    <string name="notebooks_labels_more">תוויות…</string>
     <string name="notebooks_add">הוספת %1$s</string>
     <string name="notebooks_no_labels">בלי תוויות</string>
     <string name="notebooks_no_label_chip">בלי תווית (%1$d)</string>
@@ -444,6 +443,9 @@
     <string name="notebooks_people_more">%1$s ועוד %2$d</string>
     <string name="review_rename">שינוי שם הרגע</string>
     <string name="review_rename_save">שמירה</string>
+    <string name="review_fold_speakers">קיפול הדוברים</string>
+    <string name="review_open_speakers">פתיחת הדוברים</string>
+    <string name="review_everyone">כולם</string>
     <string name="review_add_labels">הוספת תוויות</string>
     <plurals name="notebooks_voices">
         <item quantity="one">קול אחד</item>
@@ -455,7 +457,6 @@
         <item quantity="two">עוד %1$d מקומות</item>
         <item quantity="other">עוד %1$d מקומות</item>
     </plurals>
-    <string name="notebooks_add_label_quiet">+ תווית</string>
     <string name="settings_advanced_note">מודלים לדוברים, ספריית המודלים, מדי מעבד</string>
     <string name="settings_library">מודלים</string>
     <string name="settings_meters_section">בזמן הקלטה</string>
@@ -911,6 +912,14 @@
     <string name="place_status_path">מסלול</string>
     <string name="place_here">לקבוע את המקום מחדש כאן</string>
     <string name="place_cancel">לבטל להקלטה הזאת</string>
+    <string name="place_returned">חזרת לנקודה</string>
+    <string name="info_place_stop_returned">חזרה לנקודה</string>
+    <string name="place_status_back">תיעצר בחזרה לכאן</string>
+    <string name="glance_stop_leaving">עצירה ביציאה</string>
+    <string name="glance_stop_back">עצירה בחזרה</string>
+    <string name="glance_path">מסלול</string>
+    <string name="glance_location_denied">אין הרשאת מיקום, והמתגים צריכים אותה</string>
+    <string name="glance_back_set">הנקודה נקבעה כאן</string>
     <string name="place_close">לסגור</string>
     <string name="info_place_stop">נעצרה מעצמה</string>
     <string name="info_place_stop_left">יציאה מהמקום</string>

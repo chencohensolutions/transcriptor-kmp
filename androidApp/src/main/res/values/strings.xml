@@ -251,7 +251,6 @@
     <string name="models_npu_retry">Try again</string>
     <string name="models_others">Also found, not usable here (%1$d)</string>
     <string name="notebooks_labels">Labels</string>
-    <string name="notebooks_labels_more">Labels…</string>
     <string name="notebooks_add">Add %1$s</string>
     <string name="notebooks_no_labels">No labels</string>
     <string name="notebooks_no_label_chip">No label (%1$d)</string>
@@ -440,6 +439,9 @@
     <string name="notebooks_people_more">%1$s and %2$d more</string>
     <string name="review_rename">Rename the moment</string>
     <string name="review_rename_save">Save</string>
+    <string name="review_fold_speakers">Fold the speakers</string>
+    <string name="review_open_speakers">Show the speakers</string>
+    <string name="review_everyone">Everyone</string>
     <string name="review_add_labels">Add labels</string>
     <plurals name="notebooks_voices">
         <item quantity="one">%1$d voice</item>
@@ -449,7 +451,6 @@
         <item quantity="one">%1$d more place</item>
         <item quantity="other">%1$d more places</item>
     </plurals>
-    <string name="notebooks_add_label_quiet">+ label</string>
     <string name="settings_advanced_note">Speaker models, the model library, processor meters</string>
     <string name="settings_library">Models</string>
     <string name="settings_meters_section">While recording</string>
@@ -900,6 +901,14 @@
     <string name="place_status_path">Path</string>
     <string name="place_here">Set the place again here</string>
     <string name="place_cancel">Cancel for this recording</string>
+    <string name="place_returned">Back at the spot</string>
+    <string name="info_place_stop_returned">Came back to the spot</string>
+    <string name="place_status_back">Stops when back here</string>
+    <string name="glance_stop_leaving">Stop on leaving</string>
+    <string name="glance_stop_back">Stop back here</string>
+    <string name="glance_path">Path</string>
+    <string name="glance_location_denied">Location isn’t allowed: the switches need it</string>
+    <string name="glance_back_set">The spot is set here</string>
     <string name="place_close">Close</string>
     <string name="info_place_stop">Stopped by itself</string>
     <string name="info_place_stop_left">Left the place</string>

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Times in are by the clock (epoch ms); [toRecording] turns one into the recording's own time.
  */
 class MomentLocation(
-    settings: LocationSettings,
+    private val settings: LocationSettings,
     /** Stop by place is on for this moment (the setting and its profile's). */
     stopOn: Boolean,
     /** The path is saved for this moment. */
@@ -46,13 +46,21 @@ class MomentLocation(
         val request: Request,
         /** The last fix of any accuracy, by the clock; null before the first. */
         val lastFixAt: Long?,
+        /** Stop when leaving is on (the recording screen's switch). */
+        val leaving: Boolean = false,
+        /** Stop when back here is on. */
+        val returning: Boolean = false,
+        /** The path is being saved now. */
+        val pathOn: Boolean = false,
     ) {
         val stopping get() = watch is PlaceWatch.State.Counting
     }
 
     private val config = settings.watchConfig(stopOn)
     private val watch = PlaceWatch(config)
-    private val path = if (pathOn && settings.savePath) PathBuilder { time(it) } else null
+    private var path = if (pathOn && settings.savePath) PathBuilder { time(it) } else null
+    /** The path is saved now: [setPath] can pause it (its points so far are kept). */
+    private var pathSaving = path != null
 
     /** After Stop, while the path goes on: when the audio ended (recording ms and clock), until when, and the places that end it. */
     private class Keeping(val audioEndMillis: Long, val stoppedAtClock: Long, val endsAtClock: Long, val arrival: PlaceWatch?)
@@ -60,7 +68,8 @@ class MomentLocation(
 
     /** A clock time in the recording's time: past the audio's end once it stopped. */
     private fun time(clock: Long): Long = keeping?.let { it.audioEndMillis + (clock - it.stoppedAtClock) } ?: toRecording(clock)
-    private val precision = settings.pathPrecision
+    /** A path turned on from the recording screen without Settings' path: GPS while moving, so it has a path to show. */
+    private var precision = settings.pathPrecision
     private val moving = MovingSwitch()
     private var lastGood: Fix? = null
     private var lastFixAt: Long? = null
@@ -69,13 +78,13 @@ class MomentLocation(
      * The minute's fix should be a precise one (GPS waking once a minute) rather than Wi-Fi's: a 100 m stop needs
      * fixes good to 50 m, which Wi-Fi often isn't.
      */
-    val minutePrecise = (config.leaveMeters ?: Int.MAX_VALUE) <= 100
+    val minutePrecise get() = (watch.leaveMeters ?: Int.MAX_VALUE) <= 100 || watch.returning
 
     /** Anything to do at all: when false the platform listens to nothing. */
-    val active = config.anything || path != null
+    val active get() = watch.state !is PlaceWatch.State.Off || config.device || pathSaving
 
     /** Location fixes are needed (not only the device trigger). */
-    val needsFixes = config.needsFixes || path != null
+    val needsFixes get() = watch.needsFixes || pathSaving
 
     private val _status = MutableStateFlow(status(0L))
     val status: StateFlow<Status> = _status.asStateFlow()
@@ -86,7 +95,7 @@ class MomentLocation(
         if (fix.atMillis < startedAtMillis - FRESH_MILLIS) return _status.value
         lastFixAt = fix.atMillis
         if (fix.accuracyM <= 50f) lastGood = fix
-        path?.add(fix)
+        if (pathSaving) path?.add(fix)
         if (precision == PathPrecision.WhileMoving) moving.update(fix)
         val k = keeping
         if (k != null) k.arrival?.fix(fix) else watch.fix(fix)
@@ -100,7 +109,7 @@ class MomentLocation(
     }
 
     /** Precise while moving is the path's precision: the platform arms the motion sensor. */
-    val wantsMotion get() = precision == PathPrecision.WhileMoving && path != null
+    val wantsMotion get() = precision == PathPrecision.WhileMoving && pathSaving
 
     fun deviceConnected(nowMillis: Long): Status {
         watch.deviceConnected(nowMillis)
@@ -132,12 +141,42 @@ class MomentLocation(
     }
 
     /**
+     * The recording screen's "Stop when leaving": leaving is measured from here (the last good fix, else the next).
+     * One of it and back here is on at a time (owner's call, Nov 21, 2026): on turns back here off.
+     */
+    fun setLeaving(on: Boolean, nowMillis: Long): Status {
+        if (on && watch.returning) watch.setReturning(false, null)
+        watch.setLeaving(on, settings.leaveMeters, lastGood?.takeIf { nowMillis - it.atMillis < 120_000 })
+        return publish(nowMillis)
+    }
+
+    /**
+     * The recording screen's "Stop when back here": here is the spot (the last good fix, else the next); on again sets
+     * the spot here again (its long-press). On turns leaving off.
+     */
+    fun setReturning(on: Boolean, nowMillis: Long): Status {
+        if (on && watch.leaving) watch.setLeaving(false, settings.leaveMeters, null)
+        watch.setReturning(on, lastGood?.takeIf { nowMillis - it.atMillis < 120_000 })
+        return publish(nowMillis)
+    }
+
+    /** The recording screen's "Path": saves the path from now, or pauses it (what it has stays). */
+    fun setPath(on: Boolean, nowMillis: Long): Status {
+        if (on && path == null) {
+            path = PathBuilder { time(it) }
+            if (!settings.savePath && precision == PathPrecision.Passive) precision = PathPrecision.WhileMoving
+        }
+        pathSaving = on && path != null
+        return publish(nowMillis)
+    }
+
+    /**
      * The audio stopped at [audioEndMillis] (now, [nowMillis] by the clock) and the path goes on ("Keep saving the path
      * after stopping") until [until]: a time, or arriving at one of [places] (at most [KeepUntil.SavedPlace]'s time).
      * Stop by place does nothing more. Returns false when there is no path to keep.
      */
     fun keepGoing(nowMillis: Long, audioEndMillis: Long, until: KeepUntil, places: List<SavedPlace>): Boolean {
-        if (path == null) return false
+        if (path == null || !pathSaving) return false
         val arrival = if (until == KeepUntil.SavedPlace && places.isNotEmpty()) PlaceWatch(PlaceWatch.Config(arrive = places)) else null
         // Seen where it stopped: a place it stopped in isn't arrived at again until it has left it.
         lastGood?.let { arrival?.fix(it) }
@@ -173,10 +212,13 @@ class MomentLocation(
         val w = watch.state
         return Status(
             watch = w,
-            leaveMeters = config.leaveMeters.takeIf { w !is PlaceWatch.State.Off },
+            leaveMeters = watch.leaveMeters.takeIf { w !is PlaceWatch.State.Off },
             points = path?.size,
             request = request(w, nowMillis),
             lastFixAt = lastFixAt,
+            leaving = watch.leaving && w !is PlaceWatch.State.Off,
+            returning = watch.returning && w !is PlaceWatch.State.Off,
+            pathOn = pathSaving,
         )
     }
 
@@ -189,7 +231,7 @@ class MomentLocation(
     }
 
     private fun pathRequest(nowMillis: Long): Request = when {
-        path == null -> Request.None
+        !pathSaving -> Request.None
         precision == PathPrecision.Precise -> Request.EverySecond
         precision == PathPrecision.WhileMoving && moving.on(nowMillis) -> Request.EverySecond
         // Standing: the motion sensor wakes it at the first steps; without one, a fix a minute notices the walk.
@@ -199,7 +241,7 @@ class MomentLocation(
     }
 
     private fun watchRequest(w: PlaceWatch.State): Request = when {
-        !config.needsFixes || w is PlaceWatch.State.Off || w is PlaceWatch.State.Stop -> Request.None
+        !watch.needsFixes || w is PlaceWatch.State.Off || w is PlaceWatch.State.Stop -> Request.None
         // A first fix to anchor to, as soon as the phone can give one.
         w is PlaceWatch.State.NoFix -> Request.EverySecond
         else -> Request.Minute

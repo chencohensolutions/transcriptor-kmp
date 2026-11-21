@@ -317,4 +317,77 @@ class StopByPlaceTest {
         assertEquals(10, store.pathFromServerNote(with)?.points?.size)
         assertEquals(lecture.copy(segments = emptyList()), store.fromServerNote(with))
     }
+
+    @Test
+    fun backHereStopsOnlyAfterGoingAwayAndComingBack() {
+        val w = PlaceWatch(PlaceWatch.Config())
+        assertEquals(State.Off, w.state)
+        w.setReturning(true, fix(0, 0.0))
+        assertTrue(w.returning)
+        assertIs<State.Watching>(w.state)
+        // Drift around the spot doesn't arm it.
+        w.fix(fix(60, 30.0)); w.fix(fix(130, 10.0))
+        assertIs<State.Watching>(w.state)
+        w.fix(fix(600, 400.0)) // away
+        w.fix(fix(1200, 20.0)) // back: the first fix inside
+        assertIs<State.Watching>(w.state)
+        val counting = assertIs<State.Counting>(w.fix(fix(1261, 5.0)))
+        assertEquals(StopReason.Returned, counting.reason)
+        // Keep recording turns it off.
+        w.keepRecording()
+        assertFalse(w.returning)
+        assertEquals(State.Off, w.state)
+    }
+
+    @Test
+    fun backHereWithoutAFixTakesTheNextGoodOne() {
+        val w = PlaceWatch(PlaceWatch.Config())
+        w.setReturning(true, null)
+        assertEquals(State.NoFix, w.state)
+        w.fix(fix(0, 0.0, acc = 200f)) // too rough to be the spot
+        assertEquals(State.NoFix, w.state)
+        w.fix(fix(10, 0.0))
+        assertIs<State.Watching>(w.state)
+    }
+
+    @Test
+    fun leavingTurnedOnWhileRecordingMeasuresFromHereAndOffEndsItsCountdown() {
+        val w = PlaceWatch(PlaceWatch.Config())
+        w.setLeaving(true, 100, fix(0, 500.0))
+        assertEquals(100, w.leaveMeters)
+        w.fix(fix(100, 560.0)) // within 100 m of where it was turned on
+        assertIs<State.Watching>(w.state)
+        w.fix(fix(200, 700.0))
+        assertIs<State.Counting>(w.fix(fix(261, 720.0)))
+        w.setLeaving(false, 100, null)
+        assertEquals(State.Off, w.state)
+        assertNull(w.leaveMeters)
+    }
+
+    @Test
+    fun recordingScreenSwitchesInAMomentWithNothingOn() {
+        val m = MomentLocation(LocationSettings(), stopOn = false, pathOn = false, toRecording = { it })
+        assertFalse(m.active)
+        m.fix(fix(0, 0.0))
+        var s = m.setPath(true, 1_000)
+        assertTrue(s.pathOn)
+        assertTrue(m.active && m.needsFixes)
+        assertTrue(m.wantsMotion) // no path precision set: GPS while moving
+        m.fix(fix(10, 5.0))
+        assertEquals(1, s.points?.let { m.status.value.points })
+        s = m.setLeaving(true, 11_000)
+        assertTrue(s.leaving)
+        assertEquals(LocationSettings.DEFAULT_STOP_METERS, s.leaveMeters)
+        s = m.setReturning(true, 12_000)
+        assertTrue(s.returning)
+        assertFalse(s.leaving) // one stop at a time
+        s = m.setLeaving(true, 12_500)
+        assertTrue(s.leaving)
+        assertFalse(s.returning)
+        s = m.setPath(false, 13_000)
+        assertFalse(s.pathOn)
+        m.fix(fix(20, 8.0))
+        assertEquals(1, m.status.value.points) // paused: the points so far stay
+        assertNotNull(m.path())
+    }
 }

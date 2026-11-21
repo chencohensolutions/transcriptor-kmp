@@ -15,8 +15,9 @@ The code still calls it `NotebooksScreen`.
   "n versions" when it keeps earlier transcripts, and the progress of a pass running on it.
   A title goes by its own first letter, else its language's direction.
 - **One list by date** (Nov 15, 2026): moments without labels are rows like the others, in Today / This week /
-  Earlier, with a quiet **Add <label>** (the one their time suggests) and **Labels…**, or **+ label**. The "No labels
-  yet" block is gone; the No label chip still narrows the list to them.
+  Earlier, with a quiet **Add <label>** when their time suggests one. The "No labels yet" block is gone; the No label
+  chip still narrows the list to them. The **Labels…** / **+ label** button on each row is gone too (hen's ask, Nov 21,
+  2026): holding a row selects it, and the tag icon opens the labels sheet.
 - **Each row says who and what** (`LectureSummary.people`, `unnamedPeople`, `preview`): the named speakers, the one who
   talked most first ("Dan, Hen, Maya and 1 more"), and the moment's first sentence of five words or more in quotes.
 - **Search** (the magnifier in the top bar; `NotebooksController.search`, `searchMoments`): titles, speakers' names,

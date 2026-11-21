@@ -53,6 +53,20 @@ internal val reviewCurrentConversation = LabOption("current-conversation", "The 
     ReviewScreen(state, actions)
 }
 
+// Fakes: as `current-conversation`, its lines shared among twelve made-up speakers: the player panel's lanes scroll
+// under the people row, and the panel starts folded (its handle opens it).
+internal val reviewCurrentCrowd = LabOption("current-crowd", "The app's, twelve speakers", "ReviewScreen with twelve speakers: the folding, scrolling player panel") {
+    val crowd = remember {
+        val c = LabData.conversation
+        c.copy(
+            speakers = List(12) { Speaker("speaker-${it + 1}", if (it == 0) "Hen" else "") },
+            segments = c.segments.mapIndexed { i, l -> l.copy(speakerId = "speaker-${i % 12 + 1}") },
+        )
+    }
+    val (state, actions) = rememberReviewLab(modelsDownloaded = true, sample = crowd)
+    ReviewScreen(state, actions)
+}
+
 // Fakes: as `current`, with an English conversation of four (LabData.conversation) as it opens after Stop: "Who was
 // here?" comes up by itself. Names, merging and the samples work in memory (a sample moves the playhead; no audio);
 // the known voices offered are made up.

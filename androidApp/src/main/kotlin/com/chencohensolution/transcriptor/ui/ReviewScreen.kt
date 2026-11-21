@@ -13,6 +13,15 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Share
 import com.chencohensolution.transcriptor.review.LectureReview
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -185,7 +194,7 @@ class ReviewActions(
  * times, the notes) and opens Android's share sheet; holding it, or ⋮ → Save as Word, saves it in the lecture's folder.
  * Delete lecture…, in red at the end of ⋮, asks first, then goes back to the list.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReviewScreen(
     state: ReviewState, actions: ReviewActions,
@@ -391,10 +400,18 @@ fun ReviewScreen(
             }
         }
         Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 2.dp) {
-            Column(Modifier.navigationBarsPadding().padding(top = 8.dp)) {
+            // Many speakers would push the transcript off the screen: the panel has a handle to fold it to one strip,
+            // its lanes scroll under the people row, and it folds by itself while editing or typing.
+            val people = state.people
+            val manyLanes = state.lecture.speakers.size > OVERVIEW_LANES
+            var folded by rememberSaveable(state.lecture.id) { mutableStateOf(manyLanes) }
+            val forced = editing || WindowInsets.isImeVisible
+            val shownFolded = folded || forced
+            val canFold = people.size >= 2 || manyLanes
+            Column(Modifier.navigationBarsPadding().animateContentSize()) {
+                if (canFold) FoldHandle(shownFolded, enabled = !forced) { folded = !folded } else Spacer(Modifier.height(8.dp))
                 // Tap a person to hear only their turns; again for everyone.
-                val people = state.people
-                if (people.size >= 2) LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (people.size >= 2 && !shownFolded) LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(people, key = { it.speakerId }) { p ->
                         val color = speakerColor(p.speakerId)
                         FilterChip(
@@ -404,10 +421,19 @@ fun ReviewScreen(
                         )
                     }
                 }
-                Overview(state, actions)
+                Overview(state, actions, single = shownFolded)
                 Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${formatClock(state.positionMillis)} / ${formatClock(state.lecture.durationMillis)}", style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.weight(1f).padding(start = 8.dp))
+                    Row(Modifier.weight(1f).padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${formatClock(state.positionMillis)} / ${formatClock(state.lecture.durationMillis)}", style = MaterialTheme.typography.labelMedium)
+                        // Folded, the person whose turns play stays in sight; tap to hear everyone again.
+                        val only = state.onlySpeaker?.takeIf { shownFolded }?.let { id -> people.firstOrNull { it.speakerId == id } }
+                        if (only != null) FilterChip(
+                            selected = true, onClick = { actions.playOnly(only.speakerId) }, modifier = Modifier.padding(start = 8.dp),
+                            label = { Text(speakerLabel(Speaker(only.speakerId, only.name)), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = { Box(Modifier.size(8.dp).clip(CircleShape).background(speakerColor(only.speakerId))) },
+                            trailingIcon = { Icon(Icons.Filled.Close, stringResource(R.string.review_everyone), Modifier.size(16.dp)) },
+                        )
+                    }
                     FilledIconButton(onClick = actions.playPause, modifier = Modifier.size(48.dp)) {
                         if (state.loading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = androidx.compose.material3.LocalContentColor.current)
                         else Icon(if (state.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, stringResource(if (state.playing) R.string.review_pause else R.string.review_play))
@@ -513,8 +539,32 @@ fun ReviewSpeakerChip(speaker: Speaker, modifier: Modifier = Modifier, onClick: 
 }
 
 /** The whole lecture, in time order left to right: a lane per speaker with their turns, the notes above, the playhead. */
+/** Lanes shown before the speakers' lanes scroll: five, as many as fit in [OVERVIEW_MAX_HEIGHT]. */
+private const val OVERVIEW_LANES = 5
+private val OVERVIEW_MAX_HEIGHT = (14 + 10 * OVERVIEW_LANES).dp
+
+/** The panel's handle: tap to fold it to one strip or open the speakers again. */
 @Composable
-private fun Overview(state: ReviewState, actions: ReviewActions) {
+private fun FoldHandle(folded: Boolean, enabled: Boolean, onToggle: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(20.dp).clickable(
+            enabled = enabled, role = Role.Button,
+            onClickLabel = stringResource(if (folded) R.string.review_open_speakers else R.string.review_fold_speakers),
+            onClick = onToggle,
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(32.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.4f else 0.2f)))
+    }
+}
+
+/**
+ * The moment at a glance: a lane per speaker with their lines, the notes and where it plays; tap or drag to seek.
+ * [single]: folded, every line on one lane in its speaker's color. More than [OVERVIEW_LANES] lanes scroll, following
+ * the speaker who talks now.
+ */
+@Composable
+private fun Overview(state: ReviewState, actions: ReviewActions, single: Boolean = false) {
     val duration = state.lecture.durationMillis.coerceAtLeast(1)
     val speakers = state.lecture.speakers
     val laneColors = speakers.map { speakerColor(it.id) }
@@ -522,27 +572,50 @@ private fun Overview(state: ReviewState, actions: ReviewActions) {
     val noteColor = LocalTranscriptorColors.current.onNote
     val head = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.surfaceVariant
-    val lanes = speakers.size.coerceAtLeast(1)
+    val fade = MaterialTheme.colorScheme.surfaceContainer
+    val lanes = if (single) 1 else speakers.size.coerceAtLeast(1)
+    val scroll = rememberScrollState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    // The lane of who talks now, or of the person whose turns play, kept in sight.
+    val followed = (state.onlySpeaker ?: state.currentLine?.speakerId)?.let { id -> speakers.indexOfFirst { it.id == id } } ?: -1
+    if (!single && lanes > OVERVIEW_LANES) LaunchedEffect(followed) {
+        if (followed >= 0) with(density) {
+            val y = (8 + 10 * followed).dp.roundToPx()
+            val view = OVERVIEW_MAX_HEIGHT.roundToPx()
+            if (y < scroll.value || y + 10.dp.roundToPx() > scroll.value + view) scroll.animateScrollTo((y - view / 2).coerceAtLeast(0))
+        }
+    }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Canvas(
-            Modifier.fillMaxWidth().height((14 + 10 * lanes).dp).padding(horizontal = 16.dp)
-                .pointerInput(duration) { detectTapGestures { actions.seek((it.x / size.width * duration).toLong()) } },
-        ) {
-            val lane = 8.dp.toPx()
-            val gap = 2.dp.toPx()
-            val top = 8.dp.toPx()
-            for (i in 0 until lanes) drawRect(track, Offset(0f, top + i * (lane + gap)), Size(size.width, lane))
-            state.lecture.segments.forEach { line ->
-                val i = speakers.indexOfFirst { it.id == line.speakerId }
-                val y = top + i.coerceAtLeast(0) * (lane + gap)
-                val x0 = line.startMillis.toFloat() / duration * size.width
-                val x1 = (line.endMillis.toFloat() / duration * size.width).coerceAtLeast(x0 + 2f)
-                val faded = state.onlySpeaker != null && line.speakerId != state.onlySpeaker
-                drawRect((if (i >= 0) laneColors[i] else unknown).copy(alpha = if (faded) 0.25f else 1f), Offset(x0, y), Size(x1 - x0, lane))
+        Box(Modifier.fillMaxWidth().heightIn(max = OVERVIEW_MAX_HEIGHT)) {
+            Canvas(
+                Modifier.fillMaxWidth().then(if (!single && lanes > OVERVIEW_LANES) Modifier.verticalScroll(scroll) else Modifier)
+                    .height((14 + 10 * lanes).dp).padding(horizontal = 16.dp)
+                    .pointerInput(duration) { detectTapGestures { actions.seek((it.x / size.width * duration).toLong().coerceIn(0, duration)) } }
+                    .pointerInput(duration) {
+                        detectHorizontalDragGestures { change, _ -> actions.seek((change.position.x / size.width * duration).toLong().coerceIn(0, duration)) }
+                    },
+            ) {
+                val lane = 8.dp.toPx()
+                val gap = 2.dp.toPx()
+                val top = 8.dp.toPx()
+                for (i in 0 until lanes) drawRect(track, Offset(0f, top + i * (lane + gap)), Size(size.width, lane))
+                state.lecture.segments.forEach { line ->
+                    val i = speakers.indexOfFirst { it.id == line.speakerId }
+                    val y = if (single) top else top + i.coerceAtLeast(0) * (lane + gap)
+                    val x0 = line.startMillis.toFloat() / duration * size.width
+                    val x1 = (line.endMillis.toFloat() / duration * size.width).coerceAtLeast(x0 + 2f)
+                    val faded = state.onlySpeaker != null && line.speakerId != state.onlySpeaker
+                    drawRect((if (i >= 0) laneColors[i] else unknown).copy(alpha = if (faded) 0.25f else 1f), Offset(x0, y), Size(x1 - x0, lane))
+                }
+                state.lecture.notes.forEach { n -> drawCircle(noteColor, 3.dp.toPx(), Offset(n.atMillis.toFloat() / duration * size.width, 3.dp.toPx())) }
+                val px = state.positionMillis.toFloat() / duration * size.width
+                drawRect(head, Offset(px - 1.dp.toPx(), 0f), Size(2.dp.toPx(), size.height))
             }
-            state.lecture.notes.forEach { n -> drawCircle(noteColor, 3.dp.toPx(), Offset(n.atMillis.toFloat() / duration * size.width, 3.dp.toPx())) }
-            val px = state.positionMillis.toFloat() / duration * size.width
-            drawRect(head, Offset(px - 1.dp.toPx(), 0f), Size(2.dp.toPx(), size.height))
+            // More lanes below: the edge fades.
+            if (!single && scroll.canScrollForward) Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(12.dp)
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, fade))),
+            )
         }
     }
 }

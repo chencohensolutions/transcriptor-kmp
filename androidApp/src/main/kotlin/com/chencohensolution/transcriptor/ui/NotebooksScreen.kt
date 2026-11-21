@@ -605,23 +605,15 @@ private fun NotebooksContent(all: NotebooksState, actions: NotebooksActions, fol
                         onOpen = { if (selected.isEmpty()) actions.openLecture(m.id) else toggle(m.id) },
                         onLongPress = { toggle(m.id) },
                     ) {
-                        if (m.labels.isEmpty() && selected.isEmpty()) Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (suggestion != null) {
-                                Row(
-                                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { actions.setLabels(listOf(m.id), setOf(suggestion.id), emptySet()) }.padding(vertical = 6.dp).padding(end = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    LabelDot(suggestion.color)
-                                    Text(
-                                        stringResource(R.string.notebooks_add, isolated(suggestion.name)), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp),
-                                    )
-                                }
-                            }
+                        // Only the label its time suggests, one tap; long-press selects it for the labels sheet.
+                        if (m.labels.isEmpty() && selected.isEmpty() && suggestion != null) Row(
+                            Modifier.clip(RoundedCornerShape(8.dp)).clickable { actions.setLabels(listOf(m.id), setOf(suggestion.id), emptySet()) }.padding(vertical = 6.dp).padding(end = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            LabelDot(suggestion.color)
                             Text(
-                                stringResource(if (suggestion != null) R.string.notebooks_labels_more else R.string.notebooks_add_label_quiet),
-                                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { labeling = listOf(m.id) }.padding(vertical = 6.dp).padding(end = 12.dp),
+                                stringResource(R.string.notebooks_add, isolated(suggestion.name)), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp),
                             )
                         }
                     }
