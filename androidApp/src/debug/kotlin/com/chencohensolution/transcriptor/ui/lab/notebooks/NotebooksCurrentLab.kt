@@ -33,6 +33,25 @@ internal val notebooksCurrent = LabOption("current", "Labels: chips on top, labe
     NotebooksScreen(state, actions)
 }
 
+// Fakes: as `current`, with Advanced mode on: the Record bar's Quality row (Low, Normal, High, Music) and the rest of
+// the presets, from default settings in the lab's cache folder; picking one only changes the screen.
+internal val notebooksCurrentAdvanced = LabOption("current-advanced", "The app's, Advanced mode: Music among the qualities", "NotebooksScreen with the Record bar's preset rows") {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val store = androidx.compose.runtime.remember {
+        com.chencohensolution.transcriptor.settings.SettingsStore(okio.FileSystem.SYSTEM, okio.Path.Companion.run { context.cacheDir.absolutePath.toPath() } / "lab-settings")
+    }
+    val (state, actions) = rememberNotebooksLab(now = MONDAY_BEFORE_CLASS)
+    NotebooksScreen(
+        state.copy(
+            recordingChoice = store.recordingChoice,
+            musicChoice = store.recordingChoice(com.chencohensolution.transcriptor.settings.QualityProfile.Music),
+            activeSettings = store.profile(store.activeProfile),
+            musicSettings = store.profile(com.chencohensolution.transcriptor.settings.QualityProfile.Music),
+        ),
+        actions,
+    )
+}
+
 internal val notebooksCurrentNoGuess = LabOption("current-no-guess", "Labels: no class now", "The app's screen on Tuesday evening: no label guessed, so Record has none") {
     val (state, actions) = rememberNotebooksLab(now = TUESDAY_EVENING)
     NotebooksScreen(state, actions)

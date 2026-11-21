@@ -15,6 +15,7 @@ import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RecordingPresetsTest {
     private val owner = RecordingChoice(AudioFormat.WavThenAac, AacSettings(), FlacFormat(), EncodeAfter.Stop, EncodeAfter.Charging)
@@ -102,12 +103,18 @@ class RecordingPresetsTest {
     }
 
     @Test
-    fun musicModeIsKeptAndWinsOverTheOthers() {
+    fun musicIsAQualityKeptApartFromTheMode() {
         val fs = FakeFileSystem()
         val store = SettingsStore(fs, "/s".toPath())
-        store.recordMode = com.chencohensolution.transcriptor.settings.RecordMode.Music
-        assertEquals(com.chencohensolution.transcriptor.settings.RecordMode.Music, SettingsStore(fs, "/s".toPath()).recordMode)
+        store.recordMode = com.chencohensolution.transcriptor.settings.RecordMode.After
+        store.recordMusic = true
+        val again = SettingsStore(fs, "/s".toPath())
+        assertTrue(again.recordMusic)
+        // Music is transcribed like the others: the mode stays what was picked.
+        assertEquals(com.chencohensolution.transcriptor.settings.RecordMode.After, again.recordMode)
         store.recordMode = com.chencohensolution.transcriptor.settings.RecordMode.Live
+        assertTrue(store.recordMusic)
+        store.recordMusic = false
         assertEquals(com.chencohensolution.transcriptor.settings.RecordMode.Live, store.recordMode)
     }
 

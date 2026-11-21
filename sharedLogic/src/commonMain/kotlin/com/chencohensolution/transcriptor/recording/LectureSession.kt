@@ -232,7 +232,7 @@ class LectureSession(
     fun start(
         labels: List<String>, labelNames: String, language: String, title: String, transcribeLive: Boolean = true,
         transcribeAfter: Boolean = true,
-        /** Music mode ([com.chencohensolution.transcriptor.settings.RecordMode.Music]): the Music profile, no voice processing. */
+        /** Music ([com.chencohensolution.transcriptor.settings.SettingsStore.recordMusic]): the Music profile, no voice processing. */
         music: Boolean = false,
     ): Lecture {
         check(recording.value == null) { "A lecture is already being recorded" }

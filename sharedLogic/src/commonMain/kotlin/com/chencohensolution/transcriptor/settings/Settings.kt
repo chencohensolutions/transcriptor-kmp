@@ -386,8 +386,18 @@ class SettingsStore(private val fileSystem: FileSystem, private val root: Path) 
 
     /** The Record bar's choice, also what the Quick Settings tile records with: Live, After or Only record. */
     var recordMode: RecordMode
-        get() = read().let { if (it.recordMusic) RecordMode.Music else if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
-        set(value) = write(read().copy(recordMusic = value == RecordMode.Music, recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
+        get() = read().let { if (it.recordOnly) RecordMode.Only else if (it.recordLive) RecordMode.Live else RecordMode.After }
+        set(value) = write(read().copy(recordOnly = value == RecordMode.Only, recordLive = value == RecordMode.Live))
+
+    /**
+     * Music: the [QualityProfile.Music] profile (FLAC by default, as it records unless its WAV first is on; its own
+     * settings, not the active profile's) and the microphone without voice processing. A quality beside Low, Normal and
+     * High on the Record bar, and transcribed by [recordMode] like the others (owner's call, Nov 21, 2026; it was a
+     * mode with no transcript before).
+     */
+    var recordMusic: Boolean
+        get() = read().recordMusic
+        set(value) = write(read().copy(recordMusic = value))
 
     /**
      * The notification while recording is as quiet as Android lets it be (owner's request, Nov 15, 2026): the app's
@@ -559,10 +569,4 @@ enum class RecordMode {
     After,
     /** Recorded only: it waits for "Transcribe now" on the moment. */
     Only,
-
-    /**
-     * A concert: the [QualityProfile.Music] profile (FLAC by default, as it records unless its WAV first is on; its own settings, not the active
-     * profile's), the microphone without voice processing, and no transcript (like [Only]).
-     */
-    Music,
 }

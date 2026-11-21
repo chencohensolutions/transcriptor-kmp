@@ -361,6 +361,7 @@ class MainActivity : ComponentActivity() {
         }
         // The Record bar's Live, After or Only record, as last picked.
         val recordMode = remember { Recording.settings.recordMode }
+        val recordMusic = remember { Recording.settings.recordMusic }
         // Advanced mode: the Record bar also offers the quality and battery presets.
         val advanced = remember { Recording.settings.advancedMode }
         var choice by remember { mutableStateOf(if (advanced) Recording.settings.recordingChoice else null) }
@@ -374,13 +375,14 @@ class MainActivity : ComponentActivity() {
         var placeTick by remember { mutableStateOf(0) }
         val io = { work: suspend () -> Unit -> lifecycleScope.launch(Dispatchers.IO) { work() }; Unit }
         NotebooksScreen(
-            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving,
+            notebooksState(library, now, Recording.utcOffset, recordingNow, working).copy(recordMode = recordMode, recordMusic = recordMusic, recordingChoice = choice, activeProfile = active, musicChoice = musicChoice, powerSaving = saving, musicPowerSaving = musicSaving, transcribeSaving = transcribeSaving,
                 activeSettings = remember(placeTick, active, choice) { choice?.let { Recording.settings.profile(active) } },
                 musicSettings = remember(placeTick, musicChoice) { musicChoice?.let { Recording.settings.profile(musicKey) } },
                 location = remember(placeTick) { Recording.settings.location.takeIf { it.wantsLocation } }),
             NotebooksActions(
                 openLecture = ::openLecture,
                 setRecordMode = { mode -> io { Recording.settings.recordMode = mode } },
+                setRecordMusic = { on -> io { Recording.settings.recordMusic = on } },
                 setQuality = { profile ->
                     Recording.settings.activeProfile = profile
                     active = profile
